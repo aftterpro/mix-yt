@@ -5,12 +5,8 @@ exports.handler = async (event) => {
     const query = event.queryStringParameters.q;
 
     try {
-    const response = await fetch(`https://piped.nosebs.ru/results?search_query=${encodeURIComponent(query)}`, {
-    headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
-    });
-        console.log("La url es:", response);
+        const response = await fetch(`https://piped.nosebs.ru/results?search_query=${encodeURIComponent(query)}`);
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error(`HTTP error! status: ${response.status} - ${errorText}`);
@@ -26,13 +22,14 @@ exports.handler = async (event) => {
         const $ = load(html);
 
         const results = [];
-        // Selector actualizado: .stream-item-content
-        $(".stream-item-content").each((i, element) => {
+
+        // Selector actualizado: .video-grid > div
+        $(".video-grid > div").each((i, element) => {
             try {
-                // Selectores actualizados: h3.stream-title, img.stream-thumbnail, a.stream-link
-                const title = $(element).find("h3.stream-title").text();
-                const thumbnail = $(element).find("img.stream-thumbnail").attr("src");
-                const videoId = $(element).find("a.stream-link").attr("href").split("v=")[1];
+                // Selectores actualizados: img.aspect-video, p.link, a.link
+                const title = $(element).find("p.link").attr('title'); // Obtener el atributo 'title'
+                const thumbnail = $(element).find("img.aspect-video").attr("src");
+                const videoId = $(element).find("a.link").attr("href").split("v=")[1];
 
                 results.push({
                     title,
