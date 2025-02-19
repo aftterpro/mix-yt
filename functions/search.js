@@ -1,5 +1,5 @@
 exports.handler = async (event) => {
-    const fetch = require('node-fetch');
+    const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
     const cheerio = (...args) => import('cheerio').then(({default: cheerio}) => cheerio(...args));
 
     const query = event.queryStringParameters.q;
