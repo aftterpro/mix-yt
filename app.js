@@ -127,82 +127,65 @@ function onPlayerStateChange(event) {
 // Módulo: Interacción con /piped.nosebs.ru/ (Búsqueda)
 const performSearch = async (query) => {
     try {
-        const response = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(query)}`); // URL de tu Netlify Function
-        console.log("La url es:", response )
+        const response = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
-            const errorText = await response.text(); // Get the HTML error
-            console.error(`HTTP error! status: ${response.status} - ${errorText}`);
-            mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`);
+            mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`); // Display error message
             return;
         }
         const data = await response.json();
-        
-        if (!data.items || data.items.length === 0) {
-            resultsDiv.innerHTML = '<p>No se encontraron resultados para: "' + query + '"</p>'; // Mostrar la búsqueda
-            mostrarMensajeFlotante("No se encontraron resultados.");
-            return;
-        }
-        displaySearchResultsPiped(data.items);
+
+        // Now you have the search results in 'data'
+        displaySearchResults(data); // Call a function to display the results
+
     } catch (error) {
-        console.error('Error al buscar en Piped.video:', error);
-        mostrarMensajeFlotante('Error al buscar. Intenta nuevamente.');
-        resultsDiv.innerHTML = '<p>Error al buscar. Intenta nuevamente.</p>';
+        console.error("Error fetching search results:", error);
+        mostrarMensajeFlotante("Error en la búsqueda."); // Display error message
     }
 };
 // Nueva función para mostrar resultados de la API de Piped Y YT V3
 const displaySearchResultsPiped = (results) => {
-    const resultsDiv = document.getElementById('searchInput');
-    resultsDiv.innerHTML = ''; // Limpia el contenedor antes de agregar nuevos resultados
-
-    if (!results || results.length === 0) {
-        resultsDiv.innerHTML = '<p>No se encontraron resultados.</p>';
-        mostrarMensajeFlotante("No se encontraron resultados.");
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) {
+        console.error("Results div not found!");
         return;
     }
-    const fragment = document.createDocumentFragment();
+    resultsDiv.innerHTML = ''; // Clear previous results
+
+    if (!results || !Array.isArray(results) || results.length === 0) {
+        const noResultsMessage = document.createElement('p');
+        noResultsMessage.textContent = "No se encontraron resultados.";
+        resultsDiv.appendChild(noResultsMessage);
+        return;
+    }
 
     results.forEach(video => {
-        const videoId = video.url.split('v=')[1];
-        if (!videoId) {
-            console.error("URL de video inválida:", video.url);
-            return;
-        }
+        const videoDiv = document.createElement('div');
+        videoDiv.classList.add('video-result');
 
-        const videoElement = document.createElement('div');
-        videoElement.className = 'result';
-        videoElement.dataset.videoId = videoId; // Almacena el ID en un atributo data
-
-        const img = document.createElement('img');
-        img.src = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg'; // Usa el icono predeterminado
-        img.alt = video.title;
+        const thumbnail = document.createElement('img');
+        thumbnail.src = video.thumbnail;
+        thumbnail.alt = video.title;
+        videoDiv.appendChild(thumbnail);
 
         const title = document.createElement('h3');
         title.textContent = video.title;
+        videoDiv.appendChild(title);
 
-        const duration = document.createElement('p');
-        duration.className = 'result-duration';
-        duration.textContent = `Duración: ${formatDuration(video.duration)}`;
+        const addToPlaylistButton = document.createElement('button');
+        addToPlaylistButton.textContent = "Añadir a la playlist";
+        addToPlaylistButton.classList.add('add-to-playlist'); // Add the class
 
-        const button = document.createElement('button');
-        button.className = 'add-to-playlist'; // Usa la clase definida en botones.css
-        button.dataset.videoId = videoId;
-        button.dataset.videoTitle = video.title;
-        button.dataset.videoDuration = video.duration;
-        button.dataset.videoThumbnail = video.thumbnail;
+        // Set the data attributes
+        addToPlaylistButton.dataset.videoId = video.videoId;
+        addToPlaylistButton.dataset.videoTitle = video.title;
+        addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
+        addToPlaylistButton.dataset.videoDuration = video.duration; // Assuming you have duration
 
-        const icon = document.createElement('i');
-        icon.className = 'fa-solid fa-plus'; // Mantén la clase para el icono
-        button.appendChild(icon);
-
-        videoElement.appendChild(img);
-        videoElement.appendChild(title);
-        videoElement.appendChild(duration);
-        videoElement.appendChild(button);
-        fragment.appendChild(videoElement);
+        videoDiv.appendChild(addToPlaylistButton);
+        resultsDiv.appendChild(videoDiv);
     });
 
-    resultsDiv.appendChild(fragment);
-
+        // Add event listeners AFTER the buttons are added to the DOM
     const addToPlaylistButtons = document.querySelectorAll('.add-to-playlist');
     addToPlaylistButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -216,7 +199,6 @@ const displaySearchResultsPiped = (results) => {
         });
     });
 };
-
 // Módulo: Manejo de la Playlist (Añadir, Eliminar, Reordenar, Actualizar DOM)
 //Agregar a la playlist
 const addToPlaylist = (videoData) => {
