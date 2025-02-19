@@ -5,10 +5,12 @@
     "build": "echo 'No build needed'", 
     "dev": "serve -s ." 
   },
-  "devDependencies": {
-    "serve": "^14.2.1",
-    "cors-anywhere": "^0.4.4",
+  "dependencies": {
      "cheerio": "^1.0.0",
     "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1",
+    "cors-anywhere": "^0.4.4"
   }
 }
