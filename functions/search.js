@@ -1,6 +1,6 @@
 exports.handler = async (event) => {
     const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-    const cheerio = (...args) => import('cheerio').then(({ default: cheerio }) => cheerio(...args));
+    const cheerio = await import('cheerio');
 
     const query = event.queryStringParameters?.q || "daddy";
 
@@ -18,7 +18,7 @@ exports.handler = async (event) => {
         }
 
         const html = await response.text();
-        const $ = cheerio.load(html);
+        const $ = cheerio.load(html); // ✅ Usa cheerio correctamente
 
         const results = [];
 
@@ -27,7 +27,7 @@ exports.handler = async (event) => {
                 const linkElement = $(element).find("a.link");
                 const videoId = linkElement.attr("href")?.split("v=")[1];
 
-                if (!videoId) return; // Filtrar solo los videos
+                if (!videoId) return; // Filtra solo los videos
 
                 const title = linkElement.find("p.link").attr("title");
                 const thumbnail = $(element).find("img.aspect-video").attr("src");
