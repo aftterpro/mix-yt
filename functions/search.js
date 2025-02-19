@@ -1,13 +1,16 @@
-// Netlify Function (ejemplo: functions/search.js)
-
-const fetch = require('node-fetch'); // Necesitas instalar node-fetch: npm install node-fetch
-const cheerio = require('cheerio'); // Necesitas instalar cheerio: npm install cheerio
-
 exports.handler = async (event) => {
-  const query = event.queryStringParameters.q; // Obtén la query del parámetro 'q'
+  const fetch = (...args) =>
+    import('node-fetch').then(({ default: fetch }) => fetch(...args));
+  const cheerio = (...args) =>
+    import('cheerio').then(({ default: cheerio }) => cheerio(...args));
+
+  const query = event.queryStringParameters.q;
 
   try {
-    const response = await fetch(`https://piped.nosebs.ru/results?search_query=${encodeURIComponent(query)}`);
+    const response = await fetch(
+      `https://piped.nosebs.ru/results?search_query=${encodeURIComponent(query)}`
+    );
+
     if (!response.ok) {
       return {
         statusCode: response.status,
@@ -16,13 +19,16 @@ exports.handler = async (event) => {
     }
 
     const html = await response.text();
-    const $ = cheerio.load(html); // Carga el HTML en Cheerio
+    const $ = await cheerio.load(html);
 
     const results = [];
-    $('.stream-item').each((i, element) => { // Ajusta el selector '.stream-item' si es necesario
-      const title = $(element).find('.stream-title').text(); // Ajusta '.stream-title'
-      const thumbnail = $(element).find('.stream-thumbnail img').attr('src'); // Ajusta '.stream-thumbnail img'
-      const videoId = $(element).find('.stream-link').attr('href').split('v=')[1]; // Extrae el ID
+    $(".stream-item").each((i, element) => {
+      const title = $(element).find(".stream-title").text();
+      const thumbnail = $(element).find(".stream-thumbnail img").attr("src");
+      const videoId = $(element)
+        .find(".stream-link")
+        .attr("href")
+        .split("v=")[1];
 
       results.push({
         title,
