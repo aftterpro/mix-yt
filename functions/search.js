@@ -1,6 +1,5 @@
 exports.handler = async (event) => {
     const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-    const cheerio = (...args) => import('cheerio').then(({default: cheerio}) => cheerio(...args));
 
     const query = event.queryStringParameters.q;
 
@@ -8,20 +7,23 @@ exports.handler = async (event) => {
         const response = await fetch(`https://piped.nosebs.ru/results?search_query=${encodeURIComponent(query)}`);
 
         if (!response.ok) {
-            const errorText = await response.text(); // Get the error text from the response
-            console.error(`HTTP error! status: ${response.status} - ${errorText}`); // Log the error with details
+            const errorText = await response.text();
+            console.error(`HTTP error! status: ${response.status} - ${errorText}`);
             return {
                 statusCode: response.status,
-                body: `Error fetching search results: ${response.status} - ${errorText}`, // Include the error in the response
+                body: `Error fetching search results: ${response.status} - ${errorText}`,
             };
         }
 
         const html = await response.text();
-        const $ = await cheerio.load(html);
+
+        // Correct way to use cheerio with dynamic import:
+        const { load } = await import('cheerio'); // Destructure the 'load' function
+        const $ = load(html); // Now you can use load
 
         const results = [];
         $(".stream-item").each((i, element) => {
-            try { // Add a try...catch inside the loop
+            try {
                 const title = $(element).find(".stream-title").text();
                 const thumbnail = $(element).find(".stream-thumbnail img").attr("src");
                 const videoId = $(element).find(".stream-link").attr("href").split("v=")[1];
@@ -41,10 +43,10 @@ exports.handler = async (event) => {
             body: JSON.stringify(results),
         };
     } catch (error) {
-        console.error("Outer error scraping search results:", error); 
+        console.error("Outer error scraping search results:", error);
         return {
             statusCode: 500,
-            body: `Error scraping search results: ${error.message}`, 
+            body: `Error scraping search results: ${error.message}`,
         };
     }
 };
