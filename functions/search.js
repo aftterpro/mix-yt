@@ -21,6 +21,7 @@ exports.handler = async (event) => {
 
         const html = await response.text();
         console.log(`✅ HTML recibido (${html.length} caracteres)`);
+        console.log(`🔎 Primeros 1000 caracteres:\n${html.substring(0, 1000)}`);
 
         const $ = cheerio.load(html);
         const results = [];
@@ -28,16 +29,14 @@ exports.handler = async (event) => {
         $(".video-grid .flex.flex-col.flex-justify-between").each((i, element) => {
             try {
                 const linkElement = $(element).find("a.link");
-                const videoId = linkElement.attr("href")?.split("v=")[1];
-
-                if (!videoId) return; // Filtrar solo los videos
+                const videoId = linkElement.attr("href")?.split("v=")[1] || "UNKNOWN";
 
                 const title = linkElement.find("p").text().trim();
-                const thumbnail = $(element).find("img.aspect-video").attr("src");
+                const thumbnail = $(element).find("img.aspect-video").attr("src") || "NO IMAGE";
 
-                if (title && thumbnail && videoId) {
-                    results.push({ title, thumbnail, videoId });
-                }
+                console.log(`🎥 Video encontrado: ${title}, ID: ${videoId}, IMG: ${thumbnail}`);
+
+                results.push({ title, thumbnail, videoId });
             } catch (err) {
                 console.error("⚠️ Error al extraer datos:", err);
             }
