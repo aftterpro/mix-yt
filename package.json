@@ -2,8 +2,8 @@
   "name": "mix-yt.netlify.app",
   "version": "1.0.0",
   "scripts": {
-    "build": "cp -r public/ dist/",
-    "dev": "serve -s public"
+    "build": "echo 'No build needed'", 
+    "dev": "serve -s ." 
   },
   "devDependencies": {
     "serve": "^14.2.1",
