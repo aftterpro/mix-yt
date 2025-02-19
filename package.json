@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "cors-anywhere": "^0.4.4"
+  "name": mix-yt.netlify.app/",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cp -r public/ dist/",
+    "dev": "serve -s public"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1" //install serve by running npm install serve --save-dev,
+        "cors-anywhere": "^0.4.4"
   }
 }
