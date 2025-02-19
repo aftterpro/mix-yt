@@ -1,0 +1,41 @@
+.fade-out {
+    animation: fadeOutAndRotate 0.5s ease-in-out forwards;
+}
+
+.fade-in {
+    animation: fadeInAndRotate 0.5s ease-in-out forwards;
+}
+
+.fade-out::before { /* Capa para el efecto de desvanecimiento */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.8) 100%); /* Desvanecimiento radial */
+    animation: fadeOutOverlay 0.5s ease-in-out forwards;
+    pointer-events: none; /* Permite interactuar con el video */
+}
+
+.fade-in::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+    animation: fadeInOverlay 0.5s ease-in-out forwards;
+    pointer-events: none;
+}
+
+@keyframes fadeOutOverlay {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes fadeInOverlay {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT Playlist Manager With Crossfire</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+  <link rel="stylesheet" type="text/css" href="./styles.css">
+  <link rel="stylesheet" type="text/css" href="./efecto.css">
+  <link rel="stylesheet" type="text/css" href="./botones.css">
+
+  <link rel="icon" href="./electronic.ico">
+</head>
+<body>
+  <header>
+    <h3>YT Playlist Manager With Crossfire</h3>
+  </header>
+  <main>
+    <section id="search-panel">
+      <h2>Search Videos</h2>
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search On Piped.video">
+      </div>
+      <div id="resultsContainer">
+        <div id="results"></div>
+      </div>
+    </section>
+
+    <section id="player-panel">
+      <h2>Reproductor</h2>
+       <div class="playlist-url-input"> <input type="text" id="searchInput2" placeholder="Añadir Link Playlist :)"> </div>     
+	<button id="añadirUrlButton" class="add-to-playlist">
+    <i class="fa-solid fa-plus"></i> <span class="add-text">Añadir a la playlist</span>
+	</button>
+            <div id="videoContainer">
+       <div id="player1" class="video-player"></div>
+        <div id="player2" class="video-player hidden"></div>
+      </div>
+      <div id="controls">
+        <button id="mixButton"><i class="fas fa-random"></i> Mix</button>
+            <button id="iniciarButton">Iniciar</button>
+            </div>
+    </section>
+
+    <section id="playlist-panel">
+      <h2>Playlist</h2>
+      <div id="playlistContainer">
+        <div id="playlist"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Made with ❤️ by: <a href="https://www.facebook.com/edwin.jr.ch" target="_blank">Eduu</a></p>
+  </footer>
+  <script src="./app.js"></script>
+  <script src="./botones.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</body>
+</html>
