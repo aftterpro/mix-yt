@@ -1,5 +1,6 @@
 exports.handler = async (event) => {
     const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+    const cheerio = (...args) => import('cheerio').then(({default: cheerio}) => cheerio(...args));
 
     const query = event.queryStringParameters.q;
 
@@ -17,16 +18,17 @@ exports.handler = async (event) => {
 
         const html = await response.text();
 
-        // Correct way to use cheerio with dynamic import:
-        const { load } = await import('cheerio'); // Destructure the 'load' function
-        const $ = load(html); // Now you can use load
+        const { load } = await import('cheerio');
+        const $ = load(html);
 
         const results = [];
-        $(".stream-item").each((i, element) => {
+        // Selector actualizado: .stream-item-content
+        $(".stream-item-content").each((i, element) => {
             try {
-                const title = $(element).find(".stream-title").text();
-                const thumbnail = $(element).find(".stream-thumbnail img").attr("src");
-                const videoId = $(element).find(".stream-link").attr("href").split("v=")[1];
+                // Selectores actualizados: h3.stream-title, img.stream-thumbnail, a.stream-link
+                const title = $(element).find("h3.stream-title").text();
+                const thumbnail = $(element).find("img.stream-thumbnail").attr("src");
+                const videoId = $(element).find("a.stream-link").attr("href").split("v=")[1];
 
                 results.push({
                     title,
