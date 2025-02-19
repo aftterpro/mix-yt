@@ -1,4 +1,4 @@
 [build]
-  functions = "functions/"  # Explicitly tell Netlify where your functions are
-  publish = "public/"       # Or whatever your publish directory is
-  command = "npm run build"  # Or your build command
+  functions = "functions/"  # Keep this if you have functions
+  publish = "."            # Publish from the root directory
+  command = "npm run build"  # Keep this if you have a build command
