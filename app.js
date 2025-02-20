@@ -129,19 +129,20 @@ const performSearch = async (query) => {
     try {
         const response = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
-            mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`); // Display error message
+            mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`);
             return;
         }
         const data = await response.json();
 
-        // Now you have the search results in 'data'
-        displaySearchResults(data); // Call a function to display the results
+        // Llama a la función correcta para mostrar los resultados de Piped
+        displaySearchResultsPiped(data);
 
     } catch (error) {
         console.error("Error fetching search results:", error);
-        mostrarMensajeFlotante("Error en la búsqueda."); // Display error message
+        mostrarMensajeFlotante("Error en la búsqueda.");
     }
 };
+
 // Nueva función para mostrar resultados de la API de Piped Y YT V3
 const displaySearchResultsPiped = (results) => {
     const resultsDiv = document.getElementById('results');
@@ -173,19 +174,19 @@ const displaySearchResultsPiped = (results) => {
 
         const addToPlaylistButton = document.createElement('button');
         addToPlaylistButton.textContent = "Añadir a la playlist";
-        addToPlaylistButton.classList.add('add-to-playlist'); // Add the class
+        addToPlaylistButton.classList.add('add-to-playlist');
 
-        // Set the data attributes
-        addToPlaylistButton.dataset.videoId = video.videoId;
+        // Usa video.videoId, video.title, video.thumbnail directamente
+        addToPlaylistButton.dataset.videoId = video.videoId || video.url.split("v=")[1]; // Obtén videoId de url si no está disponible
         addToPlaylistButton.dataset.videoTitle = video.title;
         addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
-        addToPlaylistButton.dataset.videoDuration = video.duration; // Assuming you have duration
+        addToPlaylistButton.dataset.videoDuration = video.duration;
 
         videoDiv.appendChild(addToPlaylistButton);
         resultsDiv.appendChild(videoDiv);
     });
 
-        // Add event listeners AFTER the buttons are added to the DOM
+    // Event listeners para los botones "Añadir a la playlist"
     const addToPlaylistButtons = document.querySelectorAll('.add-to-playlist');
     addToPlaylistButtons.forEach(button => {
         button.addEventListener('click', () => {
