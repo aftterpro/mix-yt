@@ -54,7 +54,7 @@ function initializePlayers() {
 
     player1 = new YT.Player('player1', {
         height: '250',
-        width: '350',
+        width: '150',
         events: {
             'onReady': onPlayerReady, // Referencia directa a la función
             'onStateChange': onPlayerStateChange,
@@ -63,7 +63,7 @@ function initializePlayers() {
     });
     player2 = new YT.Player('player2', {
         height: '250',
-        width: '350',
+        width: '150',
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange,
