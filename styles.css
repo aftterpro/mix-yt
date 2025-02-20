@@ -45,16 +45,10 @@ html, body {
     max-height: calc(100vh - 100px);
 }
 /* Panel de búsqueda con su propia barra de desplazamiento */
-#search-panel {
-    width: 100%;
-    max-width: 600px;
-    height: 400px; /* Altura fija */
-    overflow-y: auto; /* Scroll independiente */
-}
 /* Ajuste para que la lista de resultados tenga su propia barra */
 #resultsContainer {
-    max-height: 250px;
-    width: 280px;
+    max-height: 380px;
+    width: 480px;
     overflow-y: auto;
     padding: 0.5rem;
 }
