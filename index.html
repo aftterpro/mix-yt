@@ -11,27 +11,27 @@
     <link rel="icon" href="./electronic.ico">
 </head>
 <body class="vibe-theme">
-    <header class="vibe-header">
-        <h1>Vibe Player</h1>
-    </header>
-    <main class="vibe-main">
-        <section id="search-panel" class="vibe-panel">
-            <h2>Search Videos</h2>
-            <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Search On Piped.video">
+    <div class="container">
+        <aside class="sidebar">
+            <div class="playlist-header">
+                <h2>Playlist</h2>
             </div>
-            <div id="resultsContainer">
-                <div id="results"></div>
+            <div id="playlistContainer">
+                <div id="playlist"></div>
             </div>
-        </section>
-        <section id="player-panel" class="vibe-panel player-panel">
-            <h2>Player</h2>
-            <div class="playlist-url-input">
-                <input type="text" id="searchInput2" placeholder="Add Playlist Link :)">
-            </div>
-            <button id="añadirUrlButton" class="add-to-playlist">
-                <i class="fa-solid fa-plus"></i> <span class="add-text">Add to Playlist</span>
-            </button>
+        </aside>
+        <main class="main-content">
+            <section id="search-panel" class="vibe-panel">
+                <h2>Search Videos</h2>
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search On Piped.video">
+                </div>
+                <div id="resultsContainer">
+                    <div id="results"></div>
+                </div>
+            </section>
+        </main>
+        <footer class="player-footer">
             <div id="videoContainer" class="video-container">
                 <div id="player1" class="video-player"></div>
                 <div id="player2" class="video-player hidden"></div>
@@ -41,17 +41,8 @@
                 <button id="mixButton"><i class="fas fa-random"></i> Mix</button>
                 <button id="iniciarButton">Start</button>
             </div>
-        </section>
-        <section id="playlist-panel" class="vibe-panel">
-            <h2>Playlist</h2>
-            <div id="playlistContainer">
-                <div id="playlist"></div>
-            </div>
-        </section>
-    </main>
-    <footer class="vibe-footer">
-        <p>Made with ❤️ by: <a href="https://www.facebook.com/edwin.jr.ch" target="_blank">Eduu</a></p>
-    </footer>
+        </footer>
+    </div>
     <script src="./app.js"></script>
     <script src="./botones.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
