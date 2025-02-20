@@ -646,6 +646,41 @@ function playFirstVideo() {
         startMonitoring(); // Iniciar monitoreo al comenzar la reproducción
     }
 }
+//Utilidades
+// Variables para el estado del reproductor
+let contenedorPlayer = document.getElementById("contenedor-player");
+let botonExpandir = document.getElementById("boton-expandir");
+
+// Evento para expandir/contraer el reproductor
+botonExpandir.addEventListener("click", function () {
+    contenedorPlayer.classList.toggle("expandido");
+
+    // Cambia el ícono según el estado
+    if (contenedorPlayer.classList.contains("expandido")) {
+        botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icono de minimizar
+    } else {
+        botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>'; // Icono de expandir
+    }
+});
+
+// Función para actualizar la miniatura del reproductor cuando minimiza
+function actualizarMiniatura(urlImagen) {
+    if (!contenedorPlayer.classList.contains("expandido")) {
+        contenedorPlayer.style.backgroundImage = `url(${urlImagen})`;
+        contenedorPlayer.style.backgroundSize = "cover";
+        contenedorPlayer.style.backgroundPosition = "center";
+    }
+}
+
+// Función para actualizar la miniatura según el video en reproducción
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.PLAYING) {
+        let videoId = event.target.getVideoData().video_id;
+        let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        actualizarMiniatura(urlMiniatura);
+    }
+}
+
 // Módulo: Monitoreo de Reproductores
 // Función para monitorizar los reproductores deteniendo e iniciando
 function startMonitoring() {
