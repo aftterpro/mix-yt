@@ -727,8 +727,11 @@ function monitorPlayers() {  // Función para monitorizar
     }
 }
 // Módulo: Manejo de Eventos y Botones
+let botonPlay = document.getElementById("boton-play");
+let botonNext = document.getElementById("boton-next");
+
 // Botón Mix
-document.getElementById('boton-next').addEventListener('click', () => {
+document.getElementById('botonNext').addEventListener('click', () => {
     playNextVideo()
         // Cambia el video en el siguiente reproductor
 });
@@ -774,8 +777,8 @@ añadirUrlButton.addEventListener('click', async () => {
 });
 
 // Iniciar botton
-boton-play.disabled = true; // Deshabilitado al inicio
-boton-play.addEventListener('click', () => {
+botonPlay.disabled = true; // Deshabilitado al inicio
+botonPlay.addEventListener('click', () => {
     if (playlistVideos.length > 0 && !reproduccionIniciada) {
         reproduccionIniciada = true;
         currentIndex = 0;
@@ -785,7 +788,7 @@ boton-play.addEventListener('click', () => {
         } else {
             console.error('Los reproductores no están listos.');
         }
-        boton-play.disabled = true;//Desabilitar boton para que no se inicie otra vez
+        botonPlay.disabled = true;//Desabilitar boton para que no se inicie otra vez
     }
 });
 // Carga inicial del API de YouTube (se puede retrasar con DOMContentLoaded si se desea)
