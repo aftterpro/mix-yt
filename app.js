@@ -465,7 +465,7 @@ function extractPlaylistId(url) {
 // Función para obtener información de la playlist usando la API de Piped con un proxy
 async function getPlaylistInfo(playlistId) {
     const proxyUrl = 'https://api.allorigins.win/raw?url='; // URL base del proxy
-    const targetUrl = `https://piped.nosebs.ru/playlists/${playlistId}`; // Nueva URL de Piped
+    const targetUrl = `https://pipedapi.nosebs.ru/playlists/${playlistId}`; // Nueva URL de Piped
     const url = `${proxyUrl}${encodeURIComponent(targetUrl)}`; // Codifica la URL de destino
 
     console.log("URL a solicitar:", url);
