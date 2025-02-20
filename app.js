@@ -110,7 +110,7 @@ function onPlayerReady(event) {
     }
     // Inicia el monitor
     if (!monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 10000);
+        monitorInterval = setInterval(monitorPlayers, 3000); //Monitor inicia con 3 segundos
         console.log('Monitor iniciado con ID:', monitorInterval);
     }
 }
@@ -163,21 +163,36 @@ const displaySearchResultsPiped = (results) => {
         const videoDiv = document.createElement('div');
         videoDiv.classList.add('video-result');
 
+        // Contenedor para la miniatura y la duración
+        const thumbnailContainer = document.createElement('div');
+        thumbnailContainer.classList.add('thumbnail-container');
+
         const thumbnail = document.createElement('img');
         thumbnail.src = video.thumbnail;
         thumbnail.alt = video.title;
-        videoDiv.appendChild(thumbnail);
+        thumbnail.classList.add('thumbnail'); // Clase para estilos CSS
+        thumbnailContainer.appendChild(thumbnail);
+
+        // Mostrar duración dentro de la miniatura
+        if (video.duration) {
+            const duration = document.createElement('span');
+            duration.textContent = formatDuration2(video.duration); // Formatear la duración
+            duration.classList.add('duration'); // Clase para estilos CSS
+            thumbnailContainer.appendChild(duration);
+        }
+
+        videoDiv.appendChild(thumbnailContainer);
 
         const title = document.createElement('h3');
         title.textContent = video.title;
+        title.classList.add('video-title'); // Clase para estilos CSS
         videoDiv.appendChild(title);
 
         const addToPlaylistButton = document.createElement('button');
         addToPlaylistButton.textContent = "Añadir a la playlist";
         addToPlaylistButton.classList.add('add-to-playlist');
 
-        // Usa video.videoId, video.title, video.thumbnail directamente
-        addToPlaylistButton.dataset.videoId = video.videoId || video.url.split("v=")[1]; // Obtén videoId de url si no está disponible
+        addToPlaylistButton.dataset.videoId = video.videoId || video.url.split("v=")[1];
         addToPlaylistButton.dataset.videoTitle = video.title;
         addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
         addToPlaylistButton.dataset.videoDuration = video.duration;
@@ -200,6 +215,13 @@ const displaySearchResultsPiped = (results) => {
         });
     });
 };
+
+// Función para formatear la duración de segundos a un formato legible
+function formatDuration2(duration) {
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
 // Módulo: Manejo de la Playlist (Añadir, Eliminar, Reordenar, Actualizar DOM)
 //Agregar a la playlist
 const addToPlaylist = (videoData) => {
@@ -838,7 +860,6 @@ function formatDuration(duration) {
     if (isNaN(duration) || duration < 0) {
         return "Desconocida";
     }
-
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
     const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
