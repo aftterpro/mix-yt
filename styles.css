@@ -1,8 +1,7 @@
-/* Estilos generales */
 body.vibe-theme {
-    font-family: 'Montserrat', sans-serif; /* Fuente moderna */
+    font-family: 'Montserrat', sans-serif;
     margin: 0;
-    background: linear-gradient(135deg, #4A00E0, #8E2DE2); /* Degradado vibrante */
+    background: linear-gradient(135deg, #4A00E0, #8E2DE2);
     color: #fff;
     display: flex;
     flex-direction: column;
@@ -10,28 +9,35 @@ body.vibe-theme {
     overflow-x: hidden;
 }
 
-.vibe-header {
-    background: rgba(0, 0, 0, 0.3);
-    text-align: center;
-    padding: 1rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
-}
-
-.vibe-main {
+.container {
     display: flex;
     flex-grow: 1;
-    padding: 1rem;
-    gap: 1rem;
-    flex-wrap: wrap;
-    justify-content: center;
 }
 
-.vibe-footer {
+.sidebar {
+    width: 250px;
     background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.playlist-header {
     text-align: center;
-    padding: 1rem 0;
-    margin-top: auto;
-    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.5);
+    margin-bottom: 1rem;
+}
+
+#playlistContainer {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .vibe-panel {
@@ -42,31 +48,26 @@ body.vibe-theme {
     flex: 1 1 350px;
     min-width: 350px;
     margin-bottom: 1rem;
-    backdrop-filter: blur(10px); /* Efecto de desenfoque */
+    backdrop-filter: blur(10px);
 }
 
-/* Contenedor de búsqueda */
-.search-container {
+.player-footer {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
     display: flex;
-    gap: 0.5rem;
+    justify-content: space-between;
+    align-items: center;
 }
 
-/* Estilos para el contenedor de video */
 #videoContainer.video-container {
-    position: relative;
-    aspect-ratio: 16/9;
-    width: 100%;
-    max-width: 600px;
-    margin: 1rem auto;
+    width: 200px;
+    height: 120px;
+    border-radius: 10px;
     overflow: hidden;
-    border-radius: 15px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    position: relative;
 }
 
 .video-player {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
     border: none;
@@ -83,6 +84,12 @@ body.vibe-theme {
     z-index: -1;
 }
 
+.player-controls {
+    display: flex;
+    gap: 1rem;
+}
+
+/* ... (resto de estilos) */
 /* Ocultar elementos */
 .hidden {
     display: none;
