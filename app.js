@@ -284,7 +284,7 @@ function rearrangePlaylist(fromIndex, toIndex) { // Eliminar la función duplica
     const [movedVideo] = playlistVideos.splice(fromIndex, 1);
     playlistVideos.splice(toIndex, 0, movedVideo);
 } 
-//Actualizar DOM  (CORREGIDO)
+// Actualizar DOM (CORREGIDO)
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
     playlistContainer.innerHTML = ''; // Limpiar la lista
@@ -297,10 +297,9 @@ function updatePlaylistDOM() {
         const imageContainer = document.createElement('div');
         imageContainer.className = 'image-container';
 
-       // En lugar de mostrar la miniatura, muestra el icono
-        const iconoPredeterminado = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
+        // Usar la miniatura real del video
         const img = document.createElement('img');
-        img.src = iconoPredeterminado;
+        img.src = video.thumbnail; // Usar la miniatura del video
         img.alt = video.title;
         img.className = 'drag-handle';
         imageContainer.appendChild(img);
@@ -319,7 +318,6 @@ function updatePlaylistDOM() {
                 <p style="margin: 0; font-size: 10px; color: #555;">Duración: ${formatDuration(video.duration)}</p>
             </div>
         `;
-
         // Menú de eliminar (CON MANEJO DE CLICS MEJORADO)
         const deleteMenu = document.createElement('div');
         deleteMenu.className = 'delete-menu';
@@ -531,72 +529,6 @@ async function getPlaylistInfo(playlistId) {
         mostrarMensajeFlotante(error.message);
         return null;
     }
-}
-//Función para obtener miniaturas 
-async function obtenerMiniaturas(videoIds) {
-  const apiKey = obtenerClaveAPI(); // Obtiene la clave de API actual
-  //  Divide el arreglo de IDs en grupos de 50 (límite de la API)
-  const gruposDeIds = chunkArray(videoIds, 50);
-
-  const miniaturas = {};
-
-  for (const grupoDeIds of gruposDeIds) {
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${grupoDeIds.join(',')}&key=${apiKey}`;
-
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.items) {
-        data.items.forEach(video => {
-          const videoId = video.id;
-          const thumbnails = video.snippet.thumbnails;
-
-          miniaturas[videoId] = thumbnails;
-        });
-      }
-    } catch (error) {
-      console.error('Error al obtener miniaturas:', error);
-    }
-  }
-
-  return miniaturas;
-}
-
-// Función auxiliar para dividir un arreglo en grupos
-function chunkArray(array, size) {
-  const chunkedArray = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunkedArray.push(array.slice(i, i + size));
-  }
-  return chunkedArray;
-}
-// Utiliza las miniaturas almacenadas en caché
-async function mostrarMiniaturas(videoIds) {
-  // Obtén las miniaturas almacenadas en caché
-  const miniaturasCache = JSON.parse(localStorage.getItem('miniaturas')) || {};
-
-  // Obtén las IDs de los videos que no están en caché
-  const idsSinCache = videoIds.filter(id => !miniaturasCache[id]);
-
-  // Si hay IDs sin caché, obtén las miniaturas de la API
-  if (idsSinCache.length > 0) {
-    const nuevasMiniaturas = await obtenerMiniaturas(idsSinCache);
-    // Actualiza el caché con las nuevas miniaturas
-    Object.assign(miniaturasCache, nuevasMiniaturas);
-  }
-
-  // Muestra las miniaturas
-  videoIds.forEach(videoId => {
-    const thumbnails = miniaturasCache[videoId];
-    if (thumbnails) {
-      // Muestra las miniaturas del video
-      console.log(`Miniaturas para ${videoId}:`, thumbnails);
-      // ... (código para mostrar las miniaturas en tu aplicación)
-    } else {
-      console.error(`No se encontraron miniaturas para ${videoId}`);
-    }
-  });
 }
 // Función para mostrar Playlizt
 function displayPlaylist(playlist) {
