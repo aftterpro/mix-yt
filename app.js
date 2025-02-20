@@ -727,10 +727,8 @@ function monitorPlayers() {  // Función para monitorizar
     }
 }
 // Módulo: Manejo de Eventos y Botones
-let botonPlay = document.getElementById("boton-play");
-let botonNext = document.getElementById("boton-next");
-
 // Botón Mix
+
 document.getElementById('botonNext').addEventListener('click', () => {
     playNextVideo()
         // Cambia el video en el siguiente reproductor
@@ -769,7 +767,7 @@ añadirUrlButton.addEventListener('click', async () => {
         playlistVideos.push(...nuevosVideos);
         updatePlaylistDOM();
         searchInput2.value = ''; // Limpiar el input
-        iniciarButton.disabled = false;
+       botonPlay.disabled = false;
         mostrarMensajeFlotante("Playlist añadida.");
     } else {
         alert('No se pudo obtener información de la playlist.');
@@ -777,6 +775,8 @@ añadirUrlButton.addEventListener('click', async () => {
 });
 
 // Iniciar botton
+let botonPlay = document.getElementById("botonPlay");
+
 botonPlay.disabled = true; // Deshabilitado al inicio
 botonPlay.addEventListener('click', () => {
     if (playlistVideos.length > 0 && !reproduccionIniciada) {
