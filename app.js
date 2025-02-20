@@ -649,7 +649,7 @@ function playFirstVideo() {
 //Utilidades
 // Variables para el estado del reproductor
 let contenedorPlayer = document.getElementById("contenedor-player");
-let botonExpandir = document.getElementById("boton-expandir");
+let botonExpandir = document.getElementById("botonExpandir");
 
 // Evento para expandir/contraer el reproductor
 botonExpandir.addEventListener("click", function () {
