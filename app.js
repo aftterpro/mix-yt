@@ -650,7 +650,7 @@ function playFirstVideo() {
 //Utilidades
 // Variables para el estado del reproductor
 let contenedorPlayer = document.getElementById("contenedor-player");
-let botonExpandir = document.getElementById("boton-expandir");
+let botonExpandir = document.getElementById("botonExpandir");
 let videoContainer = document.querySelector(".video-container");
 
 // Esperar a que la API de YouTube esté lista antes de modificar los reproductores
