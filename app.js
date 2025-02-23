@@ -651,6 +651,11 @@ function playFirstVideo() {
 // Variables para el estado del reproductor
 let contenedorPlayer = document.getElementById("contenedor-player");
 let botonExpandir = document.getElementById("botonExpandir");
+ let player1 = document.getElementById("player1");
+let player2 = document.getElementById("player2");
+ let videoContainer = document.querySelector(".video-container");
+
+    player1.classList.add("visible");    // Solo un reproductor debe estar visible al inicio
 
     // Expandir/contraer el reproductor
     botonExpandir.addEventListener("click", function () {
@@ -666,6 +671,7 @@ let botonExpandir = document.getElementById("botonExpandir");
     });
     // Función para actualizar la miniatura cuando el reproductor está minimizado
     function actualizarMiniatura() {
+        
         let videoId = player1.classList.contains("visible") 
             ? player1.getVideoData().video_id 
             : player2.getVideoData().video_id;
