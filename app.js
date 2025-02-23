@@ -651,7 +651,6 @@ function playFirstVideo() {
 // Variables para el estado del reproductor
 let contenedorPlayer = document.getElementById("contenedor-player");
 let botonExpandir = document.getElementById("botonExpandir");
-let player2 = document.getElementById("player2");
  let videoContainer = document.querySelector(".video-container");
 
     player1.classList.add("visible");    // Solo un reproductor debe estar visible al inicio
