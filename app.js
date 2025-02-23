@@ -650,37 +650,61 @@ function playFirstVideo() {
 //Utilidades
 // Variables para el estado del reproductor
 let contenedorPlayer = document.getElementById("contenedor-player");
-let botonExpandir = document.getElementById("botonExpandir");
- let videoContainer = document.querySelector(".video-container");
+let botonExpandir = document.getElementById("boton-expandir");
+let videoContainer = document.querySelector(".video-container");
 
-    player1.classList.add("visible");    // Solo un reproductor debe estar visible al inicio
-
-    // Expandir/contraer el reproductor
-    botonExpandir.addEventListener("click", function () {
-        contenedorPlayer.classList.toggle("expandido");
-
-        if (contenedorPlayer.classList.contains("expandido")) {
-            botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>';
-            mostrarVideo(); // Muestra el video al expandir
-        } else {
-            botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>';
-            actualizarMiniatura(); // Muestra la miniatura al minimizar
-        }
-    });
-    // Función para actualizar la miniatura cuando el reproductor está minimizado
-    function actualizarMiniatura() {
-        
-        let videoId = player1.classList.contains("visible") 
-            ? player1.getVideoData().video_id 
-            : player2.getVideoData().video_id;
-
-        let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
+// Esperar a que la API de YouTube esté lista antes de modificar los reproductores
+function esperarReproductoresListos() {
+    if (!player1 || !player2) {
+        console.warn("⏳ Esperando que los reproductores se inicialicen...");
+        setTimeout(esperarReproductoresListos, 500); // Reintentar en 500ms
+        return;
     }
-    // Función para mostrar el video cuando el reproductor está expandido
-    function mostrarVideo() {
-        videoContainer.style.backgroundImage = "none"; // Elimina la miniatura
+
+    console.log("✅ Reproductores inicializados correctamente.");
+
+    // Solo mostrar un reproductor al inicio
+    player1.getIframe().classList.add("visible");
+    player2.getIframe().classList.add("hidden");
+
+    // Evento para expandir/contraer el reproductor
+    if (botonExpandir) {
+        botonExpandir.addEventListener("click", function () {
+            contenedorPlayer.classList.toggle("expandido");
+
+            if (contenedorPlayer.classList.contains("expandido")) {
+                botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>';
+                mostrarVideo(); // Muestra el video al expandir
+            } else {
+                botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>';
+                actualizarMiniatura(); // Muestra la miniatura al minimizar
+            }
+        });
+    } else {
+        console.error("⚠️ Error: No se encontró el botón #boton-expandir en el DOM.");
     }
+}
+
+// Esperar a que los reproductores estén listos
+setTimeout(esperarReproductoresListos, 1000);
+
+// Función para actualizar la miniatura cuando el reproductor está minimizado
+function actualizarMiniatura() {
+    if (!player1 || !player2) return; // Evita errores si los reproductores no están listos
+
+    let videoId = player1.getIframe().classList.contains("visible") 
+        ? player1.getVideoData().video_id 
+        : player2.getVideoData().video_id;
+
+    let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
+}
+
+// Función para mostrar el video cuando el reproductor está expandido
+function mostrarVideo() {
+    videoContainer.style.backgroundImage = "none"; // Elimina la miniatura
+}
+
 // Módulo: Monitoreo de Reproductores
 // Función para monitorizar los reproductores deteniendo e iniciando
 function startMonitoring() {
