@@ -562,40 +562,58 @@ function playVideo(videoId, player) {
 }
 // Función para reproducir el siguiente video con efecto crossfade
 function playNextVideo(videoId, video) {
-    if (currentIndex < playlistVideos.length - 1) {
-        currentIndex++;
-    const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
-
-        const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
-        const nextPlayer = currentPlayer === 1 ? player2 : player1;
-        const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        const nextVideoId = playlistVideos[currentIndex].videoId;
-        console.log(`Reproduciendo siguiente video: player${currentPlayer}`);
-        nextPlayer.loadVideoById(nextVideoId);
-        updatePlaylistDOM(); // Actualizar el DOM para mostrar el cambio visual
-
-        // Aplicar efecto visual
-        currentPlayerElement.classList.add('fade-out');
-        nextPlayerElement.classList.remove('hidden'); // Asegura que el siguiente reproductor sea visible
-        nextPlayerElement.classList.add('fade-in');
-
-        // Esperar a que termine el efecto visual antes de continuar
-        setTimeout(() => {
-            currentPlayerElement.classList.add('hidden'); // Oculta después del fade-out
-            currentPlayerElement.classList.remove('fade-out');
-            nextPlayerElement.classList.remove('fade-in');
-
-            currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
-
-            // Efecto crossfade de volumen
-            crossfadeAudio();
-        }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
-    } else {
-        console.log('Fin de la lista de reproducción.');
-        askToRepeatPlaylist();
+    if (playlistVideos.length === 0) {
+        console.log('No hay videos en la playlist.');
+        return;
     }
-}
 
+    let currentPlayer = (player1.getIframe().classList.contains("visible")) ? player1 : player2;
+    let nextPlayer = (currentPlayer === player1) ? player2 : player1;
+
+    let currentPlayerElement = currentPlayer.getIframe();
+    let nextPlayerElement = nextPlayer.getIframe();
+
+    currentIndex++;
+
+    if (currentIndex >= playlistVideos.length) {
+        console.log('Fin de la lista de reproducción.');
+        askToRepeatPlaylist(); // Preguntar si se repite la playlist
+        return;
+    }
+
+    let nextVideoId = playlistVideos[currentIndex].videoId;
+
+    // Aplicar efecto de desvanecimiento al reproductor actual
+    currentPlayerElement.classList.add("fade-out");
+
+    // Iniciar el efecto crossfade de volumen (si está definido)
+    if (typeof crossfadeAudio === "function") {
+        crossfadeAudio();
+    }
+
+    // Esperar que termine la animación antes de ocultarlo y mostrar el siguiente
+    setTimeout(() => {
+        currentPlayerElement.classList.add("hidden");
+        currentPlayerElement.classList.remove("visible");
+
+        nextPlayerElement.classList.remove("hidden");
+        nextPlayerElement.classList.add("fade-in");
+        nextPlayerElement.classList.add("visible");
+
+        // Cargar el siguiente video en el nuevo reproductor activo
+        nextPlayer.loadVideoById(nextVideoId);
+
+        // Actualizar la interfaz de la playlist
+        updatePlaylistDOM();
+
+        // Quitar efectos de fade después de la animación
+        setTimeout(() => {
+            currentPlayerElement.classList.remove("fade-out");
+            nextPlayerElement.classList.remove("fade-in");
+        }, 500);
+    }, 500); // 500ms coincide con la duración de la animación
+}
+//
 function crossfadeAudio() {
     const previousPlayer = currentPlayer === 1 ? player2 : player1;
     const nextPlayer = currentPlayer === 1 ? player1 : player2;
