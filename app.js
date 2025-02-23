@@ -119,6 +119,7 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.ENDED) {
         console.log('Video finalizado.');
     } else if (event.data === YT.PlayerState.PLAYING) {
+     actualizarMiniatura(); // Actualiza la miniatura según el video en reproducción
         console.log('Video en reproducción.');
     } else if (event.data === YT.PlayerState.PAUSED) {
         console.log('Video en pausa.');
@@ -651,36 +652,31 @@ function playFirstVideo() {
 let contenedorPlayer = document.getElementById("contenedor-player");
 let botonExpandir = document.getElementById("botonExpandir");
 
-// Evento para expandir/contraer el reproductor
-botonExpandir.addEventListener("click", function () {
-    contenedorPlayer.classList.toggle("expandido");
+    // Expandir/contraer el reproductor
+    botonExpandir.addEventListener("click", function () {
+        contenedorPlayer.classList.toggle("expandido");
 
-    // Cambia el ícono según el estado
-    if (contenedorPlayer.classList.contains("expandido")) {
-        botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>'; // Icono de minimizar
-    } else {
-        botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>'; // Icono de expandir
-    }
-});
+        if (contenedorPlayer.classList.contains("expandido")) {
+            botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>';
+            mostrarVideo(); // Muestra el video al expandir
+        } else {
+            botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>';
+            actualizarMiniatura(); // Muestra la miniatura al minimizar
+        }
+    });
+    // Función para actualizar la miniatura cuando el reproductor está minimizado
+    function actualizarMiniatura() {
+        let videoId = player1.classList.contains("visible") 
+            ? player1.getVideoData().video_id 
+            : player2.getVideoData().video_id;
 
-// Función para actualizar la miniatura del reproductor cuando minimiza
-function actualizarMiniatura(urlImagen) {
-    if (!contenedorPlayer.classList.contains("expandido")) {
-        contenedorPlayer.style.backgroundImage = `url(${urlImagen})`;
-        contenedorPlayer.style.backgroundSize = "cover";
-        contenedorPlayer.style.backgroundPosition = "center";
-    }
-}
-
-// Función para actualizar la miniatura según el video en reproducción
-function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.PLAYING) {
-        let videoId = event.target.getVideoData().video_id;
         let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        actualizarMiniatura(urlMiniatura);
+        videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
     }
-}
-
+    // Función para mostrar el video cuando el reproductor está expandido
+    function mostrarVideo() {
+        videoContainer.style.backgroundImage = "none"; // Elimina la miniatura
+    }
 // Módulo: Monitoreo de Reproductores
 // Función para monitorizar los reproductores deteniendo e iniciando
 function startMonitoring() {
