@@ -532,26 +532,42 @@ async function getPlaylistInfo(playlistId) {
     }
     displayPlaylist() // Mostrar Nombre Playlist
 }
-// Función para mostrar Playlizt
+// Función para mostrar Playlist
 function displayPlaylist(playlist) {
     if (!playlist || !playlist.relatedStreams || !Array.isArray(playlist.relatedStreams)) {
         console.error('Error: La playlist no contiene videos válidos.');
         alert('No se encontraron videos válidos en la playlist.');
         return;
     }
-    const playlistHeader = document.getElementById('playlist-header').querySelector('h2');
+
+    const playlistHeader = document.querySelector('.playlist-header h2');
+    const playlistThumbnail = document.querySelector('.playlist-header img') || document.createElement('img'); // Crear img si no existe
+
     if (playlistHeader) {
         playlistHeader.textContent = playlist.name;
     } else {
         console.error("No se encontró el encabezado de la playlist.");
     }
-const loadedVideos = playlist.relatedStreams.map((video) => ({
+
+    // Actualizar o añadir la miniatura
+    playlistThumbnail.src = playlist.thumbnailUrl;
+    playlistThumbnail.alt = playlist.name;
+    playlistThumbnail.style.width = '50px'; // Ajusta el tamaño como necesites
+    playlistThumbnail.style.height = '50px';
+    playlistThumbnail.style.marginLeft = '10px'; // Espacio entre el título y la miniatura
+
+    if (!playlistThumbnail.parentNode) {
+        document.querySelector('.playlist-header').appendChild(playlistThumbnail); // Añadir si no está en el DOM
+    }
+
+    const loadedVideos = playlist.relatedStreams.map((video) => ({
         videoId: video.url.split('v=')[1],
         title: video.title,
         thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75/0000FF/FFFFFF/?text=No+Thumbnail',
-        duration: video.duration, // No es necesario parsear aquí, se hace al agregar a la playlist
+        duration: video.duration,
         manual: false,
     }));
+
     playlistVideos = [...loadedVideos, ...manualVideos];
     console.log('Playlist cargada:', playlistVideos);
     updatePlaylistDOM();
