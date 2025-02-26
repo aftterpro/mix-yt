@@ -561,7 +561,7 @@ const loadedVideos = playlist.relatedStreams.map((video) => ({
 function playNextVideo(videoId, video) {
     if (currentIndex < playlistVideos.length - 1) {
         currentIndex++;
-    const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
+        const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
 
         const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
         const nextPlayer = currentPlayer === 1 ? player2 : player1;
@@ -586,13 +586,12 @@ function playNextVideo(videoId, video) {
 
             // Efecto crossfade de volumen
             crossfadeAudio();
-        }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
+        }, 500); // Asegura que el tiempo coincida con las transiciones CSS (0.5s)
     } else {
         console.log('Fin de la lista de reproducción.');
         askToRepeatPlaylist();
     }
 }
-
 function crossfadeAudio() {
     const previousPlayer = currentPlayer === 1 ? player2 : player1;
     const nextPlayer = currentPlayer === 1 ? player1 : player2;
