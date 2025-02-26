@@ -530,6 +530,7 @@ async function getPlaylistInfo(playlistId) {
         mostrarMensajeFlotante(error.message);
         return null;
     }
+    displayPlaylist() // Mostrar Nombre Playlist
 }
 // Función para mostrar Playlizt
 function displayPlaylist(playlist) {
@@ -538,7 +539,7 @@ function displayPlaylist(playlist) {
         alert('No se encontraron videos válidos en la playlist.');
         return;
     }
-    const playlistHeader = document.getElementById('playlist-panel').querySelector('h2');
+    const playlistHeader = document.getElementById('playlist-header').querySelector('h2');
     if (playlistHeader) {
         playlistHeader.textContent = playlist.name;
     } else {
