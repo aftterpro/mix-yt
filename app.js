@@ -602,10 +602,11 @@ function playNextVideo(videoId, video) {
                 nextPlayerElement.classList.remove('fade-in');
 
                 currentPlayerInstance.pauseVideo();
-                currentPlayer = currentPlayer === 1 ? 2 : 1; // Asegura que se alterna correctamente
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
                 updatePlaylistDOM();
-
-                crossfadeAudio();
+                setTimeout(() => {
+                    crossfadeAudio();
+                }, 100);
             }, 500);
         }, { once: true });
     } else {
@@ -619,7 +620,7 @@ function crossfadeAudio() {
 
     let currentVolume = 100;
     let nextVolume = 0;
-    const crossfadeStep = 100 / (CROSSFADE_DURATION * 5); // Más pasos para suavidad
+    const crossfadeStep = 100 / (CROSSFADE_DURATION * 5);
 
     const crossfadeInterval = setInterval(() => {
         currentVolume = Math.max(0, currentVolume - crossfadeStep);
@@ -628,10 +629,10 @@ function crossfadeAudio() {
         previousPlayer.setVolume(currentVolume);
         nextPlayer.setVolume(nextVolume);
 
-        if (currentVolume <= 0 && nextVolume >= 100) { // Cambiado aquí
-            clearInterval(crossfadeInterval); // Detener cuando el crossfade termina
+        if (currentVolume <= 0 && nextVolume >= 100) {
+            clearInterval(crossfadeInterval);
         }
-    }, 100); // Cada 100ms
+    }, 100);
 }
 
 //Agregar gestión de repetición de playlist
@@ -666,54 +667,46 @@ function playFirstVideo() {
 }
 //Utilidades
 // Variables para el estado del reproductor
-let contenedorPlayer = document.getElementById("contenedor-player");
-let botonExpandir = document.getElementById("botonExpandir");
-let videoContainer = document.querySelector(".video-container");
+const contenedorPlayer = document.getElementById("contenedor-player");
+const botonExpandir = document.getElementById("botonExpandir");
+const videoContainer = document.querySelector(".video-container");
 
-// Esperar a que la API de YouTube esté lista antes de modificar los reproductores
 function esperarReproductoresListos() {
     if (!player1 || !player2) {
         console.warn("⏳ Esperando que los reproductores se inicialicen...");
-        setTimeout(esperarReproductoresListos, 500); // Reintentar en 500ms
+        setTimeout(esperarReproductoresListos, 500);
         return;
     }
 
     console.log("✅ Reproductores inicializados correctamente.");
 
-    // Solo mostrar un reproductor al inicio
+    // Asegurar que solo un reproductor sea visible al inicio
     player1.getIframe().classList.add("visible");
     player2.getIframe().classList.add("hidden");
 
-    // Evento para expandir/contraer el reproductor
+    // Evento para expandir/contraer el reproductor (usando toggle)
     if (botonExpandir) {
-        botonExpandir.addEventListener("click", function () {
+        botonExpandir.addEventListener("click", () => {
             contenedorPlayer.classList.toggle("expandido");
-
-            if (contenedorPlayer.classList.contains("expandido")) {
-                botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>';
-                mostrarVideo(); // Muestra el video al expandir
-            } else {
-                botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>';
-                actualizarMiniatura(); // Muestra la miniatura al minimizar
-            }
+            botonExpandir.innerHTML = contenedorPlayer.classList.contains("expandido") ?
+                '<i class="fas fa-compress-alt"></i>' :
+                '<i class="fas fa-expand-alt"></i>';
+            contenedorPlayer.classList.contains("expandido") ? mostrarVideo() : actualizarMiniatura();
         });
     } else {
         console.error("⚠️ Error: No se encontró el botón #boton-expandir en el DOM.");
     }
 }
 
-// Esperar a que los reproductores estén listos
 setTimeout(esperarReproductoresListos, 1000);
 
 // Función para actualizar la miniatura cuando el reproductor está minimizado
 function actualizarMiniatura() {
-    if (!player1 || !player2) return; // Evita errores si los reproductores no están listos
+    if (!player1 || !player2) return;
 
-    let videoId = player1.getIframe().classList.contains("visible") 
-        ? player1.getVideoData().video_id 
-        : player2.getVideoData().video_id;
-
-    let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    const visiblePlayer = player1.getIframe().classList.contains("visible") ? player1 : player2;
+    const videoId = visiblePlayer.getVideoData().video_id;
+    const urlMiniatura = `https://img.youtube.com/vi/$${videoId}/hqdefault.jpg`;
     videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
 }
 
