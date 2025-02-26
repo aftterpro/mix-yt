@@ -582,8 +582,9 @@ function playNextVideo(videoId, video) {
         currentIndex++;
         const nextVideoId = playlistVideos[currentIndex].videoId;
         const nextPlayer = currentPlayer === 1 ? player2 : player1;
-        const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
+        const currentPlayerInstance = currentPlayer === 1 ? player1 : player2; // Obtener la instancia del reproductor actual
         const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+        const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
 
         console.log(`Reproduciendo siguiente video: player${currentPlayer === 1 ? 2 : 1}`);
 
@@ -603,6 +604,7 @@ function playNextVideo(videoId, video) {
                 currentPlayerElement.classList.remove('fade-out');
                 nextPlayerElement.classList.remove('fade-in');
 
+                currentPlayerInstance.pauseVideo(); // Pausar el reproductor actual
                 currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
                 updatePlaylistDOM(); // Actualizar el DOM después del cambio
 
@@ -630,7 +632,7 @@ function crossfadeAudio() {
         previousPlayer.setVolume(currentVolume);
         nextPlayer.setVolume(nextVolume);
 
-        if (currentVolume === 0 && nextVolume === 100) {
+        if (currentVolume <= 0 && nextVolume >= 100) { // Cambiado aquí
             clearInterval(crossfadeInterval); // Detener cuando el crossfade termina
         }
     }, 100); // Cada 100ms
