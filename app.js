@@ -523,17 +523,19 @@ async function getPlaylistInfo(playlistId) {
         console.log('Información de la playlist:', data);
     // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
     const playlistName = data.name || "Playlist sin nombre"; // Accede a data.name
-
+    console.log('Llamando a displayPlaylist con datos:', data); // Añade esta línea
+    displayPlaylist(data) // Llamo para cambiar nombre de playlist
     return { ...data, name: playlistName };
 } catch (error) {
         console.error('Error al obtener la información de la playlist:', error.message);
         mostrarMensajeFlotante(error.message);
         return null;
     }
-    displayPlaylist() // Mostrar Nombre Playlist
+    
 }
 // Función para mostrar Playlist
 function displayPlaylist(playlist) {
+        console.log('Datos recibidos en displayPlaylist:', playlist); // Añade esta línea
     if (!playlist || !playlist.relatedStreams || !Array.isArray(playlist.relatedStreams)) {
         console.error('Error: La playlist no contiene videos válidos.');
         alert('No se encontraron videos válidos en la playlist.');
@@ -544,6 +546,7 @@ function displayPlaylist(playlist) {
     const playlistThumbnail = document.querySelector('.playlist-header img') || document.createElement('img'); // Crear img si no existe
 
     if (playlistHeader) {
+        console.log('Actualizando título a:', playlist.name); // Añade esta línea
         playlistHeader.textContent = playlist.name;
     } else {
         console.error("No se encontró el encabezado de la playlist.");
@@ -569,7 +572,7 @@ function displayPlaylist(playlist) {
     }));
 
     playlistVideos = [...loadedVideos, ...manualVideos];
-    console.log('Playlist cargada:', playlistVideos);
+    console.log('Playlist cargada:', playlistVideos);// Verifica si se imprime aquí
     updatePlaylistDOM();
 }
 // Módulo: Reproducción y Crossfade
