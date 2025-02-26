@@ -570,9 +570,9 @@ function displayPlaylist(playlist) {
         duration: video.duration,
         manual: false,
     }));
-
-    playlistVideos = [...loadedVideos, ...manualVideos];
-    console.log('Playlist cargada:', playlistVideos);// Verifica si se imprime aquí
+    // Concatenar los nuevos videos con los existentes
+    playlistVideos = [...playlistVideos, ...loadedVideos]; // Cambiado aquí
+    console.log('Playlist cargada:', playlistVideos);
     updatePlaylistDOM();
 }
 // Módulo: Reproducción y Crossfade
