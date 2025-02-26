@@ -582,36 +582,32 @@ function playNextVideo(videoId, video) {
         currentIndex++;
         const nextVideoId = playlistVideos[currentIndex].videoId;
         const nextPlayer = currentPlayer === 1 ? player2 : player1;
-        const currentPlayerInstance = currentPlayer === 1 ? player1 : player2; // Obtener la instancia del reproductor actual
+        const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
         const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
         const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
 
         console.log(`Reproduciendo siguiente video: player${currentPlayer === 1 ? 2 : 1}`);
 
-        // Cargar el siguiente video y esperar a que esté listo
         nextPlayer.loadVideoById(nextVideoId);
         nextPlayer.addEventListener('onReady', () => {
             console.log(`Reproductor ${currentPlayer === 1 ? 2 : 1} listo.`);
 
-            // Aplicar efecto visual
             currentPlayerElement.classList.add('fade-out');
             nextPlayerElement.classList.remove('hidden');
             nextPlayerElement.classList.add('fade-in');
 
-            // Esperar a que termine el efecto visual antes de continuar
             setTimeout(() => {
                 currentPlayerElement.classList.add('hidden');
                 currentPlayerElement.classList.remove('fade-out');
                 nextPlayerElement.classList.remove('fade-in');
 
-                currentPlayerInstance.pauseVideo(); // Pausar el reproductor actual
-                currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
-                updatePlaylistDOM(); // Actualizar el DOM después del cambio
+                currentPlayerInstance.pauseVideo();
+                currentPlayer = currentPlayer === 1 ? 2 : 1; // Asegura que se alterna correctamente
+                updatePlaylistDOM();
 
-                // Efecto crossfade de volumen
                 crossfadeAudio();
-            }, 500); // Asegura que el tiempo coincida con las transiciones CSS (0.5s)
-        }, { once: true }); // Asegura que el evento onReady solo se ejecute una vez
+            }, 500);
+        }, { once: true });
     } else {
         console.log('Fin de la lista de reproducción.');
         askToRepeatPlaylist();
