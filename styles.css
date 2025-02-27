@@ -135,25 +135,16 @@ input[type="text"]::placeholder {
 
 /* ---- REPRODUCTOR ESTILO SPOTIFY ---- */
 #contenedor-player {
-    position: fixed;
-    bottom: 0;
-    left: 0;
+    /* Estilos iniciales */
     width: 300px; /* Ajusta el ancho inicial */
     height: 200px; /* Ajusta la altura inicial */
-    background: rgba(0, 0, 0, 0.95);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
     transition: width 0.3s ease, height 0.3s ease; /* Transición suave */
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
 }
 /* Cuando el reproductor está expandido */
 #contenedor-player.expandido {
+    /* Estilos cuando el contenedor está expandido */
     width: 100%; /* Ocupa todo el ancho */
-    height: 300px; /* Tamaño cuando está expandido */
-    flex-direction: column;
-    justify-content: center;
+    height: 500px; /* Ajusta la altura expandida */
 }
 /* ---- ESTILO DE SCROLL PERSONALIZADO ---- */
 #playlistContainer::-webkit-scrollbar, 
