@@ -119,7 +119,6 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.ENDED) {
         console.log('Video finalizado.');
     } else if (event.data === YT.PlayerState.PLAYING) {
-     actualizarMiniatura(); // Actualiza la miniatura según el video en reproducción
         console.log('Video en reproducción.');
     } else if (event.data === YT.PlayerState.PAUSED) {
         console.log('Video en pausa.');
