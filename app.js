@@ -575,6 +575,31 @@ function displayPlaylist(playlist) {
     console.log('Playlist cargada:', playlistVideos);
     updatePlaylistDOM();
 }
+// Variables para el estado del reproductor
+const contenedorPlayer = document.getElementById("contenedor-player");
+const botonExpandir = document.getElementById("botonExpandir");
+
+function esperarReproductoresListos() {
+    if (!player1 || !player2) {
+        console.warn("⏳ Esperando que los reproductores se inicialicen...");
+        setTimeout(esperarReproductoresListos, 500);
+        return;
+    }
+
+    console.log("✅ Reproductores inicializados correctamente.");
+
+    if (botonExpandir) {
+        botonExpandir.addEventListener("click", () => {
+            contenedorPlayer.classList.toggle("expandido");
+            botonExpandir.innerHTML = contenedorPlayer.classList.contains("expandido") ?
+                '<i class="fas fa-compress-alt"></i>' :
+                '<i class="fas fa-expand-alt"></i>';
+        });
+    } else {
+        console.error("⚠️ Error: No se encontró el botón #boton-expandir en el DOM.");
+    }
+}
+
 // Módulo: Reproducción y Crossfade
 // Función para reproducir el siguiente video con efecto crossfade
 function playNextVideo(videoId, video) {
