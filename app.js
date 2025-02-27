@@ -53,8 +53,8 @@ function initializePlayers() {
     if (player1 && player2) return; // Evitar la reinicialización si ya existen
 
     player1 = new YT.Player('player1', {
-        height: '250',
-        width: '150',
+        height: '100%',
+        width: '100%',
         events: {
             'onReady': onPlayerReady, // Referencia directa a la función
             'onStateChange': onPlayerStateChange,
@@ -62,8 +62,8 @@ function initializePlayers() {
         }
     });
     player2 = new YT.Player('player2', {
-        height: '250',
-        width: '150',
+        height: '100%',
+        width: '100%',
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange,
@@ -589,6 +589,7 @@ function esperarReproductoresListos() {
 
     if (botonExpandir) {
         botonExpandir.addEventListener("click", () => {
+            console.log("boton expandir clickeado")
             contenedorPlayer.classList.toggle("expandido");
             botonExpandir.innerHTML = contenedorPlayer.classList.contains("expandido") ?
                 '<i class="fas fa-compress-alt"></i>' :
@@ -616,7 +617,11 @@ function playNextVideo(videoId, video) {
 
         // Aplicar efecto visual
         currentPlayerElement.classList.add('fade-out');
+        console.log("currentPlayerElement classes:", currentPlayerElement.classList);
+
         nextPlayerElement.classList.remove('hidden'); // Asegura que el siguiente reproductor sea visible
+        console.log("nextPlayerElement classes:", nextPlayerElement.classList);
+
         nextPlayerElement.classList.add('fade-in');
 
         // Esperar a que termine el efecto visual antes de continuar
