@@ -580,47 +580,45 @@ function displayPlaylist(playlist) {
 function playNextVideo(videoId, video) {
     if (currentIndex < playlistVideos.length - 1) {
         currentIndex++;
-        const nextVideoId = playlistVideos[currentIndex].videoId;
-        const nextPlayer = currentPlayer === 1 ? player2 : player1;
-        const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
-        const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
+
         const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
-
-        console.log(`Reproduciendo siguiente video: player${currentPlayer === 1 ? 2 : 1}`);
-
+        const nextPlayer = currentPlayer === 1 ? player2 : player1;
+        const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+        const nextVideoId = playlistVideos[currentIndex].videoId;
+        console.log(`Reproduciendo siguiente video: player${currentPlayer}`);
         nextPlayer.loadVideoById(nextVideoId);
-        nextPlayer.addEventListener('onReady', () => {
-            console.log(`Reproductor ${currentPlayer === 1 ? 2 : 1} listo.`);
+        updatePlaylistDOM(); // Actualizar el DOM para mostrar el cambio visual
 
-            currentPlayerElement.classList.add('fade-out');
-            nextPlayerElement.classList.remove('hidden');
-            nextPlayerElement.classList.add('fade-in');
+        // Aplicar efecto visual
+        currentPlayerElement.classList.add('fade-out');
+        nextPlayerElement.classList.remove('hidden'); // Asegura que el siguiente reproductor sea visible
+        nextPlayerElement.classList.add('fade-in');
 
-            setTimeout(() => {
-                currentPlayerElement.classList.add('hidden');
-                currentPlayerElement.classList.remove('fade-out');
-                nextPlayerElement.classList.remove('fade-in');
+        // Esperar a que termine el efecto visual antes de continuar
+        setTimeout(() => {
+            currentPlayerElement.classList.add('hidden'); // Oculta después del fade-out
+            currentPlayerElement.classList.remove('fade-out');
+            nextPlayerElement.classList.remove('fade-in');
 
-                currentPlayerInstance.pauseVideo();
-                currentPlayer = currentPlayer === 1 ? 2 : 1;
-                updatePlaylistDOM();
-                setTimeout(() => {
-                    crossfadeAudio();
-                }, 100);
-            }, 500);
-        }, { once: true });
+            currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
+
+            // Efecto crossfade de volumen
+            crossfadeAudio();
+        }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
     } else {
         console.log('Fin de la lista de reproducción.');
         askToRepeatPlaylist();
     }
 }
+
 function crossfadeAudio() {
     const previousPlayer = currentPlayer === 1 ? player2 : player1;
     const nextPlayer = currentPlayer === 1 ? player1 : player2;
 
     let currentVolume = 100;
     let nextVolume = 0;
-    const crossfadeStep = 100 / (CROSSFADE_DURATION * 5);
+    const crossfadeStep = 100 / (CROSSFADE_DURATION * 5); // Más pasos para suavidad
 
     const crossfadeInterval = setInterval(() => {
         currentVolume = Math.max(0, currentVolume - crossfadeStep);
@@ -629,12 +627,11 @@ function crossfadeAudio() {
         previousPlayer.setVolume(currentVolume);
         nextPlayer.setVolume(nextVolume);
 
-        if (currentVolume <= 0 && nextVolume >= 100) {
-            clearInterval(crossfadeInterval);
+        if (currentVolume === 0 && nextVolume === 100) {
+            clearInterval(crossfadeInterval); // Detener cuando el crossfade termina
         }
-    }, 100);
+    }, 100); // Cada 100ms
 }
-
 //Agregar gestión de repetición de playlist
 function askToRepeatPlaylist() {
     const repeat = confirm('¿Desea repetir la playlist?');
