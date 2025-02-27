@@ -665,56 +665,6 @@ function playFirstVideo() {
         startMonitoring(); // Iniciar monitoreo al comenzar la reproducción
     }
 }
-//Utilidades
-// Variables para el estado del reproductor
-const contenedorPlayer = document.getElementById("contenedor-player");
-const botonExpandir = document.getElementById("botonExpandir");
-const videoContainer = document.querySelector(".video-container");
-
-function esperarReproductoresListos() {
-    if (!player1 || !player2) {
-        console.warn("⏳ Esperando que los reproductores se inicialicen...");
-        setTimeout(esperarReproductoresListos, 500);
-        return;
-    }
-
-    console.log("✅ Reproductores inicializados correctamente.");
-
-    // Asegurar que solo un reproductor sea visible al inicio
-    player1.getIframe().classList.add("visible");
-    player2.getIframe().classList.add("hidden");
-
-    // Evento para expandir/contraer el reproductor (usando toggle)
-    if (botonExpandir) {
-        botonExpandir.addEventListener("click", () => {
-            contenedorPlayer.classList.toggle("expandido");
-            botonExpandir.innerHTML = contenedorPlayer.classList.contains("expandido") ?
-                '<i class="fas fa-compress-alt"></i>' :
-                '<i class="fas fa-expand-alt"></i>';
-            contenedorPlayer.classList.contains("expandido") ? mostrarVideo() : actualizarMiniatura();
-        });
-    } else {
-        console.error("⚠️ Error: No se encontró el botón #boton-expandir en el DOM.");
-    }
-}
-
-setTimeout(esperarReproductoresListos, 1000);
-
-// Función para actualizar la miniatura cuando el reproductor está minimizado
-function actualizarMiniatura() {
-    if (!player1 || !player2) return;
-
-    const visiblePlayer = player1.getIframe().classList.contains("visible") ? player1 : player2;
-    const videoId = visiblePlayer.getVideoData().video_id;
-    const urlMiniatura = `https://img.youtube.com/vi/$${videoId}/hqdefault.jpg`;
-    videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
-}
-
-// Función para mostrar el video cuando el reproductor está expandido
-function mostrarVideo() {
-    videoContainer.style.backgroundImage = "none"; // Elimina la miniatura
-}
-
 // Módulo: Monitoreo de Reproductores
 // Función para monitorizar los reproductores deteniendo e iniciando
 function startMonitoring() {
