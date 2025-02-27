@@ -542,7 +542,7 @@ function displayPlaylist(playlist) {
         return;
     }
 
-    const playlistHeader = document.querySelector('.playlist-header h2');
+    const playlistHeader = document.querySelector('.playlist-header h3');
     const playlistThumbnail = document.querySelector('.playlist-header img') || document.createElement('img'); // Crear img si no existe
 
     if (playlistHeader) {
