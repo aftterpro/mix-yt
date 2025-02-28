@@ -86,6 +86,9 @@ html, body {
 }
 
 /* Contenedor del video */
+#player1, #player2 {
+    visibility: visible;
+}
 #videoContainer.video-container {
     width: 180px;
     height: 100px;
@@ -141,7 +144,6 @@ input[type="text"]::placeholder {
     width: 300px;
     height: 200px;
     transition: width 0.3s ease, height 0.3s ease;
-    background: rgba(0, 0, 0, 0.8); /* Fondo para visibilidad */
     z-index: 1000; /* Asegura que esté encima de otros elementos */
 }
 /* Cuando el reproductor está expandido */
