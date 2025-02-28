@@ -107,6 +107,8 @@ function onPlayerReady(event) {
     if (player1 && player2) {
         playersInitialized = true;
        // console.log("Ambos reproductores están inicializados.");
+        document.getElementById('botonPlay').disabled = false;
+
     }
     // Inicia el monitor
     if (!monitorInterval) {
