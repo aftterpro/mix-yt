@@ -35,7 +35,7 @@ async function fetchDataWithRetry(url, maxRetries = 3, retryDelay = 1000) {
 }
 exports.handler = async function (event, context) {
   const query = event.queryStringParameters.q;
-  const instanceUrl = "https://pipedapi.ducks.party"; // Usar la instancia específica
+  const instanceUrl =  getRandomPipedInstance(); // Usar las instancias
   const targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(
     query
   )}&filter=videos`; // Añadir el parámetro filter
