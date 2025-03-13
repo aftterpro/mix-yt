@@ -39,7 +39,8 @@ exports.handler = async function (event, context) {
   const targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(
     query
   )}&filter=videos`; // Añadir el parámetro filter
-
+console.log("La url formada: ", targetUrl);
+  
   try {
     const data = await fetchDataWithRetry(targetUrl);
     return {
