@@ -154,14 +154,16 @@ const displaySearchResultsPiped = (results) => {
     }
     resultsDiv.innerHTML = ''; // Clear previous results
 
-    if (!results || !Array.isArray(results) || results.length === 0) {
+    // Verificar si la respuesta tiene la propiedad 'items' y si es un array
+    if (!results || !results.items || !Array.isArray(results.items) || results.items.length === 0) {
         const noResultsMessage = document.createElement('p');
         noResultsMessage.textContent = "No se encontraron resultados.";
         resultsDiv.appendChild(noResultsMessage);
         return;
     }
 
-    results.forEach(video => {
+    // Usar results.items en lugar de results
+    results.items.forEach(video => {
         const videoDiv = document.createElement('div');
         videoDiv.classList.add('video-result');
 
