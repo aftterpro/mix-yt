@@ -479,6 +479,41 @@ function enableDragAndDrop() {
 }
 
 // Módulo: Carga de Playlist, miniaturas desde URL, cache
+//Instancias api
+const pipedInstances = [
+  "https://pipedapi.orangenet.cc",
+  "https://api.piped.private.coffee",
+    "https://pipedapi.reallyaweso.me",
+    "https://pipedapi.ducks.party",
+    "https://piapi.ggtyler.dev"
+  // Agrega otras instancias aquí
+];
+    //Selecciona instancia aleatoria
+function getRandomPipedInstance() {
+  const randomIndex = Math.floor(Math.random() * pipedInstances.length);
+  return pipedInstances[randomIndex];
+}
+    //Función para Realizar Solicitudes con Reintentos
+async function fetchDataWithRetry(url, maxRetries = 3, retryDelay = 1000) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${url}, retry ${retries + 1}:`, error);
+      retries++;
+      if (retries < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      } else {
+        throw error; // Lanza el error después de todos los reintentos
+      }
+    }
+  }
+}
 // Función para extraer el ID de la playlist de una URL de YouTube
 function extractPlaylistId(url) {
     const urlParams = new URLSearchParams(new URL(url).search);
@@ -486,53 +521,31 @@ function extractPlaylistId(url) {
 }
 // Función para obtener información de la playlist usando la API de Piped con un proxy
 async function getPlaylistInfo(playlistId) {
-    const proxyUrl = 'https://api.allorigins.win/raw?url='; // URL base del proxy
-    const targetUrl = `https://pipedapi.nosebs.ru/playlists/${playlistId}`; // Nueva URL de Piped
-    const url = `${proxyUrl}${encodeURIComponent(targetUrl)}`; // Codifica la URL de destino
+  const instanceUrl = getRandomPipedInstance();
+  const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
+  const proxyUrl = 'https://api.allorigins.win/raw?url='; // URL base del proxy
+  const proxiedUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; // URL con proxy
 
-    console.log("URL a solicitar:", url);
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorText = await response.text(); // Obtener el texto del error
-
-            if (response.status === 502) {
-                // Manejo específico para error 502 (Bad Gateway)
-                console.error("Error 502 del proxy:", errorText);
-                mostrarMensajeFlotante("Error al cargar la playlist: El proxy no está disponible.");  // Mensaje amigable
-                return null; // Salir con error
-            } else {
-                // Manejo para otros errores (diferentes de 502)
-                console.error('Error al obtener los datos:', response.status, response.statusText, errorText);
-                let errorMessage = `Error al obtener la información de la playlist: ${response.status} - ${response.statusText}`;
-                try {
-                    const errorJson = JSON.parse(errorText); // Intenta parsear JSON si no es 502
-                    errorMessage = errorJson.message || errorMessage;
-                } catch (parseError) {
-                    errorMessage = errorText || errorMessage;
-                }
-                throw new Error(errorMessage);
-            }
-        }
-
-        const data = await response.json(); // Parsear JSON SOLO si response.ok es true y NO es 502
-        // Verificar si la estructura es válida
-        if (!data || !data.relatedStreams) {
-            throw new Error('La estructura de la respuesta no contiene videos válidos.');
-        }
-        console.log('Información de la playlist:', data);
+  try {
+    const data = await fetchDataWithRetry(proxiedUrl);
+    // Verificar si la estructura es válida
+    if (!data || !data.relatedStreams) {
+      throw new Error("La estructura de la respuesta no contiene videos válidos.");
+    }
+    console.log("Información de la playlist:", data);
     // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
     const playlistName = data.name || "Playlist sin nombre"; // Accede a data.name
-    console.log('Llamando a displayPlaylist con datos:', data); // Añade esta línea
-    displayPlaylist(data) // Llamo para cambiar nombre de playlist
+    console.log("Llamando a displayPlaylist con datos:", data); // Añade esta línea
+    displayPlaylist(data); // Llamo para cambiar nombre de playlist
     return { ...data, name: playlistName };
-} catch (error) {
-        console.error('Error al obtener la información de la playlist:', error.message);
-        mostrarMensajeFlotante(error.message);
-        return null;
-    }
-    
+  } catch (error) {
+    console.error(
+      "Error al obtener la información de la playlist:",
+      error.message
+    );
+    mostrarMensajeFlotante(error.message);
+    return null;
+  }
 }
 // Función para mostrar Playlist
 function displayPlaylist(playlist) {
