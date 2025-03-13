@@ -1,35 +1,54 @@
-exports.handler = async (event) => {
-    const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+// netlify/functions/search.js
+//Instancias api
+const pipedInstances = [
+  "https://pipedapi.orangenet.cc",
+  "https://api.piped.private.coffee",
+    "https://pipedapi.reallyaweso.me",
+    "https://pipedapi.ducks.party",
+    "https://piapi.ggtyler.dev"
+  // Agrega otras instancias aquí
+];
+function getRandomPipedInstance() {
+  const randomIndex = Math.floor(Math.random() * pipedInstances.length);
+  return pipedInstances[randomIndex];
+}
 
-    const query = event.queryStringParameters?.q || "daddy"; // Valor por defecto
-
+async function fetchDataWithRetry(url, maxRetries = 3, retryDelay = 1000) {
+  let retries = 0;
+  while (retries < maxRetries) {
     try {
-        console.log(`🔍 Buscando: ${query}`);
-
-        const apiUrl = `https://pipedapi.nosebs.ru/search?q=${encodeURIComponent(query)}&filter=videos`;
-        const response = await fetch(apiUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-        });
-
-        if (!response.ok) {
-            console.error(`❌ HTTP error! Status: ${response.status}`);
-            return { statusCode: response.status, body: `Error fetching search results` };
-        }
-
-        const data = await response.json();
-        console.log(`✅ Datos obtenidos (${data.items.length} videos)`);
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify(data.items) // Enviar los resultados tal como los devuelve la API
-        };
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
     } catch (error) {
-        console.error("❌ Error en la API:", error);
-        return {
-            statusCode: 500,
-            body: `Error fetching data: ${error.message}`,
-        };
+      console.error(`Error fetching ${url}, retry ${retries + 1}:`, error);
+      retries++;
+      if (retries < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      } else {
+        throw error; // Lanza el error después de todos los reintentos
+      }
     }
+  }
+}
+exports.handler = async function (event, context) {
+  const query = event.queryStringParameters.q;
+  const instanceUrl = getRandomPipedInstance();
+  const targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}`;
+
+  try {
+    const data = await fetchDataWithRetry(targetUrl);
+    return {
+      statusCode: 200,
+      body: JSON.stringify(data),
+    };
+  } catch (error) {
+    console.error("Error en la búsqueda:", error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Error en la búsqueda." }),
+    };
+  }
 };
