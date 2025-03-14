@@ -9,6 +9,9 @@ body.vibe-theme {
     min-height: 100vh;
     overflow-x: hidden;
 }
+:root {
+    --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
+}
 /* ---- EVITAR SCROLLING GLOBAL ---- */
 html, body {
     overflow: hidden; /* Bloquear scroll en toda la página */
@@ -18,17 +21,17 @@ html, body {
 /* ---- ESTRUCTURA PRINCIPAL ---- */
 .container {
     display: flex;
-    height: calc(100vh - 80px); /* Resta el tamaño del reproductor */
+    height: calc(100vh - 60px); /* Ajustar altura restando la del reproductor fijo */
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
 .sidebar {
-    width: 280px;
-    background: rgba(0, 0, 0, 0.85);
+    width: 240px;
+    background: #212121; /* Fondo oscuro para la sidebar */
     padding: 1rem;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Evita scroll en la sidebar */
+    overflow: hidden;
 }
 
 .playlist-header {
@@ -38,11 +41,20 @@ html, body {
     font-weight: bold;
     padding-left: 10px;
 }
-/* Playlist con scroll independiente */
+/* ---- LISTA DE REPRODUCCIÓN ---- */
 #playlistContainer {
     flex-grow: 1;
     overflow-y: auto;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100vh - 150px); /* Ajusta según sea necesario */
+}
+.playlist-item {
+    background-color: transparent;
+    color: #fff;
+    padding: 8px 10px;
+    border-bottom: 1px solid #444;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 /* Panel de búsqueda con su propia barra de desplazamiento */
 /* Ajuste para que la lista de resultados tenga su propia barra */
@@ -56,6 +68,7 @@ html, body {
 .main-content {
     flex-grow: 1;
     padding: 1rem;
+    background: #181818; /* Otro tono de oscuro para el contenido principal */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -138,13 +151,17 @@ input[type="text"]::placeholder {
 
 /* ---- REPRODUCTOR ESTILO SPOTIFY ---- */
 #contenedor-player {
-    position: fixed; /* Posicionamiento fijo */
+    position: fixed;
     bottom: 0;
     left: 0;
-    width: 300px;
-    height: 200px;
-    transition: width 0.3s ease, height 0.3s ease;
-    z-index: 1000; /* Asegura que esté encima de otros elementos */
+    width: 100%;
+    background-color: #212121; /* Ejemplo de color de fondo para el reproductor */
+    color: #fff;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Para distribuir los controles */
+    z-index: 1000; /* Asegura que esté por encima de otros elementos */
 }
 /* Cuando el reproductor está expandido */
 #contenedor-player.expandido {
@@ -251,9 +268,17 @@ input[type="text"]::placeholder {
 }
 
 .player-controls button:hover {
-    color: #1db954;
+    color: var(--primary-accent-color); /* Usando la variable de color de acento */
 }
-
+/* ---- BARRA DE BÚSQUEDA ---- */
+.search-container input[type="text"] {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 8px;
+    border-radius: 5px;
+    margin-right: 10px;
+}
 /* Iconos más grandes */
 #boton-play {
     font-size: 32px;
