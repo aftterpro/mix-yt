@@ -553,7 +553,6 @@ async function getPlaylistInfo(playlistId) {
 function displayPlaylist(playlist) {
         console.log('Datos recibidos en displayPlaylist:', playlist); // Añade esta línea
     if (!playlist || !playlist.relatedStreams || !Array.isArray(playlist.relatedStreams)) {
-        console.error('Error: La playlist no contiene videos válidos.');
         alert('No se encontraron videos válidos en la playlist.');
         return;
     }
@@ -562,7 +561,6 @@ function displayPlaylist(playlist) {
     const playlistThumbnail = document.querySelector('.playlist-header img') || document.createElement('img'); // Crear img si no existe
 
     if (playlistHeader) {
-        console.log('Actualizando título a:', playlist.name); // Añade esta línea
         playlistHeader.textContent = playlist.name;
     } else {
         console.error("No se encontró el encabezado de la playlist.");
@@ -588,7 +586,6 @@ function displayPlaylist(playlist) {
     }));
     // Concatenar los nuevos videos con los existentes
     playlistVideos = [...playlistVideos, ...loadedVideos]; // Cambiado aquí
-    console.log('Playlist cargada:', playlistVideos);
     updatePlaylistDOM();
 }
 // Variables para el estado del reproductor
@@ -787,10 +784,11 @@ document.getElementById('botonNext').addEventListener('click', () => {
         // Cambia el video en el siguiente reproductor
 });
 // Búsqueda por palabras
+const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
 document.getElementById('searchInput').addEventListener('input', (event) => {
     const query = event.target.value.trim();
     if (query.length > 0) {
-        debouncedSearch(query);
+        debouncedSearch(query); // Llamar a la función debouncedSearch
     } else {
         document.getElementById('results').innerHTML = '';
     }
@@ -856,28 +854,6 @@ function debounce(func, delay) {
         }, delay);
     };
 }
-const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
-// Estilos CSS (con la nueva ubicación del mensaje)
-const style2 = document.createElement('style');
-style2.textContent = `
-    /* ... (tus otros estilos) */
-    .mensaje-flotante {
-        margin-top: 25px; /* Espacio entre la playlist y el mensaje */
-        background-color: rgba(32, 96, 187, 0.7);
-        color: white;
-        padding: 10px 30px;
-        border: 2px dashed white;
-        border-radius: 5px;
-        text-align: center; /* Centrar el texto */
-        opacity: 1;
-        transition: opacity 1s ease-in-out;
-    }
-    .mensaje-flotante.fadeOut {
-        opacity: 0;
-    }
-    /* ... (otros estilos) */
-`;
-document.head.appendChild(style2);
 //Funciones de formato de tiempo
 function formatDuration(duration) {
     if (isNaN(duration) || duration < 0) {
