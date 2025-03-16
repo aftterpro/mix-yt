@@ -746,7 +746,7 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
-function monitorPlayers() {  // Función para monitorizar
+async function monitorPlayers() {
     if (!playersInitialized) {
         console.warn('Los reproductores no están inicializados.');
         return;
@@ -755,25 +755,67 @@ function monitorPlayers() {  // Función para monitorizar
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
 
     if (!currentPlayerInstance || currentPlayerInstance.getPlayerState() !== YT.PlayerState.PLAYING) {
-      return; // Salir si el reproductor no existe o no está reproduciendo
+        return; // Salir si el reproductor no existe o no está reproduciendo
     }
-      try {
+
+    try {
         const currentTime = currentPlayerInstance.getCurrentTime();
         const duration = currentPlayerInstance.getDuration();
 
         if (isNaN(duration) || duration <= 0) {
             return; // Salir si la duración no es válida
         }
-        const timeRemaining = duration - currentTime;
+
+        // Obtener el videoId del reproductor actual
+        const videoId = currentPlayerInstance.getVideoData().video_id;
+
+        // Obtener los segmentos de SponsorBlock (asumiendo que tienes una función para esto)
+        const segmentos = await obtenerSegmentosSponsorBlock(videoId);
+        console.log("Los segmentos encontrados: ", segmentos")
+        let timeSponsorblock = 0;
+        if (segmentos && segmentos.length > 0) {
+            // Calcular el tiempo total de los segmentos
+            timeSponsorblock = segmentos.reduce((total, segmento) => {
+                return total + (segmento.endTime - segmento.startTime);
+            }, 0);
+        }
+
+        // Calcular el tiempo restante con o sin segmentos
+        const timeRemaining = segmentos && segmentos.length > 0
+            ? duration - currentTime - timeSponsorblock
+            : duration - currentTime;
+
         console.log(`Tiempo restante para Player${currentPlayer}: ${timeRemaining.toFixed(1)} segundos`);
 
         const roundedTimeRemaining = Math.floor(timeRemaining);
         if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining > 0) {
-         console.log('Iniciando efecto crossfade al próximo reproductor.');
-        playNextVideo();
-       }
+            console.log('Iniciando efecto crossfade al próximo reproductor.');
+            playNextVideo();
+        }
     } catch (error) {
         console.error(`Error al monitorear Player${currentPlayer}:`, error);
+    }
+}
+
+// Función ficticia para obtener los segmentos de SponsorBlock
+async function obtenerSegmentosSponsorBlock(videoId) {
+    try {
+        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
+        const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, {
+            headers: {
+                'X-UserID': userId
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.filter(segment => segment.category !== 'music_offtopic');
+    } catch (error) {
+        console.error("Error al obtener segmentos de SponsorBlock:", error);
+        return []; // Devolver un array vacío en caso de error
     }
 }
 // Módulo: Manejo de Eventos y Botones
