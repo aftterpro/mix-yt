@@ -811,7 +811,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         }
 
         const data = await response.json();
-        return data.filter(segment => segment.category !== 'music_offtopic');
+        return data
     } catch (error) {
         console.error("Error al obtener segmentos de SponsorBlock:", error);
         return []; // Devolver un array vacío en caso de error
