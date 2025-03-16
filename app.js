@@ -771,7 +771,7 @@ async function monitorPlayers() {
 
         // Obtener los segmentos de SponsorBlock (asumiendo que tienes una función para esto)
         const segmentos = await obtenerSegmentosSponsorBlock(videoId);
-        console.log("Los segmentos encontrados: ", segmentos")
+        console.log("Los segmentos encontrados: ", segmentos);
         let timeSponsorblock = 0;
         if (segmentos && segmentos.length > 0) {
             // Calcular el tiempo total de los segmentos
