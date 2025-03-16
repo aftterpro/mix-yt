@@ -534,10 +534,9 @@ async function getPlaylistInfo(playlistId) {
     if (!data || !data.relatedStreams) {
       throw new Error("La estructura de la respuesta no contiene videos válidos.");
     }
-    console.log("Información de la playlist:", data);
+   
     // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
     const playlistName = data.name || "Playlist sin nombre"; // Accede a data.name
-    console.log("Llamando a displayPlaylist con datos:", data); // Añade esta línea
     displayPlaylist(data); // Llamo para cambiar nombre de playlist
     return { ...data, name: playlistName };
   } catch (error) {
