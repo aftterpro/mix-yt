@@ -745,6 +745,9 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
+
+let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
+
 async function monitorPlayers() {
     if (!playersInitialized) {
         console.warn('Los reproductores no están inicializados.');
@@ -768,9 +771,17 @@ async function monitorPlayers() {
         // Obtener el videoId del reproductor actual
         const videoId = currentPlayerInstance.getVideoData().video_id;
 
-        // Obtener los segmentos de SponsorBlock (asumiendo que tienes una función para esto)
-        const segmentos = await obtenerSegmentosSponsorBlock(videoId);
-        console.log("Los segmentos encontrados: ", segmentos);
+        // Verificar si ya hemos obtenido los segmentos para este videoId
+        if (!segmentosCache[videoId]) {
+            console.log(`Obteniendo segmentos de SponsorBlock para el video ID: ${videoId}`);
+            const segmentos = await obtenerSegmentosSponsorBlock(videoId);
+            segmentosCache[videoId] = segmentos; // Almacenar los segmentos en la caché
+            console.log("Los segmentos encontrados: ", segmentosCache[videoId]);
+        } else {
+            console.log(`Utilizando segmentos en caché para el video ID: ${videoId}`);
+        }
+
+        const segmentos = segmentosCache[videoId];
         let timeSponsorblock = 0;
         if (segmentos && segmentos.length > 0) {
             // Calcular el tiempo total de los segmentos
@@ -789,7 +800,8 @@ async function monitorPlayers() {
         const roundedTimeRemaining = Math.floor(timeRemaining);
         if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining > 0) {
             console.log('Iniciando efecto crossfade al próximo reproductor.');
-            playNextVideo();
+            // Pasar el videoId del video actual a playNextVideo para que pueda limpiar la caché si es necesario
+            playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));
         }
     } catch (error) {
         console.error(`Error al monitorear Player${currentPlayer}:`, error);
@@ -799,27 +811,27 @@ async function monitorPlayers() {
 // Función ficticia para obtener los segmentos de SponsorBlock
 async function obtenerSegmentosSponsorBlock(videoId) {
     try {
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-    const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, { // URL corregida
-    headers: {
-        'X-UserID': userId
-    }
-});
-
+        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
+        const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, { // URL corregida
+            headers: {
+                'X-UserID': userId
+            }
+        });
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Si hay un error al obtener los segmentos, no los almacenamos en caché
+            console.error(`Error al obtener segmentos de SponsorBlock para ${videoId}: ${response.status}`);
+            return;
         }
 
         const data = await response.json();
-        return data
+        return data;
     } catch (error) {
         console.error("Error al obtener segmentos de SponsorBlock:", error);
-        return []; // Devolver un array vacío en caso de error
+        return ; // Devolver un array vacío en caso de error
     }
 }
 // Módulo: Manejo de Eventos y Botones
 // Botón Mix
-
 document.getElementById('botonNext').addEventListener('click', () => {
     playNextVideo()
         // Cambia el video en el siguiente reproductor
