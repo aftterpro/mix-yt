@@ -799,12 +799,12 @@ async function monitorPlayers() {
 // Función ficticia para obtener los segmentos de SponsorBlock
 async function obtenerSegmentosSponsorBlock(videoId) {
     try {
-        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-        const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, {
-            headers: {
-                'X-UserID': userId
-            }
-        });
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
+    const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, { // URL corregida
+    headers: {
+        'X-UserID': userId
+    }
+});
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
