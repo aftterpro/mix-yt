@@ -809,23 +809,22 @@ async function monitorPlayers() {
         console.error(`Error al monitorear Player${currentPlayer}:`, error);
     }
 }
-
 // Función ficticia para obtener los segmentos de SponsorBlock manejar respuestas vacías o de error de la API
 async function obtenerSegmentosSponsorBlock(videoId) {
     try {
         userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-        response = fetch(f'https://sponsorblock.netlify.app/api/segments/{videoId}', {
+        response = fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, {
             headers: {
                 'X-UserID': userId
             }
-        })
+        });
 
         if (!response.ok) {
             if (response.status === 404) {
                 console.log(`No se encontraron segmentos para el video ID: ${videoId}`);
                 return []; // Devolver un array vacío en caso de 404
             }
-            throw new Error(f'HTTP error! status: {response.status}')
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         // Verificar si la respuesta está vacía antes de intentar parsear JSON
@@ -836,11 +835,11 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         }
 
         const data = JSON.parse(text);
-        return data
+        return data;
 
-    except (error) {
-        console.error('Error al obtener segmentos de SponsorBlock:', error)
-        return []  // Devolver un array vacío en caso de error
+    } catch (error) { // Cambiar "except" a "catch"
+        console.error('Error al obtener segmentos de SponsorBlock:', error);
+        return []; // Devolver un array vacío en caso de error
     }
 }
 // Módulo: Manejo de Eventos y Botones
