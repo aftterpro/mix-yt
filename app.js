@@ -673,7 +673,11 @@ function playNextVideo(videoId, video) {
 
             // Efecto crossfade de volumen
             crossfadeAudio();
-        }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
+              // Limpiar la caché del video anterior
+    if (videoId) {
+        delete segmentosCache[videoId];
+        console.log(`Caché limpiada para el video ID: ${videoId}`);
+    }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
     } else {
         console.log('Fin de la lista de reproducción.');
         askToRepeatPlaylist();
@@ -745,7 +749,6 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
-
 let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
 
 async function monitorPlayers() {
@@ -808,26 +811,37 @@ async function monitorPlayers() {
     }
 }
 
-// Función ficticia para obtener los segmentos de SponsorBlock
+// Función ficticia para obtener los segmentos de SponsorBlock manejar respuestas vacías o de error de la API
 async function obtenerSegmentosSponsorBlock(videoId) {
     try {
-        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-        const response = await fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, { // URL corregida
+        userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
+        response = fetch(f'https://sponsorblock.netlify.app/api/segments/{videoId}', {
             headers: {
                 'X-UserID': userId
             }
-        });
+        })
+
         if (!response.ok) {
-            // Si hay un error al obtener los segmentos, no los almacenamos en caché
-            console.error(`Error al obtener segmentos de SponsorBlock para ${videoId}: ${response.status}`);
-            return;
+            if (response.status === 404) {
+                console.log(`No se encontraron segmentos para el video ID: ${videoId}`);
+                return []; // Devolver un array vacío en caso de 404
+            }
+            throw new Error(f'HTTP error! status: {response.status}')
         }
 
-        const data = await response.json();
-        return data;
-    } catch (error) {
-        console.error("Error al obtener segmentos de SponsorBlock:", error);
-        return ; // Devolver un array vacío en caso de error
+        // Verificar si la respuesta está vacía antes de intentar parsear JSON
+        const text = await response.text();
+        if (!text) {
+            console.log(`Respuesta vacía para el video ID: ${videoId}`);
+            return []; // Devolver un array vacío si la respuesta está vacía
+        }
+
+        const data = JSON.parse(text);
+        return data
+
+    except (error) {
+        console.error('Error al obtener segmentos de SponsorBlock:', error)
+        return []  // Devolver un array vacío en caso de error
     }
 }
 // Módulo: Manejo de Eventos y Botones
