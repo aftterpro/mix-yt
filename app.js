@@ -670,14 +670,13 @@ function playNextVideo(videoId, video) {
             nextPlayerElement.classList.remove('fade-in');
 
             currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
-
-            // Efecto crossfade de volumen
-            crossfadeAudio();
+            crossfadeAudio(); // Efecto crossfade de volumen
               // Limpiar la caché del video anterior
-    if (videoId) {
+     if (videoId) {
         delete segmentosCache[videoId];
         console.log(`Caché limpiada para el video ID: ${videoId}`);
-    }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
+    }
+}, 1500); // Coma eliminada Asegura que el tiempo coincida con las transiciones CSS
     } else {
         console.log('Fin de la lista de reproducción.');
         askToRepeatPlaylist();
