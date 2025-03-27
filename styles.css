@@ -25,6 +25,29 @@ html, body {
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
+
+/* Estilos para los elementos de la playlist */
+#playlistContainer #playlist .playlist-item {
+    display: flex; /* Para alinear la imagen y el título en la misma línea */
+    align-items: center; /* Para centrar verticalmente la imagen y el título */
+    margin-bottom: 5px; /* Espacio entre cada elemento de la playlist */
+    padding: 5px; /* Un poco de espacio interno */
+    border-bottom: 1px solid #333; /* Separador visual entre elementos */
+}
+
+#playlistContainer #playlist .playlist-item h3 {
+    font-size: 0.9em; /* Reduce el tamaño de la fuente del título */
+    margin: 0; /* Elimina los márgenes por defecto del h3 */
+    flex-grow: 1; /* Permite que el título ocupe el espacio restante */
+}
+
+#playlistContainer #playlist .playlist-item img {
+    width: 50px; /* Ancho de la miniatura */
+    height: 50px; /* Alto de la miniatura */
+    margin-left: 10px; /* Espacio entre el título y la imagen */
+    border-radius: 5px; /* Opcional: bordes redondeados para la imagen */
+}
+
 .sidebar {
     width: 240px;
     background: #212121; /* Fondo oscuro para la sidebar */
