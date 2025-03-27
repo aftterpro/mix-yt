@@ -25,21 +25,22 @@
     <div class="container">
         <aside class="sidebar">
             <div class="playlist-header">
-		</div>    
-                <h3>Playlist</h3>
+		</div>   
+		 <div id="playlistContainer">
+                   <div id="playlist"></div>
+                  <h3>Playlist</h3>
             </div>
-            <div id="playlistContainer">
-                <div id="playlist"></div>
-            </div>
-        </aside>
-        <main class="main-content">
-            <section id="search-panel" class="vibe-panel">
-                <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search On Piped.video">
-                    <div class="playlist-url-input"> <input type="text" id="searchInput2" placeholder="Añadir Link Playlist :)"> </div>     
-	            <button id="añadirUrlButton" class="add-to-playlist">
-                <i class="fa-solid fa-plus"></i> <span class="add-text">Añadir a la playlist</span>
+             <div class="search-container">
+         	<div class="playlist-url-input"> <input type="text" id="searchInput2" placeholder="Añadir Link Playlist :)"> </div>     
+		   <button id="añadirUrlButton" class="add-to-playlist" style="width: 100%; margin-bottom: 10px;">>
+                    <i class="fa-solid fa-plus"></i> <span class="add-text">Añadir a la playlist</span>
 	        </button>
+                </div>
+        </aside>
+<main class="main-content">
+        <section id="search-panel" class="vibe-panel">
+		    
+                    <input type="text" id="searchInput" placeholder="Search On Piped.video">
                 </div>
                 <div id="resultsContainer">
                     <div id="results"></div>
