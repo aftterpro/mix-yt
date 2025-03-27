@@ -656,11 +656,7 @@ function playNextVideo(videoId, video) {
 
         // Aplicar efecto visual
         currentPlayerElement.classList.add('fade-out');
-        console.log("currentPlayerElement classes:", currentPlayerElement.classList);
-
         nextPlayerElement.classList.remove('hidden'); // Asegura que el siguiente reproductor sea visible
-        console.log("nextPlayerElement classes:", nextPlayerElement.classList);
-
         nextPlayerElement.classList.add('fade-in');
 
         // Esperar a que termine el efecto visual antes de continuar
