@@ -21,7 +21,7 @@ html, body {
 /* ---- ESTRUCTURA PRINCIPAL ---- */
 .container {
     display: flex;
-    height: calc(100vh - 60px); /* Ajustar altura restando la del reproductor fijo */
+        flex: 1; /* Permite que el contenedor principal crezca */
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
@@ -66,7 +66,7 @@ html, body {
 }
 /* ---- SEARCH VIDEOS ---- */
 .main-content {
-    flex-grow: 1;
+    flex: 1;
     padding: 1rem;
     background: #181818; /* Otro tono de oscuro para el contenido principal */
     display: flex;
