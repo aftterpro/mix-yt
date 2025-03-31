@@ -89,7 +89,6 @@ aside.sidebar {
     width: 450px; /* Ancho del sidebar */
     padding: 10px;
     box-sizing: border-box;
-    overflow-y: auto; /* Permite el scroll si la playlist es muy larga */
     flex-shrink: 0; /* Evita que el sidebar se encoja */
     scrollbar-width: thin; /* Para navegadores Firefox */
     scrollbar-color: #555 #333; /* Para navegadores Firefox */
