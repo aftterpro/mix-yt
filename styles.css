@@ -26,7 +26,11 @@ html, body {
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
-
+#playlistContainer {
+    overflow-y: scroll; /* Enables vertical scrolling */
+    /* You might also need to set a height for the container */
+    height: 300px; /* Adjust as needed */
+}
 /* Estilos para los elementos de la playlist */
 #playlistContainer #playlist .playlist-item {
     display: flex; /* Para alinear la imagen y el título en la misma línea */
