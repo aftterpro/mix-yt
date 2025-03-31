@@ -21,7 +21,7 @@ html, body {
 /* ---- ESTRUCTURA PRINCIPAL ---- */
 .container {
     display: flex;
-        flex: 1; /* Permite que el contenedor principal crezca */
+    flex: 1; /* Permite que el contenedor principal crezca */
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
@@ -36,251 +36,166 @@ html, body {
 }
 
 #playlistContainer #playlist .playlist-item h3 {
-    font-size: 0.9em; /* Reduce el tamaño de la fuente del título */
-    margin: 0; /* Elimina los márgenes por defecto del h3 */
+    font-size: 0.9em;
+    margin-left: 10px; /* Espacio entre la imagen y el texto */
     flex-grow: 1; /* Permite que el título ocupe el espacio restante */
 }
-
-#playlistContainer #playlist .playlist-item img {
-    width: 50px; /* Ancho de la miniatura */
-    height: 50px; /* Alto de la miniatura */
-    margin-left: 10px; /* Espacio entre el título y la imagen */
-    border-radius: 5px; /* Opcional: bordes redondeados para la imagen */
+#playlistContainer #playlist .playlist-item .thumbnail-container {
+    margin-right: 10px; /* Espacio entre la miniatura y el título */
+}
+/* Estilos para el contenedor de la playlist */
+.playlist-header {
+    text-align: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #555;
+    margin-bottom: 10px;
 }
 
 .sidebar {
-    width: 240px;
-    background: #212121; /* Fondo oscuro para la sidebar */
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.playlist-header {
-    text-align: left;
-    margin-bottom: 1rem;
-    font-size: 1.3rem;
-    font-weight: bold;
-    padding-left: 10px;
-}
-/* ---- LISTA DE REPRODUCCIÓN ---- */
-#playlistContainer {
-    flex-grow: 1;
-    overflow-y: auto;
-    max-height: calc(100vh - 150px); /* Ajusta según sea necesario */
-}
-.playlist-item {
-    background-color: transparent;
-    color: #fff;
-    padding: 8px 10px;
-    border-bottom: 1px solid #444;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-/* Panel de búsqueda con su propia barra de desplazamiento */
-/* Ajuste para que la lista de resultados tenga su propia barra */
-#resultsContainer {
-    max-height: 380px;
-    width: 480px;
-    overflow-y: auto;
-    padding: 0.5rem;
-}
-/* ---- SEARCH VIDEOS ---- */
-.main-content {
-    flex: 1;
-    padding: 1rem;
-    background: #181818; /* Otro tono de oscuro para el contenido principal */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow: hidden; /* Evita scroll de la página */
-}
-
-/* Panel de búsqueda con estilo más limpio */
-.vibe-panel {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    width: 100%;
-    max-width: 600px;
-    backdrop-filter: blur(10px);
-}
-
-/* ---- FOOTER - REPRODUCTOR ---- */
-.player-footer {
-    background: rgba(0, 0, 0, 0.9);
-    padding: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
-
-/* Contenedor del video */
-#player1, #player2 {
-    visibility: visible;
-}
-#videoContainer.video-container {
-    width: 180px;
-    height: 100px;
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-}
-
-/* ---- BOTONES ---- */
-.player-controls {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-}
-
-#iniciarButton, #mixButton {
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    border: none;
-    border-radius: 20px;
-    background-color: #1db954; /* Color de Spotify */
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-#iniciarButton:hover, #mixButton:hover {
-    background-color: #1aa34a;
-}
-
-/* ---- INPUTS ---- */
-input[type="text"] {
-    padding: 0.6rem;
-    font-size: 1rem;
-    border: 1px solid #333;
-    border-radius: 20px;
-    width: 100%;
-    max-width: 400px;
+    background-color: #222;
+    color: #eee;
+    width: 300px; /* Ancho del sidebar */
+    padding: 20px;
     box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    overflow-y: auto; /* Permite el scroll si la playlist es muy larga */
+    flex-shrink: 0; /* Evita que el sidebar se encoja */
 }
 
-input[type="text"]::placeholder {
-    color: rgba(255, 255, 255, 0.6);
+.playlist-url-input input[type="text"] {
+    width: calc(100% - 20px); /* Ajustar ancho para el padding */
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: #eee;
+    border-radius: 5px;
+    box-sizing: border-box;
 }
 
-/* ---- REPRODUCTOR ESTILO SPOTIFY ---- */
-#contenedor-player {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background-color: #212121; /* Ejemplo de color de fondo para el reproductor */
+#playlist {
+    padding: 0;
+    list-style-type: none;
+}
+
+#playlist li {
+    padding: 8px 0;
+    border-bottom: 1px solid #444;
+}
+
+#playlist li:last-child {
+    border-bottom: none;
+}
+
+#playlist li button {
+    background: none;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+#playlist li button:hover {
     color: #fff;
-    padding: 10px;
+}
+/* ---- CONTENIDO PRINCIPAL ---- */
+.main-content {
+    flex-grow: 1; /* El contenido principal ocupa el espacio restante */
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto; /* Permite el scroll en el contenido principal */
+}
+
+#search-panel {
+    background-color: #1e1e1e;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+#resultsContainer {
+    margin-top: 15px;
+}
+
+.search-result-item {
+    background-color: #282828;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
     display: flex;
     align-items: center;
-    justify-content: space-between; /* Para distribuir los controles */
-    z-index: 1000; /* Asegura que esté por encima de otros elementos */
-}
-/* Cuando el reproductor está expandido */
-#contenedor-player.expandido {
-    width: 500px;
-    height: 300px;
-}
-/* ---- ESTILO DE SCROLL PERSONALIZADO ---- */
-#playlistContainer::-webkit-scrollbar, 
-#resultsContainer::-webkit-scrollbar {
-    width: 6px;
 }
 
-#playlistContainer::-webkit-scrollbar-thumb, 
-#resultsContainer::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 3px;
+.search-result-item img {
+    width: 80px;
+    height: 60px;
+    margin-right: 15px;
+    object-fit: cover;
 }
 
-#playlistContainer::-webkit-scrollbar-track, 
-#resultsContainer::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
+.search-result-item h3 {
+    font-size: 1em;
+    margin: 0 0 5px 0;
 }
+
+.search-result-item p {
+    font-size: 0.8em;
+    color: #aaa;
+    margin: 0;
+}
+
+.search-container input[type="text"] {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 5px;
+    background-color: #333;
+    color: #fff;
+    box-sizing: border-box;
+}
+
+#results {
+    /* Estilos para la lista de resultados de búsqueda */
+}
+/* ---- CONTENEDOR DEL PLAYER ---- */
+#contenedor-player {
+    background-color: #000; /* Fondo oscuro para el reproductor */
+    color: #fff;
+    padding: 15px;
+    margin-bottom: 20px; /* Espacio entre el reproductor y el siguiente elemento */
+}
+
 #videoContainer {
     position: relative;
     width: 100%;
-    height: 100%;
+    max-width: 640px; /* Ancho máximo del reproductor */
+    margin: 0 auto; /* Centrar el reproductor */
 }
-#contenedor-player.expandido {
-    width: 500px;  /* Tamaño cuando está expandido */
-    height: 300px;
-}
-/* Contenedor del video (minimizado) */
+
 .video-container {
-    width: 80px;
-    height: 80px;
+    position: relative;
+    padding-bottom: 56.25%; /* Proporción 16:9 para el video */
+    height: 0;
     overflow: hidden;
-    border-radius: 8px;
-    transition: width 0.3s ease, height 0.3s ease;
-     position: relative; /* Asegura que el video se coloque en el contenedor correctamente */
+    background-color: #111; /* Fondo si el video no está cargado */
 }
-/* Cuando el reproductor está expandido, el video se muestra grande */
-#contenedor-player.expandido .video-container {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-}
-/* Solo un player debe estar visible */
+
 .video-player {
-    width: 100%;
-    height: 100%;
-    display: block;  /* Asegúrate de que el video no se oculte */
-}
-
-.video-container video {
-    width: 100%;
-    height: 100%;
-    border-radius: 10px;
-    object-fit: cover;
-}
-.hidden {
-    display: none !important; /* Evitar que se oculten si no es necesario */
-}
-/* Botón de expandir/contraer */
-#boton-expandir {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(255, 255, 255, 0.2);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     border: none;
-    color: white;
-    padding: 5px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s ease;
 }
 
-#boton-expandir:hover {
-    background: rgba(255, 255, 255, 0.4);
-}
-
-/* ---- IMÁGENES DE LA PLAYLIST ---- */
-.playlist-item img {
-    width: 40px;  /* Tamaño reducido */
-    height: 40px;
-    border-radius: 5px;
-    object-fit: cover;
-}
-
-/* ---- CONTROLES ESTILO SPOTIFY ---- */
 .player-controls {
     display: flex;
-    align-items: center;
-    gap: 20px;
+    justify-content: center;
+    margin-top: 10px;
 }
-/* Botones estilo Spotify */
+
+/* Estilos tipo Spotify */
 .player-controls button {
     background: none;
     border: none;
@@ -288,6 +203,7 @@ input[type="text"]::placeholder {
     font-size: 24px;
     cursor: pointer;
     transition: color 0.3s ease;
+    margin: 0 10px; /* Espacio entre los botones */
 }
 
 .player-controls button:hover {
@@ -327,17 +243,52 @@ input[type="text"]::placeholder {
 
 #iniciarButton, #mixButton {
     padding: 10px 15px;
-    font-size: 1rem;
+    margin: 10px;
     border: none;
-    border-radius: 20px;
-    background-color: #1db954; /* Color de Spotify */
-    color: white;
+    border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    font-size: 1em;
 }
 
-#iniciarButton:hover, #mixButton:hover {
-    background-color: #1aa34a;
+#iniciarButton {
+    background-color: #007bff;
+    color: white;
+}
+
+#mixButton {
+    background-color: #28a745;
+    color: white;
+}
+/* Estilos para el mensaje flotante */
+.mensaje-flotante {
+    position: fixed;
+    bottom: 20px; /* Ajusta la distancia desde la parte inferior */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1000; /* Asegura que esté por encima de otros elementos */
+    opacity: 1;
+    transition: opacity 1s ease-out;
+}
+
+.mensaje-flotante.fadeOut {
+    opacity: 0;
+}
+/* Estilos para el contenedor de búsqueda en la playlist y el panel principal */
+.search-container {
+    margin-bottom: 15px;
+}
+.search-container input[type="text"] {
+    width: calc(100% - 22px); /* Ajuste para el padding */
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 5px;
+    background-color: #333;
+    color: #eee;
+    box-sizing: border-box;
 }
 
 /* ---- RESPONSIVIDAD ---- */
