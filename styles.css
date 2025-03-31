@@ -28,7 +28,6 @@ html, body {
 /* ---- SIDEBAR (PLAYLIST) ---- */
 aside.sidebar {
     border-radius: 12px;
-    overflow-y: auto;
     box-sizing: border-box;
     max-height: 410px;
     margin-bottom: 25px;
