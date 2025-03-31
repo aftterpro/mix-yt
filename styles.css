@@ -163,6 +163,8 @@ html, body {
     color: #fff;
     padding: 15px;
     margin-bottom: 20px; /* Espacio entre el reproductor y el siguiente elemento */
+    height: 460px;
+    width: 640px;
 }
 
 #videoContainer {
