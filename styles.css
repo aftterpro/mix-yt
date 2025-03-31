@@ -1,14 +1,14 @@
 /* ---- ESTILO GENERAL ---- */
 body.vibe-theme {
     font-family: 'Montserrat', sans-serif;
-    margin: 0;
-    background: linear-gradient(135deg, #121212, #181818); /* Más oscuro */
+    margin: 15px;
+    background: linear-gradient(135deg, #121212, #181818);
     color: #fff;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     overflow-x: hidden;
-    align-items: center; /* Centrar horizontalmente el contenedor del reproductor */
+    align-items: center;
 }
 :root {
     --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
@@ -26,6 +26,13 @@ html, body {
 }
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
+aside.sidebar {
+    border-radius: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    max-height: 410px;
+    margin-bottom: 25px;
+}
 #playlistContainer {
     overflow-y: scroll; /* Enables vertical scrolling */
     /* You might also need to set a height for the container */
@@ -39,7 +46,19 @@ html, body {
     padding: 5px; /* Un poco de espacio interno */
     border-bottom: 1px solid #333; /* Separador visual entre elementos */
 }
-
+.add-to-playlist {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1em;
+    padding: 5px 10px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    transition: background-color 0.3s ease;
+    margin-bottom: 5px;
+}
 #playlistContainer #playlist .playlist-item h3 {
     font-size: 0.9em;
     margin-left: 10px; /* Espacio entre la imagen y el texto */
@@ -57,16 +76,18 @@ html, body {
 /* Estilos para el contenedor de la playlist */
 .playlist-header {
     text-align: center;
-    padding: 10px 0;
+    padding: 5px;
     border-bottom: 1px solid #555;
-    margin-bottom: 10px;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: rgb(85, 85, 85);
+    margin-bottom: 5px;
 }
-
 .sidebar {
     background-color: #222;
     color: #eee;
-    width: 300px; /* Ancho del sidebar */
-    padding: 20px;
+    width: 450px; /* Ancho del sidebar */
+    padding: 10px;
     box-sizing: border-box;
     overflow-y: auto; /* Permite el scroll si la playlist es muy larga */
     flex-shrink: 0; /* Evita que el sidebar se encoja */
@@ -107,7 +128,11 @@ html, body {
     padding: 8px 0;
     border-bottom: 1px solid #444;
 }
-
+.thumbnail {
+    width: 150px;
+    height: 80px;
+    object-fit: cover;
+}
 #playlist li:last-child {
     border-bottom: none;
 }
@@ -125,22 +150,21 @@ html, body {
 }
 /* ---- CONTENIDO PRINCIPAL ---- */
 .main-content {
-    flex-grow: 1; /* El contenido principal ocupa el espacio restante */
-    padding: 20px;
+    flex-grow: 1;
+    padding: 5px;
     box-sizing: border-box;
-    overflow-y: auto; /* Permite el scroll en el contenido principal */
+    overflow-y: auto;
 }
-
 #search-panel {
     background-color: #1e1e1e;
-    padding: 20px;
-    border-radius: 8px;
+    padding: 10px;
+    border-radius: 20px;
     margin-bottom: 20px;
-    overflow-y: auto; /* Añadir scroll al panel de búsqueda */
+    overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #555 #333;
+    width: 650px;
 }
-
 #search-panel::-webkit-scrollbar {
     width: 8px;
 }
@@ -195,9 +219,9 @@ html, body {
     color: #fff;
     box-sizing: border-box;
 }
-
 #results {
-    /* Estilos para la lista de resultados de búsqueda */
+    overflow-y: scroll;
+    height: 300px;
 }
 /* ---- CONTENEDOR DEL PLAYER ---- */
 #contenedor-player {
@@ -328,7 +352,7 @@ html, body {
 }
 /* Estilos para el contenedor de búsqueda en la playlist y el panel principal */
 .search-container {
-    margin-bottom: 15px;
+    margin-bottom: 5px;
 }
 .search-container input[type="text"] {
     width: calc(100% - 22px); /* Ajuste para el padding */
