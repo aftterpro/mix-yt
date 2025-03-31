@@ -43,6 +43,12 @@ html, body {
 #playlistContainer #playlist .playlist-item .thumbnail-container {
     margin-right: 10px; /* Espacio entre la miniatura y el título */
 }
+/* Estilos para las imágenes de la playlist */
+#playlistContainer #playlist .playlist-item img {
+    width: 60px; /* Ancho reducido de las imágenes */
+    height: 45px; /* Alto reducido de las imágenes */
+    object-fit: cover;
+}
 /* Estilos para el contenedor de la playlist */
 .playlist-header {
     text-align: center;
@@ -59,6 +65,21 @@ html, body {
     box-sizing: border-box;
     overflow-y: auto; /* Permite el scroll si la playlist es muy larga */
     flex-shrink: 0; /* Evita que el sidebar se encoja */
+    scrollbar-width: thin; /* Para navegadores Firefox */
+    scrollbar-color: #555 #333; /* Para navegadores Firefox */
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 8px; /* Ancho de la barra de scroll */
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background-color: #555; /* Color del "pulgar" de la barra de scroll */
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background-color: #333; /* Color del "riego" de la barra de scroll */
 }
 
 .playlist-url-input input[type="text"] {
@@ -110,6 +131,22 @@ html, body {
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+    overflow-y: auto; /* Añadir scroll al panel de búsqueda */
+    scrollbar-width: thin;
+    scrollbar-color: #555 #333;
+}
+
+#search-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+#search-panel::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}
+
+#search-panel::-webkit-scrollbar-track {
+    background-color: #333;
 }
 
 #resultsContainer {
@@ -163,8 +200,8 @@ html, body {
     color: #fff;
     padding: 15px;
     margin-bottom: 20px; /* Espacio entre el reproductor y el siguiente elemento */
-    height: 460px;
-    width: 640px;
+    height: 460px; /* Altura fija del contenedor */
+    width: 700px; /* Ancho fijo del contenedor */
 }
 
 #videoContainer {
