@@ -8,6 +8,7 @@ body.vibe-theme {
     flex-direction: column;
     min-height: 100vh;
     overflow-x: hidden;
+    align-items: center; /* Centrar horizontalmente el contenedor del reproductor */
 }
 :root {
     --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
@@ -200,15 +201,19 @@ html, body {
     color: #fff;
     padding: 15px;
     margin-bottom: 20px; /* Espacio entre el reproductor y el siguiente elemento */
-    height: 460px; /* Altura fija del contenedor */
-    width: 700px; /* Ancho fijo del contenedor */
+    height: 360px; /* Altura fija del contenedor */
+    width: 450px; /* Ancho fijo del contenedor */
+    display: flex; /* Para centrar el contenido internamente */
+    flex-direction: column;
+    align-items: center; /* Centrar horizontalmente el contenido */
+    justify-content: center; /* Centrar verticalmente el contenido (si es necesario) */
 }
 
 #videoContainer {
     position: relative;
     width: 100%;
     max-width: 640px; /* Ancho máximo del reproductor */
-    margin: 0 auto; /* Centrar el reproductor */
+    /* margin: 0 auto; Centrar el reproductor (se centra el contenedor padre) */
 }
 
 .video-container {
@@ -217,6 +222,7 @@ html, body {
     height: 0;
     overflow: hidden;
     background-color: #111; /* Fondo si el video no está cargado */
+    width: 100%; /* Asegurar que el contenedor del video ocupe el ancho del padre */
 }
 
 .video-player {
@@ -329,7 +335,6 @@ html, body {
     color: #eee;
     box-sizing: border-box;
 }
-
 /* ---- RESPONSIVIDAD ---- */
 @media (max-width: 600px) {
     #contenedor-player {
