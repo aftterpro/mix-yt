@@ -178,6 +178,13 @@ aside.sidebar {
     height: 67.5px;
     object-fit: cover;
 }
+.thumbnail-container {
+    position: relative;
+    width: 160px;
+    height: 90px;
+    overflow: hidden;
+    border-radius: 5px;
+}
 #playlist li:last-child {
     border-bottom: none;
 }
@@ -229,13 +236,6 @@ aside.sidebar {
     gap: 15px; /* Adjust the spacing between thumbnail and details */
     padding: 10px;
     border-bottom: 1px solid #333; /* Optional: Add a separator between results */
-}
-.thumbnail-container {
-    position: relative;
-    width: 160px; /* Adjust as needed */
-    height: 90px; /* Adjust as needed */
-    overflow: hidden; /* Clip the thumbnail if it doesn't fit */
-    border-radius: 5px;
 }
 .thumbnail-container img {
     width: 100%;
@@ -596,7 +596,11 @@ aside.sidebar {
     }
 
     .thumbnail-container {
-        width: 100%;
+    position: relative;
+    width: 160px;
+    height: 90px;
+    overflow: hidden;
+    border-radius: 5px;
     }
 
     .thumbnail-container img {
