@@ -292,9 +292,8 @@ aside.sidebar {
 }
 /* Ajustes de scroll */
 #results {
-    overflow-y: scroll;
-    height: 350px; /* Aumentado de 300px */
-    padding: 8px;
+    overflow-y: auto;
+    height: 350px;
 }
 /* ---- CONTENEDOR DEL PLAYER ---- */
 #contenedor-player {
