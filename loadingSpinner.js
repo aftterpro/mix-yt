@@ -1,4 +1,3 @@
-// loadingSpinner.js
 
 // Function to hide the loading spinner
 function hideLoadingSpinner() {
