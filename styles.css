@@ -1,7 +1,8 @@
 /* ---- ESTILO GENERAL ---- */
 body.vibe-theme {
     font-family: 'Montserrat', sans-serif;
-    margin: 15px;
+    margin: 10px;
+    padding: 10px;
     background: linear-gradient(135deg, #121212, #181818);
     color: #fff;
     display: flex;
@@ -9,6 +10,11 @@ body.vibe-theme {
     min-height: 100vh;
     overflow-x: hidden;
     align-items: center;
+}
+.container {
+    display: flex;
+    gap: 15px; /* Añadido para espaciado consistente entre elementos */
+    padding: 10px;
 }
 :root {
     --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
@@ -27,22 +33,24 @@ html, body {
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
 aside.sidebar {
-    border-radius: 12px;
+    border-radius: 10px;
     box-sizing: border-box;
-    max-height: 410px;
-    margin-bottom: 25px;
+    width: 400px; /* Reducido de 450px */
+    max-height: 450px;
+    margin-bottom: 15px;
 }
 #playlistContainer {
     overflow-y: scroll; /* Enables vertical scrolling */
     /* You might also need to set a height for the container */
-    height: 300px; /* Adjust as needed */
+    height: 350px; /* Adjust as needed */
+    padding: 10px;
 }
 /* Estilos para los elementos de la playlist */
 #playlistContainer #playlist .playlist-item {
     display: flex; /* Para alinear la imagen y el título en la misma línea */
     align-items: center; /* Para centrar verticalmente la imagen y el título */
-    margin-bottom: 5px; /* Espacio entre cada elemento de la playlist */
-    padding: 5px; /* Un poco de espacio interno */
+    margin-bottom: 8px; /* Espacio entre cada elemento de la playlist */
+    padding: 8px; /* Un poco de espacio interno */
     border-bottom: 1px solid #333; /* Separador visual entre elementos */
 }
 .add-to-playlist {
@@ -68,10 +76,26 @@ aside.sidebar {
 }
 /* Estilos para las imágenes de la playlist */
 #playlistContainer #playlist .playlist-item img {
-    width: 60px; /* Ancho reducido de las imágenes */
-    height: 45px; /* Alto reducido de las imágenes */
+    width: 80px; /* Ancho reducido de las imágenes */
+    height: 60px; /* Alto reducido de las imágenes */
     object-fit: cover;
 }
+/* Ajustes de inputs */
+.search-container input[type="text"],
+.playlist-url-input input[type="text"] {
+    padding: 10px;
+    margin-bottom: 12px;
+    height: 40px;
+}
+/* Ajustes de botones */
+.add-to-playlist,
+#iniciarButton,
+#mixButton {
+    padding: 10px 15px;
+    margin: 8px;
+    height: 40px;
+}
+
 /* Estilos para el contenedor de la playlist */
 .playlist-header {
     text-align: center;
@@ -127,8 +151,8 @@ aside.sidebar {
     border-bottom: 1px solid #444;
 }
 .thumbnail {
-    width: 150px;
-    height: 80px;
+    width: 120px;
+    height: 67.5px;
     object-fit: cover;
 }
 #playlist li:last-child {
@@ -155,13 +179,13 @@ aside.sidebar {
 }
 #search-panel {
     background-color: #1e1e1e;
-    padding: 10px;
+    padding: 15px;
     border-radius: 20px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #555 #333;
-    width: 650px;
+    width: 600px;
 }
 #search-panel::-webkit-scrollbar {
     width: 8px;
@@ -190,9 +214,9 @@ aside.sidebar {
 }
 
 .search-result-item img {
-    width: 80px;
-    height: 60px;
-    margin-right: 15px;
+    width: 120px;
+    height: 90px;
+    margin-right: 12px;
     object-fit: cover;
 }
 
@@ -217,18 +241,20 @@ aside.sidebar {
     color: #fff;
     box-sizing: border-box;
 }
+/* Ajustes de scroll */
 #results {
     overflow-y: scroll;
-    height: 300px;
+    height: 350px; /* Aumentado de 300px */
+    padding: 8px;
 }
 /* ---- CONTENEDOR DEL PLAYER ---- */
 #contenedor-player {
     background-color: #000; /* Fondo oscuro para el reproductor */
     color: #fff;
-    padding: 15px;
-    margin-bottom: 20px; /* Espacio entre el reproductor y el siguiente elemento */
-    height: 360px; /* Altura fija del contenedor */
-    width: 450px; /* Ancho fijo del contenedor */
+    padding: 12px;
+    margin-bottom: 15px; /* Espacio entre el reproductor y el siguiente elemento */
+    height: 400px; /* Altura fija del contenedor */
+    width: 400px; /* Ancho fijo del contenedor */
     display: flex; /* Para centrar el contenido internamente */
     flex-direction: column;
     align-items: center; /* Centrar horizontalmente el contenido */
