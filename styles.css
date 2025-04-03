@@ -1,20 +1,34 @@
+/* ---- VARIABLES CSS ---- */
+:root {
+    --sidebar-width: 400px;
+    --player-width: 400px;
+    --search-panel-width: 600px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 15px;
+}
 /* ---- ESTILO GENERAL ---- */
 body.vibe-theme {
     font-family: 'Montserrat', sans-serif;
-    margin: 10px;
-    padding: 10px;
+    margin: var(--spacing-sm);
+    padding: var(--spacing-sm);
     background: linear-gradient(135deg, #121212, #181818);
     color: #fff;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    width: 100%;
     overflow-x: hidden;
     align-items: center;
+    max-width: 1440px;
+    margin: 0 auto;
 }
 .container {
     display: flex;
-    gap: 15px; /* Añadido para espaciado consistente entre elementos */
-    padding: 10px;
+    flex-direction: row;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm);
+    flex-wrap: wrap;
 }
 :root {
     --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
@@ -33,17 +47,19 @@ html, body {
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
 aside.sidebar {
+    flex: 1;
+    min-width: 300px;
+    max-width: var(--sidebar-width);
     border-radius: 10px;
-    box-sizing: border-box;
-    width: 400px; /* Reducido de 450px */
-    max-height: 450px;
-    margin-bottom: 15px;
+    height: calc(100vh - 500px);
+    min-height: 450px;
 }
 #playlistContainer {
     overflow-y: scroll; /* Enables vertical scrolling */
-    /* You might also need to set a height for the container */
-    height: 350px; /* Adjust as needed */
-    padding: 10px;
+    height: 100%;
+    max-height: 350px;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
 }
 /* Estilos para los elementos de la playlist */
 #playlistContainer #playlist .playlist-item {
@@ -52,6 +68,13 @@ aside.sidebar {
     margin-bottom: 8px; /* Espacio entre cada elemento de la playlist */
     padding: 8px; /* Un poco de espacio interno */
     border-bottom: 1px solid #333; /* Separador visual entre elementos */
+}
+/* ---- INPUTS Y BOTONES RESPONSIVE ---- */
+.search-container input[type="text"],
+.playlist-url-input input[type="text"] {
+    width: 100%;
+    height: 40px;
+    padding: 8px;
 }
 .add-to-playlist {
     background-color: #007bff;
@@ -91,8 +114,8 @@ aside.sidebar {
 .add-to-playlist,
 #iniciarButton,
 #mixButton {
-    padding: 10px 15px;
-    margin: 8px;
+   width: 100%;
+    max-width: 200px;
     height: 40px;
 }
 
@@ -172,20 +195,15 @@ aside.sidebar {
 }
 /* ---- CONTENIDO PRINCIPAL ---- */
 .main-content {
-    flex-grow: 1;
-    padding: 5px;
-    box-sizing: border-box;
-    overflow-y: auto;
+    flex: 2;
+    min-width: 300px;
+    max-width: calc(100% - var(--sidebar-width) - var(--spacing-lg));
 }
 #search-panel {
     background-color: #1e1e1e;
-    padding: 15px;
-    border-radius: 20px;
-    margin-bottom: 15px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #555 #333;
-    width: 600px;
+    width: 100%;
+    max-width: var(--search-panel-width);
+    margin: 0 auto;  
 }
 #search-panel::-webkit-scrollbar {
     width: 8px;
@@ -206,20 +224,20 @@ aside.sidebar {
 
 .search-result-item {
     background-color: #282828;
-    padding: 15px;
-    margin-bottom: 10px;
-    border-radius: 5px;
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
 }
 
 .search-result-item img {
     width: 120px;
     height: 90px;
-    margin-right: 12px;
     object-fit: cover;
 }
-
+.search-result-item .content {
+    flex: 1;
+    min-width: 200px;
+}
 .search-result-item h3 {
     font-size: 1em;
     margin: 0 0 5px 0;
@@ -251,21 +269,17 @@ aside.sidebar {
 #contenedor-player {
     background-color: #000; /* Fondo oscuro para el reproductor */
     color: #fff;
-    padding: 12px;
-    margin-bottom: 15px; /* Espacio entre el reproductor y el siguiente elemento */
-    height: 400px; /* Altura fija del contenedor */
-    width: 400px; /* Ancho fijo del contenedor */
-    display: flex; /* Para centrar el contenido internamente */
-    flex-direction: column;
-    align-items: center; /* Centrar horizontalmente el contenido */
-    justify-content: center; /* Centrar verticalmente el contenido (si es necesario) */
+    width: 100%;
+    max-width: var(--player-width);
+    margin: 0 auto var(--spacing-lg);
+    aspect-ratio: 16/9;
+    height: auto;
 }
 
 #videoContainer {
-    position: relative;
     width: 100%;
-    max-width: 640px; /* Ancho máximo del reproductor */
-    /* margin: 0 auto; Centrar el reproductor (se centra el contenedor padre) */
+    padding-bottom: 56.25%;
+    position: relative;
 }
 
 .video-container {
@@ -319,25 +333,6 @@ aside.sidebar {
 #boton-play {
     font-size: 32px;
 }
-/* Botón expandir en la esquina */
-#boton-expandir {
-    position: absolute;
-    top: 10px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    padding: 5px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s ease;
-}
-
-#boton-expandir:hover {
-    background: rgba(255, 255, 255, 0.4);
-}
-
 #iniciarButton, #mixButton {
     padding: 10px 15px;
     margin: 10px;
@@ -359,7 +354,7 @@ aside.sidebar {
 /* Estilos para el mensaje flotante */
 .mensaje-flotante {
     position: fixed;
-    bottom: 20px; /* Ajusta la distancia desde la parte inferior */
+    bottom: 30px; /* Ajusta la distancia desde la parte inferior */
     left: 50%;
     transform: translateX(-50%);
     background-color: rgba(0, 0, 0, 0.8);
@@ -388,14 +383,108 @@ aside.sidebar {
     box-sizing: border-box;
 }
 /* ---- RESPONSIVIDAD ---- */
-@media (max-width: 600px) {
-    #contenedor-player {
-        width: 100%;
-        height: 80px;
+@media (max-width: 1200px) {
+    .container {
+        gap: var(--spacing-md);
+    }
+    
+    aside.sidebar {
+        max-width: 350px;
+    }
+    
+    #search-panel {
+        max-width: 500px;
+    }
+}
+
+@media (max-width: 992px) {
+    .container {
+        flex-direction: column;
+        align-items: center;
     }
 
-    #contenedor-player.expandido {
+    aside.sidebar,
+    .main-content {
+        max-width: 600px;
         width: 100%;
-        height: 250px;
+    }
+
+    #contenedor-player {
+        max-width: 600px;
+    }
+}
+
+@media (max-width: 768px) {
+    body.vibe-theme {
+        margin: var(--spacing-sm);
+    }
+
+    aside.sidebar,
+    .main-content,
+    #contenedor-player,
+    #search-panel {
+        max-width: 100%;
+    }
+
+    .search-result-item {
+        flex-direction: column;
+    }
+
+    .search-result-item img {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --spacing-sm: 5px;
+        --spacing-md: 8px;
+        --spacing-lg: 10px;
+    }
+
+    .playlist-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .add-to-playlist,
+    #iniciarButton,
+    #mixButton {
+        max-width: 100%;
+    }
+
+    #playlistContainer {
+        max-height: 300px;
+    }
+}
+
+/* ---- UTILIDADES RESPONSIVE ---- */
+.hidden-mobile {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .hidden-mobile {
+        display: block;
+    }
+}
+
+/* ---- MEJORAS DE ACCESIBILIDAD ---- */
+@media (hover: none) {
+    /* Mejoras para dispositivos táctiles */
+    .playlist-item,
+    .search-result-item,
+    button {
+        padding: var(--spacing-md);
+    }
+}
+
+/* ---- SOPORTE PARA MODO OSCURO DEL SISTEMA ---- */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-accent-color: #ff4081;
     }
 }
