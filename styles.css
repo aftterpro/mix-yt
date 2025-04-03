@@ -365,6 +365,7 @@ aside.sidebar {
 /* Estilos para el contenedor de búsqueda en la playlist y el panel principal */
 .search-container {
     margin-bottom: 5px;
+    padding: 10px;
 }
 .search-container input[type="text"] {
     width: calc(100% - 22px); /* Ajuste para el padding */
