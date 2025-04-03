@@ -17,7 +17,6 @@ body.vibe-theme {
     min-height: 100vh;
     width: 100%;
     max-width: 1440px;
-    margin: 0 auto;
 }
 .container {
     display: flex;
@@ -245,13 +244,12 @@ aside.sidebar {
 }
 
 .search-container input[type="text"] {
-    width: calc(100% - 20px);
+    width: calc(100% - 22px);
     padding: 10px;
-    margin-bottom: 15px;
-    border: none;
-    border-radius: 5px;
+    border: 2px solid #555;
+    border-radius: 10px;
     background-color: #333;
-    color: #fff;
+    color: #eee;
     box-sizing: border-box;
 }
 /* Ajustes de scroll */
