@@ -378,6 +378,79 @@ aside.sidebar {
     color: #eee;
     box-sizing: border-box;
 }
+/* ---- Loading Spinner ---- */
+.loading-spinner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--primary-accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ---- Error Container ---- */
+.error-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff5252;
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    z-index: 1000;
+    max-width: 90%;
+    text-align: center;
+}
+
+/* ---- Templates ---- */
+.playlist-item, .search-result-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.item-content, .result-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.item-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ---- Utility Classes ---- */
+.hidden {
+    display: none !important;
+}
+
+.invisible {
+    visibility: hidden;
+}
 /* ---- RESPONSIVIDAD ---- */
 @media (max-width: 1200px) {
     .container {
@@ -477,7 +550,25 @@ aside.sidebar {
         padding: var(--spacing-md);
     }
 }
+/* ---- Responsive Improvements ---- */
+@media (max-width: 480px) {
+    .item-controls {
+        flex-direction: column;
+    }
 
+    .playlist-item, .search-result-item {
+        flex-direction: column;
+    }
+
+    .thumbnail-container {
+        width: 100%;
+    }
+
+    .thumbnail-container img {
+        width: 100%;
+        height: auto;
+    }
+}
 /* ---- SOPORTE PARA MODO OSCURO DEL SISTEMA ---- */
 @media (prefers-color-scheme: dark) {
     :root {
