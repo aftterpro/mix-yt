@@ -96,22 +96,21 @@
     </template>
 
     <!-- Template para resultados de búsqueda -->
-    <template id="search-result-template">
-        <div class="search-result-item">
-            <div class="thumbnail-container">
-                <img src="" alt="" class="result-thumbnail">
-                <span class="duration"></span>
-            </div>
-            <div class="result-content">
-                <h3 class="result-title"></h3>
-                <p class="result-description"></p>
-                <button class="add-to-playlist">
-                    <i class="fa-solid fa-plus"></i>
-                    <span>Añadir a la playlist</span>
-                </button>
-            </div>
+<template id="search-result-template">
+    <div class="search-result-item">
+        <div class="thumbnail-container">
+            <img src="" alt="" class="result-thumbnail">
+            <span class="duration"></span>
         </div>
-    </template>
+        <div class="result-details">
+            <h3 class="result-title video-title"></h3>
+            <button class="add-to-playlist">
+                <i class="fa-solid fa-plus"></i>
+                <span class="add-text">Añadir a la playlist</span>
+            </button>
+        </div>
+    </div>
+</template>
 
     <!-- Loading Spinner -->
     <div id="loadingSpinner" class="loading-spinner hidden">
