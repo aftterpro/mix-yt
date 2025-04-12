@@ -867,22 +867,51 @@ añadirUrlButton.addEventListener('click', async () => {
         return;
     }
 
+    // Muestra algún indicador de carga si es necesario
+    mostrarMensajeFlotante("Cargando playlist..."); // O un spinner
+
     const playlistInfo = await getPlaylistInfo(playlistId);
+
     if (playlistInfo && playlistInfo.relatedStreams) {
         const nuevosVideos = playlistInfo.relatedStreams.map(video => ({
             videoId: video.url.split('v=')[1],
             title: video.title,
-            thumbnail: video.thumbnail || 'placeholder.png',
+            thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75/0000FF/FFFFFF/?text=No+Thumbnail', // Usa tu placeholder
             duration: video.duration,
-            manual: true,
+            manual: false, // Marcar como no manuales si vienen de URL
         }));
-        playlistVideos.push(...nuevosVideos);
+
+        let videosAñadidos = 0;
+        nuevosVideos.forEach(nuevoVideo => {
+            // *** INICIO DE LA CORRECCIÓN ***
+            // Verificar si el video YA existe en playlistVideos por videoId
+            const existe = playlistVideos.some(videoExistente => videoExistente.videoId === nuevoVideo.videoId);
+            if (!existe) {
+                playlistVideos.push(nuevoVideo); // Añadir solo si no existe
+                videosAñadidos++;
+            }
+            // *** FIN DE LA CORRECCIÓN ***
+        });
+
         updatePlaylistDOM();
         searchInput2.value = ''; // Limpiar el input
-       botonPlay.disabled = false;
-        mostrarMensajeFlotante("Playlist añadida.");
+
+        // Solo habilita 'Play' si la lista no estaba vacía o si se añadieron videos nuevos
+        if (playlistVideos.length > 0) {
+             botonPlay.disabled = false;
+        }
+
+        // Mensaje más informativo
+        if (videosAñadidos > 0) {
+             mostrarMensajeFlotante(`Se añadieron ${videosAñadidos} nuevos videos a la playlist.`);
+        } else {
+             mostrarMensajeFlotante("Todos los videos de la URL ya estaban en la playlist.");
+        }
+
     } else {
-        alert('No se pudo obtener información de la playlist.');
+        // Mensaje de error si no se pudo obtener info o no hay videos
+         mostrarMensajeFlotante('No se pudo obtener información de la playlist o está vacía.');
+        // alert('No se pudo obtener información de la playlist o no contiene videos válidos.'); // Puedes usar alert o mensaje flotante
     }
 });
 
