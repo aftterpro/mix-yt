@@ -109,7 +109,7 @@ function onPlayerReady(event) {
     // Inicia el monitor con intervalo reducido para saltos precisos
     if (!monitorInterval) {
         // *** CAMBIO AQUÍ: Intervalo más corto ***
-        monitorInterval = setInterval(monitorPlayers, 1000); // Chequear cada 1000ms (1 segundo)
+        monitorInterval = setInterval(monitorPlayers, 300); // Chequear cada 300ms (0.5 segundo)
         console.log('Monitor iniciado con ID:', monitorInterval, '(intervalo: 1000ms)');
     }
 }
@@ -584,58 +584,6 @@ function displayPlaylist(playlist) {
     playlistVideos = [...playlistVideos, ...loadedVideos]; // Cambiado aquí
     updatePlaylistDOM();
 }
-// Variables para el estado del reproductor
-const contenedorPlayer = document.getElementById("contenedor-player");
-const botonExpandir = document.getElementById("botonExpandir");
-
-function esperarReproductoresListos() {
-    if (!player1 || !player2) {
-        console.warn("⏳ Esperando que los reproductores se inicialicen...");
-        setTimeout(esperarReproductoresListos, 500);
-        return;
-    }
-
-    console.log("✅ Reproductores inicializados correctamente.");
-
-    if (botonExpandir) {
-      console.log("boton expandir encontrado")
-       // Event listener para el botón de expandir
-     botonExpandir.addEventListener("click", function () {
-    // Alterna la clase 'expandido' en el contenedor del reproductor
-    contenedorPlayer.classList.toggle("expandido");
-
-    if (contenedorPlayer.classList.contains("expandido")) {
-        botonExpandir.innerHTML = '<i class="fas fa-compress-alt"></i>';  // Cambiar icono a "comprimir"
-        mostrarVideo();  // Muestra el video al expandir
-    } else {
-        botonExpandir.innerHTML = '<i class="fas fa-expand-alt"></i>';  // Cambiar icono a "expandir"
-        actualizarMiniatura();  // Muestra la miniatura cuando está minimizado
-    }
-    });
-
-    } else {
-        console.error("⚠️ Error: No se encontró el botón #boton-expandir en el DOM.");
-    }
-}
-function mostrarVideo() {
-    // Elimina la miniatura
-    videoContainer.style.backgroundImage = "none"; 
-    // Asegúrate de que el reproductor no esté oculto
-    document.getElementById('player1').classList.remove('hidden');
-    document.getElementById('player2').classList.remove('hidden');
-}
-
-function actualizarMiniatura() {
-    // Muestra la miniatura cuando el reproductor está minimizado
-    if (!player1 || !player2) return;  // Evita errores si los reproductores no están listos
-    let videoId = player1.getIframe().classList.contains("visible")
-        ? player1.getVideoData().video_id
-        : player2.getVideoData().video_id;
-
-    let urlMiniatura = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-    videoContainer.style.backgroundImage = `url(${urlMiniatura})`;
-}
-
 // Módulo: Reproducción y Crossfade
 // Función para reproducir el siguiente video con efecto crossfade
 function playNextVideo(videoId, video) {
