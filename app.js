@@ -666,7 +666,6 @@ function playFirstVideo() {
     if (playlistVideos.length > 0) {
         const firstVideoId = playlistVideos[currentIndex].videoId;
         console.log('Reproduciendo el primer video:', firstVideoId);
-        esperarReproductoresListos() 
         player1.loadVideoById(firstVideoId);
         document.getElementById('player1').classList.remove('hidden');
         document.getElementById('player2').classList.add('hidden');
