@@ -8,6 +8,7 @@ let monitorInterval;// Declarar fuera para controlar el intervalo
 let playersInitialized = false;// Estado global para saber si ambos reproductores están listos
 let youtubeAPIReady = false;
 let currentIndex = 0;
+let isTransitioning = false; // Flag para estado de transición
 
 // Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
 function mostrarMensajeFlotante(mensaje) {
