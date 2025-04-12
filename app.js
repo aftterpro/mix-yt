@@ -695,7 +695,7 @@ function stopMonitoring() {
  // Función Reutilizable checkAndSkipSegment: Extraemos la lógica de salto para poder llamarla desde varios lugares.
   async function checkAndSkipSegment(playerInstance) {
       if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
-          // console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
+           console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
           return;
       }
 
@@ -709,7 +709,7 @@ function stopMonitoring() {
             currentTime = playerInstance.getCurrentTime();
             const videoData = playerInstance.getVideoData();
             if (!videoData || !videoData.video_id) {
-                // console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
+                 console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
                 return;
             }
             videoId = videoData.video_id;
@@ -732,7 +732,7 @@ function stopMonitoring() {
            if (segmentosCache[videoId] && segmentosCache[videoId].length > 0) {
               segmentosCache[videoId].sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
            }
-           // console.log("Segmentos cacheados para", videoId, ":", segmentosCache[videoId]);
+         console.log("Segmentos cacheados para", videoId, ":", segmentosCache[videoId]);
       }
       const segmentos = segmentosCache[videoId];
 
