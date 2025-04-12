@@ -819,37 +819,53 @@ async function monitorPlayers() {
           console.error(`Monitor: Error procesando Player ${currentPlayer}:`, error);
       }
   }
-// Función ficticia para obtener los segmentos de SponsorBlock manejar respuestas vacías o de error de la API
+// Función para obtener los segmentos llamando a NUESTRA Netlify Function
 async function obtenerSegmentosSponsorBlock(videoId) {
+    // Declarar userId correctamente. Usa una constante si es fijo,
+    // o obténlo de donde corresponda si es dinámico.
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // ¡Asegúrate que este ID sea válido y esté declarado!
+
+    // URL Relativa a tu propia API backend en Netlify
+    const apiUrl = `/api/segments/${videoId}`;
+    // console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
+
     try {
-        userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-        response = fetch(`https://sponsorblock.netlify.app/api/segments/${videoId}`, {
+        const response = await fetch(apiUrl, {
             headers: {
+                // Enviar el encabezado X-UserID que tu API espera
                 'X-UserID': userId
             }
         });
 
+        // Verificar si la respuesta de NUESTRA API fue exitosa
         if (!response.ok) {
-            if (response.status === 404) {
-                console.log(`No se encontraron segmentos para el video ID: ${videoId}`);
-                return []; // Devolver un array vacío en caso de 404
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
+             // Si la API devuelve un error (ej. 500), response.status tendrá un valor
+             console.error(`Error desde la API (${apiUrl}): ${response.status} ${response.statusText}`);
+             // Intentar obtener más detalles del cuerpo del error si existen
+             let errorBody = await response.text(); // Usar text() por si no es JSON
+             console.error("Cuerpo del error de la API:", errorBody);
+             // Lanzar un error específico para que el catch lo maneje
+             throw new Error(`API Error: ${response.status}`);
         }
 
-        // Verificar si la respuesta está vacía antes de intentar parsear JSON
-        const text = await response.text();
-        if (!text) {
-            console.log(`Respuesta vacía para el video ID: ${videoId}`);
-            return []; // Devolver un array vacío si la respuesta está vacía
-        }
+        // Si la respuesta es OK (200), intentar parsear como JSON
+        // Aquí es donde un 404 manejado correctamente devolvería '[]'
+        const data = await response.json();
 
-        const data = JSON.parse(text);
-        return data;
+         // Verificar si data es realmente un array (por si acaso la API falla)
+         if (!Array.isArray(data)) {
+             console.warn(`La API (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
+             return []; // Devolver array vacío si la respuesta no es un array
+         }
 
-    } catch (error) { // Cambiar "except" a "catch"
-        console.error('Error al obtener segmentos de SponsorBlock:', error);
-        return []; // Devolver un array vacío en caso de error
+        // console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
+        return data; // Devolver los segmentos (o array vacío si fue 404)
+
+    } catch (error) {
+        // Capturar errores de red (fetch falló) o errores lanzados desde el 'if (!response.ok)'
+        console.error(`Error en fetch/procesamiento para ${apiUrl}:`, error);
+        // Devolver siempre un array vacío en caso de cualquier error para evitar problemas posteriores
+        return [];
     }
 }
 // Módulo: Manejo de Eventos y Botones
