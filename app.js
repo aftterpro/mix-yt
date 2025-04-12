@@ -115,10 +115,14 @@ function onPlayerReady(event) {
 }
 //Verificar si el usuario modifica la duración del video
 function onPlayerStateChange(event) {
+    // console.log('Player State Change:', event.data, 'Player:', event.target === player1 ? '1' : '2'); // Log para debug
     if (event.data === YT.PlayerState.ENDED) {
+         lastSeekEndTime = -1; // Considera si necesitas limpiar lastSeekEndTime aquí también
         console.log('Video finalizado.');
-    } else if (event.data === YT.PlayerState.PLAYING) {
-        console.log('Video en reproducción.');
+    if (event.data === YT.PlayerState.PLAYING) {   // Si el video comienza a reproducirse, verificar segmentos inmediatamente
+          console.log("Estado PLAYING detectado. Verificando segmentos iniciales...");
+          checkAndSkipSegment(event.target);// Llamar a la función de chequeo pasando la instancia del reproductor que disparó el evento
+      }
     } else if (event.data === YT.PlayerState.PAUSED) {
         console.log('Video en pausa.');
     }
@@ -688,6 +692,77 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
+ // Función Reutilizable checkAndSkipSegment: Extraemos la lógica de salto para poder llamarla desde varios lugares.
+  async function checkAndSkipSegment(playerInstance) {
+      if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
+          // console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
+          return;
+      }
+
+      // No intentar saltar si estamos en transición
+      if (isTransitioning) return;
+
+       // Datos necesarios del reproductor activo
+       let currentTime;
+       let videoId;
+       try {
+            currentTime = playerInstance.getCurrentTime();
+            const videoData = playerInstance.getVideoData();
+            if (!videoData || !videoData.video_id) {
+                // console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
+                return;
+            }
+            videoId = videoData.video_id;
+       } catch (error) {
+            console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
+            return;
+       }
+
+
+      // Reiniciar lastSeek si el video cambió
+      if (lastSeekVideoId !== videoId) {
+          lastSeekEndTime = -1;
+          lastSeekVideoId = videoId;
+      }
+
+      // Obtener segmentos (asegúrate de que la caché esté actualizada)
+      if (!segmentosCache[videoId]) {
+           console.log(`checkAndSkipSegment: Obteniendo segmentos SB para ${videoId}`);
+           segmentosCache[videoId] = await obtenerSegmentosSponsorBlock(videoId);
+           if (segmentosCache[videoId] && segmentosCache[videoId].length > 0) {
+              segmentosCache[videoId].sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
+           }
+           // console.log("Segmentos cacheados para", videoId, ":", segmentosCache[videoId]);
+      }
+      const segmentos = segmentosCache[videoId];
+
+      // Lógica de salto
+      if (segmentos && segmentos.length > 0) {
+          for (const segmento of segmentos) {
+              const startTime = parseFloat(segmento.startTime);
+              const endTime = parseFloat(segmento.endTime);
+
+              if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) continue;
+
+              // *** IMPORTANTE: Ajuste para startTime: 0 ***
+              // Si el segmento empieza en 0, considerar saltar si currentTime es < endTime
+              // Si empieza después, usar la condición original.
+              const isInSegment = (startTime === 0 && currentTime >= 0 && currentTime < endTime) ||
+                                (startTime > 0 && currentTime >= startTime && currentTime < endTime);
+
+              if (isInSegment) {
+                  if (lastSeekEndTime !== endTime) {
+                      console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando [<span class="math-inline">\{startTime\.toFixed\(1\)\}\-</span>{endTime.toFixed(1)}] en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                      playerInstance.seekTo(endTime, true);
+                      lastSeekEndTime = endTime;
+                      lastSeekVideoId = videoId;
+                      break; // Salir después de saltar
+                  }
+              }
+          }
+      }
+  }
+
 let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
 // Variable global o al menos fuera del alcance inmediato de monitorPlayers
 // para recordar el último punto al que saltamos y para qué video fue.
@@ -709,102 +784,41 @@ async function monitorPlayers() {
     // --- Fin: Checks existentes ---
 
     try {
-        const currentTime = currentPlayerInstance.getCurrentTime();
-        const duration = currentPlayerInstance.getDuration();
-        const videoId = currentPlayerInstance.getVideoData().video_id;
-
-        // Reiniciar el estado del último salto si el video ha cambiado
-        if (lastSeekVideoId !== videoId) {
-            // console.log(`Nuevo video detectado (${videoId}), reiniciando lastSeekEndTime.`);
-            lastSeekEndTime = -1;
-            lastSeekVideoId = videoId;
-        }
-
+        await checkAndSkipSegment(currentPlayerInstance);  // *** LLAMAR A LA FUNCIÓN REUTILIZABLE ***
+        
+        // --- Lógica de Crossfade (sin la lógica de salto que ahora está en checkAndSkipSegment) ---
+          const currentTime = currentPlayerInstance.getCurrentTime(); // Obtener de nuevo por si checkAndSkip saltó
+          const duration = currentPlayerInstance.getDuration();
+          const videoId = currentPlayerInstance.getVideoData().video_id; // Obtener de nuevo por si cambió
+        
         if (isNaN(duration) || duration <= 0) return; // Duración inválida
+         // Recalcular timeSponsorblock basado en caché
+           const segmentos = segmentosCache[videoId];
+           let timeSponsorblock = 0;
+           if (segmentos && segmentos.length > 0) {
+              timeSponsorblock = segmentos.reduce((total, seg) => {
+                   const start = parseFloat(seg.startTime);
+                   const end = parseFloat(seg.endTime);
+                   return (!isNaN(start) && !isNaN(end) && end > start) ? total + (end - start) : total;
+              }, 0);
+           }
 
-        // --- Obtener/Usar Segmentos Cacheados (como antes) ---
-        if (!segmentosCache[videoId]) {
-            console.log(`Obteniendo segmentos SB para: ${videoId}`);
-            segmentosCache[videoId] = await obtenerSegmentosSponsorBlock(videoId);
-             // Opcional: Ordenar segmentos por tiempo de inicio por si acaso
-             if (segmentosCache[videoId] && segmentosCache[videoId].length > 0) {
-                segmentosCache[videoId].sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
-             }
-            console.log("Segmentos para", videoId, ":", segmentosCache[videoId]);
-        }
-        const segmentos = segmentosCache[videoId];
-        // --- Fin Obtener Segmentos ---
+           const timeRemaining = (segmentos && segmentos.length > 0 && timeSponsorblock > 0)
+              ? duration - currentTime - timeSponsorblock
+              : duration - currentTime;
 
+          const roundedTimeRemaining = Math.floor(timeRemaining);
 
-        // *** INICIO: LÓGICA PARA SALTAR SEGMENTOS ***
-        if (segmentos && segmentos.length > 0) {
-            for (const segmento of segmentos) {
-                // Asegurarse que los tiempos son números válidos
-                const startTime = parseFloat(segmento.startTime);
-                const endTime = parseFloat(segmento.endTime);
+          if (!isTransitioning && roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) {
+              console.log(`Monitor: Condición de crossfade (Player ${currentPlayer}). Restante: ${roundedTimeRemaining}s.`);
+              playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));
+          }
+          // --- Fin Lógica de Crossfade ---
 
-                if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) {
-                     // console.warn(`Segmento inválido omitido para ${videoId}:`, segmento);
-                     continue; // Saltar a la siguiente iteración si el segmento no es válido
-                }
-
-                // ¿Estamos DENTRO de este segmento? (con un pequeño margen por si acaso)
-                // Usamos >= startTime para capturar el inicio exacto
-                if (currentTime >= startTime && currentTime < endTime) {
-
-                    // ¿Ya intentamos saltar a este 'endTime' justo ahora?
-                    // Esto evita llamadas seekTo() múltiples si el monitor corre rápido.
-                    if (lastSeekEndTime !== endTime) {
-                        console.log(`SPONSORBLOCK: Detectado segmento [${startTime.toFixed(1)} - <span class="math-inline">\{endTime\.toFixed\(1\)\}\] en t\=</span>{currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
-
-                        // ¡El Salto! Usa seekTo(seconds, allowSeekAhead)
-                        currentPlayerInstance.seekTo(endTime, true);
-
-                        // Recordar a dónde saltamos para este video
-                        lastSeekEndTime = endTime;
-                        lastSeekVideoId = videoId; // Confirmar que es para este video
-
-                        // Una vez que saltamos, no necesitamos revisar más segmentos en *este* ciclo del monitor.
-                        break;
-                    } else {
-                        // Ya se dio la orden de saltar a 'endTime', estamos esperando que el player actualice su 'currentTime'.
-                     console.log(`SPONSORBLOCK: Esperando que el tiempo avance más allá de ${endTime.toFixed(1)} después del seek.`);
-                    }
-                }
-            }
-        }
-        // *** FIN: LÓGICA PARA SALTAR SEGMENTOS ***
-
-
-        // --- Lógica de Crossfade (Existente, ahora se ejecuta después del chequeo de saltos) ---
-        let timeSponsorblock = 0;
-        if (segmentos && segmentos.length > 0) {
-            timeSponsorblock = segmentos.reduce((total, seg) => {
-                 const start = parseFloat(seg.startTime);
-                 const end = parseFloat(seg.endTime);
-                 return (!isNaN(start) && !isNaN(end) && end > start) ? total + (end - start) : total;
-            }, 0);
-        }
-
-        const timeRemaining = (segmentos && segmentos.length > 0 && timeSponsorblock > 0)
-            ? duration - currentTime - timeSponsorblock
-            : duration - currentTime;
-
-        const roundedTimeRemaining = Math.floor(timeRemaining);
-
-        // La condición de crossfade sigue igual, verificando !isTransitioning
-        if (!isTransitioning && roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) {
-            console.log(`Monitor: Condición de crossfade cumplida (Player ${currentPlayer}). Restante: ${roundedTimeRemaining}s.`);
-            playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));
-        }
-        // --- Fin Lógica de Crossfade ---
-
-    } catch (error) {
-         console.error(`Monitor: Error procesando Player ${currentPlayer}:`, error);
-         // Considera resetear lastSeekEndTime aquí si un error podría dejarlo en un estado incorrecto
-         lastSeekEndTime = -1;
-    }
-}
+      } catch (error) {
+          console.error(`Monitor: Error procesando Player ${currentPlayer}:`, error);
+      }
+  }
 // Función ficticia para obtener los segmentos de SponsorBlock manejar respuestas vacías o de error de la API
 async function obtenerSegmentosSponsorBlock(videoId) {
     try {
