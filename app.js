@@ -23,10 +23,9 @@ function mostrarMensajeFlotante(mensaje) {
         setTimeout(() => {
             mensajeDiv.remove();
         }, 1000);
-    7},10000);// 10 segundos
+    7},6000);// 6segundos
 }
 // Ejemplo de uso:
-mostrarMensajeFlotante("¡Recomendamos instalar extencion : \n Amplificador de volumen - refuerzo de sonido \n SponsorBlock, para una mejor experiencia :)" );
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
 
 // Módulo: Carga del API de YouTube (Optimizado)
