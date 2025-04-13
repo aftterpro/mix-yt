@@ -11,7 +11,7 @@
     "express": "^4.21.2", 
     "serverless-http": "^3.2.0",
     "sponsorblock-api": "^0.2.4" ,
-    "googleapis": "^144.0.0",
+    "googleapis": "^144.0.0"
   },
   "devDependencies": {
     "serve": "^14.2.1",
