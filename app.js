@@ -826,7 +826,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // ¡Asegúrate que este ID sea válido y esté declarado!
 
     // URL Relativa a tu propia API backend en Netlify
-    const apiUrl = `https://sponsorblock.netlify.app/api/segments/${videoId}`;
+     const apiUrl = `/api/segments/${videoId}`;
      console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
 
     try {
