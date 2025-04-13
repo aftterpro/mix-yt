@@ -1,4 +1,12 @@
+
 [build]
-  functions = "functions/"  # Keep this if you have functions
-  publish = "."            # Publish from the root directory
-  command = "npm run build"  # Keep this if you have a build command
+  functions = "functions/"  # Directorio de tus funciones Netlify
+  publish = "."             # Directorio a publicar (tu sitio estático)
+  command = "npm run build" # Comando para construir tu sitio (si aplica)
+
+# Regla para dirigir las llamadas /api/* a la función sponsorblock
+[[redirects]]
+  from = "/api/*"                             # Cualquier ruta que empiece con /api/
+  to = "/.netlify/functions/sponsorblock/:splat" # Dirígela a la función sponsorblock.js
+  status = 200                                # Código 200 para que funcione como un rewrite/proxy
+  # force = true                              # Descomenta si es necesario para forzar esta regla sobre otras
