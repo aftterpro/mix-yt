@@ -48,7 +48,6 @@ function onYouTubeIframeAPIReady() {
     initializePlayers();
 }
 // Agregaremos una función que garantice que ambos reproductores estén listos antes de ejecutar cualquier acción.
-// asegurarte de que todo el flujo se configura correctamente
 function initializePlayers() {
     if (player1 && player2) return; // Evitar la reinicialización si ya existen
 
