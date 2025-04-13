@@ -53,7 +53,8 @@ router.get('/segments/:videoId', async (req, res) => {
         return res.json([]); // *** CORRECCIÓN: Devolver array JSON vacío explícito ***
 }
         // Si es otro tipo de error, devolverlo
-        return res.status(500).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
+    console.error("Error en la función SponsorBlock:", error); // Añadir log del error completo
+    return res.status(500).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
     }
 });
 
