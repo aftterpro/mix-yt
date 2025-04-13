@@ -7,7 +7,10 @@
   },
   "dependencies": {
      "cheerio": "^1.0.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "express": "^4.21.2", 
+    "serverless-http": "^3.2.0",
+    "sponsorblock-api": "^0.2.4" 
   },
   "devDependencies": {
     "serve": "^14.2.1",
