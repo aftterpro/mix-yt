@@ -752,7 +752,7 @@ function stopMonitoring() {
 
               if (isInSegment) {
                   if (lastSeekEndTime !== endTime) {
-                      console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando [<span class="math-inline">\{startTime\.toFixed\(1\)\}\-</span>{endTime.toFixed(1)}] en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                      console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
                       playerInstance.seekTo(endTime, true);
                       lastSeekEndTime = endTime;
                       lastSeekVideoId = videoId;
@@ -827,7 +827,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
 
     // URL Relativa a tu propia API backend en Netlify
     const apiUrl = `https://sponsorblock.netlify.app/api/segments/${videoId}`;
-    // console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
+     console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
 
     try {
         const response = await fetch(apiUrl, {
@@ -858,7 +858,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
              return []; // Devolver array vacío si la respuesta no es un array
          }
 
-        // console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
+         console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
         return data; // Devolver los segmentos (o array vacío si fue 404)
 
     } catch (error) {
