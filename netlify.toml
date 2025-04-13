@@ -2,11 +2,3 @@
   functions = "functions/"  # Keep this if you have functions
   publish = "."            # Publish from the root directory
   command = "npm run build"  # Keep this if you have a build command
-  
-[functions]
-  node_bundler = "esbuild"
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/index/:splat"
-  status = 200
