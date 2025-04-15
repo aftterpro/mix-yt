@@ -774,66 +774,71 @@ let lastSeekEndTime = -1;
 let lastSeekVideoId = null;
 
 async function monitorPlayers() {
-    // --- Inicio: Checks existentes (isTransitioning, playersInitialized, playerState, etc.) ---
+    // Guardia principal: No hacer nada si estamos en transición
     if (isTransitioning) {
-        console.log("Monitor: Pausado durante transición."); // Opcional: puede ser muy verboso
+        // console.log("Monitor: Pausado durante transición."); // Opcional
         return;
     }
-    if (!playersInitialized) return;
+
+    if (!playersInitialized) return; // Salir si los reproductores no están listos
 
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
-    if (!currentPlayerInstance || !currentPlayerInstance.getPlayerState) return;
 
+    // Checks básicos del reproductor
+    if (!currentPlayerInstance || typeof currentPlayerInstance.getPlayerState !== 'function') return;
     const playerState = currentPlayerInstance.getPlayerState();
     if (playerState !== YT.PlayerState.PLAYING) return; // Solo actuar si está reproduciendo
+    if (!currentPlayerInstance.getVideoData || !currentPlayerInstance.getVideoData().video_id) return; // Datos aún no listos
 
-    if (!currentPlayerInstance.getVideoData || !currentPlayerInstance.getVideoData().video_id) return; // Datos del video aún no listos
-    // --- Fin: Checks existentes ---
+    try {
+        // 1. Ejecutar salto de segmentos internos primero
+        // (Esto también asegura que los segmentos estén en caché si es posible)
+        await checkAndSkipSegment(currentPlayerInstance);
 
-       try {
-        await checkAndSkipSegment(currentPlayerInstance); // Comprobar saltos primero
-
-        // Re-obtener datos después de posible salto en checkAndSkipSegment
-        // Asegurarse de que el player sigue reproduciendo y es válido
+        // 2. Re-obtener estado actual (puede haber cambiado por checkAndSkipSegment)
+        // Asegurarse que sigue reproduciendo después del posible salto
         if (currentPlayerInstance.getPlayerState() !== YT.PlayerState.PLAYING) return;
         const currentTime = currentPlayerInstance.getCurrentTime();
-        const duration = currentPlayerInstance.getDuration();
+        const playerDuration = currentPlayerInstance.getDuration(); // Duración reportada por el player
         const videoId = currentPlayerInstance.getVideoData().video_id;
 
-        if (isNaN(duration) || duration <= 0) return;
+        if (isNaN(playerDuration) || playerDuration <= 0) return; // Salir si la duración del player no es válida
 
-        // --- Lógica de Crossfade ---
-        const segmentos = segmentosCache[videoId] || []; // Usar caché o array vacío
-        let timeSponsorblock = 0;
-        if (segmentos.length > 0) {
-            timeSponsorblock = segmentos.reduce((total, seg) => {
-                 const start = parseFloat(seg.startTime);
-                 const end = parseFloat(seg.endTime);
-                 return (!isNaN(start) && !isNaN(end) && end > start) ? total + (end - start) : total;
-            }, 0);
+        // 3. Determinar la duración base para el cálculo del crossfade
+        let effectiveDuration = playerDuration; // Por defecto, usar la duración del player
+        let durationSource = "Player"; // Para saber de dónde vino la duración
+        const cachedData = segmentosCache[videoId];
+
+        // Intentar usar videoDuration de SponsorBlock si existe en caché
+        if (cachedData && cachedData.length > 0 && cachedData[0].videoDuration) {
+            const sbDuration = parseFloat(cachedData[0].videoDuration);
+            if (!isNaN(sbDuration) && sbDuration > 0) {
+                effectiveDuration = sbDuration; // Usar duración de SponsorBlock
+                durationSource = "SponsorBlock";
+            }
         }
 
-        const timeRemaining = (segmentos.length > 0 && timeSponsorblock > 0)
-            ? duration - currentTime - timeSponsorblock
-            : duration - currentTime;
+        // 4. Calcular tiempo restante según la lógica solicitada
+        const timeRemaining = effectiveDuration - currentTime;
+        const roundedTimeRemaining = Math.floor(timeRemaining); // Redondear como antes
 
-        const roundedTimeRemaining = Math.floor(timeRemaining);
+        // 5. Log solicitado (mostrando qué duración base se usó)
+        // Mostrar solo si está razonablemente cerca del final para no saturar consola
+         if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 10) {
+              console.log(`Monitor: Player ${currentPlayer} (${videoId}). Base: ${durationSource}(${effectiveDuration.toFixed(1)}s). Tiempo para Crossfade Aprox: ${roundedTimeRemaining}s.`);
+         }
 
-        // *** AÑADIR LOG DE CUENTA REGRESIVA ***
-        if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 5) { // Mostrar log en los últimos segundos + 5s de margen
-             console.log(`Monitor: Player ${currentPlayer} (${videoId}). Tiempo efectivo restante Aprox: ${roundedTimeRemaining}s.`);
-        }
-        // *** FIN LOG ***
-        // Condición de crossfade (ya incluía !isTransitioning, pero ahora el monitor sale antes si es true)
+
+        // 6. Condición para iniciar el crossfade
+        // Usar >= 0 para evitar triggers con tiempo restante negativo
         if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) {
             console.log(`Monitor: *** Condición de crossfade cumplida (Player ${currentPlayer}). Restante: ${roundedTimeRemaining}s. ***`);
-            // Llamar a playNextVideo. La propia playNextVideo ahora tiene un check !isTransitioning al inicio.
+            // La guarda !isTransitioning ya está al inicio de playNextVideo
             playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));
         }
-        // --- Fin Lógica de Crossfade ---
 
     } catch (error) {
-        console.error(`Monitor: Error procesando Player ${currentPlayer}:`, error);
+        console.error(`Monitor: Error procesando Player ${currentPlayer} (${videoId || 'ID desconocido'}):`, error);
     }
 }
 // Función para obtener los segmentos llamando a NUESTRA Netlify Function
