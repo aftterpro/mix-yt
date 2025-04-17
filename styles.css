@@ -1,401 +1,65 @@
+/* styles.css - Versión Corregida y Combinada */
+
 /* ---- VARIABLES CSS ---- */
 :root {
-    --sidebar-width: 400px;
-    --player-width: 400px;
-    --search-panel-width: 600px;
+    --sidebar-width: 400px; /* Ancho deseado para la playlist */
+    --player-width: 400px; /* Ancho deseado para el reproductor */
+    /* --search-panel-width: 600px; */ /* Eliminado, el panel será flexible */
     --spacing-sm: 10px;
     --spacing-md: 12px;
     --spacing-lg: 15px;
+    --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
 }
+
 /* ---- ESTILO GENERAL ---- */
 body.vibe-theme {
     font-family: 'Montserrat', sans-serif;
     color: #fff;
     background: linear-gradient(135deg, #121212, #181818);
-    margin: var(--spacing-sm);
-    padding: var(--spacing-sm);
+    margin: 0; /* Quitamos margen del body */
+    padding: var(--spacing-sm); /* Añadimos padding general */
     min-height: 100vh;
-    width: 100%;
-    max-width: 1440px;
+    box-sizing: border-box; /* Incluir padding en el tamaño */
+    display: flex; /* Usar flex para organizar main-player y container */
+    flex-direction: column; /* Apilar verticalmente */
+    height: 100vh; /* Ocupar toda la altura */
 }
-.container {
-    display: flex;
-    flex-direction: row;
-    gap: var(--spacing-lg);
-    padding: var(--spacing-sm);
-    flex-wrap: wrap;
-}
-:root {
-    --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
-}
+
 /* ---- EVITAR SCROLLING GLOBAL ---- */
 html, body {
     overflow: hidden; /* Bloquear scroll en toda la página */
     height: 100%;
     margin: 0;
 }
-/* ---- ESTRUCTURA PRINCIPAL ---- */
-.container {
+
+/* ---- CONTENEDOR DEL PLAYER PRINCIPAL ---- */
+.main-player-container {
+    padding: var(--spacing-sm) 0; /* Espacio arriba/abajo */
     display: flex;
-    flex: 1; /* Permite que el contenedor principal crezca */
+    justify-content: center; /* Centrar el reproductor horizontalmente */
+    flex-shrink: 0; /* Evitar que se encoja */
 }
 
-/* ---- SIDEBAR (PLAYLIST) ---- */
-aside.sidebar {
-    flex: 1;
-    min-width: 300px;
-    max-width: var(--sidebar-width);
-    border-radius: 10px;
-    height: calc(100vh - 500px);
-    min-height: 450px;
-}
-#playlistContainer {
-    height: 100%;
-    max-height: 150px;
-    overflow-y: auto;
-    padding: var(--spacing-sm);
-}
-/* Estilos para los elementos de la playlist */
-#playlistContainer #playlist .playlist-item {
-    display: flex; /* Para alinear la imagen y el título en la misma línea */
-    align-items: center; /* Para centrar verticalmente la imagen y el título */
-    margin-bottom: 8px; /* Espacio entre cada elemento de la playlist */
-    padding: 8px; /* Un poco de espacio interno */
-    border-bottom: 1px solid #333; /* Separador visual entre elementos */
-}
-/* ---- INPUTS Y BOTONES RESPONSIVE ---- */
-.search-container input[type="text"],
-.playlist-url-input input[type="text"] {
-    width: 100%;
-    height: 40px;
-    padding: 8px;
-}
-.add-to-playlist {
-    /* You might already have styles for this, adjust if needed */
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9em;
-    padding: 5px 10px;
-    border-radius: 5px;
-    display: inline-flex;
-    align-items: center;
-    transition: background-color 0.3s ease;
-}
-.add-to-playlist:hover {
-    background-color: #0056b3;
-}
-.add-text {
-    margin-left: 5px;
-}
-#playlistContainer #playlist .playlist-item h3 {
-    font-size: 0.9em;
-    margin-left: 10px; /* Espacio entre la imagen y el texto */
-    flex-grow: 1; /* Permite que el título ocupe el espacio restante */
-}
-#playlistContainer #playlist .playlist-item .thumbnail-container {
-    margin-right: 10px; /* Espacio entre la miniatura y el título */
-}
-/* Estilos para las imágenes de la playlist */
-#playlistContainer #playlist .playlist-item img {
-    width: 80px; /* Ancho reducido de las imágenes */
-    height: 60px; /* Alto reducido de las imágenes */
-    object-fit: cover;
-}
-/* Ajustes de inputs */
-.search-container input[type="text"],
-.playlist-url-input input[type="text"] {
-    padding: 10px;
-    margin-bottom: 12px;
-    height: 40px;
-}
-/* Ajustes de botones */
-.add-to-playlist,
-#iniciarButton,
-#mixButton {
-   width: 100%;
-    max-width: 200px;
-    height: 40px;
-}
-
-/* Estilos para el contenedor de la playlist */
-.playlist-header {
-    text-align: center;
-    padding: 5px;
-    border-bottom: 1px solid #555;
-    border-bottom-width: 1px;
-    border-bottom-style: solid;
-    border-bottom-color: rgb(85, 85, 85);
-    margin-bottom: 5px;
-}
-.sidebar {
-    background-color: #222;
-    color: #eee;
-    width: 450px; /* Ancho del sidebar */
-    padding: 10px;
-    box-sizing: border-box;
-    flex-shrink: 0; /* Evita que el sidebar se encoja */
-    scrollbar-width: thin; /* Para navegadores Firefox */
-    scrollbar-color: #555 #333; /* Para navegadores Firefox */
-}
-
-.sidebar::-webkit-scrollbar {
-    width: 8px; /* Ancho de la barra de scroll */
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-    background-color: #555; /* Color del "pulgar" de la barra de scroll */
-    border-radius: 4px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-    background-color: #333; /* Color del "riego" de la barra de scroll */
-}
-
-.playlist-url-input input[type="text"] {
-    width: calc(100% - 20px); /* Ajustar ancho para el padding */
-    padding: 8px;
-    margin-bottom: 10px;
-    border: 1px solid #555;
-    background-color: #333;
-    color: #eee;
-    border-radius: 5px;
-    box-sizing: border-box;
-}
-
-#playlist {
-    padding: 0;
-    list-style-type: none;
-}
-
-#playlist li {
-    padding: 8px 0;
-    border-bottom: 1px solid #444;
-}
-.thumbnail {
-    width: 120px;
-    height: 67.5px;
-    object-fit: cover;
-}
-.thumbnail-container {
-    position: relative;
-    width: 160px;
-    height: 90px;
-    overflow: hidden;
-    border-radius: 5px;
-}
-#playlist li:last-child {
-    border-bottom: none;
-}
-
-#playlist li button {
-    background: none;
-    border: none;
-    color: #ccc;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-
-#playlist li button:hover {
-    color: #fff;
-}
-/* ---- CONTENIDO PRINCIPAL ---- */
-.main-content {
-    flex: 2;
-    min-width: 300px;
-    max-width: calc(100% - var(--sidebar-width) - var(--spacing-lg));
-}
-#search-panel {
-    background-color: #1e1e1e;
-    width: 100%;
-    max-width: var(--search-panel-width);
-    margin: 0 auto;  
-}
-#search-panel::-webkit-scrollbar {
-    width: 8px;
-}
-
-#search-panel::-webkit-scrollbar-thumb {
-    background-color: #555;
-    border-radius: 4px;
-}
-
-#search-panel::-webkit-scrollbar-track {
-    background-color: #333;
-}
-
-#resultsContainer {
-    margin-top: 15px;
-}
-/* Styles for the search result item */
-.video-result .search-result-item { 
-    background-color: #282828;
-    border-radius: 8px;
-    overflow: hidden; /* Para que la imagen no se salga */
-    display: flex;
-    flex-direction: column; /* Apilar imagen y contenido */
-    padding: 0; /* Quitamos padding general para controlar interno */
-    border: none; /* Quita borde si lo tenía */
-    gap: 0; /* Sin gap interno, controlamos márgenes */
-}
-.video-result .thumbnail-container {
-    position: relative; /* Necesario para la duración absoluta */
-    width: 100%; /* Ocupa todo el ancho de la baldosa */
-    padding-bottom: 56.25%; /* Aspect ratio 16:9 */
-    height: 0; /* Truco para mantener aspect ratio */
-    overflow: hidden; /* Por si acaso */
-    display: block; /* Asegurar que sea bloque */
-    margin: 0; /* Sin margen */
-}
-/* Miniatura */
-.video-result .thumbnail {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Cubre el espacio sin deformar */
-    border-radius: 0; /* Sin bordes redondeados aquí */
-}
-.video-result .duration {
-    position: absolute;
-    bottom: 5px; /* Ajusta posición */
-    right: 5px; /* Ajusta posición */
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 0.75em; /* Más pequeño */
-    z-index: 1; /* Asegurar que esté sobre la imagen */
-}
-/* Contenedor para Título, Autor y Botón */
-.video-result .video-details {
-    padding: 8px; /* Espaciado interno */
-    display: flex;
-    flex-direction: column;
-    gap: 4px; /* Espacio entre título, autor y botón */
-}
-
-
-/* Título */
-.video-result .video-title {
-    font-size: 0.9em; /* Ajusta tamaño */
-    font-weight: bold;
-    color: #eee;
-    margin: 0;
-    /* Truncamiento de texto a 2 líneas */
-    display: -webkit-box;
-    -webkit-line-clamp: 2; /* Número de líneas a mostrar */
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.3; /* Ajusta interlineado si es necesario */
-    max-height: 2.6em; /* Aproximadamente 2 líneas (line-height * 2) */
-}
-
-/* Autor */
-.video-result .video-author {
-    font-size: 0.8em;
-    color: #aaa;
-    margin: 0;
-    /* Truncamiento opcional para el autor si también puede ser largo */
-    white-space: nowrap;
-    overflow: hidden;
-     text-overflow: ellipsis;
-}
-/* Botón Añadir (ya existente, ajusta si es necesario) */
-.video-result .add-to-playlist {
-    /* background-color: #007bff; (ya definido en botones.css) */
-    /* color: white; (ya definido en botones.css) */
-    /* ... otros estilos del botón ... */
-    margin-top: 5px; /* Espacio arriba del botón */
-    padding: 6px 10px; /* Ajusta padding del botón */
-    font-size: 0.85em; /* Ajusta tamaño fuente botón */
-    align-self: flex-start; /* Alinear botón a la izquierda */
-}
-.thumbnail-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Ensure the image covers the container */
-}
-.thumbnail-container .duration {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-size: 0.8em;
-}
-.result-details {
-    display: flex; /* Use flexbox to align title and button */
-    flex-direction: column; /* Stack title and button vertically */
-    justify-content: center; /* Center items vertically in the available space */
-}
-.result-title.video-title {
-    font-size: 1em; /* Adjust as needed */
-    margin-bottom: 5px; /* Space between title and button */
-}
-.search-result-item img {
-    width: 120px;
-    height: 90px;
-    object-fit: cover;
-}
-.search-result-item .content {
-    flex: 1;
-    min-width: 200px;
-}
-.search-result-item h3 {
-    font-size: 1em;
-    margin: 0 0 5px 0;
-}
-
-.search-result-item p {
-    font-size: 0.8em;
-    color: #aaa;
-    margin: 0;
-}
-
-.search-container input[type="text"] {
-    width: calc(100% - 22px);
-    padding: 10px;
-    border: 2px solid #555;
-    border-radius: 10px;
-    background-color: #333;
-    color: #eee;
-    box-sizing: border-box;
-}
-/* Ajustes de scroll */
-#results {
-    overflow-y: auto;
-    height: 350px;
-}
-/* ---- CONTENEDOR DEL PLAYER ---- */
 #contenedor-player {
-    background-color: #000; /* Fondo oscuro para el reproductor */
+    background-color: #000;
     color: #fff;
     width: 100%;
     max-width: var(--player-width);
-    margin: 0 auto var(--spacing-lg);
-    aspect-ratio: 16/9;
-    height: auto;
+    /* aspect-ratio: 16/9; */ /* Quitado para que no dependa del aspect-ratio */
+    /* height: auto; */ /* Quitado */
+    border-radius: 8px; /* Opcional */
+    overflow: hidden; /* Opcional */
+    display: flex;
+    flex-direction: column;
 }
 
 #videoContainer {
     width: 100%;
-    padding-bottom: 56.25%;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
     position: relative;
-}
-
-.video-container {
-    position: relative;
-    padding-bottom: 56.25%; /* Proporción 16:9 para el video */
+    background-color: #111; /* Fondo si el video no está cargado */
     height: 0;
     overflow: hidden;
-    background-color: #111; /* Fondo si el video no está cargado */
-    width: 100%; /* Asegurar que el contenedor del video ocupe el ancho del padre */
 }
 
 .video-player {
@@ -410,10 +74,10 @@ aside.sidebar {
 .player-controls {
     display: flex;
     justify-content: center;
-    margin-top: 10px;
+    padding: var(--spacing-sm) 0; /* Espacio para controles */
+    background-color: #000; /* Fondo oscuro para controles */
 }
 
-/* Estilos tipo Spotify */
 .player-controls button {
     background: none;
     border: none;
@@ -425,98 +89,377 @@ aside.sidebar {
 }
 
 .player-controls button:hover {
-    color: var(--primary-accent-color); /* Usando la variable de color de acento */
+    color: var(--primary-accent-color);
 }
-/* ---- BARRA DE BÚSQUEDA ---- */
-.search-container input[type="text"] {
-    background-color: #333;
-    color: #fff;
-    border: none;
+
+/* ---- CONTENEDOR PRINCIPAL (Sidebar y Main Content) ---- */
+.container {
+    display: flex;
+    flex-direction: row;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-sm) 0; /* Ajustar padding */
+    flex-grow: 1; /* Ocupa el espacio restante */
+    overflow: hidden; /* Evitar que el container cause scroll */
+    height: calc(100% - var(--player-width) * 9 / 16 - 80px); /* Altura dinámica aproximada */
+}
+
+/* ---- SIDEBAR (PLAYLIST) ---- */
+aside.sidebar {
+    flex: 0 0 var(--sidebar-width); /* Base fija, no crece, no encoge */
+    min-width: var(--sidebar-width); /* Asegurar ancho mínimo */
+    max-width: var(--sidebar-width); /* Asegurar ancho máximo */
+    background-color: #222;
+    color: #eee;
+    border-radius: 10px;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ocupar toda la altura del .container */
+    overflow: hidden; /* Controlar scroll interno */
+}
+
+.playlist-header {
+    text-align: center;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid #555;
+    margin-bottom: var(--spacing-sm);
+    flex-shrink: 0; /* Evitar que se encoja */
+    display: flex; /* Para alinear título e imagen */
+    align-items: center;
+    justify-content: center;
+}
+.playlist-header h3 {
+    margin: 0;
+    margin-right: 10px; /* Espacio entre texto e imagen */
+}
+.playlist-header img { /* Estilos para la imagen de la playlist */
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.playlist-url-input {
+    margin-bottom: var(--spacing-md);
+    flex-shrink: 0;
+}
+.playlist-url-input input[type="text"] {
+    width: 100%;
     padding: 8px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: #eee;
     border-radius: 5px;
-    margin-right: 10px;
+    box-sizing: border-box;
+    height: 40px;
 }
-/* Iconos más grandes */
-#boton-play {
-    font-size: 32px;
+.sidebar .add-to-playlist { /* Estilo específico para el botón de añadir URL */
+     width: 100%;
+     max-width: 100%; /* Ocupar todo el ancho */
+     justify-content: center; /* Centrar contenido del botón */
+     margin-bottom: var(--spacing-md);
+     flex-shrink: 0;
 }
-#iniciarButton, #mixButton {
-    padding: 10px 15px;
-    margin: 10px;
-    border: none;
-    border-radius: 5px;
+
+#playlistContainer {
+    flex-grow: 1; /* Ocupa el espacio restante en el sidebar */
+    overflow-y: auto; /* Scroll vertical SOLO para la lista */
+    padding-right: 5px; /* Espacio para scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #555 #333;
+}
+#playlistContainer::-webkit-scrollbar {
+    width: 8px;
+}
+#playlistContainer::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}
+#playlistContainer::-webkit-scrollbar-track {
+    background-color: #333;
+}
+
+#playlist {
+    padding: 0;
+    list-style-type: none;
+    margin: 0; /* Quitar margen por defecto */
+}
+
+/* Estilos para items de la playlist (ya existentes en app.js, pero como referencia) */
+.playlist-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid #ddd;
     cursor: pointer;
-    font-size: 1em;
+    position: relative;
+    color: #eee; /* Asegurar color de texto */
+}
+.playlist-item .image-container {
+    position: relative;
+    margin-right: 0.5rem;
+    flex-shrink: 0; /* Evitar que la imagen se encoja */
+}
+.playlist-item img.drag-handle { /* Estilo imagen playlist */
+    width: 80px;
+    height: 45px; /* Mantener 16:9 */
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: move;
+}
+.playlist-item .playing-icon {
+    position: absolute;
+    bottom: 2px; /* Ajustar posición */
+    left: 2px;  /* Ajustar posición */
+    color: #007bff;
+    font-size: 1em; /* Ajustar tamaño */
+    background-color: rgba(0, 0, 0, 0.6); /* Fondo para visibilidad */
+    border-radius: 50%;
+    padding: 2px;
+}
+.playlist-item.playing {
+    border: 1px solid #007bff; /* Borde más sutil */
+    background-color: rgba(0, 123, 255, 0.1); /* Fondo sutil */
+}
+.playlist-item.playing img.drag-handle{
+    border: 1px solid #007bff;
+}
+.playlist-item > div:not(.image-container):not(.delete-menu) { /* Contenedor de texto */
+    flex-grow: 1; /* Ocupar espacio */
+    overflow: hidden; /* Para truncar texto si es necesario */
+    margin-right: 5px; /* Espacio antes del menú */
+}
+.playlist-item p { /* Estilos para texto en playlist */
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+p[style*="font-weight: bold"] { /* Título */
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+p[style*="color: #555"] { /* Duración */
+    font-size: 10px;
+    color: #999; /* Color más claro */
+}
+/* Menú eliminar (ya en botones.css, ajustar si es necesario) */
+.playlist-item .delete-menu {
+   flex-shrink: 0; /* Evitar que se encoja */
+   margin-left: auto; /* Empujar a la derecha */
 }
 
-#iniciarButton {
-    background-color: #007bff;
-    color: white;
+/* ---- CONTENIDO PRINCIPAL (Panel de Búsqueda) ---- */
+.main-content {
+    flex: 1; /* Ocupa el espacio restante */
+    min-width: 300px; /* Ancho mínimo */
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Ocupar toda la altura del .container */
+    overflow: hidden; /* Controlar scroll interno */
 }
 
-#mixButton {
-    background-color: #28a745;
-    color: white;
-}
-/* Estilos para el mensaje flotante */
-.mensaje-flotante {
-    position: fixed;
-    bottom: 30px; /* Ajusta la distancia desde la parte inferior */
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    z-index: 1000; /* Asegura que esté por encima de otros elementos */
-    opacity: 1;
-    transition: opacity 1s ease-out;
+#search-panel {
+    background-color: #1e1e1e;
+    width: 100%;
+    border-radius: 10px;
+    padding: var(--spacing-md);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Ocupa el espacio en main-content */
+    overflow: hidden; /* Controlar scroll interno */
 }
 
-.mensaje-flotante.fadeOut {
-    opacity: 0;
+/* Contenedor del input de búsqueda */
+#search-panel .search-container {
+     margin-bottom: var(--spacing-md);
+     flex-shrink: 0; /* No encoger */
 }
-/* Estilos para el contenedor de búsqueda en la playlist y el panel principal */
-.search-container {
-    margin-bottom: 5px;
-    padding: 10px;
-}
-.search-container input[type="text"] {
-    width: calc(100% - 22px); /* Ajuste para el padding */
+#search-panel .search-container input[type="text"] {
+    width: 100%;
     padding: 10px;
     border: 1px solid #555;
     border-radius: 5px;
     background-color: #333;
     color: #eee;
     box-sizing: border-box;
+    height: 40px;
 }
-/* ---- Loading Spinner ---- */
-.loading-spinner {
-    position: fixed;
+
+/* Contenedor de Resultados (Scrollable) */
+#resultsContainer {
+    flex-grow: 1; /* Ocupa el espacio restante en search-panel */
+    overflow-y: auto; /* Habilita el scroll vertical SOLO aquí */
+    scrollbar-width: thin;
+    scrollbar-color: #555 #333;
+    padding-right: 5px; /* Espacio para scrollbar */
+    margin-right: -5px; /* Compensar padding */
+}
+#resultsContainer::-webkit-scrollbar {
+    width: 8px;
+}
+#resultsContainer::-webkit-scrollbar-thumb {
+    background-color: #555;
+    border-radius: 4px;
+}
+#resultsContainer::-webkit-scrollbar-track {
+    background-color: #333;
+}
+
+/* Grilla de Resultados */
+#results {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+    gap: var(--spacing-md);
+    padding-bottom: var(--spacing-sm); /* Espacio al final */
+}
+
+/* Estilos para CADA resultado (baldosa) */
+.video-result {
+    background-color: #282828;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border: none;
+    gap: 0;
+    transition: transform 0.2s ease-in-out; /* Efecto hover sutil */
+}
+.video-result:hover {
+    transform: translateY(-2px); /* Levantar un poco al pasar el ratón */
+}
+
+/* Contenedor de la miniatura */
+.video-result .thumbnail-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    height: 0;
+    overflow: hidden;
+    display: block;
+    margin: 0;
+}
+
+/* Miniatura */
+.video-result .thumbnail {
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    object-fit: cover;
+    border-radius: 0;
+    display: block; /* Asegurar display block */
+}
+
+/* Duración */
+.video-result .duration {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    z-index: 1;
+}
+
+/* Contenedor para Título, Autor y Botón */
+.video-result .video-details {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-grow: 1; /* Para que ocupe espacio si es necesario */
+}
+
+/* Título */
+.video-result .video-title {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #eee;
+    margin: 0;
+    /* Truncamiento de texto a 2 líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    max-height: 2.6em; /* line-height * 2 */
+    word-break: break-word; /* Para palabras largas */
+}
+
+/* Autor */
+.video-result .video-author {
+    font-size: 0.8em;
+    color: #aaa;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Botón Añadir (usa estilos de botones.css por defecto) */
+.video-result .add-to-playlist {
+    margin-top: auto; /* Empujar al fondo */
+    padding: 6px 10px;
+    font-size: 0.85em;
+    align-self: flex-start; /* Alinear a la izquierda */
+}
+
+
+/* ---- MENSAJE FLOTANTE ---- */
+.mensaje-flotante {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 1s ease-out;
+    font-size: 0.9em; /* Tamaño de fuente */
+}
+
+.mensaje-flotante.fadeOut {
+    opacity: 0;
+}
+
+/* ---- Loading Spinner (general, ya en loadingSpinner.css) ---- */
+/* .loading-spinner { ... } */
+/* .spinner { ... } */
+/* @keyframes spin { ... } */
+
+/* ---- Spinner pequeño para "Cargar Más" ---- */
+.loading-spinner-small {
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    padding: 10px;
+    margin: 10px auto; /* Centrarlo */
+    height: 30px; /* Altura fija */
+    flex-shrink: 0; /* Evitar que cambie tamaño */
 }
-
-.spinner {
-    width: 50px;
-    height: 50px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid var(--primary-accent-color);
+.loading-spinner-small::after { /* Pseudo-elemento para el spinner */
+    content: '';
+    width: 25px;
+    height: 25px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid white; /* O usa --primary-accent-color */
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    box-sizing: border-box; /* Incluir borde en tamaño */
 }
+/* Keyframes spin ya definido globalmente */
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 
 /* ---- Error Container ---- */
 .error-container {
@@ -533,27 +476,10 @@ aside.sidebar {
     text-align: center;
 }
 
-/* ---- Templates ---- */
-.playlist-item
-    display: flex;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    margin-bottom: var(--spacing-sm);
-}
+/* ---- TEMPLATES (No usados directamente para estilo activo, pero referenciados) ---- */
+/* .playlist-item (estilos ya definidos arriba) */
+/* .search-result-item (reemplazado por .video-result) */
 
-.item-content, .result-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.item-controls {
-    display: flex;
-    gap: var(--spacing-sm);
-}
 
 /* ---- Utility Classes ---- */
 .hidden {
@@ -563,127 +489,126 @@ aside.sidebar {
 .invisible {
     visibility: hidden;
 }
+
 /* ---- RESPONSIVIDAD ---- */
 @media (max-width: 1200px) {
-    .container {
-        gap: var(--spacing-md);
-    }
-    
-    aside.sidebar {
-        max-width: 350px;
-    }
-    
-    #search-panel {
-        max-width: 500px;
-    }
+    /* No se necesitan ajustes específicos aquí si el layout es fluido */
 }
 
 @media (max-width: 992px) {
+    /* Cuando el layout principal se vuelve columna */
     .container {
         flex-direction: column;
-        align-items: center;
+        height: auto; /* Altura automática en modo columna */
+        overflow: auto; /* Permitir scroll si el contenido es muy alto */
     }
 
     aside.sidebar,
     .main-content {
-        max-width: 600px;
-        width: 100%;
+        width: 100%; /* Ocupar todo el ancho */
+        max-width: 100%; /* Quitar límite */
+        height: auto; /* Altura automática */
+    }
+    aside.sidebar {
+        max-height: 40vh; /* Limitar altura del sidebar */
+    }
+    .main-content {
+         min-height: 50vh; /* Asegurar altura mínima para resultados */
     }
 
     #contenedor-player {
-        max-width: 600px;
+         max-width: 600px; /* O un ancho relativo como 90% */
+         width: 90%;
+         margin: 0 auto var(--spacing-lg); /* Centrar */
     }
+
 }
 
 @media (max-width: 768px) {
-    body.vibe-theme {
-        margin: var(--spacing-sm);
+    /* Ajustes para tablets y móviles grandes */
+     body.vibe-theme {
+        padding: var(--spacing-sm); /* Reducir padding general */
     }
-
-    aside.sidebar,
-    .main-content,
-    #contenedor-player,
-    #search-panel {
-        max-width: 100%;
+    #results {
+        grid-template-columns: 1fr; /* 1 columna en pantallas más pequeñas */
     }
-
-    .search-result-item {
-        flex-direction: column;
+    :root { /* Reducir espaciado */
+        --spacing-sm: 8px;
+        --spacing-md: 10px;
+        --spacing-lg: 12px;
     }
-
-    .search-result-item img {
-        width: 100%;
-        height: auto;
-        max-height: 200px;
+     aside.sidebar {
+        max-height: 45vh; /* Ajustar altura si es necesario */
     }
 }
 
 @media (max-width: 480px) {
-    :root {
+     /* Ajustes para móviles pequeños */
+     :root {
         --spacing-sm: 5px;
         --spacing-md: 8px;
         --spacing-lg: 10px;
     }
-
-    .playlist-item {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
+     /* Player más pequeño */
+     #contenedor-player {
+         max-width: 100%;
+         width: 100%;
     }
-
-    .add-to-playlist,
-    #iniciarButton,
-    #mixButton {
-        max-width: 100%;
+     body.vibe-theme {
+        padding: var(--spacing-sm);
     }
+     /* Ajustar tamaño de fuente base si es necesario */
+     /* html { font-size: 14px; } */
 
-    #playlistContainer {
-        max-height: 300px;
-    }
+     /* Simplificar layout de items en playlist */
+     .playlist-item {
+        /* Podrías querer mostrar menos info o apilarla */
+        padding: var(--spacing-sm);
+     }
+     .playlist-item img.drag-handle {
+         width: 60px;
+         height: 33.75px; /* 16:9 */
+     }
+     .playlist-item p[style*="font-weight: bold"] { font-size: 11px; }
+     .playlist-item p[style*="color: #555"] { font-size: 9px; }
+
+     /* Hacer controles de playlist más grandes/fáciles de tocar */
+     .playlist-item .delete-menu-button { font-size: 1.4em; padding: 5px;}
+     .delete-menu-content button { padding: 8px 5px; }
+
+
+     /* Ajustar baldosa de resultados */
+     .video-result .video-title { font-size: 0.85em; }
+     .video-result .video-author { font-size: 0.75em; }
+     .video-result .add-to-playlist { font-size: 0.8em; padding: 5px 8px;}
+
+     .mensaje-flotante {
+         width: 90%; /* Más ancho en pantallas pequeñas */
+         box-sizing: border-box;
+         text-align: center;
+         bottom: 10px; /* Más cerca del fondo */
+     }
 }
 
-/* ---- UTILIDADES RESPONSIVE ---- */
-.hidden-mobile {
-    display: none;
-}
-
-@media (min-width: 768px) {
-    .hidden-mobile {
-        display: block;
-    }
-}
 
 /* ---- MEJORAS DE ACCESIBILIDAD ---- */
 @media (hover: none) {
-    /* Mejoras para dispositivos táctiles */
-    .playlist-item,
-    .search-result-item,
-    button {
+    /* Mejoras para dispositivos táctiles - botones más grandes */
+    button, input[type="text"] {
+        min-height: 44px; /* Mínimo recomendado */
         padding: var(--spacing-md);
     }
-}
-/* ---- Responsive Improvements ---- */
-@media (max-width: 480px) {
-    .item-controls {
-        flex-direction: column;
+    .player-controls button {
+        font-size: 28px; /* Iconos de control más grandes */
     }
-
-    .playlist-item, .search-result-item {
-        flex-direction: column;
+    .add-to-playlist {
+         padding: 10px 15px; /* Botón añadir más grande */
     }
-
-    .thumbnail-container {
-    position: relative;
-    width: 160px;
-    height: 90px;
-    overflow: hidden;
-    border-radius: 5px;
+    /* Ajustar padding si se superpone con min-height */
+    .video-result .add-to-playlist {
+        padding: 8px 12px; /* Ajuste específico si es necesario */
     }
-
-    .thumbnail-container img {
-        width: 100%;
-        height: auto;
-    }
+     .playlist-item .delete-menu-button { min-height: auto; } /* Evitar altura doble */
 }
 /* ---- SOPORTE PARA MODO OSCURO DEL SISTEMA ---- */
 @media (prefers-color-scheme: dark) {
