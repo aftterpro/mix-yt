@@ -20,44 +20,45 @@ router.get('/segments/:videoId', async (req, res) => {
     console.log('Video ID:', videoId);
 
     try {
-        // Obtener el userID del encabezado de la solicitud
-        const userId = req.headers['x-userid'];
+        const userId = process.env.SPONSORBLOCK_USER_ID; //Obtener userID desde la variable de entorno ***
 
-        // Verificar si se proporcionó el userID
+        // Verificar que la variable de entorno esté configurada en Netlify
         if (!userId) {
-        console.error('❌ userID es requerido:', userId);
-            return res.status(400).json({ error: 'userID es requerido.' });
+            console.error('Function Error: La variable de entorno SPONSORBLOCK_USER_ID no está configurada en Netlify.');
+            // Usar 500 Internal Server Error porque es un problema de configuración del backend
+            return res.status(500).json({ error: 'Error de configuración interna del servidor.' });
         }
 
-        // Crear una instancia de SponsorBlock con el userID recibido
+        // Ya no se necesita el encabezado 'X-UserID' de la solicitud
         const sponsorBlock = new SponsorBlock(userId);
+        // console.log(`Function: Usando userID del entorno para SponsorBlock.`); // Evita loguear el ID real
 
         const segments = await sponsorBlock.getSegments(videoId, [
-            "sponsor",
-            "intro",
-            "outro",
-            "selfpromo",
-            "interaction",
-            "poi",
-            "music_offtopic", // OJO a esto
+            "sponsor", "intro", "outro", "selfpromo",
+            "interaction", "poi", "music_offtopic",
+            // Añade o quita categorías según necesites
         ]);
 
-        console.log('Segmentos obtenidos:', segments);
+        console.log(`Function: Segmentos obtenidos para ${videoId}: ${segments.length}`);
 
-        res.json(segments);
+        // Asegúrate de devolver un array vacío si no se encontraron segmentos (manejo de 404)
+        res.json(segments || []); // Devolver segmentos o array vacío
+
     } catch (error) {
+        console.error(`Function Error procesando ${videoId}:`, error);
 
-        // Verificar si el error es un 404 (Not Found)
-        if (error.status === 404) {
-        console.log('No se encontraron segmentos para este video. Devolviendo un array vacío.');
-        return res.json([]); // *** CORRECCIÓN: Devolver array JSON vacío explícito ***
-}
-        // Si es otro tipo de error, devolverlo
-    console.error("Error en la función SponsorBlock:", error); // Añadir log del error completo
-    return res.status(500).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
+        // Mejorar manejo de error 404 de la librería sponsorblock-api
+        if (error.status === 404 || (error.message && error.message.includes('404'))) {
+            console.log(`Function: No se encontraron segmentos SB para ${videoId}. Devolviendo array vacío.`);
+            return res.json([]); // Devolver array vacío para 404
+        }
+
+        // Otros errores
+        const statusCode = error.status || 500;
+        return res.status(statusCode).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
     }
 });
 
+// Montar el router en /api (para que coincida con la llamada del frontend)
 app.use('/api', router);
-
 module.exports.handler = serverless(app);
