@@ -488,9 +488,8 @@ const pipedInstances = [
   "https://pipedapi.orangenet.cc",
   "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
-    "https://pipedapi.ducks.party",
-    "https://piapi.ggtyler.dev"
-  // Agrega otras instancias aquí
+    "https://pipedapi.ducks.party"
+   // "https://piapi.ggtyler.dev" lento cargar imagen
 ];
     //Selecciona instancia aleatoria
 function getRandomPipedInstance() {
@@ -532,13 +531,10 @@ async function getPlaylistInfo(playlistId) {
 
   try {
     const data = await fetchDataWithRetry(proxiedUrl);
-    // Verificar si la estructura es válida
-    if (!data || !data.relatedStreams) {
+    if (!data || !data.relatedStreams) { // Verificar si la estructura es válida
       throw new Error("La estructura de la respuesta no contiene videos válidos.");
     }
-   
-    // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
-    const playlistName = data.name || "Playlist sin nombre"; // Accede a data.name
+    const playlistName = data.name || "Playlist sin nombre";    // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
     displayPlaylist(data); // Llamo para cambiar nombre de playlist
     return { ...data, name: playlistName };
   } catch (error) {
@@ -674,7 +670,6 @@ function playNextVideo(videoId, video) {
          console.log(`playNextVideo: *** Transición INTERRUMPIDA (Error para ${previousVideoId}). Flag=false. ***`);
     }
 }
-
 function crossfadeAudio() {
     const previousPlayer = currentPlayer === 1 ? player2 : player1;
     const nextPlayer = currentPlayer === 1 ? player1 : player2;
@@ -704,7 +699,6 @@ function askToRepeatPlaylist() {
     } else {
         stopMonitoring(); // Detener el monitoreo
        mostrarMensajeFlotante("Gracias por utilizar :) !");
-        console.log("Gracias por utilizar.");
     }
 }
 //Iniciar el monitoreo solo al reproducir la playlist
@@ -720,7 +714,6 @@ function playFirstVideo() {
         player1.loadVideoById(firstVideoId);
         document.getElementById('player1').classList.remove('hidden');
         document.getElementById('player2').classList.add('hidden');
-
         startMonitoring(); // Iniciar monitoreo al comenzar la reproducción
     }
 }
@@ -745,7 +738,6 @@ function stopMonitoring() {
            console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
           return;
       }
-
       // No intentar saltar si estamos en transición
       if (isTransitioning) return;
 
@@ -798,6 +790,7 @@ function stopMonitoring() {
               if (isInSegment) {
                   if (lastSeekEndTime !== endTime) {
                       console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                        mostrarMensajeFlotante("SPONSORBLOCK saltando segmento")
                       playerInstance.seekTo(endTime, true);
                       lastSeekEndTime = endTime;
                       lastSeekVideoId = videoId;
