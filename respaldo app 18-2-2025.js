@@ -8,6 +8,7 @@ let monitorInterval;// Declarar fuera para controlar el intervalo
 let playersInitialized = false;// Estado global para saber si ambos reproductores están listos
 let youtubeAPIReady = false;
 let currentIndex = 0;
+let isTransitioning = false; // Flag para estado de transición
 
 // Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
 function mostrarMensajeFlotante(mensaje) {
@@ -22,10 +23,9 @@ function mostrarMensajeFlotante(mensaje) {
         setTimeout(() => {
             mensajeDiv.remove();
         }, 1000);
-    7},10000);// 10 segundos
+    7},6000);// 6segundos
 }
 // Ejemplo de uso:
-mostrarMensajeFlotante("¡Recomendamos instalar extencion : \n Amplificador de volumen - refuerzo de sonido \n SponsorBlock, para una mejor experiencia :)" );
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
 
 // Módulo: Carga del API de YouTube (Optimizado)
@@ -48,13 +48,12 @@ function onYouTubeIframeAPIReady() {
     initializePlayers();
 }
 // Agregaremos una función que garantice que ambos reproductores estén listos antes de ejecutar cualquier acción.
-// asegurarte de que todo el flujo se configura correctamente
 function initializePlayers() {
     if (player1 && player2) return; // Evitar la reinicialización si ya existen
 
     player1 = new YT.Player('player1', {
-        height: '250',
-        width: '350',
+        height: '100%',
+        width: '100%',
         events: {
             'onReady': onPlayerReady, // Referencia directa a la función
             'onStateChange': onPlayerStateChange,
@@ -62,8 +61,8 @@ function initializePlayers() {
         }
     });
     player2 = new YT.Player('player2', {
-        height: '250',
-        width: '350',
+        height: '100%',
+        width: '100%',
         events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange,
@@ -102,114 +101,121 @@ function onPlayerError(event) { //Errores con Api
 }
 //Verifica que monitorPlayers se llama correctamente cada 10 segundos:
 function onPlayerReady(event) {
-   // console.log(`Reproductor listo: player${currentPlayer}`);
-     // Si ambos reproductores están listos, marca `playersInitialized` como verdadero
     if (player1 && player2) {
         playersInitialized = true;
-       // console.log("Ambos reproductores están inicializados.");
+        document.getElementById('botonPlay').disabled = false;
     }
-    // Inicia el monitor
+    // Inicia el monitor con intervalo reducido para saltos precisos
     if (!monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 10000);
-        console.log('Monitor iniciado con ID:', monitorInterval);
+        // *** CAMBIO AQUÍ: Intervalo más corto ***
+        monitorInterval = setInterval(monitorPlayers, 300); // Chequear cada 300ms (0.5 segundo)
+        console.log('Monitor iniciado con ID:', monitorInterval, '(intervalo: 1000ms)');
     }
 }
 //Verificar si el usuario modifica la duración del video
 function onPlayerStateChange(event) {
+    // console.log('Player State Change:', event.data, 'Player:', event.target === player1 ? '1' : '2'); // Log para debug
     if (event.data === YT.PlayerState.ENDED) {
+         lastSeekEndTime = -1; // Considera si necesitas limpiar lastSeekEndTime aquí también
         console.log('Video finalizado.');
-    } else if (event.data === YT.PlayerState.PLAYING) {
-        console.log('Video en reproducción.');
+    if (event.data === YT.PlayerState.PLAYING) {   // Si el video comienza a reproducirse, verificar segmentos inmediatamente
+          console.log("Estado PLAYING detectado. Verificando segmentos iniciales...");
+          checkAndSkipSegment(event.target);// Llamar a la función de chequeo pasando la instancia del reproductor que disparó el evento
+      }
     } else if (event.data === YT.PlayerState.PAUSED) {
         console.log('Video en pausa.');
     }
 }
-// Módulo: Interacción con Piped API (Búsqueda)
+// Módulo: Interacción con piped.nosebs.ru (Búsqueda)
 const performSearch = async (query) => {
-    console.log("Iniciando búsqueda...", query); // Incluir la query en el log
+    // Obtener referencia al div de resultados DENTRO de la función
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = '<p>Buscando...</p>';
-    
+    if (!resultsDiv) return; // Salir si no se encuentra el div
+
+    console.log(`Iniciando búsqueda para: ${query}`);
+    resultsDiv.innerHTML = '<p>Buscando...</p>';     // Mostrar "Buscando..." antes del fetch
 
     try {
-        const url = `https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`;
-        const response = await fetch(url);
-
+         // La URL relativa ya apunta a tu función Netlify
+        const response = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
-            console.error(`Error en la solicitud: ${response.status} ${response.statusText}`, url); // Log con URL y detalles
-            mostrarMensajeFlotante(`Error al buscar: ${response.status} ${response.statusText}`);
-            resultsDiv.innerHTML = '<p>Error al buscar. Intenta nuevamente.</p>';
+            resultsDiv.innerHTML = `<p>Error en la búsqueda: ${response.status}</p>`; // Mostrar error
+            mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`);
             return;
         }
-
         const data = await response.json();
 
-        if (!data.items || data.items.length === 0) {
-            resultsDiv.innerHTML = '<p>No se encontraron resultados para: "' + query + '"</p>'; // Mostrar la búsqueda
-            mostrarMensajeFlotante("No se encontraron resultados.");
-            return;
-        }
-        displaySearchResultsPiped(data.items);
+        // Llamar a displaySearchResultsPiped (esta función reemplazará el "Buscando...")
+        displaySearchResultsPiped(data);
+
     } catch (error) {
-        console.error('Error al buscar en Piped.video:', error);
-        mostrarMensajeFlotante('Error al buscar. Intenta nuevamente.');
-        resultsDiv.innerHTML = '<p>Error al buscar. Intenta nuevamente.</p>';
+        console.error("Error fetching search results:", error);
+        resultsDiv.innerHTML = '<p>Error en la conexión al buscar.</p>'; // Mostrar error
+        mostrarMensajeFlotante("Error en la conexión al buscar.");
     }
 };
-// Nueva función para mostrar resultados de la API de Piped Y YT V3
+// Nueva función para mostrar resultados de la API de Piped
 const displaySearchResultsPiped = (results) => {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = ''; // Limpia el contenedor antes de agregar nuevos resultados
-
-    if (!results || results.length === 0) {
-        resultsDiv.innerHTML = '<p>No se encontraron resultados.</p>';
-        mostrarMensajeFlotante("No se encontraron resultados.");
+    if (!resultsDiv) {
+        console.error("Results div not found!");
         return;
     }
-    const fragment = document.createDocumentFragment();
+    resultsDiv.innerHTML = ''; // Clear previous results
 
-    results.forEach(video => {
-        const videoId = video.url.split('v=')[1];
-        if (!videoId) {
-            console.error("URL de video inválida:", video.url);
-            return;
+    // Verificar si la respuesta tiene la propiedad 'items' y si es un array
+    if (!results || !results.items || !Array.isArray(results.items) || results.items.length === 0) {
+        const noResultsMessage = document.createElement('p');
+        noResultsMessage.textContent = "No se encontraron resultados.";
+        resultsDiv.appendChild(noResultsMessage);
+        return;
+    }
+
+    // Usar results.items en lugar de results
+    results.items.forEach(video => {
+        const videoDiv = document.createElement('div');
+        videoDiv.classList.add('video-result');
+
+        // Contenedor para la miniatura y la duración
+        const thumbnailContainer = document.createElement('div');
+        thumbnailContainer.classList.add('thumbnail-container');
+
+        const thumbnail = document.createElement('img');
+        thumbnail.src = video.thumbnail;
+        thumbnail.alt = video.title;
+        thumbnail.classList.add('thumbnail'); // Clase para estilos CSS
+        thumbnail.loading = "lazy";
+        thumbnailContainer.appendChild(thumbnail);
+
+        // Mostrar duración dentro de la miniatura
+        if (video.duration) {
+            const duration = document.createElement('span');
+            duration.textContent = formatDuration2(video.duration); // Formatear la duración
+            duration.classList.add('duration'); // Clase para estilos CSS
+            thumbnailContainer.appendChild(duration);
         }
 
-        const videoElement = document.createElement('div');
-        videoElement.className = 'result';
-        videoElement.dataset.videoId = videoId; // Almacena el ID en un atributo data
-
-        const img = document.createElement('img');
-        img.src = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg'; // Usa el icono predeterminado
-        img.alt = video.title;
+        videoDiv.appendChild(thumbnailContainer);
 
         const title = document.createElement('h3');
         title.textContent = video.title;
+        title.classList.add('video-title'); // Clase para estilos CSS
+        videoDiv.appendChild(title);
 
-        const duration = document.createElement('p');
-        duration.className = 'result-duration';
-        duration.textContent = `Duración: ${formatDuration(video.duration)}`;
+        const addToPlaylistButton = document.createElement('button');
+        addToPlaylistButton.textContent = "Añadir a la playlist";
+        addToPlaylistButton.classList.add('add-to-playlist');
 
-        const button = document.createElement('button');
-        button.className = 'add-to-playlist'; // Usa la clase definida en botones.css
-        button.dataset.videoId = videoId;
-        button.dataset.videoTitle = video.title;
-        button.dataset.videoDuration = video.duration;
-        button.dataset.videoThumbnail = video.thumbnail;
+        addToPlaylistButton.dataset.videoId = video.videoId || video.url.split("v=")[1];
+        addToPlaylistButton.dataset.videoTitle = video.title;
+        addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
+        addToPlaylistButton.dataset.videoDuration = video.duration;
 
-        const icon = document.createElement('i');
-        icon.className = 'fa-solid fa-plus'; // Mantén la clase para el icono
-        button.appendChild(icon);
-
-        videoElement.appendChild(img);
-        videoElement.appendChild(title);
-        videoElement.appendChild(duration);
-        videoElement.appendChild(button);
-        fragment.appendChild(videoElement);
+        videoDiv.appendChild(addToPlaylistButton);
+        resultsDiv.appendChild(videoDiv);
     });
 
-    resultsDiv.appendChild(fragment);
-
+    // Event listeners para los botones "Añadir a la playlist"
     const addToPlaylistButtons = document.querySelectorAll('.add-to-playlist');
     addToPlaylistButtons.forEach(button => {
         button.addEventListener('click', () => {
@@ -224,11 +230,16 @@ const displaySearchResultsPiped = (results) => {
     });
 };
 
+// Función para formatear la duración de segundos a un formato legible
+function formatDuration2(duration) {
+    const minutes = Math.floor(duration / 60);
+    const seconds = duration % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
 // Módulo: Manejo de la Playlist (Añadir, Eliminar, Reordenar, Actualizar DOM)
 //Agregar a la playlist
 const addToPlaylist = (videoData) => {
-    // **VALIDACIÓN EXHAUSTIVA DE LOS DATOS**
-    if (!videoData || !videoData.videoId) {
+    if (!videoData || !videoData.videoId) {     // **VALIDACIÓN EXHAUSTIVA DE LOS DATOS**
         console.error("Error: Datos de video inválidos:", videoData);
         mostrarMensajeFlotante("Error al añadir el video. Datos inválidos.");
         return; // Salir de la función si los datos son inválidos
@@ -260,18 +271,12 @@ function deleteVideo(videoId) {
        mostrarMensajeFlotante(`Video: ${playlistVideos[videoIndex].title} eliminado`);
         console.log(`Eliminando video: ${playlistVideos[videoIndex].title}`);
 
-        // Verificar si es un video añadido manualmente
-        const isManual = playlistVideos[videoIndex].manual;
-
-        // Eliminar de la playlist principal
-        playlistVideos.splice(videoIndex, 1);
-
-        // Si es manual, también eliminarlo de manualVideos
-        if (isManual) {
+        const isManual = playlistVideos[videoIndex].manual;  // Verificar si es un video añadido manualmente
+        playlistVideos.splice(videoIndex, 1); // Eliminar de la playlist principal
+        if (isManual) {    // Si es manual, también eliminarlo de manualVideos
             manualVideos = manualVideos.filter((video) => video.videoId !== videoId);
         }
-        // Ajustar el índice actual si afecta la reproducción
-        if (currentIndex >= videoIndex) {
+        if (currentIndex >= videoIndex) {         // Ajustar el índice actual si afecta la reproducción
             currentIndex = Math.max(0, currentIndex - 1);
         }
 
@@ -286,7 +291,7 @@ function rearrangePlaylist(fromIndex, toIndex) { // Eliminar la función duplica
     const [movedVideo] = playlistVideos.splice(fromIndex, 1);
     playlistVideos.splice(toIndex, 0, movedVideo);
 } 
-//Actualizar DOM  (CORREGIDO)
+// Actualizar DOM (CORREGIDO)
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
     playlistContainer.innerHTML = ''; // Limpiar la lista
@@ -299,10 +304,9 @@ function updatePlaylistDOM() {
         const imageContainer = document.createElement('div');
         imageContainer.className = 'image-container';
 
-       // En lugar de mostrar la miniatura, muestra el icono
-        const iconoPredeterminado = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
+        // Usar la miniatura real del video
         const img = document.createElement('img');
-        img.src = iconoPredeterminado;
+        img.src = video.thumbnail; // Usar la miniatura del video
         img.alt = video.title;
         img.className = 'drag-handle';
         imageContainer.appendChild(img);
@@ -321,7 +325,6 @@ function updatePlaylistDOM() {
                 <p style="margin: 0; font-size: 10px; color: #555;">Duración: ${formatDuration(video.duration)}</p>
             </div>
         `;
-
         // Menú de eliminar (CON MANEJO DE CLICS MEJORADO)
         const deleteMenu = document.createElement('div');
         deleteMenu.className = 'delete-menu';
@@ -379,7 +382,6 @@ function updatePlaylistDOM() {
 
     });
     enableDragAndDrop();
-
 }
 // Estilos CSS (Modificados para el icono y el estilo)
 const style3 = document.createElement('style');
@@ -481,6 +483,40 @@ function enableDragAndDrop() {
 }
 
 // Módulo: Carga de Playlist, miniaturas desde URL, cache
+//Instancias api
+const pipedInstances = [
+  "https://pipedapi.orangenet.cc",
+  "https://api.piped.private.coffee",
+    "https://pipedapi.reallyaweso.me",
+    "https://pipedapi.ducks.party"
+   // "https://piapi.ggtyler.dev" lento cargar imagen
+];
+    //Selecciona instancia aleatoria
+function getRandomPipedInstance() {
+  const randomIndex = Math.floor(Math.random() * pipedInstances.length);
+  return pipedInstances[randomIndex];
+}
+    //Función para Realizar Solicitudes con Reintentos
+async function fetchDataWithRetry(url, maxRetries = 3, retryDelay = 1000) {
+  let retries = 0;
+  while (retries < maxRetries) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`Error fetching ${url}, retry ${retries + 1}:`, error);
+      retries++;
+      if (retries < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      } else {
+        throw error; // Lanza el error después de todos los reintentos
+      }
+    }
+  }
+}
 // Función para extraer el ID de la playlist de una URL de YouTube
 function extractPlaylistId(url) {
     const urlParams = new URLSearchParams(new URL(url).search);
@@ -488,184 +524,152 @@ function extractPlaylistId(url) {
 }
 // Función para obtener información de la playlist usando la API de Piped con un proxy
 async function getPlaylistInfo(playlistId) {
-    const proxyUrl = 'https://api.allorigins.win/raw?url='; // URL base del proxy
-    const targetUrl = `https://pipedapi.kavin.rocks/playlists/${playlistId}`;
-    const url = `${proxyUrl}${encodeURIComponent(targetUrl)}`; // Codifica la URL de destino
+  const instanceUrl = getRandomPipedInstance();
+  const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
+  const proxyUrl = 'https://api.allorigins.win/raw?url='; // URL base del proxy
+  const proxiedUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`; // URL con proxy
 
-
-    console.log("URL a solicitar:", url);
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            const errorText = await response.text(); // Obtener el texto del error
-
-            if (response.status === 502) {
-                // Manejo específico para error 502 (Bad Gateway)
-                console.error("Error 502 del proxy:", errorText);
-                mostrarMensajeFlotante("Error al cargar la playlist: El proxy no está disponible.");  // Mensaje amigable
-                return null; // Salir con error
-            } else {
-                // Manejo para otros errores (diferentes de 502)
-                console.error('Error al obtener los datos:', response.status, response.statusText, errorText);
-                let errorMessage = `Error al obtener la información de la playlist: ${response.status} - ${response.statusText}`;
-                try {
-                    const errorJson = JSON.parse(errorText); // Intenta parsear JSON si no es 502
-                    errorMessage = errorJson.message || errorMessage;
-                } catch (parseError) {
-                    errorMessage = errorText || errorMessage;
-                }
-                throw new Error(errorMessage);
-            }
-        }
-
-        const data = await response.json(); // Parsear JSON SOLO si response.ok es true y NO es 502
-        // Verificar si la estructura es válida
-        if (!data || !data.relatedStreams) {
-            throw new Error('La estructura de la respuesta no contiene videos válidos.');
-        }
-        console.log('Información de la playlist:', data);
-    // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
-    const playlistName = data.name || "Playlist sin nombre"; // Accede a data.name
-
+  try {
+    const data = await fetchDataWithRetry(proxiedUrl);
+    if (!data || !data.relatedStreams) { // Verificar si la estructura es válida
+      throw new Error("La estructura de la respuesta no contiene videos válidos.");
+    }
+    const playlistName = data.name || "Playlist sin nombre";    // EXTRAE EL NOMBRE DE LA PLAYLIST (CORREGIDO)
+    displayPlaylist(data); // Llamo para cambiar nombre de playlist
     return { ...data, name: playlistName };
-} catch (error) {
-        console.error('Error al obtener la información de la playlist:', error.message);
-        mostrarMensajeFlotante(error.message);
-        return null;
-    }
-}
-//Función para obtener miniaturas 
-async function obtenerMiniaturas(videoIds) {
-  const apiKey = obtenerClaveAPI(); // Obtiene la clave de API actual
-  //  Divide el arreglo de IDs en grupos de 50 (límite de la API)
-  const gruposDeIds = chunkArray(videoIds, 50);
-
-  const miniaturas = {};
-
-  for (const grupoDeIds of gruposDeIds) {
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${grupoDeIds.join(',')}&key=${apiKey}`;
-
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.items) {
-        data.items.forEach(video => {
-          const videoId = video.id;
-          const thumbnails = video.snippet.thumbnails;
-
-          miniaturas[videoId] = thumbnails;
-        });
-      }
-    } catch (error) {
-      console.error('Error al obtener miniaturas:', error);
-    }
+  } catch (error) {
+    console.error(
+      "Error al obtener la información de la playlist:",
+      error.message
+    );
+    mostrarMensajeFlotante(error.message);
+    return null;
   }
-
-  return miniaturas;
 }
-
-// Función auxiliar para dividir un arreglo en grupos
-function chunkArray(array, size) {
-  const chunkedArray = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunkedArray.push(array.slice(i, i + size));
-  }
-  return chunkedArray;
-}
-// Utiliza las miniaturas almacenadas en caché
-async function mostrarMiniaturas(videoIds) {
-  // Obtén las miniaturas almacenadas en caché
-  const miniaturasCache = JSON.parse(localStorage.getItem('miniaturas')) || {};
-
-  // Obtén las IDs de los videos que no están en caché
-  const idsSinCache = videoIds.filter(id => !miniaturasCache[id]);
-
-  // Si hay IDs sin caché, obtén las miniaturas de la API
-  if (idsSinCache.length > 0) {
-    const nuevasMiniaturas = await obtenerMiniaturas(idsSinCache);
-    // Actualiza el caché con las nuevas miniaturas
-    Object.assign(miniaturasCache, nuevasMiniaturas);
-  }
-
-  // Muestra las miniaturas
-  videoIds.forEach(videoId => {
-    const thumbnails = miniaturasCache[videoId];
-    if (thumbnails) {
-      // Muestra las miniaturas del video
-      console.log(`Miniaturas para ${videoId}:`, thumbnails);
-      // ... (código para mostrar las miniaturas en tu aplicación)
-    } else {
-      console.error(`No se encontraron miniaturas para ${videoId}`);
-    }
-  });
-}
-// Función para mostrar Playlizt
+// Función para mostrar Playlist
 function displayPlaylist(playlist) {
+        console.log('Datos recibidos en displayPlaylist:', playlist); // Añade esta línea
     if (!playlist || !playlist.relatedStreams || !Array.isArray(playlist.relatedStreams)) {
-        console.error('Error: La playlist no contiene videos válidos.');
         alert('No se encontraron videos válidos en la playlist.');
         return;
     }
-    const playlistHeader = document.getElementById('playlist-panel').querySelector('h2');
+
+    const playlistHeader = document.querySelector('.playlist-header h3');
+    const playlistThumbnail = document.querySelector('.playlist-header img') || document.createElement('img'); // Crear img si no existe
+
     if (playlistHeader) {
         playlistHeader.textContent = playlist.name;
     } else {
         console.error("No se encontró el encabezado de la playlist.");
     }
-const loadedVideos = playlist.relatedStreams.map((video) => ({
+
+    // Actualizar o añadir la miniatura
+    playlistThumbnail.src = playlist.thumbnailUrl;
+    playlistThumbnail.alt = playlist.name;
+    playlistThumbnail.style.width = '50px'; // Ajusta el tamaño como necesites
+    playlistThumbnail.style.height = '50px';
+    playlistThumbnail.style.marginLeft = '10px'; // Espacio entre el título y la miniatura
+
+    if (!playlistThumbnail.parentNode) {
+        document.querySelector('.playlist-header').appendChild(playlistThumbnail); // Añadir si no está en el DOM
+    }
+
+    const loadedVideos = playlist.relatedStreams.map((video) => ({
         videoId: video.url.split('v=')[1],
         title: video.title,
         thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75/0000FF/FFFFFF/?text=No+Thumbnail',
-        duration: video.duration, // No es necesario parsear aquí, se hace al agregar a la playlist
+        duration: video.duration,
         manual: false,
     }));
-    playlistVideos = [...loadedVideos, ...manualVideos];
-    console.log('Playlist cargada:', playlistVideos);
+    // Concatenar los nuevos videos con los existentes
+    playlistVideos = [...playlistVideos, ...loadedVideos]; // Cambiado aquí
     updatePlaylistDOM();
 }
 // Módulo: Reproducción y Crossfade
-// Función para reproducir un video
-function playVideo(videoId, player) {
-    player.loadVideoById(videoId);
-}
 // Función para reproducir el siguiente video con efecto crossfade
 function playNextVideo(videoId, video) {
-    if (currentIndex < playlistVideos.length - 1) {
+    console.log(`playNextVideo: Intento de inicio para video anterior: ${videoId}. isTransitioning AHORA = ${isTransitioning}`); // Log entrada
+    if (isTransitioning) {
+        console.warn(`playNextVideo: BLOQUEADO - Transición ya en progreso. Ignorando llamada para video ${videoId}.`);
+        return; // Salir si ya está en transición
+    }
+    if (currentIndex >= playlistVideos.length - 1) {
+        console.log('playNextVideo: Fin de la lista detectado.');
+        askToRepeatPlaylist();
+        return; // Exit if at the end
+    }
+
+    // *** SETTING FLAG ***
+    isTransitioning = true;
+    const previousVideoId = videoId; // Store the ID of the video we are transitioning FROM
+    console.log(`playNextVideo: *** Transición INICIADA desde ${previousVideoId || 'inicio/desconocido'}. Flag=true. ***`);
+
+    try {
         currentIndex++;
-    const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
+        const nextVideoId = playlistVideos[currentIndex].videoId;
+        console.log(`playNextVideo: Cargando SIGUIENTE video (${nextVideoId}), index=${currentIndex}.`);
 
         const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
         const nextPlayer = currentPlayer === 1 ? player2 : player1;
         const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        const nextVideoId = playlistVideos[currentIndex].videoId;
-        console.log(`Reproduciendo siguiente video: player${currentPlayer}`);
-        nextPlayer.loadVideoById(nextVideoId);
-        updatePlaylistDOM(); // Actualizar el DOM para mostrar el cambio visual
 
-        // Aplicar efecto visual
-        currentPlayerElement.classList.add('fade-out');
-        nextPlayerElement.classList.remove('hidden'); // Asegura que el siguiente reproductor sea visible
-        nextPlayerElement.classList.add('fade-in');
+        if (nextPlayer && typeof nextPlayer.loadVideoById === 'function') {
+            nextPlayer.loadVideoById(nextVideoId);
+        } else {
+            console.error("playNextVideo: Error crítico - nextPlayer inválido.");
+            isTransitioning = false; // Reset on critical error
+            return;
+        }
 
-        // Esperar a que termine el efecto visual antes de continuar
+        updatePlaylistDOM();
+
+        if (currentPlayerElement) currentPlayerElement.classList.add('fade-out');
+        if (nextPlayerElement) {
+            nextPlayerElement.classList.remove('hidden');
+            nextPlayerElement.classList.add('fade-in');
+        }
+
         setTimeout(() => {
-            currentPlayerElement.classList.add('hidden'); // Oculta después del fade-out
-            currentPlayerElement.classList.remove('fade-out');
-            nextPlayerElement.classList.remove('fade-in');
+             const timeoutVideoId = previousVideoId; // Capturar el ID para el log del timeout
+            console.log(`playNextVideo: TIMEOUT INICIADO para transición desde ${timeoutVideoId}.`);
+            try {
+                if (currentPlayerElement) {
+                    currentPlayerElement.classList.add('hidden');
+                    currentPlayerElement.classList.remove('fade-out');
+                }
+                if (nextPlayerElement) {
+                    nextPlayerElement.classList.remove('fade-in');
+                }
 
-            currentPlayer = currentPlayer === 1 ? 2 : 1; // Alternar reproductores
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                 console.log(`playNextVideo: Timeout - currentPlayer cambiado a ${currentPlayer}.`);
 
-            // Efecto crossfade de volumen
-            crossfadeAudio();
-        }, 1500); // Asegura que el tiempo coincida con las transiciones CSS
-    } else {
-        console.log('Fin de la lista de reproducción.');
-        askToRepeatPlaylist();
+                crossfadeAudio();
+
+                if (timeoutVideoId && segmentosCache[timeoutVideoId]) {
+                    console.log(`playNextVideo: Timeout - Limpiando caché SB para video ANTERIOR: ${timeoutVideoId}`);
+                    delete segmentosCache[timeoutVideoId];
+                }
+                 if (timeoutVideoId && lastSeekVideoId === timeoutVideoId) {
+                     lastSeekEndTime = -1; // Resetear seek si era del video viejo
+                 }
+
+            } catch (timeoutError) {
+                console.error("Error dentro del setTimeout de playNextVideo:", timeoutError);
+            } finally {
+                // *** RESETTING FLAG ***
+                isTransitioning = false;
+                 console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para ${timeoutVideoId}). Flag=false. ***`);
+            }
+        }, 1500);
+
+    } catch (error) {
+        console.error("Error en playNextVideo:", error);
+        // *** RESETTING FLAG ON ERROR ***
+        isTransitioning = false;
+         console.log(`playNextVideo: *** Transición INTERRUMPIDA (Error para ${previousVideoId}). Flag=false. ***`);
     }
 }
-
 function crossfadeAudio() {
     const previousPlayer = currentPlayer === 1 ? player2 : player1;
     const nextPlayer = currentPlayer === 1 ? player1 : player2;
@@ -686,7 +690,6 @@ function crossfadeAudio() {
         }
     }, 100); // Cada 100ms
 }
-
 //Agregar gestión de repetición de playlist
 function askToRepeatPlaylist() {
     const repeat = confirm('¿Desea repetir la playlist?');
@@ -696,7 +699,6 @@ function askToRepeatPlaylist() {
     } else {
         stopMonitoring(); // Detener el monitoreo
        mostrarMensajeFlotante("Gracias por utilizar :) !");
-        console.log("Gracias por utilizar.");
     }
 }
 //Iniciar el monitoreo solo al reproducir la playlist
@@ -709,11 +711,9 @@ function playFirstVideo() {
     if (playlistVideos.length > 0) {
         const firstVideoId = playlistVideos[currentIndex].videoId;
         console.log('Reproduciendo el primer video:', firstVideoId);
-
         player1.loadVideoById(firstVideoId);
         document.getElementById('player1').classList.remove('hidden');
         document.getElementById('player2').classList.add('hidden');
-
         startMonitoring(); // Iniciar monitoreo al comenzar la reproducción
     }
 }
@@ -721,8 +721,8 @@ function playFirstVideo() {
 // Función para monitorizar los reproductores deteniendo e iniciando
 function startMonitoring() {
     if (!monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 3000); // Monitorear cada 3 segundos (ajustar según necesidad)
-        console.log('Monitoreo iniciado.');
+        monitorInterval = setInterval(monitorPlayers, 1000);
+        console.log('Monitoreo iniciado (intervalo: 1000ms).');
     }
 }
 function stopMonitoring() {
@@ -732,49 +732,218 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
-function monitorPlayers() {  // Función para monitorizar
-    if (!playersInitialized) {
-        console.warn('Los reproductores no están inicializados.');
+ // Función Reutilizable checkAndSkipSegment: Extraemos la lógica de salto para poder llamarla desde varios lugares.
+  async function checkAndSkipSegment(playerInstance) {
+      if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
+           console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
+          return;
+      }
+      // No intentar saltar si estamos en transición
+      if (isTransitioning) return;
+
+       // Datos necesarios del reproductor activo
+       let currentTime;
+       let videoId;
+       try {
+            currentTime = playerInstance.getCurrentTime();
+            const videoData = playerInstance.getVideoData();
+            if (!videoData || !videoData.video_id) {
+                 console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
+                return;
+            }
+            videoId = videoData.video_id;
+       } catch (error) {
+            console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
+            return;
+       }
+      // Reiniciar lastSeek si el video cambió
+      if (lastSeekVideoId !== videoId) {
+          lastSeekEndTime = -1;
+          lastSeekVideoId = videoId;
+      }
+
+      // Obtener segmentos (asegúrate de que la caché esté actualizada)
+      if (!segmentosCache[videoId]) {
+           console.log(`checkAndSkipSegment: Obteniendo segmentos SB para ${videoId}`);
+           segmentosCache[videoId] = await obtenerSegmentosSponsorBlock(videoId);
+           if (segmentosCache[videoId] && segmentosCache[videoId].length > 0) {
+              segmentosCache[videoId].sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
+           }
+         console.log("Segmentos cacheados para", videoId, ":", segmentosCache[videoId]);
+      }
+      const segmentos = segmentosCache[videoId];
+
+      // Lógica de salto
+      if (segmentos && segmentos.length > 0) {
+          for (const segmento of segmentos) {
+              const startTime = parseFloat(segmento.startTime);
+              const endTime = parseFloat(segmento.endTime);
+
+              if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) continue;
+
+              // *** IMPORTANTE: Ajuste para startTime: 0 ***
+              // Si el segmento empieza en 0, considerar saltar si currentTime es < endTime
+              // Si empieza después, usar la condición original.
+              const isInSegment = (startTime === 0 && currentTime >= 0 && currentTime < endTime) ||
+                                (startTime > 0 && currentTime >= startTime && currentTime < endTime);
+
+              if (isInSegment) {
+                  if (lastSeekEndTime !== endTime) {
+                      console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                        mostrarMensajeFlotante("SPONSORBLOCK saltando segmento")
+                      playerInstance.seekTo(endTime, true);
+                      lastSeekEndTime = endTime;
+                      lastSeekVideoId = videoId;
+                      break; // Salir después de saltar
+                  }
+              }
+          }
+      }
+  }
+
+let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
+// Variable global o al menos fuera del alcance inmediato de monitorPlayers
+// para recordar el último punto al que saltamos y para qué video fue.
+let lastSeekEndTime = -1;
+let lastSeekVideoId = null;
+async function monitorPlayers() {
+    // Guardia principal: No hacer nada si estamos en transición
+    if (isTransitioning) {
+        // console.log("Monitor: Pausado durante transición.");
         return;
     }
 
+    if (!playersInitialized) return;
+
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
 
-    if (!currentPlayerInstance || currentPlayerInstance.getPlayerState() !== YT.PlayerState.PLAYING) {
-      return; // Salir si el reproductor no existe o no está reproduciendo
-    }
-      try {
+    // Checks básicos del reproductor
+    if (!currentPlayerInstance || typeof currentPlayerInstance.getPlayerState !== 'function') return;
+    const playerState = currentPlayerInstance.getPlayerState();
+    if (playerState !== YT.PlayerState.PLAYING) return; // Solo actuar si está reproduciendo
+    if (!currentPlayerInstance.getVideoData || !currentPlayerInstance.getVideoData().video_id) return;
+
+    const videoId = currentPlayerInstance.getVideoData().video_id; // Obtener videoId para contexto
+
+    try {
+        // 1. Obtener datos y calcular si es tiempo de crossfade PRIMERO
         const currentTime = currentPlayerInstance.getCurrentTime();
-        const duration = currentPlayerInstance.getDuration();
+        const playerDuration = currentPlayerInstance.getDuration();
+        if (isNaN(playerDuration) || playerDuration <= 0) return;
 
-        if (isNaN(duration) || duration <= 0) {
-            return; // Salir si la duración no es válida
+        let effectiveDuration = playerDuration;
+        let durationSource = "Player";
+        const cachedData = segmentosCache[videoId];
+
+        // Cargar segmentos si no están en caché (necesario para obtener videoDuration si existe)
+        if (!cachedData) {
+             console.log(`Monitor: Obteniendo segmentos SB para ${videoId} (para cálculo de duración)`);
+             segmentosCache[videoId] = await obtenerSegmentosSponsorBlock(videoId);
+             // Reasignar cachedData por si se obtuvieron ahora
+             const newlyCachedData = segmentosCache[videoId];
+             if (newlyCachedData && newlyCachedData.length > 0 && newlyCachedData[0].videoDuration) {
+                const sbDuration = parseFloat(newlyCachedData[0].videoDuration);
+                if (!isNaN(sbDuration) && sbDuration > 0) {
+                    effectiveDuration = sbDuration;
+                    durationSource = "SponsorBlock";
+                }
+             }
+        } else if (cachedData.length > 0 && cachedData[0].videoDuration) { // Usar caché si ya existe
+             const sbDuration = parseFloat(cachedData[0].videoDuration);
+             if (!isNaN(sbDuration) && sbDuration > 0) {
+                effectiveDuration = sbDuration;
+                durationSource = "SponsorBlock";
+            }
         }
-        const timeRemaining = duration - currentTime;
-        console.log(`Tiempo restante para Player${currentPlayer}: ${timeRemaining.toFixed(1)} segundos`);
-
+        const timeRemaining = effectiveDuration - currentTime;
         const roundedTimeRemaining = Math.floor(timeRemaining);
-        if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining > 0) {
-         console.log('Iniciando efecto crossfade al próximo reproductor.');
-        playNextVideo();
-       }
+
+         if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 10) {           // Log de cuenta regresiva
+              console.log(`Monitor: Player ${currentPlayer} (${videoId}). Base: ${durationSource}(${effectiveDuration.toFixed(1)}s). Tiempo para Crossfade Aprox: ${roundedTimeRemaining}s.`);
+         }
+
+        if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) { //Evaluar condición de Crossfade
+            console.log(`Monitor: *** Condición crossfade CUMPLIDA (Player ${currentPlayer}, ${videoId}). Restante: ${roundedTimeRemaining}s. Llamando playNextVideo... ***`);
+           
+            playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));  // Llamar a playNextVideo. Esta función ahora maneja la bandera isTransitioning.
+            // IMPORTANTE: Salir de monitorPlayers aquí, ya que iniciamos la transición
+            // y no queremos ejecutar checkAndSkipSegment para el video actual.
+            return;
+        }
+
+        // 3. Si NO es tiempo de crossfade, ENTONCES verificar saltos de segmentos internos
+        // console.log(`Monitor: No es tiempo de crossfade, verificando saltos internos para ${videoId}`);
+        await checkAndSkipSegment(currentPlayerInstance);
+
+
     } catch (error) {
-        console.error(`Error al monitorear Player${currentPlayer}:`, error);
+        console.error(`Monitor: Error procesando Player ${currentPlayer} (${videoId || 'ID desconocido'}):`, error);
+    }
+}
+// Función para obtener los segmentos llamando a NUESTRA Netlify Function
+async function obtenerSegmentosSponsorBlock(videoId) {
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
+
+    // URL Relativa a tu propia API backend en Netlify
+     const apiUrl = `/api/segments/${videoId}`;
+     console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
+
+    try {
+        const response = await fetch(apiUrl, {
+            headers: {
+                // Enviar el encabezado X-UserID que tu API espera
+                'X-UserID': userId
+            }
+        });
+
+        // Verificar si la respuesta de NUESTRA API fue exitosa
+        if (!response.ok) {
+             // Si la API devuelve un error (ej. 500), response.status tendrá un valor
+             console.error(`Error desde la API (${apiUrl}): ${response.status} ${response.statusText}`);
+             // Intentar obtener más detalles del cuerpo del error si existen
+             let errorBody = await response.text(); // Usar text() por si no es JSON
+             console.error("Cuerpo del error de la API:", errorBody);
+             // Lanzar un error específico para que el catch lo maneje
+             throw new Error(`API Error: ${response.status}`);
+        }
+        const data = await response.json();  // Aquí es donde un 404 manejado correctamente devolvería '[]'
+
+         if (!Array.isArray(data)) {  // Verificar si data es realmente un array (por si acaso la API falla)
+             console.warn(`La API (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
+             return []; // Devolver array vacío si la respuesta no es un array
+         }
+
+         console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
+        return data; // Devolver los segmentos (o array vacío si fue 404)
+
+    } catch (error) {
+        // Capturar errores de red (fetch falló) o errores lanzados desde el 'if (!response.ok)'
+        console.error(`Error en fetch/procesamiento para ${apiUrl}:`, error);
+        // Devolver siempre un array vacío en caso de cualquier error para evitar problemas posteriores
+        return [];
     }
 }
 // Módulo: Manejo de Eventos y Botones
 // Botón Mix
-document.getElementById('mixButton').addEventListener('click', () => {
+document.getElementById('botonNext').addEventListener('click', () => {
     playNextVideo()
-        // Cambia el video en el siguiente reproductor
+     console.log("Click boton mix cambiando el video y el siguiente reproductor");
 });
 // Búsqueda por palabras
-document.getElementById('searchInput').addEventListener('input', (event) => {
+const searchInput = document.getElementById('searchInput');
+const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
+const debouncedSearch = debounce(performSearch, 500); // 500ms de retraso
+
+searchInput.addEventListener('input', (event) => {
     const query = event.target.value.trim();
+
     if (query.length > 0) {
+        resultsDiv.innerHTML = '<p>Escribiendo...</p>'; // Mostrar feedback
+        // Llamar a la búsqueda con debounce
         debouncedSearch(query);
     } else {
-        document.getElementById('results').innerHTML = '';
+        // Limpiar si el input está vacío
+        resultsDiv.innerHTML = '';
     }
 });
 // Variable para controlar si la reproducción ha comenzado
@@ -790,28 +959,56 @@ añadirUrlButton.addEventListener('click', async () => {
         return;
     }
 
+    // Muestra algún indicador de carga si es necesario
+    mostrarMensajeFlotante("Cargando playlist..."); // O un spinner
+
     const playlistInfo = await getPlaylistInfo(playlistId);
+
     if (playlistInfo && playlistInfo.relatedStreams) {
         const nuevosVideos = playlistInfo.relatedStreams.map(video => ({
             videoId: video.url.split('v=')[1],
             title: video.title,
-            thumbnail: video.thumbnail || 'placeholder.png',
+            thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75/0000FF/FFFFFF/?text=No+Thumbnail', // Usa tu placeholder
             duration: video.duration,
-            manual: true,
+            manual: false, // Marcar como no manuales si vienen de URL
         }));
-        playlistVideos.push(...nuevosVideos);
+
+        let videosAñadidos = 0;
+        nuevosVideos.forEach(nuevoVideo => {
+            // Verificar si el video YA existe en playlistVideos por videoId
+            const existe = playlistVideos.some(videoExistente => videoExistente.videoId === nuevoVideo.videoId);
+            if (!existe) {
+                playlistVideos.push(nuevoVideo); // Añadir solo si no existe
+                videosAñadidos++;
+            }
+        });
+
         updatePlaylistDOM();
         searchInput2.value = ''; // Limpiar el input
-        iniciarButton.disabled = false;
-        mostrarMensajeFlotante("Playlist añadida.");
+
+        if (playlistVideos.length > 0) { // Solo habilita 'Play' si la lista no estaba vacía o si se añadieron videos nuevos
+             botonPlay.disabled = false;
+        }
+
+        // Mensaje más informativo
+        if (videosAñadidos > 0) {
+             mostrarMensajeFlotante(`Se añadieron ${videosAñadidos} nuevos videos a la playlist.`);
+        } else {
+             mostrarMensajeFlotante("Todos los videos de la URL ya estaban en la playlist.");
+        }
+
     } else {
-        alert('No se pudo obtener información de la playlist.');
+        // Mensaje de error si no se pudo obtener info o no hay videos
+         mostrarMensajeFlotante('No se pudo obtener información de la playlist o está vacía.');
+        // alert('No se pudo obtener información de la playlist o no contiene videos válidos.'); // Puedes usar alert o mensaje flotante
     }
 });
 
 // Iniciar botton
-iniciarButton.disabled = true; // Deshabilitado al inicio
-iniciarButton.addEventListener('click', () => {
+let botonPlay = document.getElementById("botonPlay");
+
+botonPlay.disabled = true; // Deshabilitado al inicio
+botonPlay.addEventListener('click', () => {
     if (playlistVideos.length > 0 && !reproduccionIniciada) {
         reproduccionIniciada = true;
         currentIndex = 0;
@@ -821,7 +1018,7 @@ iniciarButton.addEventListener('click', () => {
         } else {
             console.error('Los reproductores no están listos.');
         }
-        iniciarButton.disabled = true;//Desabilitar boton para que no se inicie otra vez
+        botonPlay.disabled = true;//Desabilitar boton para que no se inicie otra vez
     }
 });
 // Carga inicial del API de YouTube (se puede retrasar con DOMContentLoaded si se desea)
@@ -836,34 +1033,11 @@ function debounce(func, delay) {
         }, delay);
     };
 }
-const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
-// Estilos CSS (con la nueva ubicación del mensaje)
-const style2 = document.createElement('style');
-style2.textContent = `
-    /* ... (tus otros estilos) */
-    .mensaje-flotante {
-        margin-top: 25px; /* Espacio entre la playlist y el mensaje */
-        background-color: rgba(32, 96, 187, 0.7);
-        color: white;
-        padding: 10px 30px;
-        border: 2px dashed white;
-        border-radius: 5px;
-        text-align: center; /* Centrar el texto */
-        opacity: 1;
-        transition: opacity 1s ease-in-out;
-    }
-    .mensaje-flotante.fadeOut {
-        opacity: 0;
-    }
-    /* ... (otros estilos) */
-`;
-document.head.appendChild(style2);
 //Funciones de formato de tiempo
 function formatDuration(duration) {
     if (isNaN(duration) || duration < 0) {
         return "Desconocida";
     }
-
     const minutes = Math.floor(duration / 60);
     const seconds = duration % 60;
     const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
