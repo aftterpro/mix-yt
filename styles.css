@@ -312,8 +312,8 @@ p[style*="color: #555"] { /* Duración */
 #results {
     display: grid;
     grid-template-columns: repeat(2, 1fr); /* 2 columnas */
-    gap: var(--spacing-md);
-    padding-bottom: var(--spacing-sm); /* Espacio al final */
+    gap: var(--spacing-sm); /* Reduce el espacio entre baldosas */
+    padding-bottom: var(--spacing-sm);
 }
 
 /* Estilos para CADA resultado (baldosa) */
@@ -370,33 +370,32 @@ p[style*="color: #555"] { /* Duración */
 
 /* Contenedor para Título, Autor y Botón */
 .video-result .video-details {
-    padding: 8px;
+    padding: 6px; /* Reduce el padding interno */
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    flex-grow: 1; /* Para que ocupe espacio si es necesario */
+    gap: 3px; /* Reduce el espacio entre elementos */
+    flex-grow: 1;
 }
 
 /* Título */
 .video-result .video-title {
-    font-size: 0.9em;
+    font-size: 0.8em; /* Reduce tamaño de fuente */
     font-weight: bold;
     color: #eee;
     margin: 0;
-    /* Truncamiento de texto a 2 líneas */
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.3;
-    max-height: 2.6em; /* line-height * 2 */
-    word-break: break-word; /* Para palabras largas */
+    line-height: 1.2; /* Reduce interlineado */
+    max-height: 2.4em; /* line-height * 2 */
+    word-break: break-word;
 }
 
 /* Autor */
 .video-result .video-author {
-    font-size: 0.8em;
+    font-size: 0.7em; /* Reduce tamaño de fuente */
     color: #aaa;
     margin: 0;
     white-space: nowrap;
@@ -404,13 +403,31 @@ p[style*="color: #555"] { /* Duración */
     text-overflow: ellipsis;
 }
 
-/* Botón Añadir (usa estilos de botones.css por defecto) */
+/* --- >> SECCIÓN MODIFICADA PARA BOTÓN OCULTO/HOVER << --- */
+
+/* Botón Añadir (oculto por defecto) */
 .video-result .add-to-playlist {
-    margin-top: auto; /* Empujar al fondo */
-    padding: 6px 10px;
-    font-size: 0.85em;
-    align-self: flex-start; /* Alinear a la izquierda */
+    margin-top: auto;
+    padding: 5px 8px;  /* Reduce padding */
+    font-size: 0.8em; /* Reduce tamaño fuente */
+    align-self: flex-start;
+
+    /* --- NUEVO: Ocultar por defecto --- */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(5px); /* Opcional: Moverlo un poco hacia abajo */
+    transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
+
+/* Mostrar botón al hacer hover sobre la BALDOSA COMPLETA */
+.video-result:hover .add-to-playlist {
+    /* --- NUEVO: Mostrar en hover --- */
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0); /* Opcional: Moverlo a su posición original */
+}
+
+/* --- >> FIN SECCIÓN MODIFICADA << --- */
 
 
 /* ---- MENSAJE FLOTANTE ---- */
