@@ -39,22 +39,24 @@ router.get('/segments/:videoId', async (req, res) => {
             "selfpromo",
             "interaction",
             "poi",
-            "music_offtopic", // OJO a esto
+            "music_offtopic", 
         ]);
+        console.log(`Function: Segmentos obtenidos para ${videoId}: ${segments.length}`);
+        // Asegúrate de devolver un array vacío si no se encontraron segmentos (manejo de 404)
+        res.json(segments || []); // Devolver segmentos o array vacío
 
-        console.log('Segmentos obtenidos:', segments);
-
-        res.json(segments);
     } catch (error) {
+        console.error(`Function Error procesando ${videoId}:`, error);
 
-        // Verificar si el error es un 404 (Not Found)
-        if (error.status === 404) {
-            console.log('No se encontraron segmentos para este video. Devolviendo un array vacío.');
-            return res.json(); // Devolver un array vacío con un status 200 (OK)
+        // Mejorar manejo de error 404 de la librería sponsorblock-api
+        if (error.status === 404 || (error.message && error.message.includes('404'))) {
+            console.log(`Function: No se encontraron segmentos SB para ${videoId}. Devolviendo array vacío.`);
+            return res.json([]); // Devolver array vacío para 404
         }
 
-        // Si es otro tipo de error, devolverlo
-        return res.status(500).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
+        // Otros errores
+        const statusCode = error.status || 500;
+        return res.status(statusCode).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
     }
 });
 
