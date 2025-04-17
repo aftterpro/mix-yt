@@ -893,7 +893,12 @@ async function obtenerSegmentosSponsorBlock(videoId) {
     // console.log(`Llamando a la API local: ${apiUrl}`);
 
     try {
+        
+       const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
         const response = await fetch(apiUrl); // Ya no se envía el encabezado X-UserID
+         headers: {
+                'X-UserID': userId
+            }
 
         if (!response.ok) {
              console.error(`Error desde la API (${apiUrl}): ${response.status} ${response.statusText}`);
