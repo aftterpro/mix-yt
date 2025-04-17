@@ -31,7 +31,6 @@ router.get('/segments/:videoId', async (req, res) => {
 
         // Ya no se necesita el encabezado 'X-UserID' de la solicitud
         const sponsorBlock = new SponsorBlock(userId);
-        // console.log(`Function: Usando userID del entorno para SponsorBlock.`); // Evita loguear el ID real
 
         const segments = await sponsorBlock.getSegments(videoId, [
             "sponsor", "intro", "outro", "selfpromo",
