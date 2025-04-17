@@ -897,7 +897,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
         const response = await fetch(apiUrl); // Ya no se envía el encabezado X-UserID
          headers: {
-                'X-UserID': userId
+                'X-UserID': userId;
             }
 
         if (!response.ok) {
