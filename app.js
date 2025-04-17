@@ -9,6 +9,12 @@ let playersInitialized = false;// Estado global para saber si ambos reproductore
 let youtubeAPIReady = false;
 let currentIndex = 0;
 let isTransitioning = false; // Flag para estado de transición
+let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
+let nextPageContext = null; // Para guardar información de la siguiente página (si la API la provee)
+let currentSearchQuery = ''; // Guarda la última consulta realizada
+const resultsContainer = document.getElementById('resultsContainer'); // Contenedor scrollable
+const resultsDiv = document.getElementById('results'); // Contenedor de la grilla
+
 
 // Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
 function mostrarMensajeFlotante(mensaje) {
