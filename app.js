@@ -889,36 +889,45 @@ async function monitorPlayers() {
 }
 // Función para obtener los segmentos llamando a NUESTRA Netlify Function
 async function obtenerSegmentosSponsorBlock(videoId) {
-    const apiUrl = `/api/segments/${videoId}`;
-    // console.log(`Llamando a la API local: ${apiUrl}`);
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
+
+    // URL Relativa a tu propia API backend en Netlify
+     const apiUrl = `/api/segments/${videoId}`;
+     console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
 
     try {
-        
-       const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // userID estático
-        const response = await fetch(apiUrl); // Ya no se envía el encabezado X-UserID
-         headers: {
-                'X-UserID': userId;
+        const response = await fetch(apiUrl, {
+            headers: {
+                // Enviar el encabezado X-UserID que tu API espera
+                'X-UserID': userId
             }
+        });
 
+        // Verificar si la respuesta de NUESTRA API fue exitosa
         if (!response.ok) {
+             // Si la API devuelve un error (ej. 500), response.status tendrá un valor
              console.error(`Error desde la API (${apiUrl}): ${response.status} ${response.statusText}`);
-             let errorBody = await response.text();
+             // Intentar obtener más detalles del cuerpo del error si existen
+             let errorBody = await response.text(); // Usar text() por si no es JSON
              console.error("Cuerpo del error de la API:", errorBody);
+             // Lanzar un error específico para que el catch lo maneje
              throw new Error(`API Error: ${response.status}`);
         }
+        const data = await response.json();  // Aquí es donde un 404 manejado correctamente devolvería '[]'
 
-        const data = await response.json();
-
-        if (!Array.isArray(data)) {
+         if (!Array.isArray(data)) {  // Verificar si data es realmente un array (por si acaso la API falla)
              console.warn(`La API (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
-             return [];
-        }
-        console.log(`Segmentos recibidos de la API para ${videoId}:`, data.length);
-        return data; // Devuelve los segmentos (o array vacío si fue 404 o error)
+             return []; // Devolver array vacío si la respuesta no es un array
+         }
+
+         console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
+        return data; // Devolver los segmentos (o array vacío si fue 404)
 
     } catch (error) {
+        // Capturar errores de red (fetch falló) o errores lanzados desde el 'if (!response.ok)'
         console.error(`Error en fetch/procesamiento para ${apiUrl}:`, error);
-        return []; // Devolver array vacío en caso de error
+        // Devolver siempre un array vacío en caso de cualquier error para evitar problemas posteriores
+        return [];
     }
 }
 // Módulo: Manejo de Eventos y Botones
