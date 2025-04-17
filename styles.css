@@ -229,13 +229,90 @@ aside.sidebar {
     margin-top: 15px;
 }
 /* Styles for the search result item */
-.search-result-item {
+.video-result .search-result-item { 
     background-color: #282828;
-    display: flex; /* Use flexbox to align items horizontally */
-    align-items: center; /* Vertically align items in the center */
-    gap: 15px; /* Adjust the spacing between thumbnail and details */
-    padding: 10px;
-    border-bottom: 1px solid #333; /* Optional: Add a separator between results */
+    border-radius: 8px;
+    overflow: hidden; /* Para que la imagen no se salga */
+    display: flex;
+    flex-direction: column; /* Apilar imagen y contenido */
+    padding: 0; /* Quitamos padding general para controlar interno */
+    border: none; /* Quita borde si lo tenía */
+    gap: 0; /* Sin gap interno, controlamos márgenes */
+}
+.video-result .thumbnail-container {
+    position: relative; /* Necesario para la duración absoluta */
+    width: 100%; /* Ocupa todo el ancho de la baldosa */
+    padding-bottom: 56.25%; /* Aspect ratio 16:9 */
+    height: 0; /* Truco para mantener aspect ratio */
+    overflow: hidden; /* Por si acaso */
+    display: block; /* Asegurar que sea bloque */
+    margin: 0; /* Sin margen */
+}
+/* Miniatura */
+.video-result .thumbnail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cubre el espacio sin deformar */
+    border-radius: 0; /* Sin bordes redondeados aquí */
+}
+.video-result .duration {
+    position: absolute;
+    bottom: 5px; /* Ajusta posición */
+    right: 5px; /* Ajusta posición */
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.75em; /* Más pequeño */
+    z-index: 1; /* Asegurar que esté sobre la imagen */
+}
+/* Contenedor para Título, Autor y Botón */
+.video-result .video-details {
+    padding: 8px; /* Espaciado interno */
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Espacio entre título, autor y botón */
+}
+
+
+/* Título */
+.video-result .video-title {
+    font-size: 0.9em; /* Ajusta tamaño */
+    font-weight: bold;
+    color: #eee;
+    margin: 0;
+    /* Truncamiento de texto a 2 líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Número de líneas a mostrar */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3; /* Ajusta interlineado si es necesario */
+    max-height: 2.6em; /* Aproximadamente 2 líneas (line-height * 2) */
+}
+
+/* Autor */
+.video-result .video-author {
+    font-size: 0.8em;
+    color: #aaa;
+    margin: 0;
+    /* Truncamiento opcional para el autor si también puede ser largo */
+    white-space: nowrap;
+    overflow: hidden;
+     text-overflow: ellipsis;
+}
+/* Botón Añadir (ya existente, ajusta si es necesario) */
+.video-result .add-to-playlist {
+    /* background-color: #007bff; (ya definido en botones.css) */
+    /* color: white; (ya definido en botones.css) */
+    /* ... otros estilos del botón ... */
+    margin-top: 5px; /* Espacio arriba del botón */
+    padding: 6px 10px; /* Ajusta padding del botón */
+    font-size: 0.85em; /* Ajusta tamaño fuente botón */
+    align-self: flex-start; /* Alinear botón a la izquierda */
 }
 .thumbnail-container img {
     width: 100%;
@@ -457,7 +534,7 @@ aside.sidebar {
 }
 
 /* ---- Templates ---- */
-.playlist-item, .search-result-item {
+.playlist-item
     display: flex;
     gap: var(--spacing-md);
     padding: var(--spacing-md);
