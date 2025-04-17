@@ -239,8 +239,7 @@ function formatDuration2(duration) {
 // Módulo: Manejo de la Playlist (Añadir, Eliminar, Reordenar, Actualizar DOM)
 //Agregar a la playlist
 const addToPlaylist = (videoData) => {
-    // **VALIDACIÓN EXHAUSTIVA DE LOS DATOS**
-    if (!videoData || !videoData.videoId) {
+    if (!videoData || !videoData.videoId) {     // **VALIDACIÓN EXHAUSTIVA DE LOS DATOS**
         console.error("Error: Datos de video inválidos:", videoData);
         mostrarMensajeFlotante("Error al añadir el video. Datos inválidos.");
         return; // Salir de la función si los datos son inválidos
@@ -272,18 +271,12 @@ function deleteVideo(videoId) {
        mostrarMensajeFlotante(`Video: ${playlistVideos[videoIndex].title} eliminado`);
         console.log(`Eliminando video: ${playlistVideos[videoIndex].title}`);
 
-        // Verificar si es un video añadido manualmente
-        const isManual = playlistVideos[videoIndex].manual;
-
-        // Eliminar de la playlist principal
-        playlistVideos.splice(videoIndex, 1);
-
-        // Si es manual, también eliminarlo de manualVideos
-        if (isManual) {
+        const isManual = playlistVideos[videoIndex].manual;  // Verificar si es un video añadido manualmente
+        playlistVideos.splice(videoIndex, 1); // Eliminar de la playlist principal
+        if (isManual) {    // Si es manual, también eliminarlo de manualVideos
             manualVideos = manualVideos.filter((video) => video.videoId !== videoId);
         }
-        // Ajustar el índice actual si afecta la reproducción
-        if (currentIndex >= videoIndex) {
+        if (currentIndex >= videoIndex) {         // Ajustar el índice actual si afecta la reproducción
             currentIndex = Math.max(0, currentIndex - 1);
         }
 
@@ -389,7 +382,6 @@ function updatePlaylistDOM() {
 
     });
     enableDragAndDrop();
-
 }
 // Estilos CSS (Modificados para el icono y el estilo)
 const style3 = document.createElement('style');
@@ -772,8 +764,6 @@ function stopMonitoring() {
             console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
             return;
        }
-
-
       // Reiniciar lastSeek si el video cambió
       if (lastSeekVideoId !== videoId) {
           lastSeekEndTime = -1;
@@ -872,21 +862,17 @@ async function monitorPlayers() {
                 durationSource = "SponsorBlock";
             }
         }
-
-
         const timeRemaining = effectiveDuration - currentTime;
         const roundedTimeRemaining = Math.floor(timeRemaining);
 
-         // Log de cuenta regresiva
-         if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 10) {
+         if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 10) {           // Log de cuenta regresiva
               console.log(`Monitor: Player ${currentPlayer} (${videoId}). Base: ${durationSource}(${effectiveDuration.toFixed(1)}s). Tiempo para Crossfade Aprox: ${roundedTimeRemaining}s.`);
          }
 
-        // 2. Evaluar condición de Crossfade
-        if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) {
+        if (roundedTimeRemaining <= CROSSFADE_DURATION && roundedTimeRemaining >= 0) { //Evaluar condición de Crossfade
             console.log(`Monitor: *** Condición crossfade CUMPLIDA (Player ${currentPlayer}, ${videoId}). Restante: ${roundedTimeRemaining}s. Llamando playNextVideo... ***`);
-            // Llamar a playNextVideo. Esta función ahora maneja la bandera isTransitioning.
-            playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));
+           
+            playNextVideo(videoId, playlistVideos.find(v => v.videoId === videoId));  // Llamar a playNextVideo. Esta función ahora maneja la bandera isTransitioning.
             // IMPORTANTE: Salir de monitorPlayers aquí, ya que iniciamos la transición
             // y no queremos ejecutar checkAndSkipSegment para el video actual.
             return;
@@ -903,51 +889,31 @@ async function monitorPlayers() {
 }
 // Función para obtener los segmentos llamando a NUESTRA Netlify Function
 async function obtenerSegmentosSponsorBlock(videoId) {
-    // Declarar userId correctamente. Usa una constante si es fijo,
-    // o obténlo de donde corresponda si es dinámico.
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // ¡Asegúrate que este ID sea válido y esté declarado!
-
-    // URL Relativa a tu propia API backend en Netlify
-     const apiUrl = `/api/segments/${videoId}`;
-     console.log(`Llamando a la API local: ${apiUrl}`); // Log para debug
+    const apiUrl = `/api/segments/${videoId}`;
+    // console.log(`Llamando a la API local: ${apiUrl}`);
 
     try {
-        const response = await fetch(apiUrl, {
-            headers: {
-                // Enviar el encabezado X-UserID que tu API espera
-                'X-UserID': userId
-            }
-        });
+        const response = await fetch(apiUrl); // Ya no se envía el encabezado X-UserID
 
-        // Verificar si la respuesta de NUESTRA API fue exitosa
         if (!response.ok) {
-             // Si la API devuelve un error (ej. 500), response.status tendrá un valor
              console.error(`Error desde la API (${apiUrl}): ${response.status} ${response.statusText}`);
-             // Intentar obtener más detalles del cuerpo del error si existen
-             let errorBody = await response.text(); // Usar text() por si no es JSON
+             let errorBody = await response.text();
              console.error("Cuerpo del error de la API:", errorBody);
-             // Lanzar un error específico para que el catch lo maneje
              throw new Error(`API Error: ${response.status}`);
         }
 
-        // Si la respuesta es OK (200), intentar parsear como JSON
-        // Aquí es donde un 404 manejado correctamente devolvería '[]'
         const data = await response.json();
 
-         // Verificar si data es realmente un array (por si acaso la API falla)
-         if (!Array.isArray(data)) {
+        if (!Array.isArray(data)) {
              console.warn(`La API (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
-             return []; // Devolver array vacío si la respuesta no es un array
-         }
-
-         console.log(`Segmentos recibidos de la API para ${videoId}:`, data); // Log para debug
-        return data; // Devolver los segmentos (o array vacío si fue 404)
+             return [];
+        }
+        console.log(`Segmentos recibidos de la API para ${videoId}:`, data.length);
+        return data; // Devuelve los segmentos (o array vacío si fue 404 o error)
 
     } catch (error) {
-        // Capturar errores de red (fetch falló) o errores lanzados desde el 'if (!response.ok)'
         console.error(`Error en fetch/procesamiento para ${apiUrl}:`, error);
-        // Devolver siempre un array vacío en caso de cualquier error para evitar problemas posteriores
-        return [];
+        return []; // Devolver array vacío en caso de error
     }
 }
 // Módulo: Manejo de Eventos y Botones
@@ -959,7 +925,7 @@ document.getElementById('botonNext').addEventListener('click', () => {
 // Búsqueda por palabras
 const searchInput = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
-const debouncedSearch = debounce(performSearch, 500); // 300ms de retraso
+const debouncedSearch = debounce(performSearch, 500); // 500ms de retraso
 
 searchInput.addEventListener('input', (event) => {
     const query = event.target.value.trim();
@@ -1002,21 +968,18 @@ añadirUrlButton.addEventListener('click', async () => {
 
         let videosAñadidos = 0;
         nuevosVideos.forEach(nuevoVideo => {
-            // *** INICIO DE LA CORRECCIÓN ***
             // Verificar si el video YA existe en playlistVideos por videoId
             const existe = playlistVideos.some(videoExistente => videoExistente.videoId === nuevoVideo.videoId);
             if (!existe) {
                 playlistVideos.push(nuevoVideo); // Añadir solo si no existe
                 videosAñadidos++;
             }
-            // *** FIN DE LA CORRECCIÓN ***
         });
 
         updatePlaylistDOM();
         searchInput2.value = ''; // Limpiar el input
 
-        // Solo habilita 'Play' si la lista no estaba vacía o si se añadieron videos nuevos
-        if (playlistVideos.length > 0) {
+        if (playlistVideos.length > 0) { // Solo habilita 'Play' si la lista no estaba vacía o si se añadieron videos nuevos
              botonPlay.disabled = false;
         }
 
