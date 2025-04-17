@@ -126,26 +126,35 @@ function onPlayerStateChange(event) {
         console.log('Video en pausa.');
     }
 }
-// Módulo: Interacción con /piped.nosebs.ru/ (Búsqueda)
+// Módulo: Interacción con piped.nosebs.ru (Búsqueda)
 const performSearch = async (query) => {
+    // Obtener referencia al div de resultados DENTRO de la función
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) return; // Salir si no se encuentra el div
+
+    console.log(`Iniciando búsqueda para: ${query}`);
+    resultsDiv.innerHTML = '<p>Buscando...</p>';     // Mostrar "Buscando..." antes del fetch
+
     try {
+         // La URL relativa ya apunta a tu función Netlify
         const response = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(query)}`);
         if (!response.ok) {
+            resultsDiv.innerHTML = `<p>Error en la búsqueda: ${response.status}</p>`; // Mostrar error
             mostrarMensajeFlotante(`Error en la búsqueda: ${response.status}`);
             return;
         }
         const data = await response.json();
 
-        // Llama a la función correcta para mostrar los resultados de Piped
+        // Llamar a displaySearchResultsPiped (esta función reemplazará el "Buscando...")
         displaySearchResultsPiped(data);
 
     } catch (error) {
         console.error("Error fetching search results:", error);
-        mostrarMensajeFlotante("Error en la búsqueda.");
+        resultsDiv.innerHTML = '<p>Error en la conexión al buscar.</p>'; // Mostrar error
+        mostrarMensajeFlotante("Error en la conexión al buscar.");
     }
 };
-
-// Nueva función para mostrar resultados de la API de Piped Y YT V3
+// Nueva función para mostrar resultados de la API de Piped
 const displaySearchResultsPiped = (results) => {
     const resultsDiv = document.getElementById('results');
     if (!resultsDiv) {
@@ -175,6 +184,7 @@ const displaySearchResultsPiped = (results) => {
         thumbnail.src = video.thumbnail;
         thumbnail.alt = video.title;
         thumbnail.classList.add('thumbnail'); // Clase para estilos CSS
+        thumbnail.loading = "lazy";
         thumbnailContainer.appendChild(thumbnail);
 
         // Mostrar duración dentro de la miniatura
@@ -944,16 +954,23 @@ async function obtenerSegmentosSponsorBlock(videoId) {
 // Botón Mix
 document.getElementById('botonNext').addEventListener('click', () => {
     playNextVideo()
-        // Cambia el video en el siguiente reproductor
+     console.log("Click boton mix cambiando el video y el siguiente reproductor");
 });
 // Búsqueda por palabras
+const searchInput = document.getElementById('searchInput');
+const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
 const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
-document.getElementById('searchInput').addEventListener('input', (event) => {
+
+searchInput.addEventListener('input', (event) => {
     const query = event.target.value.trim();
+
     if (query.length > 0) {
-        debouncedSearch(query); // Llamar a la función debouncedSearch
+        resultsDiv.innerHTML = '<p>Escribiendo...</p>'; // Mostrar feedback
+        // Llamar a la búsqueda con debounce
+        debouncedSearch(query);
     } else {
-        document.getElementById('results').innerHTML = '';
+        // Limpiar si el input está vacío
+        resultsDiv.innerHTML = '';
     }
 });
 // Variable para controlar si la reproducción ha comenzado
