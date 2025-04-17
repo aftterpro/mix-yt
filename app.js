@@ -959,7 +959,7 @@ document.getElementById('botonNext').addEventListener('click', () => {
 // Búsqueda por palabras
 const searchInput = document.getElementById('searchInput');
 const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
-const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
+const debouncedSearch = debounce(performSearch, 500); // 300ms de retraso
 
 searchInput.addEventListener('input', (event) => {
     const query = event.target.value.trim();
