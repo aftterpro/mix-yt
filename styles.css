@@ -1,5 +1,3 @@
-/* styles.css - Versión Corregida y Combinada */
-
 /* ---- VARIABLES CSS ---- */
 :root {
     --sidebar-width: 400px; /* Ancho deseado para la playlist */
@@ -311,8 +309,8 @@ p[style*="color: #555"] { /* Duración */
 /* Grilla de Resultados */
 #results {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 2 columnas */
-    gap: var(--spacing-sm); /* Reduce el espacio entre baldosas */
+    grid-template-columns: repeat(4, 1fr); 
+    gap: var(--spacing-sm);
     padding-bottom: var(--spacing-sm);
 }
 
