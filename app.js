@@ -937,7 +937,7 @@ document.getElementById('botonNext').addEventListener('click', () => {
 });
 // Búsqueda por palabras
 const searchInput = document.getElementById('searchInput');
-const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
+
 const debouncedSearch = debounce(performSearch, 500); // 500ms de retraso
 
 searchInput.addEventListener('input', (event) => {
