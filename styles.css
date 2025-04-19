@@ -43,8 +43,6 @@ html, body {
     color: #fff;
     width: 100%;
     max-width: var(--player-width);
-    /* aspect-ratio: 16/9; */ /* Quitado para que no dependa del aspect-ratio */
-    /* height: auto; */ /* Quitado */
     border-radius: 8px; /* Opcional */
     overflow: hidden; /* Opcional */
     display: flex;
@@ -52,9 +50,9 @@ html, body {
 }
 
 #videoContainer {
+    position: relative;
     width: 100%;
     padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-    position: relative;
     background-color: #111; /* Fondo si el video no está cargado */
     height: 0;
     overflow: hidden;
@@ -448,10 +446,52 @@ p[style*="color: #555"] { /* Duración */
     opacity: 0;
 }
 
-/* ---- Loading Spinner (general, ya en loadingSpinner.css) ---- */
-/* .loading-spinner { ... } */
-/* .spinner { ... } */
-/* @keyframes spin { ... } */
+/* ---- ESTILOS FRANJA INFERIOR (FOOTER) ---- */
+.page-footer {
+    background-color: #101010; /* Un fondo ligeramente diferente o igual al body */
+    color: #888; /* Color de texto grisáceo */
+    font-size: 0.75em; /* Tamaño de letra pequeño */
+    padding: 8px 15px; /* Espaciado interno (vertical, horizontal) */
+    text-align: center; /* Centrar el texto */
+    width: 100%;       /* Ocupa todo el ancho */
+    box-sizing: border-box; /* Incluir padding en el ancho total */
+    position: fixed; /* Fijar en la parte inferior */
+    bottom: 0;
+    left: 0;
+    z-index: 500; /* Asegurar que esté visible pero debajo de elementos como mensajes flotantes si es necesario */
+    border-top: 1px solid #282828; /* Línea superior sutil */
+}
+
+.page-footer p {
+    margin: 2px 0; /* Poco espacio entre párrafos */
+    display: inline; /* Mostrar párrafos en línea si hay espacio */
+    margin-right: 15px; /* Espacio entre los dos textos si están en línea */
+}
+
+/* Estilo para los enlaces dentro del footer */
+.page-footer a {
+    color: #aaa; /* Color de enlace un poco más claro */
+    text-decoration: underline; /* Subrayado estándar */
+    transition: color 0.2s ease;
+}
+
+.page-footer a:hover {
+    color: #eee; /* Color al pasar el ratón */
+    text-decoration: none; /* Quitar subrayado en hover (opcional) */
+}
+
+/* Ajuste para pantallas pequeñas si los textos se superponen */
+@media (max-width: 768px) {
+    .page-footer p {
+        display: block; /* Mostrar cada párrafo en su propia línea */
+        margin-right: 0; /* Quitar margen derecho */
+        margin-bottom: 4px; /* Añadir espacio inferior */
+    }
+     .page-footer {
+         font-size: 0.7em; /* Aún más pequeño en móviles */
+         padding: 5px 10px;
+     }
+}
 
 /* ---- Spinner pequeño para "Cargar Más" ---- */
 .loading-spinner-small {
@@ -490,12 +530,6 @@ p[style*="color: #555"] { /* Duración */
     max-width: 90%;
     text-align: center;
 }
-
-/* ---- TEMPLATES (No usados directamente para estilo activo, pero referenciados) ---- */
-/* .playlist-item (estilos ya definidos arriba) */
-/* .search-result-item (reemplazado por .video-result) */
-
-
 /* ---- Utility Classes ---- */
 .hidden {
     display: none !important;
