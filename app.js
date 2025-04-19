@@ -634,23 +634,24 @@ function playNextVideo(videoId, video) {
             nextPlayerElement.classList.remove('hidden');
             nextPlayerElement.classList.add('fade-in');
         }
-
-        setTimeout(() => {
+                setTimeout(() => {
              const timeoutVideoId = previousVideoId; // Capturar el ID para el log del timeout
             console.log(`playNextVideo: TIMEOUT INICIADO para transición desde ${timeoutVideoId}.`);
             try {
+                // --- Player que se oculta ---
                 if (currentPlayerElement) {
-                    currentPlayerElement.classList.add('hidden');
-                    currentPlayerElement.classList.remove('fade-out');
+                    currentPlayerElement.classList.remove('fade-out'); // Quita la clase de transición
+                    currentPlayerElement.classList.add('hidden'); // Añade hidden al final para asegurar estado
                 }
+                // --- Player que aparece ---
                 if (nextPlayerElement) {
-                    nextPlayerElement.classList.remove('fade-in');
+                    nextPlayerElement.classList.remove('fade-in'); // Quita la clase de transición
                 }
 
                 currentPlayer = currentPlayer === 1 ? 2 : 1;
                  console.log(`playNextVideo: Timeout - currentPlayer cambiado a ${currentPlayer}.`);
 
-                crossfadeAudio();
+                crossfadeAudio(); // El crossfade de audio sigue igual
 
                 if (timeoutVideoId && segmentosCache[timeoutVideoId]) {
                     console.log(`playNextVideo: Timeout - Limpiando caché SB para video ANTERIOR: ${timeoutVideoId}`);
@@ -663,11 +664,10 @@ function playNextVideo(videoId, video) {
             } catch (timeoutError) {
                 console.error("Error dentro del setTimeout de playNextVideo:", timeoutError);
             } finally {
-                // *** RESETTING FLAG ***
                 isTransitioning = false;
-                 console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para ${timeoutVideoId}). Flag=false. ***`);
+                console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para ${timeoutVideoId}). Flag=false. ***`);
             }
-        }, 1500);
+        }, 2000); 
 
     } catch (error) {
         console.error("Error en playNextVideo:", error);
