@@ -1,12 +1,10 @@
-// netlify/functions/search.js
 //Instancias api
 const pipedInstances = [
   "https://pipedapi.orangenet.cc",
   "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
-    "https://pipedapi.ducks.party",
-    "https://piapi.ggtyler.dev"
-  // Agrega otras instancias aquí
+    "https://pipedapi.ducks.party"
+   // "https://piapi.ggtyler.dev" carga lenta imagenes
 ];
 function getRandomPipedInstance() {
   const randomIndex = Math.floor(Math.random() * pipedInstances.length);
