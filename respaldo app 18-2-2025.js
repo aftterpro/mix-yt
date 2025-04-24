@@ -9,6 +9,12 @@ let playersInitialized = false;// Estado global para saber si ambos reproductore
 let youtubeAPIReady = false;
 let currentIndex = 0;
 let isTransitioning = false; // Flag para estado de transición
+let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
+let nextPageContext = null; // Para guardar información de la siguiente página (si la API la provee)
+let currentSearchQuery = ''; // Guarda la última consulta realizada
+const resultsContainer = document.getElementById('resultsContainer'); // Contenedor scrollable
+const resultsDiv = document.getElementById('results'); // Contenedor de la grilla
+
 
 // Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
 function mostrarMensajeFlotante(mensaje) {
@@ -628,23 +634,24 @@ function playNextVideo(videoId, video) {
             nextPlayerElement.classList.remove('hidden');
             nextPlayerElement.classList.add('fade-in');
         }
-
-        setTimeout(() => {
+                setTimeout(() => {
              const timeoutVideoId = previousVideoId; // Capturar el ID para el log del timeout
             console.log(`playNextVideo: TIMEOUT INICIADO para transición desde ${timeoutVideoId}.`);
             try {
+                // --- Player que se oculta ---
                 if (currentPlayerElement) {
-                    currentPlayerElement.classList.add('hidden');
-                    currentPlayerElement.classList.remove('fade-out');
+                    currentPlayerElement.classList.remove('fade-out'); // Quita la clase de transición
+                    currentPlayerElement.classList.add('hidden'); // Añade hidden al final para asegurar estado
                 }
+                // --- Player que aparece ---
                 if (nextPlayerElement) {
-                    nextPlayerElement.classList.remove('fade-in');
+                    nextPlayerElement.classList.remove('fade-in'); // Quita la clase de transición
                 }
 
                 currentPlayer = currentPlayer === 1 ? 2 : 1;
                  console.log(`playNextVideo: Timeout - currentPlayer cambiado a ${currentPlayer}.`);
 
-                crossfadeAudio();
+                crossfadeAudio(); // El crossfade de audio sigue igual
 
                 if (timeoutVideoId && segmentosCache[timeoutVideoId]) {
                     console.log(`playNextVideo: Timeout - Limpiando caché SB para video ANTERIOR: ${timeoutVideoId}`);
@@ -657,11 +664,10 @@ function playNextVideo(videoId, video) {
             } catch (timeoutError) {
                 console.error("Error dentro del setTimeout de playNextVideo:", timeoutError);
             } finally {
-                // *** RESETTING FLAG ***
                 isTransitioning = false;
-                 console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para ${timeoutVideoId}). Flag=false. ***`);
+                console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para ${timeoutVideoId}). Flag=false. ***`);
             }
-        }, 1500);
+        }, 2000); 
 
     } catch (error) {
         console.error("Error en playNextVideo:", error);
@@ -931,7 +937,7 @@ document.getElementById('botonNext').addEventListener('click', () => {
 });
 // Búsqueda por palabras
 const searchInput = document.getElementById('searchInput');
-const resultsDiv = document.getElementById('results'); // Obtener referencia al div de resultados
+
 const debouncedSearch = debounce(performSearch, 500); // 500ms de retraso
 
 searchInput.addEventListener('input', (event) => {
