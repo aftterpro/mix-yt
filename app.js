@@ -1705,7 +1705,7 @@ function extractPlaylistId(url) {
 document.addEventListener('DOMContentLoaded', () => {
      // Asegurarse que la playlist manual exista al inicio (si no hay datos guardados)
      if (!playlistsData.some(p => p.id === 'manual')) {
-        playlistsData.push({ id: 'manual', name: 'Mis Vídeos Añadidos', thumbnailUrl: 'https://via.placeholder.com/50?text=+', videos: [], isExpanded: true });
+        playlistsData.push({ id: 'manual', name: 'Mis Vídeos Añadidos', thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico', videos: [], isExpanded: true });
      }
      updatePlaylistsUI(); // Render inicial de la UI de playlists
      loadYouTubeAPI(); // Iniciar carga de la API de YouTube
