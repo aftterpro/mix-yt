@@ -1627,12 +1627,12 @@ function parseDuration(durationInput) {
 
 // --- Carga de Playlist desde URL (Piped API + Proxy + Retry) ---
 const pipedInstances = [ // Lista de instancias Piped
-    "https://pipedapi.kavin.rocks", // Kavin Rocks es popular
-    "https://pipedapi.drgns.space",
-    "https://pipedapi.syncpundit.io",
-    "https://pipedapi.adminforge.de",
-    // "https://pipedapi.frontendfriendly.xyz", // Añadir más si es necesario
-    // "https://pipedapi.chauvet.pro" // Algunas pueden ser más rápidas/lentas
+     "https://pipedapi.orangenet.cc",
+     "https://api.piped.private.coffee",
+    "https://pipedapi.reallyaweso.me",
+    "https://pipedapi.ducks.party",
+    "https://pipedapi.orangenet.cc",
+    "https://pipedapi.adminforge.de"
 ];
 function getRandomPipedInstance() {
     const randomIndex = Math.floor(Math.random() * pipedInstances.length);
