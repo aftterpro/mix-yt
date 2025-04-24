@@ -506,7 +506,7 @@ const addToPlaylist = (videoData) => {
         manualPlaylist = {
             id: manualPlaylistId,
             name: 'Mis Vídeos Añadidos',
-            thumbnailUrl: 'https://via.placeholder.com/50?text=+',
+            thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico',
             videos: [],
             isExpanded: true
         };
