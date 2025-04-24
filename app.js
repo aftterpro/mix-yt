@@ -672,9 +672,14 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
 }
 
 // --- Función para alternar expansión/colapso ---
+// app.js
+
+// --- REEMPLAZA la función togglePlaylistExpansion existente con esta: ---
 function togglePlaylistExpansion(playlistId) {
     const playlist = playlistsData.find(p => p.id === playlistId);
     if (!playlist) return;
+
+    // Alternar el estado
     playlist.isExpanded = !playlist.isExpanded;
 
     const groupDiv = document.querySelector(`.playlist-group[data-playlist-id="${playlistId}"]`);
@@ -682,33 +687,74 @@ function togglePlaylistExpansion(playlistId) {
     const icon = groupDiv?.querySelector('.expand-icon');
 
     if (groupDiv && videosDiv && icon) {
+        // Actualizar clases para icono y estado general
         groupDiv.classList.toggle('expanded', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-up', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-down', !playlist.isExpanded);
 
-        // Animar max-height
+        // Detener transiciones pendientes en este elemento para evitar conflictos
+        videosDiv.removeEventListener('transitionend', handleTransitionEnd); // Quitar listener anterior si existe
+
         if (playlist.isExpanded) {
-             // Asegurar display block antes de medir scrollHeight
-             videosDiv.style.display = 'block'; // O quitar display: none si se usa así
-            videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-             // Resetear display después de la transición si se ocultó con display
-             videosDiv.addEventListener('transitionend', () => {
-                if (playlist.isExpanded) videosDiv.style.maxHeight = 'none'; // Permitir altura natural
-             }, { once: true });
+            // --- EXPANDIR ---
+            // 1. (CSS ya NO debería tener display: none) Asegurar que sea visible para medir
+            videosDiv.style.display = 'block'; // O 'flex', 'grid' si usas eso internamente
+            videosDiv.style.maxHeight = '0px'; // Asegurar que parte de 0
+
+            // 2. Calcular altura necesaria
+            const scrollHeight = videosDiv.scrollHeight;
+
+            // 3. Aplicar altura para iniciar animación
+            requestAnimationFrame(() => { // Esperar al siguiente frame
+                videosDiv.style.maxHeight = scrollHeight + 'px';
+            });
+
+            // 4. Opcional: Remover max-height explícito después de la animación para altura natural
+            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
+
         } else {
-            // Establecer altura explícita antes de animar a 0
+            // --- COLAPSAR ---
+            // 1. Establecer max-height a su altura actual ANTES de animar a 0
             videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-            requestAnimationFrame(() => { // Forzar reflow
+
+            // 2. Forzar reflow para que la transición se aplique desde la altura actual
+            requestAnimationFrame(() => {
+                 // 3. Animar a max-height 0
                  videosDiv.style.maxHeight = '0px';
             });
-             // Opcional: Poner display: none al terminar transición
-            // videosDiv.addEventListener('transitionend', () => {
-            //    if (!playlist.isExpanded) videosDiv.style.display = 'none';
-            // }, { once: true });
+
+            // 4. Opcional: Poner display: none DESPUÉS de que termine la animación
+             videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
         }
     } else {
-        // Si no se encontró en el DOM, re-renderizar todo como fallback
+        // Fallback si no se encuentran los elementos: re-renderizar todo
+        console.warn("Elementos no encontrados para toggle, re-renderizando UI completa.");
         updatePlaylistsUI();
+    }
+}
+
+// --- Función manejadora para el final de la transición ---
+function handleTransitionEnd(event) {
+    // Asegurarse que la transición completada sea de 'max-height'
+    if (event.propertyName !== 'max-height') {
+        return;
+    }
+
+    const videosDiv = event.target;
+    const groupDiv = videosDiv.closest('.playlist-group');
+    const playlistId = groupDiv?.dataset.playlistId;
+    const playlist = playlistsData.find(p => p.id === playlistId);
+
+    if (playlist && videosDiv) {
+        if (playlist.isExpanded) {
+            // Si terminó de expandirse, quitar max-height para que la altura sea automática
+            videosDiv.style.maxHeight = 'none';
+            // console.log(`Playlist ${playlistId} expandida, max-height: none`);
+        } else {
+            // Si terminó de colapsarse, ahora sí podemos ocultarlo con display si queremos
+            // videosDiv.style.display = 'none'; // Opcional, max-height 0 ya lo oculta visualmente
+            // console.log(`Playlist ${playlistId} colapsada, max-height: 0`);
+        }
     }
 }
 
@@ -735,10 +781,6 @@ function deleteVideo(playlistId, videoId) {
     updatePlaylistsUI(); // Actualizar UI
     updateCurrentPlayingIndex(); // Recalcular índice por si acaso
 }
-
-
-// --- REESCRIBIR COMPLETAMENTE enableDragAndDrop ---
-// app.js
 
 // --- REESCRIBIR COMPLETAMENTE enableDragAndDrop ---
 function enableDragAndDrop() {
@@ -1307,7 +1349,6 @@ async function monitorPlayers() {
         // Evaluar condición de Crossfade
         if (timeRemaining <= CROSSFADE_DURATION && timeRemaining >= -1) { // Permitir un pequeño margen negativo
             console.log(`Monitor: *** Condición crossfade CUMPLIDA (Player ${currentPlayer}, ${videoId}). Restante: ${timeRemaining.toFixed(1)}s. Llamando playNextVideo... ***`);
-            // Llamar a playNextVideo SIN argumentos
             playNextVideo();
             // IMPORTANTE: Salir aquí para no ejecutar skip de segmentos en el video actual
             return;
@@ -1421,14 +1462,14 @@ async function checkAndSkipSegment(playerInstance) {
 
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
-    // const userId = '...'; // Tu UserID si lo tienes, si no, la API puede funcionar anónima
+     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
     const apiUrl = `/api/segments/${videoId}`; // URL relativa a tu función Netlify
-    // console.log(`Llamando a la API local SB: ${apiUrl}`);
+    console.log(`Llamando a la API local SB: ${apiUrl}`);
 
     try {
         const response = await fetch(apiUrl, {
              headers: {
-                 // 'X-UserID': userId // Enviar si tienes ID
+                  'X-UserID': userId
              }
         });
         if (!response.ok) {
@@ -1443,7 +1484,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
              console.warn(`La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
              return null; // Devolver null si la respuesta no es un array
         }
-        // console.log(`Segmentos recibidos de API SB para ${videoId}:`, data.length);
+        console.log(`Segmentos recibidos de API SB para ${videoId}:`, data.length);
         // Añadir duración del video si viene en el primer segmento (algunas APIs SB lo incluyen)
         if (data.length > 0 && data[0].videoDuration) {
              console.log(`Duración del video según SB para ${videoId}: ${data[0].videoDuration}s`);
