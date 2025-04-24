@@ -1627,7 +1627,6 @@ function parseDuration(durationInput) {
 
 // --- Carga de Playlist desde URL (Piped API + Proxy + Retry) ---
 const pipedInstances = [ // Lista de instancias Piped
-     "https://pipedapi.orangenet.cc",
      "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
     "https://pipedapi.ducks.party",
