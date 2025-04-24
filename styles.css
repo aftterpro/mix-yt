@@ -1,12 +1,13 @@
+/* styles.css - Versión Completa con Últimos Cambios */
+
 /* ---- VARIABLES CSS ---- */
 :root {
-    --sidebar-width: 400px; /* Ancho deseado para la playlist */
-    --player-width: 400px; /* Ancho deseado para el reproductor */
-    /* --search-panel-width: 600px; */ /* Eliminado, el panel será flexible */
+    --sidebar-width: 400px;
+    --player-width: 400px;
     --spacing-sm: 10px;
     --spacing-md: 12px;
     --spacing-lg: 15px;
-    --primary-accent-color: #e91e63; /* Ejemplo de un color de acento */
+    --primary-accent-color: #e91e63; /* Color de acento */
 }
 
 /* ---- ESTILO GENERAL ---- */
@@ -14,28 +15,28 @@ body.vibe-theme {
     font-family: 'Montserrat', sans-serif;
     color: #fff;
     background: linear-gradient(135deg, #121212, #181818);
-    margin: 0; /* Quitamos margen del body */
-    padding: var(--spacing-sm); /* Añadimos padding general */
+    margin: 0;
+    padding: var(--spacing-sm);
     min-height: 100vh;
-    box-sizing: border-box; /* Incluir padding en el tamaño */
-    display: flex; /* Usar flex para organizar main-player y container */
-    flex-direction: column; /* Apilar verticalmente */
-    height: 100vh; /* Ocupar toda la altura */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 /* ---- EVITAR SCROLLING GLOBAL ---- */
 html, body {
-    overflow: hidden; /* Bloquear scroll en toda la página */
+    overflow: hidden;
     height: 100%;
     margin: 0;
 }
 
 /* ---- CONTENEDOR DEL PLAYER PRINCIPAL ---- */
 .main-player-container {
-    padding: var(--spacing-sm) 0; /* Espacio arriba/abajo */
+    padding: var(--spacing-sm) 0;
     display: flex;
-    justify-content: center; /* Centrar el reproductor horizontalmente */
-    flex-shrink: 0; /* Evitar que se encoja */
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 #contenedor-player {
@@ -43,35 +44,31 @@ html, body {
     color: #fff;
     width: 100%;
     max-width: var(--player-width);
-    border-radius: 8px; /* Opcional */
-    overflow: hidden; /* Opcional */
+    border-radius: 8px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
 
 #videoContainer {
-    position: relative;
     width: 100%;
     padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-    background-color: #111; /* Fondo si el video no está cargado */
+    position: relative; /* Esencial para players absolutos */
+    background-color: #111;
     height: 0;
     overflow: hidden;
 }
 
-.video-player {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: none;
+.video-player { /* Estilo base movido a efecto.css */
+   /* position: absolute; */ /* Asegúrate que esté en efecto.css */
+   /* ... resto de estilos base en efecto.css ... */
 }
 
 .player-controls {
     display: flex;
     justify-content: center;
-    padding: var(--spacing-sm) 0; /* Espacio para controles */
-    background-color: #000; /* Fondo oscuro para controles */
+    padding: var(--spacing-sm) 0;
+    background-color: #000;
 }
 
 .player-controls button {
@@ -81,7 +78,7 @@ html, body {
     font-size: 24px;
     cursor: pointer;
     transition: color 0.3s ease;
-    margin: 0 10px; /* Espacio entre los botones */
+    margin: 0 10px;
 }
 
 .player-controls button:hover {
@@ -93,17 +90,19 @@ html, body {
     display: flex;
     flex-direction: row;
     gap: var(--spacing-lg);
-    padding: var(--spacing-sm) 0; /* Ajustar padding */
-    flex-grow: 1; /* Ocupa el espacio restante */
-    overflow: hidden; /* Evitar que el container cause scroll */
-    height: calc(100% - var(--player-width) * 9 / 16 - 80px); /* Altura dinámica aproximada */
+    padding: var(--spacing-sm) 0;
+    flex-grow: 1;
+    overflow: hidden;
+    /* Altura dinámica aproximada (puede requerir ajuste) */
+    height: calc(100% - var(--player-width) * 9 / 16 - 80px - var(--spacing-sm) * 2 - 45px); /* Restar player, padding, footer */
 }
+
 
 /* ---- SIDEBAR (PLAYLIST) ---- */
 aside.sidebar {
-    flex: 0 0 var(--sidebar-width); /* Base fija, no crece, no encoge */
-    min-width: var(--sidebar-width); /* Asegurar ancho mínimo */
-    max-width: var(--sidebar-width); /* Asegurar ancho máximo */
+    flex: 0 0 var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
     background-color: #222;
     color: #eee;
     border-radius: 10px;
@@ -111,8 +110,8 @@ aside.sidebar {
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    height: 100%; /* Ocupar toda la altura del .container */
-    overflow: hidden; /* Controlar scroll interno */
+    height: 100%;
+    overflow: hidden;
 }
 
 .playlist-header {
@@ -120,16 +119,15 @@ aside.sidebar {
     padding-bottom: var(--spacing-sm);
     border-bottom: 1px solid #555;
     margin-bottom: var(--spacing-sm);
-    flex-shrink: 0; /* Evitar que se encoja */
-    display: flex; /* Para alinear título e imagen */
+    flex-shrink: 0;
+    display: flex;
     align-items: center;
     justify-content: center;
 }
 .playlist-header h3 {
-    margin: 0;
-    margin-right: 10px; /* Espacio entre texto e imagen */
+    margin: 0 10px 0 0;
 }
-.playlist-header img { /* Estilos para la imagen de la playlist */
+.playlist-header img {
     width: 40px;
     height: 40px;
     border-radius: 4px;
@@ -150,20 +148,22 @@ aside.sidebar {
     box-sizing: border-box;
     height: 40px;
 }
-.sidebar .add-to-playlist { /* Estilo específico para el botón de añadir URL */
+.sidebar .add-to-playlist {
      width: 100%;
-     max-width: 100%; /* Ocupar todo el ancho */
-     justify-content: center; /* Centrar contenido del botón */
+     max-width: 100%;
+     justify-content: center;
      margin-bottom: var(--spacing-md);
      flex-shrink: 0;
 }
 
 #playlistContainer {
-    flex-grow: 1; /* Ocupa el espacio restante en el sidebar */
-    overflow-y: auto; /* Scroll vertical SOLO para la lista */
-    padding-right: 5px; /* Espacio para scrollbar */
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-right: -5px; /* Compensar padding */
     scrollbar-width: thin;
     scrollbar-color: #555 #333;
+    padding: 0; /* Quitar padding para que grupos ocupen todo */
 }
 #playlistContainer::-webkit-scrollbar {
     width: 8px;
@@ -176,84 +176,207 @@ aside.sidebar {
     background-color: #333;
 }
 
-#playlist {
-    padding: 0;
-    list-style-type: none;
-    margin: 0; /* Quitar margen por defecto */
+
+/* --- ESTILOS PARA GRUPOS DE PLAYLIST (PESTAÑAS) --- */
+
+.playlist-group {
+    border: 1px solid #333;
+    margin-bottom: 8px;
+    border-radius: 5px;
+    background-color: #282828;
+    overflow: hidden;
 }
 
-/* Estilos para items de la playlist (ya existentes en app.js, pero como referencia) */
+.playlist-group-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 10px;
+    cursor: pointer;
+    background-color: #303030;
+    transition: background-color 0.2s ease;
+    border-bottom: 1px solid #3a3a3a;
+}
+.playlist-group.expanded .playlist-group-header {
+    border-bottom-color: transparent;
+}
+
+
+.playlist-group-header:hover {
+    background-color: #3f3f3f;
+}
+
+.playlist-group-thumb {
+    width: 30px;  /* <-- Tamaño Reducido */
+    height: 30px; /* <-- Tamaño Reducido */
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.playlist-group-name {
+    flex-grow: 1;
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 10px;
+}
+
+.playlist-group-header .expand-icon {
+    font-size: 0.9em;
+    color: #aaa;
+    transition: transform 0.3s ease;
+    flex-shrink: 0;
+}
+/* Opcional: rotar icono
+.playlist-group.expanded .expand-icon {
+     transform: rotate(180deg);
+}
+*/
+
+.playlist-group-videos {
+    overflow: hidden; /* ¡Esencial! */
+    max-height: 0;    /* ¡Esencial! Colapsado por defecto */
+    transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out; /* Animación */
+    background-color: #222;
+    padding: 0px 5px 0px 10px; /* Padding colapsado (solo lados) */
+    box-sizing: border-box;
+    /* No poner display: none; aquí */
+}
+
+.playlist-group.expanded .playlist-group-videos {
+    /* Padding cuando está expandido */
+    padding-top: 5px;
+    padding-bottom: 5px;
+    /* max-height se aplica con JS para altura dinámica */
+}
+
+/* Estilos para items individuales dentro de la playlist */
 .playlist-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem;
-    border-bottom: 1px solid #ddd;
+    /* padding: 0.5rem; */ /* Controlado en .playlist-group-videos .playlist-item */
     cursor: pointer;
     position: relative;
-    color: #eee; /* Asegurar color de texto */
+    color: #eee;
 }
+.playlist-group-videos .playlist-item { /* Estilo específico dentro del grupo */
+    border-bottom: 1px solid #383838;
+    padding: 6px 0px 6px 5px;
+    margin: 0;
+}
+.playlist-group-videos .playlist-item:last-child {
+    border-bottom: none;
+}
+
+
 .playlist-item .image-container {
     position: relative;
     margin-right: 0.5rem;
-    flex-shrink: 0; /* Evitar que la imagen se encoja */
+    flex-shrink: 0;
 }
-.playlist-item img.drag-handle { /* Estilo imagen playlist */
+.playlist-item img.drag-handle {
     width: 80px;
-    height: 45px; /* Mantener 16:9 */
+    height: 45px;
     object-fit: cover;
     border-radius: 4px;
     cursor: move;
+    display: block; /* Evitar espacio extra debajo */
 }
 .playlist-item .playing-icon {
     position: absolute;
-    bottom: 2px; /* Ajustar posición */
-    left: 2px;  /* Ajustar posición */
-    color: #007bff;
-    font-size: 1em; /* Ajustar tamaño */
-    background-color: rgba(0, 0, 0, 0.6); /* Fondo para visibilidad */
-    border-radius: 50%;
-    padding: 2px;
+    bottom: 2px;
+    left: 2px;
+    color: var(--primary-accent-color, #e91e63);
+    font-size: 1em;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 3px;
+    padding: 1px 3px;
+    z-index: 1; /* Asegurar que esté sobre la imagen */
 }
 .playlist-item.playing {
-    border: 1px solid #007bff; /* Borde más sutil */
-    background-color: rgba(0, 123, 255, 0.1); /* Fondo sutil */
+    border: 1px solid var(--primary-accent-color, #e91e63);
+    background-color: rgba(233, 30, 99, 0.1); /* Usar color de acento con transparencia */
+    margin: -1px; /* Compensar borde */
+    border-radius: 4px; /* Redondear borde */
 }
 .playlist-item.playing img.drag-handle{
-    border: 1px solid #007bff;
+    /* border: 1px solid var(--primary-accent-color); */ /* Quitado para no duplicar */
 }
 .playlist-item > div:not(.image-container):not(.delete-menu) { /* Contenedor de texto */
-    flex-grow: 1; /* Ocupar espacio */
-    overflow: hidden; /* Para truncar texto si es necesario */
-    margin-right: 5px; /* Espacio antes del menú */
+    flex-grow: 1;
+    overflow: hidden;
+    margin-right: 5px;
 }
-.playlist-item p { /* Estilos para texto en playlist */
+.playlist-item p {
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-p[style*="font-weight: bold"] { /* Título */
+p[style*="font-weight: bold"] { /* Título en Playlist */
     font-size: 12px;
     margin-bottom: 2px;
 }
-p[style*="color: #555"] { /* Duración */
+p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     font-size: 10px;
-    color: #999; /* Color más claro */
+    color: #999;
 }
-/* Menú eliminar (ya en botones.css, ajustar si es necesario) */
+/* Menú eliminar/mover (estilos base en botones.css) */
 .playlist-item .delete-menu {
-   flex-shrink: 0; /* Evitar que se encoja */
-   margin-left: auto; /* Empujar a la derecha */
+   flex-shrink: 0;
+   margin-left: auto;
+   position: relative; /* Para posicionar el contenido */
+   z-index: 10; /* Asegurar que el menú esté sobre otros items */
 }
+.delete-menu-content { /* Estilos para el contenido del menú */
+    /* display: none; */ /* Controlado por JS */
+    position: absolute;
+    background-color: rgba(30, 30, 30, 0.95); /* Fondo oscuro y menos transparente */
+    min-width: 150px; /* Ancho mínimo */
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4);
+    z-index: 11; /* Sobre el botón */
+    border-radius: 5px;
+    padding: 5px;
+    right: 0;
+    border: 1px solid #444;
+}
+.delete-menu-content button { /* Botones dentro del menú */
+    background: none;
+    border: none;
+    color: #ccc; /* Color texto botón */
+    cursor: pointer;
+    display: flex; /* Alinear icono y texto */
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px; /* Padding botón */
+    font-size: 0.9em;
+    border-radius: 3px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.delete-menu-content button:hover {
+    background-color: #555;
+    color: #fff;
+}
+.delete-menu-content button i {
+    margin-right: 8px; /* Espacio entre icono y texto */
+    width: 14px; /* Ancho fijo para icono */
+    text-align: center;
+}
+
 
 /* ---- CONTENIDO PRINCIPAL (Panel de Búsqueda) ---- */
 .main-content {
-    flex: 1; /* Ocupa el espacio restante */
-    min-width: 300px; /* Ancho mínimo */
+    flex: 1;
+    min-width: 300px;
     display: flex;
     flex-direction: column;
-    height: 100%; /* Ocupar toda la altura del .container */
-    overflow: hidden; /* Controlar scroll interno */
+    height: 100%;
+    overflow: hidden;
 }
 
 #search-panel {
@@ -264,14 +387,14 @@ p[style*="color: #555"] { /* Duración */
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    flex-grow: 1; /* Ocupa el espacio en main-content */
-    overflow: hidden; /* Controlar scroll interno */
+    flex-grow: 1;
+    overflow: hidden;
 }
 
 /* Contenedor del input de búsqueda */
 #search-panel .search-container {
      margin-bottom: var(--spacing-md);
-     flex-shrink: 0; /* No encoger */
+     flex-shrink: 0;
 }
 #search-panel .search-container input[type="text"] {
     width: 100%;
@@ -286,12 +409,12 @@ p[style*="color: #555"] { /* Duración */
 
 /* Contenedor de Resultados (Scrollable) */
 #resultsContainer {
-    flex-grow: 1; /* Ocupa el espacio restante en search-panel */
-    overflow-y: auto; /* Habilita el scroll vertical SOLO aquí */
+    flex-grow: 1;
+    overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: #555 #333;
-    padding-right: 5px; /* Espacio para scrollbar */
-    margin-right: -5px; /* Compensar padding */
+    padding-right: 5px;
+    margin-right: -5px;
 }
 #resultsContainer::-webkit-scrollbar {
     width: 8px;
@@ -307,8 +430,8 @@ p[style*="color: #555"] { /* Duración */
 /* Grilla de Resultados */
 #results {
     display: grid;
-    grid-template-columns: repeat(4, 1fr); 
-    gap: var(--spacing-sm);
+    grid-template-columns: repeat(4, 1fr); /* <-- 4 COLUMNAS */
+    gap: var(--spacing-sm); /* Espacio reducido */
     padding-bottom: var(--spacing-sm);
 }
 
@@ -320,26 +443,25 @@ p[style*="color: #555"] { /* Duración */
     display: flex;
     flex-direction: column;
     padding: 0;
-    border: none;
-    gap: 0;
-    transition: transform 0.2s ease-in-out; /* Efecto hover sutil */
+    border: 1px solid transparent; /* Borde para hover */
+    transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    position: relative; /* Para posicionar botón */
 }
 .video-result:hover {
-    transform: translateY(-2px); /* Levantar un poco al pasar el ratón */
+    transform: translateY(-2px);
+    border-color: #444; /* Borde sutil en hover */
 }
 
 /* Contenedor de la miniatura */
 .video-result .thumbnail-container {
     position: relative;
     width: 100%;
-    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    padding-bottom: 56.25%; /* 16:9 */
     height: 0;
     overflow: hidden;
     display: block;
     margin: 0;
 }
-
-/* Miniatura */
 .video-result .thumbnail {
     position: absolute;
     top: 0;
@@ -348,10 +470,8 @@ p[style*="color: #555"] { /* Duración */
     height: 100%;
     object-fit: cover;
     border-radius: 0;
-    display: block; /* Asegurar display block */
+    display: block;
 }
-
-/* Duración */
 .video-result .duration {
     position: absolute;
     bottom: 5px;
@@ -366,16 +486,14 @@ p[style*="color: #555"] { /* Duración */
 
 /* Contenedor para Título, Autor y Botón */
 .video-result .video-details {
-    padding: 6px; /* Reduce el padding interno */
+    padding: 6px; /* Padding reducido */
     display: flex;
     flex-direction: column;
-    gap: 3px; /* Reduce el espacio entre elementos */
+    gap: 3px;   /* Gap reducido */
     flex-grow: 1;
 }
-
-/* Título */
 .video-result .video-title {
-    font-size: 0.8em; /* Reduce tamaño de fuente */
+    font-size: 0.8em; /* Fuente reducida */
     font-weight: bold;
     color: #eee;
     margin: 0;
@@ -384,14 +502,12 @@ p[style*="color: #555"] { /* Duración */
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2; /* Reduce interlineado */
+    line-height: 1.2; /* Interlineado reducido */
     max-height: 2.4em; /* line-height * 2 */
     word-break: break-word;
 }
-
-/* Autor */
 .video-result .video-author {
-    font-size: 0.7em; /* Reduce tamaño de fuente */
+    font-size: 0.7em; /* Fuente reducida */
     color: #aaa;
     margin: 0;
     white-space: nowrap;
@@ -399,98 +515,50 @@ p[style*="color: #555"] { /* Duración */
     text-overflow: ellipsis;
 }
 
-/* --- >> SECCIÓN MODIFICADA PARA BOTÓN OCULTO/HOVER << --- */
-
-/* Botón Añadir (oculto por defecto) */
+/* Botón Añadir en resultados (oculto por defecto) */
 .video-result .add-to-playlist {
     margin-top: auto;
-    padding: 5px 8px;  /* Reduce padding */
-    font-size: 0.8em; /* Reduce tamaño fuente */
+    padding: 5px 8px;  /* Padding reducido */
+    font-size: 0.8em; /* Fuente reducida */
     align-self: flex-start;
-
-    /* --- NUEVO: Ocultar por defecto --- */
+    /* --- Ocultar por defecto --- */
     opacity: 0;
     visibility: hidden;
-    transform: translateY(5px); /* Opcional: Moverlo un poco hacia abajo */
+    transform: translateY(5px); /* Efecto sutil */
     transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out, transform 0.2s ease-in-out;
+    /* Posicionarlo si se quiere superpuesto */
+    /* position: absolute; */
+    /* bottom: 5px; */
+    /* right: 5px; */
+    /* z-index: 5; */
 }
-
-/* Mostrar botón al hacer hover sobre la BALDOSA COMPLETA */
+/* Mostrar botón al hacer hover sobre la BALDOSA */
 .video-result:hover .add-to-playlist {
-    /* --- NUEVO: Mostrar en hover --- */
     opacity: 1;
     visibility: visible;
-    transform: translateY(0); /* Opcional: Moverlo a su posición original */
+    transform: translateY(0);
 }
-
-/* --- >> FIN SECCIÓN MODIFICADA << --- */
-
 
 /* ---- MENSAJE FLOTANTE ---- */
 .mensaje-flotante {
     position: fixed;
-    bottom: 30px;
+    bottom: 50px; /* Subir un poco para no chocar con footer */
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.85); /* Más opaco */
     color: white;
     padding: 10px 20px;
     border-radius: 5px;
-    z-index: 1000;
+    z-index: 1001; /* Sobre el footer */
     opacity: 1;
-    transition: opacity 1s ease-out;
-    font-size: 0.9em; /* Tamaño de fuente */
+    transition: opacity 1s ease-out, bottom 0.5s ease;
+    font-size: 0.9em;
+    max-width: 90%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
-
 .mensaje-flotante.fadeOut {
     opacity: 0;
-}
-
-/* ---- ESTILOS FRANJA INFERIOR (FOOTER) ---- */
-.page-footer {
-    background-color: #101010; /* Un fondo ligeramente diferente o igual al body */
-    color: #888; /* Color de texto grisáceo */
-    font-size: 0.75em; /* Tamaño de letra pequeño */
-    padding: 8px 15px; /* Espaciado interno (vertical, horizontal) */
-    text-align: center; /* Centrar el texto */
-    width: 100%;       /* Ocupa todo el ancho */
-    box-sizing: border-box; /* Incluir padding en el ancho total */
-    position: fixed; /* Fijar en la parte inferior */
-    bottom: 0;
-    left: 0;
-    z-index: 500; /* Asegurar que esté visible pero debajo de elementos como mensajes flotantes si es necesario */
-    border-top: 1px solid #282828; /* Línea superior sutil */
-}
-
-.page-footer p {
-    margin: 2px 0; /* Poco espacio entre párrafos */
-    display: inline; /* Mostrar párrafos en línea si hay espacio */
-    margin-right: 15px; /* Espacio entre los dos textos si están en línea */
-}
-
-/* Estilo para los enlaces dentro del footer */
-.page-footer a {
-    color: #aaa; /* Color de enlace un poco más claro */
-    text-decoration: underline; /* Subrayado estándar */
-    transition: color 0.2s ease;
-}
-
-.page-footer a:hover {
-    color: #eee; /* Color al pasar el ratón */
-    text-decoration: none; /* Quitar subrayado en hover (opcional) */
-}
-
-/* Ajuste para pantallas pequeñas si los textos se superponen */
-@media (max-width: 768px) {
-    .page-footer p {
-        display: block; /* Mostrar cada párrafo en su propia línea */
-        margin-right: 0; /* Quitar margen derecho */
-        margin-bottom: 4px; /* Añadir espacio inferior */
-    }
-     .page-footer {
-         font-size: 0.7em; /* Aún más pequeño en móviles */
-         padding: 5px 10px;
-     }
+    bottom: 30px; /* Bajar al desaparecer */
 }
 
 /* ---- Spinner pequeño para "Cargar Más" ---- */
@@ -499,169 +567,223 @@ p[style*="color: #555"] { /* Duración */
     justify-content: center;
     align-items: center;
     padding: 10px;
-    margin: 10px auto; /* Centrarlo */
-    height: 30px; /* Altura fija */
-    flex-shrink: 0; /* Evitar que cambie tamaño */
+    margin: 10px auto;
+    height: 30px;
+    flex-shrink: 0;
 }
-.loading-spinner-small::after { /* Pseudo-elemento para el spinner */
+.loading-spinner-small::after {
     content: '';
     width: 25px;
     height: 25px;
     border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top: 3px solid white; /* O usa --primary-accent-color */
+    border-top: 3px solid white;
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    box-sizing: border-box; /* Incluir borde en tamaño */
+    box-sizing: border-box;
 }
-/* Keyframes spin ya definido globalmente */
-
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
 /* ---- Error Container ---- */
-.error-container {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ff5252;
-    color: white;
-    padding: 15px;
-    border-radius: 5px;
-    z-index: 1000;
-    max-width: 90%;
-    text-align: center;
-}
-/* ---- Utility Classes ---- */
-.hidden {
-    display: none !important;
+.error-container { /* Podría usarse para errores persistentes */
+    /* ... estilos si se necesita ... */
 }
 
-.invisible {
+/* ---- DRAG AND DROP VISUALS ---- */
+.playlist-item.dragging {
+    opacity: 0.4;
+    background-color: #444;
+}
+.playlist-item.placeholder { /* Estilo del placeholder */
+    height: 40px;
+    background-color: rgba(0, 123, 255, 0.2);
+    border: 1px dashed #007bff;
+    margin: 4px 0;
+    box-sizing: border-box;
+}
+.playlist-item.drag-over { /* Borde sobre item al arrastrar encima */
+    border-top: 2px solid var(--primary-accent-color, #e91e63);
+    margin-top: -2px; /* Compensar borde */
+}
+.playlist-group-videos.drag-over-area { /* Área al final de la lista */
+     border: 2px dashed var(--primary-accent-color, #e91e63);
+     background-color: rgba(233, 30, 99, 0.1);
+     min-height: 40px; /* Asegurar visibilidad */
+     margin: 5px 0;
+     border-radius: 4px;
+}
+
+
+/* ---- Utility Classes ---- */
+.hidden {
+    /* display: none !important; */ /* Evitar usar display si se anima opacidad/altura */
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+.invisible { /* Solo oculta visualmente, sigue ocupando espacio */
     visibility: hidden;
 }
 
-/* ---- RESPONSIVIDAD ---- */
-@media (max-width: 1200px) {
-    /* No se necesitan ajustes específicos aquí si el layout es fluido */
+/* ---- ESTILOS FRANJA INFERIOR (FOOTER) ---- */
+.page-footer {
+    background-color: #101010;
+    color: #888;
+    font-size: 0.75em;
+    padding: 8px 15px;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 500;
+    border-top: 1px solid #282828;
+    flex-shrink: 0; /* Evitar que se encoja */
+    height: auto; /* Altura automática basada en contenido */
+}
+.page-footer p {
+    margin: 2px 0;
+    display: inline;
+    margin-right: 15px;
+}
+.page-footer a {
+    color: #aaa;
+    text-decoration: underline;
+    transition: color 0.2s ease;
+}
+.page-footer a:hover {
+    color: #eee;
+    text-decoration: none;
 }
 
-@media (max-width: 992px) {
-    /* Cuando el layout principal se vuelve columna */
+/* ---- RESPONSIVIDAD ---- */
+@media (max-width: 1200px) { /* Pantallas grandes/medianas */
+     #results {
+        grid-template-columns: repeat(3, 1fr); /* 3 columnas */
+    }
+}
+
+@media (max-width: 992px) { /* Tablets */
     .container {
         flex-direction: column;
-        height: auto; /* Altura automática en modo columna */
-        overflow: auto; /* Permitir scroll si el contenido es muy alto */
+        height: auto;
+        overflow: visible; /* Permitir scroll general si es necesario */
+         /* Recalcular altura restando player y footer */
+         height: calc(100% - var(--player-width) * 9 / 16 - 80px - var(--spacing-sm) * 2 - 45px);
+         min-height: 400px; /* Altura mínima */
     }
-
     aside.sidebar,
     .main-content {
-        width: 100%; /* Ocupar todo el ancho */
-        max-width: 100%; /* Quitar límite */
-        height: auto; /* Altura automática */
+        width: 100%;
+        max-width: 100%;
+        height: auto; /* Permitir que crezcan */
+        max-height: 50vh; /* Limitar altura para que ambos quepan */
+        overflow-y: auto; /* Permitir scroll interno si exceden 50vh */
     }
-    aside.sidebar {
-        max-height: 40vh; /* Limitar altura del sidebar */
-    }
-    .main-content {
-         min-height: 50vh; /* Asegurar altura mínima para resultados */
-    }
-
+     aside.sidebar {
+        max-height: 45vh; /* Un poco menos para el sidebar */
+     }
+     .main-content {
+         max-height: 55vh; /* Un poco más para resultados */
+     }
     #contenedor-player {
-         max-width: 600px; /* O un ancho relativo como 90% */
+         max-width: 90%;
          width: 90%;
-         margin: 0 auto var(--spacing-lg); /* Centrar */
+         margin: 0 auto var(--spacing-lg);
     }
-
+     #results {
+        grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+    }
+     .page-footer p {
+        margin-right: 10px; /* Menos espacio */
+     }
 }
 
-@media (max-width: 768px) {
-    /* Ajustes para tablets y móviles grandes */
-     body.vibe-theme {
-        padding: var(--spacing-sm); /* Reducir padding general */
-    }
-    #results {
-        grid-template-columns: 1fr; /* 1 columna en pantallas más pequeñas */
-    }
-    :root { /* Reducir espaciado */
+@media (max-width: 768px) { /* Móviles grandes */
+    :root {
         --spacing-sm: 8px;
         --spacing-md: 10px;
         --spacing-lg: 12px;
+        --sidebar-width: 100%; /* Sidebar ocupa todo el ancho */
     }
-     aside.sidebar {
-        max-height: 45vh; /* Ajustar altura si es necesario */
+    body.vibe-theme {
+        padding: var(--spacing-sm);
     }
+    aside.sidebar, .main-content {
+        max-height: none; /* Quitar límite de altura en modo columna total */
+        overflow-y: visible; /* Quitar scroll interno */
+    }
+    .container {
+         height: auto; /* Altura basada en contenido */
+         overflow-y: auto; /* Permitir scroll si todo junto es muy alto */
+    }
+
+     #results {
+        grid-template-columns: repeat(2, 1fr); /* Mantener 2 columnas o pasar a 1 */
+        /* grid-template-columns: 1fr; */
+    }
+     .page-footer p {
+        display: block; /* Párrafos en líneas separadas */
+        margin-right: 0;
+        margin-bottom: 4px;
+    }
+     .page-footer {
+         font-size: 0.7em;
+         padding: 5px 10px;
+         position: relative; /* Quitar fixed si interfiere con scroll */
+         /* bottom: auto; */
+         /* left: auto; */
+     }
+      .mensaje-flotante {
+           bottom: 10px; /* Ajustar si footer no es fixed */
+           /* bottom: 55px; */ /* Ajustar si footer SÍ es fixed */
+           z-index: 1001;
+      }
 }
 
-@media (max-width: 480px) {
-     /* Ajustes para móviles pequeños */
+@media (max-width: 480px) { /* Móviles pequeños */
      :root {
         --spacing-sm: 5px;
         --spacing-md: 8px;
         --spacing-lg: 10px;
     }
-     /* Player más pequeño */
+     #results {
+        grid-template-columns: 1fr; /* 1 columna */
+        gap: var(--spacing-sm);
+    }
      #contenedor-player {
          max-width: 100%;
          width: 100%;
     }
-     body.vibe-theme {
-        padding: var(--spacing-sm);
-    }
-     /* Ajustar tamaño de fuente base si es necesario */
-     /* html { font-size: 14px; } */
+     /* Reducir fuentes/padding aún más si es necesario */
+     .video-result .video-title { font-size: 0.75em; line-height: 1.1; max-height: 2.2em;}
+     .video-result .video-author { font-size: 0.65em; }
+     .video-result .add-to-playlist { font-size: 0.75em; padding: 4px 6px;}
+     .playlist-group-thumb { width: 25px; height: 25px; margin-right: 5px;}
+     .playlist-group-name { font-size: 0.8em; }
+     .playlist-item img.drag-handle { width: 60px; height: 33.75px; }
+     p[style*="font-weight: bold"] { font-size: 11px; }
+     p[style*="color: #999"] { font-size: 9px; }
 
-     /* Simplificar layout de items en playlist */
-     .playlist-item {
-        /* Podrías querer mostrar menos info o apilarla */
-        padding: var(--spacing-sm);
-     }
-     .playlist-item img.drag-handle {
-         width: 60px;
-         height: 33.75px; /* 16:9 */
-     }
-     .playlist-item p[style*="font-weight: bold"] { font-size: 11px; }
-     .playlist-item p[style*="color: #555"] { font-size: 9px; }
-
-     /* Hacer controles de playlist más grandes/fáciles de tocar */
-     .playlist-item .delete-menu-button { font-size: 1.4em; padding: 5px;}
-     .delete-menu-content button { padding: 8px 5px; }
-
-
-     /* Ajustar baldosa de resultados */
-     .video-result .video-title { font-size: 0.85em; }
-     .video-result .video-author { font-size: 0.75em; }
-     .video-result .add-to-playlist { font-size: 0.8em; padding: 5px 8px;}
-
-     .mensaje-flotante {
-         width: 90%; /* Más ancho en pantallas pequeñas */
-         box-sizing: border-box;
-         text-align: center;
-         bottom: 10px; /* Más cerca del fondo */
-     }
 }
 
 
 /* ---- MEJORAS DE ACCESIBILIDAD ---- */
-@media (hover: none) {
-    /* Mejoras para dispositivos táctiles - botones más grandes */
+@media (hover: none) { /* Mejoras para dispositivos táctiles */
     button, input[type="text"] {
-        min-height: 44px; /* Mínimo recomendado */
-        padding: var(--spacing-md);
+        min-height: 44px;
+        /* padding: var(--spacing-md); */ /* Puede hacer botones muy grandes */
     }
-    .player-controls button {
-        font-size: 28px; /* Iconos de control más grandes */
+    .player-controls button { font-size: 28px; }
+    .add-to-playlist { padding: 10px 15px; }
+    .video-result .add-to-playlist { /* Botón siempre visible en táctil */
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+         padding: 8px 12px; /* Ajustar padding táctil */
     }
-    .add-to-playlist {
-         padding: 10px 15px; /* Botón añadir más grande */
-    }
-    /* Ajustar padding si se superpone con min-height */
-    .video-result .add-to-playlist {
-        padding: 8px 12px; /* Ajuste específico si es necesario */
-    }
-     .playlist-item .delete-menu-button { min-height: auto; } /* Evitar altura doble */
-}
-/* ---- SOPORTE PARA MODO OSCURO DEL SISTEMA ---- */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --primary-accent-color: #ff4081;
-    }
+    .playlist-item .delete-menu-button { min-height: auto; padding: 8px;} /* Botón menú táctil */
 }
