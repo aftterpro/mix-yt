@@ -1,6 +1,5 @@
 //Instancias api
 const pipedInstances = [
-  "https://pipedapi.orangenet.cc",
   "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
     "https://pipedapi.ducks.party"
