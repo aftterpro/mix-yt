@@ -14,7 +14,7 @@ exports.handler = async (event, context) => {
     let pipedPath = event.rawUrl.substring(event.rawUrl.indexOf('/.netlify/functions/cors-proxy/') + '/.netlify/functions/cors-proxy/'.length);
 
     // Construir la URL completa de Piped
-    const pipedUrl = `https://pipedapi.kavin.rocks/${pipedPath}`;
+    const pipedUrl = `https://pipedapi.orangenet.cc/${pipedPath}`;
 
     const req = {
       method: event.httpMethod,
