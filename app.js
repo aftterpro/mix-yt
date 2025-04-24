@@ -1,4 +1,3 @@
-// app.js - Versión con Multi-Playlist (Fase 1) y Correcciones
 
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
@@ -1630,7 +1629,6 @@ const pipedInstances = [ // Lista de instancias Piped
      "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
     "https://pipedapi.ducks.party",
-    "https://pipedapi.orangenet.cc",
     "https://pipedapi.adminforge.de"
 ];
 function getRandomPipedInstance() {
