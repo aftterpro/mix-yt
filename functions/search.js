@@ -33,23 +33,38 @@ async function fetchDataWithRetry(url, maxRetries = 3, retryDelay = 1000) {
 }
 exports.handler = async function (event, context) {
   const query = event.queryStringParameters.q;
-  const instanceUrl =  getRandomPipedInstance(); // Usar las instancias
-  const targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(
+  const nextPageToken = event.queryStringParameters.nextpage;
+  const instanceUrl = getRandomPipedInstance();
+  let targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(
     query
   )}&filter=videos`; // Añadir el parámetro filter
-console.log("La url formada: ", targetUrl);
+  console.log("Netlify Function: Target URL:", targetUrl); // Log URL
   
+
   try {
     const data = await fetchDataWithRetry(targetUrl);
     return {
       statusCode: 200,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     };
   } catch (error) {
-    console.error("Error en la búsqueda:", error);
+
+    console.error("!!! Netlify Function Error during search !!!");
+    console.error("Query:", query);
+    console.error("NextPage Token:", nextPageToken);
+    console.error("Target URL attempted:", targetUrl);
+    console.error("Error details:", error); 
+    console.error("Error message:", error.message);
+
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Error en la búsqueda." }),
+      statusCode: 502,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+          error: "Error al contactar el servicio de búsqueda externo (Piped).", 
+          details: error.message, // Incluir mensaje de error real
+          failedUrl: targetUrl // Informar qué URL falló
+      }),
     };
   }
 };
