@@ -44,7 +44,7 @@ function mostrarMensajeFlotante(mensaje) {
          document.body.appendChild(fallbackDiv);
           setTimeout(() => { // Simple timeout para fallback
              fallbackDiv.remove();
-          }, 6000);
+          }, 3000);
         return;
     }
 
@@ -75,7 +75,7 @@ function mostrarMensajeFlotante(mensaje) {
                  mensajeDiv.remove();
             }
         }, 500); // Coincidir con la duración de la transición de opacidad en CSS
-    }, 6000); // Tiempo visible: 6 segundos
+    }, 4000); // Tiempo visible: 4 segundos
 }
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
 
