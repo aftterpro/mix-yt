@@ -175,8 +175,6 @@ aside.sidebar {
 #playlistContainer::-webkit-scrollbar-track {
     background-color: #333;
 }
-
-
 /* --- ESTILOS PARA GRUPOS DE PLAYLIST (PESTAÑAS) --- */
 
 .playlist-group {
@@ -231,12 +229,10 @@ aside.sidebar {
     transition: transform 0.3s ease;
     flex-shrink: 0;
 }
-/* Opcional: rotar icono
+ Opcional: rotar icono
 .playlist-group.expanded .expand-icon {
      transform: rotate(180deg);
 }
-*/
-
 .playlist-group-videos {
     overflow: hidden; /* ¡Esencial! */
     max-height: 0;    /* ¡Esencial! Colapsado por defecto */
@@ -333,7 +329,6 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
    z-index: 10; /* Asegurar que el menú esté sobre otros items */
 }
 .delete-menu-content { /* Estilos para el contenido del menú */
-    /* display: none; */ /* Controlado por JS */
     position: absolute;
     background-color: rgba(30, 30, 30, 0.95); /* Fondo oscuro y menos transparente */
     min-width: 150px; /* Ancho mínimo */
@@ -367,8 +362,65 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     width: 14px; /* Ancho fijo para icono */
     text-align: center;
 }
+/* --- Estilos para Submenú "Mover a Playlist" --- */
+
+/* Contenedor del botón y submenú (opcional, para agrupar) */
+.move-to-playlist-container {
+    position: relative; /* Permite posicionar submenú si es necesario */
+    display: block; /* Ocupa el ancho */
+}
+
+/* Botón principal "Mover a playlist" (hereda estilo base) */
+.move-to-playlist-button {
+    width: 100%; /* Asegurar ancho completo */
+}
+
+/* Contenedor del submenú */
+.move-to-playlist-submenu {
+    background-color: #383838; /* Fondo ligeramente diferente */
+    border-radius: 4px;
+    margin-top: 4px; /* Espacio sobre el submenú */
+    /* Position absolute si quieres que flote sobre otros elementos del menú */
+    /* position: absolute; */
+    /* left: 100%; */ /* Posicionar a la derecha del menú principal */
+    /* top: 0; */
+    /* min-width: 150px; */
+    /* box-shadow: 3px 3px 8px rgba(0,0,0,0.3); */
+    /* border: 1px solid #555; */
+    /* z-index: 12; */ /* Sobre el menú principal */
+    padding: 5px; /* Padding interno */
+    max-height: 150px; /* Altura máxima con scroll si hay muchas playlists */
+    overflow-y: auto; /* Scroll si es necesario */
+    scrollbar-width: thin;
+    scrollbar-color: #666 #383838;
+}
+.move-to-playlist-submenu::-webkit-scrollbar { width: 5px; }
+.move-to-playlist-submenu::-webkit-scrollbar-thumb { background-color: #666; border-radius: 3px;}
+.move-to-playlist-submenu::-webkit-scrollbar-track { background-color: #383838;}
 
 
+/* Botones dentro del submenú (nombres de playlist) */
+.submenu-playlist-target {
+    background: none;
+    border: none;
+    color: #ddd; /* Color texto playlist destino */
+    cursor: pointer;
+    display: block; /* Un botón por línea */
+    width: 100%;
+    text-align: left;
+    padding: 5px 8px;
+    font-size: 0.85em; /* Ligeramente más pequeño */
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.submenu-playlist-target:hover {
+    background-color: #007bff; /* Resaltar al pasar ratón */
+    color: #fff;
+}
 /* ---- CONTENIDO PRINCIPAL (Panel de Búsqueda) ---- */
 .main-content {
     flex: 1;
@@ -526,11 +578,6 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     visibility: hidden;
     transform: translateY(5px); /* Efecto sutil */
     transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out, transform 0.2s ease-in-out;
-    /* Posicionarlo si se quiere superpuesto */
-    /* position: absolute; */
-    /* bottom: 5px; */
-    /* right: 5px; */
-    /* z-index: 5; */
 }
 /* Mostrar botón al hacer hover sobre la BALDOSA */
 .video-result:hover .add-to-playlist {
