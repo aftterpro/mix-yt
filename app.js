@@ -147,28 +147,7 @@ function onPlayerError(event) {
     }
 }
 
-function onPlayerStateChange(event) {
-    const playerState = event.data;
-    const changedPlayerNum = event.target === player1 ? 1 : 2;
-     console.log(`Player ${changedPlayerNum} State Change: ${playerState}`); // Log para debug
 
-    // Actualizar índice cuando un video EMPIEZA a reproducirse en el player activo
-     if (playerState === YT.PlayerState.PLAYING && changedPlayerNum === currentPlayer) {
-         updateCurrentPlayingIndex(); // Recalcular índice basado en el video que suena
-         checkAndSkipSegment(event.target); // Verificar segmentos al empezar a reproducir
-     } else if (playerState === YT.PlayerState.ENDED) {
-        console.log('Video finalizado en Player', changedPlayerNum);
-        // Si el video que terminó es el que se supone que está activo
-        if (changedPlayerNum === currentPlayer) {
-            lastSeekEndTime = -1; // Resetear seek
-            playNextVideo(); // Llama a reproducir el siguiente
-        } else {
-             console.log(`Video en player inactivo ${changedPlayerNum} terminó (posiblemente pre-cargado). Ignorando.`);
-        }
-     } else if (playerState === YT.PlayerState.PAUSED) {
-        console.log('Video en pausa en Player', changedPlayerNum);
-    }
-}
 
 // Módulo: Interacción con API de Búsqueda (Piped)
 
