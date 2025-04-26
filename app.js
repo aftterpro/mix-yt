@@ -146,9 +146,27 @@ function onPlayerError(event) {
          setTimeout(playNextVideo, 500); // Pequeño delay antes de saltar
     }
 }
+function onPlayerStateChange(event) {
+    const playerState = event.data;
+    const changedPlayerNum = event.target === player1 ? 1 : 2;
+    // console.log(`Player ${changedPlayerNum} State Change: ${playerState}`);
 
-
-
+     if (playerState === YT.PlayerState.PLAYING && changedPlayerNum === currentPlayer) {
+         updateCurrentPlayingIndex();
+         // Llamar a checkAndSkipSegment forzando el chequeo (ignora isTransitioning)
+         checkAndSkipSegment(event.target, true); // <<<< AÑADIR true AQUÍ
+     } else if (playerState === YT.PlayerState.ENDED) {
+          console.log('Video finalizado en Player', changedPlayerNum);
+        if (changedPlayerNum === currentPlayer) {
+            lastSeekEndTime = -1;
+            playNextVideo();
+        } else {
+             console.log(`Video en player inactivo ${changedPlayerNum} terminó. Ignorando.`);
+        }
+     } else if (playerState === YT.PlayerState.PAUSED) {
+        console.log('Video en pausa en Player', changedPlayerNum);
+    }
+}
 // Módulo: Interacción con API de Búsqueda (Piped)
 
 const performSearch = async (query, nextPage = null) => {
