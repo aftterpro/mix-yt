@@ -42,8 +42,6 @@ function mostrarMensajeFlotante(mensaje) {
     } else {
         document.body.appendChild(mensajeDiv); // Fallback
     }
-
-
     setTimeout(() => {
         mensajeDiv.classList.add('fadeOut');
         setTimeout(() => {
@@ -51,8 +49,7 @@ function mostrarMensajeFlotante(mensaje) {
         }, 1000); // Tiempo para que termine la animación fadeOut
     }, 6000); // Duración visible del mensaje: 6 segundos
 }
-// Ejemplo de uso inicial:
-// mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
+mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
 
 // Módulo: Carga del API de YouTube (Optimizado)
 function loadYouTubeAPI() {
@@ -149,12 +146,11 @@ function onPlayerError(event) {
 function onPlayerStateChange(event) {
     const playerState = event.data;
     const changedPlayerNum = event.target === player1 ? 1 : 2;
-    // console.log(`Player ${changedPlayerNum} State Change: ${playerState}`);
 
      if (playerState === YT.PlayerState.PLAYING && changedPlayerNum === currentPlayer) {
          updateCurrentPlayingIndex();
          // Llamar a checkAndSkipSegment forzando el chequeo (ignora isTransitioning)
-         checkAndSkipSegment(event.target, true); // <<<< AÑADIR true AQUÍ
+         checkAndSkipSegment(event.target, true); 
      } else if (playerState === YT.PlayerState.ENDED) {
           console.log('Video finalizado en Player', changedPlayerNum);
         if (changedPlayerNum === currentPlayer) {
@@ -999,7 +995,6 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 
 // --- Play/Next   ---
 function playNextVideo() {
-
      console.log(`playNextVideo: Llamado. Índice aplanado actual: ${currentPlayingInfo.flattenedIndex}`);
     if (isTransitioning) {
         console.warn("playNextVideo: Transición ya en progreso.");
@@ -1048,20 +1043,18 @@ function playNextVideo() {
         const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
 
         if (nextPlayerInstance && typeof nextPlayerInstance.loadVideoById === 'function') {
+            crossfadeAudio(); // --- INICIAR CROSSFADE DE AUDIO AQUÍ ---
             nextPlayerInstance.loadVideoById(nextVideoId);
             if (nextPlayerElement) nextPlayerElement.classList.remove('hidden');
         } else {
             console.error("playNextVideo: Error crítico - nextPlayerInstance inválido.");
              throw new Error("Reproductor destino inválido.");
         }
-
-        // Actualizar UI para mostrar el nuevo item como 'playing' (incluso antes de sonar)
-        updatePlaylistsUI();
+        updatePlaylistsUI(); // Actualizar UI para mostrar el nuevo item como 'playing' (incluso antes de sonar)
 
         // Iniciar transición visual
         if (currentPlayerElement) currentPlayerElement.classList.add('fade-out');
         if (nextPlayerElement) nextPlayerElement.classList.add('fade-in');
-
 
         // Timeout para completar la transición
         setTimeout(() => {
@@ -1078,8 +1071,6 @@ function playNextVideo() {
                 const oldPlayerNum = currentPlayer;
                 currentPlayer = currentPlayer === 1 ? 2 : 1; // Cambiar player activo LÓGICO
                 console.log(`playNextVideo: Timeout - currentPlayer cambiado a ${currentPlayer}.`);
-
-                crossfadeAudio(); // Iniciar crossfade de audio AHORA
 
                 // Limpiar caché SB del video ANTERIOR (usando ID guardado)
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
@@ -1333,8 +1324,6 @@ async function monitorPlayers() {
              effectiveDuration = sbDuration;
              durationSource = "SponsorBlock";
         }
-
-
         const timeRemaining = effectiveDuration - currentTime;
         const roundedTimeRemaining = Math.floor(timeRemaining);
 
@@ -1367,8 +1356,11 @@ async function monitorPlayers() {
 
 
 // --- SponsorBlock: Chequear y Saltar Segmento ---
-async function checkAndSkipSegment(playerInstance) {
-    if (isTransitioning) return; // No saltar durante transición
+async function checkAndSkipSegment(playerInstance, forceCheck = false) { // Añadir parámetro
+    if (isTransitioning && !forceCheck) { // <<<< MODIFICAR GUARDA
+        console.log("checkAndSkipSegment: Bloqueado por transición.");
+         return;
+    }
     if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function') return;
 
     let videoId;
@@ -1442,8 +1434,7 @@ async function checkAndSkipSegment(playerInstance) {
                 } else {
                     // console.log(`SPONSORBLOCK SKIP: Ya estábamos en un seek a ${endTime}, ignorando.`);
                 }
-                // Si estamos en el segmento pero lastSeekEndTime === endTime,
-                // significa que justo acabamos de saltar aquí, no hacer nada y dejar que siga.
+
             } else {
                  // Si el tiempo actual ya superó el punto al que habíamos saltado,
                  // reseteamos lastSeekEndTime para permitir futuros saltos a ese mismo punto si fuera necesario.
@@ -1455,8 +1446,6 @@ async function checkAndSkipSegment(playerInstance) {
         }
     }
 }
-
-
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
      const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
@@ -1602,8 +1591,6 @@ añadirUrlButton.addEventListener('click', async () => {
          mostrarMensajeFlotante(`Error al cargar playlist: ${error.message}`);
     }
 });
-
-
 // --- Funciones Auxiliares (Debounce, Formato Duración, Parseo Duración, etc.) ---
 
 // Debounce para la busqueda
@@ -1660,8 +1647,6 @@ function parseDuration(durationInput) {
 
     return 0; // Fallback
 }
-
-
 // --- Carga de Playlist desde URL (Piped API + Proxy + Retry) ---
 const pipedInstances = [ // Lista de instancias Piped
      "https://api.piped.private.coffee",
@@ -1734,8 +1719,6 @@ function extractPlaylistId(url) {
         return null;
     }
 }
-
-
 // --- Inicialización ---
 document.addEventListener('DOMContentLoaded', () => {
      // Asegurarse que la playlist manual exista al inicio (si no hay datos guardados)
