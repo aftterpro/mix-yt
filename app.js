@@ -1305,7 +1305,7 @@ function crossfadeAudio() {
     let nextVolume = 0;
     const crossfadeSteps = CROSSFADE_DURATION * 5; // 5 steps per second
     const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100; // Avoid division by zero
-    const intervalTime = crossfadeSteps > 0 ? 200 : 100; // 1000ms / 5 steps
+    const intervalTime = crossfadeSteps > 0 ? 200 : 50; // 1000ms / 5 steps
 
     const crossfadeInterval = setInterval(() => {
         currentVolume = Math.max(0, currentVolume - volumeStep);
