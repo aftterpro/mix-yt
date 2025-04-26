@@ -732,6 +732,16 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
 .invisible { /* Solo oculta visualmente, sigue ocupando espacio */
     visibility: hidden;
 }
+/* Estilo opcional para el título del Popup "Mover a" */
+.move-to-playlist-popup-title {
+    padding: 4px 8px 6px 8px; /* Padding */
+    font-size: 0.8em;      /* Tamaño pequeño */
+    font-weight: bold;
+    color: #ccc;           /* Color tenue */
+    border-bottom: 1px solid #555; /* Separador */
+    margin-bottom: 4px;      /* Espacio debajo */
+    text-align: center;
+}
 
 /* ---- ESTILOS FRANJA INFERIOR (FOOTER) ---- */
 .page-footer {
