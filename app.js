@@ -285,33 +285,234 @@ const displaySearchResultsPiped = (results, append = false) => {
         author.textContent = authorName;
         author.classList.add('video-author');
         detailsDiv.appendChild(author);
+                // --- Botón Añadir ---
         const addToPlaylistButton = document.createElement('button');
+        // Estilos base del botón (pueden estar en CSS)
         addToPlaylistButton.innerHTML = '<i class="fa-solid fa-plus"></i><span class="add-text"> Añadir</span>';
-        addToPlaylistButton.classList.add('add-to-playlist');
+        addToPlaylistButton.classList.add('add-to-playlist', 'search-result-add-button'); // Añadir clase específica
+        // Guardar datos del video en el botón
         addToPlaylistButton.dataset.videoId = videoId;
         addToPlaylistButton.dataset.videoTitle = video.title;
         addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
         const durationSeconds = typeof video.duration === 'number' ? video.duration : parseDuration(video.duration);
         addToPlaylistButton.dataset.videoDuration = durationSeconds;
-        addToPlaylistButton.addEventListener('click', () => {
+        
+        addToPlaylistButton.addEventListener('click', (event) => {
+            // Extraer datos del botón presionado
+            const button = event.currentTarget;
             const videoData = {
-                videoId: addToPlaylistButton.dataset.videoId,
-                title: addToPlaylistButton.dataset.videoTitle,
-                thumbnail: addToPlaylistButton.dataset.videoThumbnail,
-                duration: parseInt(addToPlaylistButton.dataset.videoDuration, 10),
+                videoId: button.dataset.videoId,
+                title: button.dataset.videoTitle,
+                thumbnail: button.dataset.videoThumbnail,
+                duration: parseInt(button.dataset.videoDuration, 10),
             };
-            addToPlaylist(videoData); // Llama a la función refactorizada
+            // Llamar a la nueva función manejadora
+            handleSearchResultAddClick(event, videoData);
         });
+      
         detailsDiv.appendChild(addToPlaylistButton);
         videoDiv.appendChild(detailsDiv);
         resultsDiv.appendChild(videoDiv);
-    });
+    }); // Fin del forEach de resultados
 
     if (append) {
         hideLoadMoreSpinner();
     }
     isLoadingMore = false;
 };
+function handleSearchResultAddClick(event, videoData) {
+    event.preventDefault(); // Evitar comportamiento por defecto
+    event.stopPropagation(); // Detener propagación
+
+    const addButton = event.currentTarget; // El botón que fue clickeado
+
+    // Filtrar playlists cargadas por el usuario (no la manual si está vacía)
+    const userLoadedPlaylists = playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
+
+    if (userLoadedPlaylists.length === 0) {
+        // Caso 2 (o inicio): No hay playlists cargadas (o solo manual vacía), añadir directo a manual
+        console.log("Añadiendo directo a playlist manual.");
+        addVideoToManualPlaylist(videoData);
+    } else {
+        // Caso 1 o 3: Hay playlists cargadas, mostrar menú para elegir
+        console.log("Mostrando menú para seleccionar playlist destino.");
+        showAddToPlaylistMenu(addButton, videoData);
+      }
+}
+// --- NUEVA: Función específica para añadir a "Mis Vídeos Añadidos" ---
+function addVideoToManualPlaylist(videoData) {
+    const manualPlaylistId = 'manual';
+    let manualPlaylist = playlistsData.find(p => p.id === manualPlaylistId);
+
+    // Crear playlist manual si no existe
+    if (!manualPlaylist) {
+        manualPlaylist = {
+            id: manualPlaylistId,
+            name: 'Mis Vídeos Añadidos',
+            thumbnailUrl: 'https://via.placeholder.com/50?text=+',
+            videos: [],
+            isExpanded: true
+        };
+        // Asegurar que la manual siempre quede al principio si se crea ahora
+        playlistsData.unshift(manualPlaylist);
+        console.log("Playlist 'manual' creada y añadida al inicio.");
+    }
+
+    // Verificar duplicados DENTRO de la playlist manual
+    const isDuplicate = manualPlaylist.videos.some(video => video.videoId === videoData.videoId);
+    if (isDuplicate) {
+        mostrarMensajeFlotante(`"${videoData.title}" ya está en "${manualPlaylist.name}".`);
+        return;
+    }
+
+    // Crear el objeto de video
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || "Título no disponible",
+        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
+        duration: videoData.duration || 0, // Ya debería ser número
+    };
+
+    // Añadir al final de la playlist manual
+    manualPlaylist.videos.push(videoObject);
+    mostrarMensajeFlotante(`Video añadido a "${manualPlaylist.name}": ${videoObject.title}`);
+    console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
+
+    updatePlaylistsUI(); // Actualizar la UI
+    checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
+}
+
+// --- NUEVA: Función para mostrar Menú Emergente de Playlists Destino ---
+function showAddToPlaylistMenu(buttonElement, videoData) {
+    // Cerrar cualquier otro menú emergente similar abierto
+    closeAddToPlaylistMenus();
+
+    const menu = document.createElement('div');
+    menu.className = 'add-to-playlist-menu'; // Clase para estilo
+
+    // Filtrar playlists donde añadir (todas las existentes)
+    const availablePlaylists = playlistsData; // O filtrar si es necesario
+
+    if (availablePlaylists.length === 0) {
+        // Si por alguna razón no hay listas (ni manual), añadir a manual
+        addVideoToManualPlaylist(videoData);
+        return;
+    }
+
+    availablePlaylists.forEach(playlist => {
+        const item = document.createElement('button');
+        item.className = 'add-to-playlist-menu-item';
+        item.dataset.targetPlaylistId = playlist.id;
+        // Miniatura y Título
+        item.innerHTML = `
+            <img src="${playlist.thumbnailUrl}" alt="" loading="lazy">
+            <span>${playlist.name}</span>
+        `;
+        item.title = `Añadir a "${playlist.name}"`;
+
+        item.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const targetPId = event.currentTarget.dataset.targetPlaylistId;
+            console.log(`Añadiendo ${videoData.videoId} a playlist ${targetPId}`);
+            addVideoToSpecificPlaylist(videoData, targetPId); // Llamar a la función de inserción
+            closeAddToPlaylistMenus(); // Cerrar este menú
+        });
+        menu.appendChild(item);
+    });
+
+    // Posicionar el menú cerca del botón
+    document.body.appendChild(menu); // Añadir al body para evitar problemas de overflow
+    const buttonRect = buttonElement.getBoundingClientRect();
+    // Posicionar debajo o encima del botón, centrado horizontalmente
+    menu.style.position = 'absolute';
+    menu.style.top = `${window.scrollY + buttonRect.bottom + 5}px`; // Debajo del botón
+    menu.style.left = `${window.scrollX + buttonRect.left + (buttonRect.width / 2) - (menu.offsetWidth / 2)}px`; // Centrado
+
+    // Ajustar si se sale de la pantalla (simplificado)
+    if (menu.offsetLeft < 10) menu.style.left = '10px';
+    if (menu.offsetLeft + menu.offsetWidth > window.innerWidth - 10) {
+         menu.style.left = `${window.innerWidth - menu.offsetWidth - 10}px`;
+    }
+     // Si se sale por abajo, ponerlo encima
+     if(menu.offsetTop + menu.offsetHeight > window.innerHeight - 10) {
+         menu.style.top = `${window.scrollY + buttonRect.top - menu.offsetHeight - 5}px`;
+     }
+
+
+    // Añadir listener para cerrar si se hace click fuera
+    setTimeout(() => { // Pequeño delay para evitar que se cierre por el mismo click que lo abrió
+         document.addEventListener('click', closeAddToPlaylistMenus, { once: true, capture: true });
+         // Detener propagación en el menú mismo para evitar cierre inmediato
+         menu.addEventListener('click', e => e.stopPropagation());
+    }, 0);
+
+}
+
+// --- NUEVA: Función para cerrar todos los menús emergentes de añadir ---
+function closeAddToPlaylistMenus() {
+    document.querySelectorAll('.add-to-playlist-menu').forEach(menu => menu.remove());
+    // Quitar listener global si existe (aunque 'once: true' ayuda)
+    // document.removeEventListener('click', closeAddToPlaylistMenus, { capture: true });
+}
+
+
+// --- NUEVA: Función para añadir a una Playlist ESPECÍFICA ---
+function addVideoToSpecificPlaylist(videoData, targetPlaylistId) {
+    const targetPlaylist = playlistsData.find(p => p.id === targetPlaylistId);
+    if (!targetPlaylist) {
+        console.error(`Error: Playlist destino ${targetPlaylistId} no encontrada.`);
+        mostrarMensajeFlotante("Error: No se encontró la playlist destino.");
+        return;
+    }
+
+    // Verificar duplicados en la playlist destino
+    const isDuplicate = targetPlaylist.videos.some(video => video.videoId === videoData.videoId);
+    if (isDuplicate) {
+        mostrarMensajeFlotante(`"${videoData.title}" ya está en "${targetPlaylist.name}".`);
+        return;
+    }
+
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || "Título no disponible",
+        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
+        duration: videoData.duration || 0,
+    };
+
+    // --- Lógica de Inserción: "Debajo del video que se está reproduciendo" ---
+    let targetIndex = targetPlaylist.videos.length; // Por defecto, añadir al final
+
+    if (currentPlayingInfo.playlistId === targetPlaylistId && currentPlayingInfo.flattenedIndex >= 0) {
+        // Si el video actual está en la playlist destino
+        const currentVideoLocalIndex = targetPlaylist.videos.findIndex(v => v.videoId === currentPlayingInfo.videoId);
+        if (currentVideoLocalIndex !== -1) {
+            targetIndex = currentVideoLocalIndex + 1; // Insertar justo después
+            console.log(`Insertando después del video actual (índice local ${currentVideoLocalIndex}) en ${targetPlaylistId}. Nuevo índice: ${targetIndex}`);
+        } else {
+             console.log(`Video actual (${currentPlayingInfo.videoId}) no encontrado localmente en ${targetPlaylistId}, añadiendo al final.`);
+        }
+    } else {
+        // Si no hay nada sonando, o está en otra playlist, añadir al final
+        console.log(`Video actual no está en ${targetPlaylistId} (o nada suena), añadiendo al final.`);
+         targetIndex = targetPlaylist.videos.length;
+    }
+
+    // Insertar el video en el array
+    targetPlaylist.videos.splice(targetIndex, 0, videoObject);
+    mostrarMensajeFlotante(`Video añadido a "${targetPlaylist.name}": ${videoObject.title}`);
+    console.log(`Video ${videoObject.videoId} añadido a playlist '${targetPlaylistId}' en índice ${targetIndex}.`);
+
+    updatePlaylistsUI(); // Actualizar UI
+    updateCurrentPlayingIndex(); // Recalcular índice aplanado
+    checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
+}
+// --- NUEVA: Función auxiliar para habilitar botón Play ---
+function checkAndEnablePlayButton() {
+     const flatList = getFlattenedPlaylist();
+     if (flatList.length > 0 && playersInitialized) {
+         botonPlay.disabled = false;
+     }
+}
 
 // Función auxiliar para formatear duración (Segundos -> MM:SS)
 function formatDuration2(durationInSeconds) {
@@ -427,12 +628,18 @@ function updateCurrentPlayingIndex() {
 }
 
 // --- Manejar carga de Playlist desde URL ---
-async function handlePlaylistLoaded(playlistInfo) {
+async function handlePlaylistLoaded(playlistInfo) { // Marcar como async si usa await interno
     console.log('Datos de playlist recibidos:', playlistInfo);
+
+    // --- VALIDACIÓN INICIAL ---
     if (!playlistInfo || !playlistInfo.relatedStreams || !Array.isArray(playlistInfo.relatedStreams)) {
-        mostrarMensajeFlotante('No se encontraron videos válidos en la playlist.');
+        // Intenta obtener ID incluso si falla para mensaje de error
+        const failedPlaylistId = playlistInfo?.id || playlistInfo?.url?.split('list=')[1] || 'desconocida';
+        mostrarMensajeFlotante(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`);
+        console.error("Respuesta inválida de getPlaylistInfo:", playlistInfo);
         return;
     }
+
     const playlistId = playlistInfo.id || playlistInfo.url?.split('list=')[1] || `playlist_${Date.now()}`;
 
     if (playlistsData.some(p => p.id === playlistId)) {
@@ -440,78 +647,42 @@ async function handlePlaylistLoaded(playlistInfo) {
         return;
     }
 
-    const loadedVideos = playlistInfo.relatedStreams.map((video) => ({
+    const loadedVideos = playlistInfo.relatedStreams.map(video => ({
         videoId: video.url?.split('v=')[1],
         title: video.title || "Título Desconocido",
         thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
         duration: parseDuration(video.duration) || 0,
-    })).filter(v => v.videoId);
+    })).filter(v => v.videoId); // Filtrar videos sin ID válido
 
     if (loadedVideos.length === 0) {
-        mostrarMensajeFlotante(`La playlist "${playlistInfo.name}" no contiene videos válidos.`);
+        mostrarMensajeFlotante(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`);
         return;
     }
 
     const newPlaylist = {
         id: playlistId,
         name: playlistInfo.name || "Playlist Sin Nombre",
-        thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || 'https://via.placeholder.com/50?text=?', // Fallback
+        thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || 'https://via.placeholder.com/50?text=?',
         videos: loadedVideos,
         isExpanded: true
     };
 
-    playlistsData.push(newPlaylist);
-    console.log(`Playlist '${newPlaylist.name}' añadida a playlistsData.`);
-    updatePlaylistsUI();
-
-    if (getFlattenedPlaylist().length > 0 && botonPlay.disabled) {
-        botonPlay.disabled = false;
+    // --- LÓGICA DE ORDENAMIENTO (CASO 2) ---
+    const manualPlaylistIndex = playlistsData.findIndex(p => p.id === 'manual');
+    if (manualPlaylistIndex !== -1) {
+        // Si existe la playlist 'manual', insertar la nueva DESPUÉS de ella
+        playlistsData.splice(manualPlaylistIndex + 1, 0, newPlaylist);
+        console.log(`Playlist '${newPlaylist.name}' insertada después de 'manual'.`);
+    } else {
+        // Si no existe 'manual', añadir al final (o al principio si se prefiere)
+        playlistsData.push(newPlaylist);
+        console.log(`Playlist '${newPlaylist.name}' añadida al final.`);
     }
+    // --- FIN LÓGICA ORDENAMIENTO ---
     mostrarMensajeFlotante(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos).`);
-}
-
-// --- Añadir video Manualmente ---
-const addToPlaylist = (videoData) => {
-    if (!videoData || !videoData.videoId) {
-        console.error("Error: Datos de video inválidos:", videoData);
-        mostrarMensajeFlotante("Error al añadir el video. Datos inválidos.");
-        return;
-    }
-    const manualPlaylistId = 'manual';
-    let manualPlaylist = playlistsData.find(p => p.id === manualPlaylistId);
-    if (!manualPlaylist) {
-        manualPlaylist = {
-            id: manualPlaylistId,
-            name: 'Mis Vídeos Añadidos',
-            thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico',
-            videos: [],
-            isExpanded: true
-        };
-        playlistsData.push(manualPlaylist);
-        console.log("Playlist 'manual' creada.");
-    }
-
-    const isDuplicate = manualPlaylist.videos.some(video => video.videoId === videoData.videoId);
-    if (isDuplicate) {
-        mostrarMensajeFlotante(`"${videoData.title}" ya está en "${manualPlaylist.name}".`);
-        return;
-    }
-
-    const videoObject = {
-        videoId: videoData.videoId,
-        title: videoData.title || "Título no disponible",
-        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-        duration: parseDuration(videoData.duration) || 0,
-    };
-
-    manualPlaylist.videos.push(videoObject);
-    mostrarMensajeFlotante(`Video añadido a "${manualPlaylist.name}": ${videoObject.title}`);
-    console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
     updatePlaylistsUI();
-    if (getFlattenedPlaylist().length > 0 && botonPlay.disabled) {
-        botonPlay.disabled = false;
-    }
-};
+    checkAndEnablePlayButton();
+}
 
 // --- Renderizar/Actualizar UI de Playlists con Pestañas ---
 function updatePlaylistsUI() {
