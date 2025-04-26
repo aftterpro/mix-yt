@@ -787,22 +787,35 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
 
     // Listener para botón "Mover a playlist" (para mostrar submenú)
     moveToPlaylistButton.addEventListener('click', (event) => {
-        event.stopPropagation(); // Evitar que se cierre el menú principal
-        // Ocultar otros submenús
-        document.querySelectorAll('.move-to-playlist-submenu').forEach(sm => {
-             if(sm !== submenu) sm.style.display = 'none';
-        });
+        event.stopPropagation(); // <--- IMPORTANTE: Detener la propagación del evento
 
-        if (submenu.style.display === 'block') {
-             submenu.style.display = 'none'; // Ocultar si ya está visible
+        // Referencia al submenú específico de este botón
+        const currentSubmenu = moveToPlaylistContainer.querySelector('.move-to-playlist-submenu');
+        if (!currentSubmenu) return; // Salir si no se encuentra
+
+        // Ocultar TODOS los OTROS submenús antes de decidir qué hacer con este
+        document.querySelectorAll('.move-to-playlist-submenu').forEach(sm => {
+             if(sm !== currentSubmenu) {
+                  sm.style.display = 'none';
+             }
+        });
+         // También cerrar el menú principal padre si el submenú se va a mostrar/ocultar
+         // const parentMenuContent = moveToPlaylistButton.closest('.delete-menu-content');
+
+        const isCurrentlyVisible = currentSubmenu.style.display === 'block';
+
+        if (isCurrentlyVisible) {
+             currentSubmenu.style.display = 'none'; // Ocultar si ya está visible
              return;
         }
 
-        // Poblar el submenú dinámicamente
-        submenu.innerHTML = ''; // Limpiar opciones previas
+        // --- Poblar el submenú dinámicamente ---
+        currentSubmenu.innerHTML = ''; // Limpiar opciones previas
         const sourcePlaylistId = playlistId;
         const sourceVideoId = video.videoId;
         let otherPlaylistsExist = false;
+
+        console.log("Poblando submenú para mover desde:", sourcePlaylistId); // Log
 
         playlistsData.forEach(p => {
             if (p.id !== sourcePlaylistId) { // Mostrar solo OTRAS playlists
@@ -813,46 +826,41 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
                 targetButton.textContent = p.name;
                 targetButton.title = `Mover a "${p.name}"`;
 
-                // Listener para mover el video al hacer clic en el nombre de la playlist destino
                 targetButton.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
+                    ev.stopPropagation(); // Detener propagación también aquí
                     const targetPId = ev.target.dataset.targetPlaylistId;
                     console.log(`Mover ${sourceVideoId} de ${sourcePlaylistId} a ${targetPId}`);
+                    const targetInsertionIndex = 0; // Mover al inicio por simplicidad
 
-                    // --- Decidir Índice Destino ---
-                    // Opción 1: Siempre al principio
-                    const targetInsertionIndex = 0;
+                    moveVideo(sourceVideoId, sourcePlaylistId, targetPId, targetInsertionIndex);
 
-                    // Opción 2: Debajo del video actual SI está en la playlist destino
-                    // let targetInsertionIndex = 0;
-                    // if (currentPlayingInfo.playlistId === targetPId && currentPlayingInfo.flattenedIndex >= 0) {
-                    //      // Encontrar índice local del video actual en la playlist destino
-                    //      const targetPlaylist = playlistsData.find(pl => pl.id === targetPId);
-                    //      const currentVideoLocalIndex = targetPlaylist?.videos.findIndex(v => v.videoId === currentPlayingInfo.videoId);
-                    //      if (currentVideoLocalIndex !== -1 && currentVideoLocalIndex !== undefined) {
-                    //          targetInsertionIndex = currentVideoLocalIndex + 1;
-                    //      }
-                    // }
-                    // --- Fin Decidir Índice ---
-
-                    moveVideo(sourceVideoId, sourcePlaylistId, targetPId, targetInsertionIndex); // Mover al inicio por ahora
-                    menuContent.style.display = 'none'; // Cerrar menú principal
-                    submenu.style.display = 'none'; // Cerrar submenú
+                    // Cerrar TODO el menú contextual después de la acción
+                    const parentMenuContent = moveToPlaylistButton.closest('.delete-menu-content');
+                    if(parentMenuContent) parentMenuContent.style.display = 'none';
+                    currentSubmenu.style.display = 'none'; // Asegurarse que el submenú se cierre
                 });
-                submenu.appendChild(targetButton);
+                currentSubmenu.appendChild(targetButton);
             }
         });
 
         if (!otherPlaylistsExist) {
-            const noOptionsMsg = document.createElement('span');
-            noOptionsMsg.textContent = 'No hay otras playlists.';
-            noOptionsMsg.style.padding = '5px';
-            noOptionsMsg.style.color = '#888';
-            noOptionsMsg.style.fontSize = '0.9em';
-            submenu.appendChild(noOptionsMsg);
+             // Mostrar mensaje si no hay otras listas
+             const noOptionsMsg = document.createElement('span');
+             noOptionsMsg.textContent = 'No hay otras playlists.';
+             noOptionsMsg.style.padding = '5px 8px'; // Darle padding similar a botones
+             noOptionsMsg.style.display = 'block'; // Asegurar que ocupe espacio
+             noOptionsMsg.style.color = '#888';
+             noOptionsMsg.style.fontSize = '0.9em';
+             currentSubmenu.appendChild(noOptionsMsg);
         }
 
-        submenu.style.display = 'block'; // Mostrar submenú
+        // --- Mostrar el submenú ---
+        currentSubmenu.style.display = 'block';
+        console.log("Submenú desplegado para:", sourcePlaylistId); // Log
+
+        // NO CERRAR EL MENÚ PRINCIPAL AQUÍ, solo mostrar el submenú
+        // if(parentMenuContent) parentMenuContent.style.display = 'block'; // Asegurarse que el padre esté visible
+
     });
 
     // Devolver el elemento item completo
@@ -1221,7 +1229,6 @@ async function playNextVideo() { // Marcada como async por si se añaden awaits 
 
     let nextIndex = currentPlayingInfo.flattenedIndex + 1;
 
-    // Verificar si llegamos al final
     if (nextIndex >= flatList.length) {
         console.log('playNextVideo: Fin de la lista aplanada detectado.');
         askToRepeatPlaylist();
@@ -1229,23 +1236,21 @@ async function playNextVideo() { // Marcada como async por si se añaden awaits 
     }
 
     isTransitioning = true; // Marcar inicio de transición
-    const previousFlatIndex = currentPlayingInfo.flattenedIndex; // Guardar índice anterior
-    const previousVideoIdForCleanup = currentPlayingInfo.videoId; // Guardar ID anterior para limpieza SB
+    const previousFlatIndex = currentPlayingInfo.flattenedIndex;
+    const previousVideoIdForCleanup = currentPlayingInfo.videoId;
     console.log(`playNextVideo: *** Transición INICIADA desde índice aplanado ${previousFlatIndex}. Flag=true. ***`);
 
     try {
-        // --- Actualizar estado ANTES de iniciar cargas ---
         const nextVideo = flatList[nextIndex];
         if (!nextVideo || !nextVideo.videoId) {
-             console.error("playNextVideo: Siguiente video inválido en lista aplanada.", nextVideo);
-             throw new Error("Siguiente video inválido."); // Lanzar error para revertir en catch
+             throw new Error("Siguiente video inválido.");
         }
-        // Actualizar la información global AHORA
+        // --- Actualizar estado LÓGICO ahora ---
         currentPlayingInfo.flattenedIndex = nextIndex;
         currentPlayingInfo.videoId = nextVideo.videoId;
         currentPlayingInfo.playlistId = nextVideo.sourcePlaylistId;
         const nextVideoId = nextVideo.videoId;
-        // --- Fin actualización estado ---
+        // --- Fin actualización ---
 
         console.log(`playNextVideo: Cargando SIGUIENTE video (${nextVideoId}), índice aplanado=${nextIndex}.`);
 
@@ -1254,30 +1259,30 @@ async function playNextVideo() { // Marcada como async por si se añaden awaits 
         const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
 
         if (nextPlayerInstance && typeof nextPlayerInstance.loadVideoById === 'function') {
-           
-            crossfadeAudio();  // --- INICIAR CROSSFADE DE AUDIO ANTES DE CARGAR ---
-            nextPlayerInstance.loadVideoById(nextVideoId); // Cargar el video
-            if (nextPlayerElement) nextPlayerElement.classList.remove('hidden'); // Asegurar visibilidad del contenedor
+            // --- CARGAR VIDEO PRIMERO ---
+            nextPlayerInstance.loadVideoById(nextVideoId);
+            if (nextPlayerElement) nextPlayerElement.classList.remove('hidden');
         } else {
-            console.error("playNextVideo: Error crítico - nextPlayerInstance inválido.");
-             throw new Error("Reproductor destino inválido.");
+            throw new Error("Reproductor destino inválido.");
         }
 
-        // Actualizar UI para mostrar el nuevo item como 'playing' (incluso antes de sonar)
-        // Se actualizará de nuevo en updateCurrentPlayingIndex cuando realmente suene
-        updatePlaylistsUI();
+        updatePlaylistsUI(); // Actualizar UI para resaltar (aunque aún no suene)
 
-        // Iniciar transición visual
+        // Iniciar transición VISUAL
         if (currentPlayerElement) currentPlayerElement.classList.add('fade-out');
         if (nextPlayerElement) nextPlayerElement.classList.add('fade-in');
 
-        // Timeout para completar la transición VISUAL y lógica
+        // Timeout para completar la transición VISUAL, LÓGICA y de AUDIO
         setTimeout(() => {
             console.log(`playNextVideo: TIMEOUT INICIADO para transición desde índice aplanado ${previousFlatIndex}.`);
             try {
                 // Limpieza visual del player anterior
                 if (currentPlayerElement) {
                     currentPlayerElement.classList.remove('fade-out');
+                    // --- Asegurar que se detenga antes de ocultar ---
+                    try {
+                         if (currentPlayer === 1) player1?.stopVideo(); else player2?.stopVideo();
+                    } catch(e) { console.warn("Error deteniendo video anterior:", e); }
                     currentPlayerElement.classList.add('hidden');
                 }
                 // Limpieza visual del player nuevo
@@ -1285,14 +1290,12 @@ async function playNextVideo() { // Marcada como async por si se añaden awaits 
                     nextPlayerElement.classList.remove('fade-in');
                 }
 
-                // Cambiar player activo LÓGICO
+                // --- Cambiar player activo LÓGICO ---
                 const oldPlayerNum = currentPlayer;
                 currentPlayer = currentPlayer === 1 ? 2 : 1;
                 console.log(`playNextVideo: Timeout - currentPlayer cambiado a ${currentPlayer}.`);
-
-                // --- crossfadeAudio() YA SE LLAMÓ ---
-
-                // Limpiar caché SB del video ANTERIOR (usando ID guardado)
+                crossfadeAudio(); // Iniciar fade de audio AHORA que el cambio lógico se hizo
+                // Limpiar caché SB del video ANTERIOR
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
                     console.log(`playNextVideo: Timeout - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
                     delete segmentosCache[previousVideoIdForCleanup];
@@ -1307,17 +1310,16 @@ async function playNextVideo() { // Marcada como async por si se añaden awaits 
             } finally {
                 isTransitioning = false; // Marcar transición como finalizada
                 console.log(`playNextVideo: *** Transición FINALIZADA (Timeout para índice ${previousFlatIndex}). Flag=false. ***`);
-                 // Forzar re-sincronización del índice cuando el nuevo video empiece a sonar (vía onPlayerStateChange)
-                 // updateCurrentPlayingIndex(); // No llamar aquí, esperar al PLAYING state
+                 // La sincronización del índice se hará en onPlayerStateChange cuando el nuevo video entre en estado PLAYING
             }
-        }, 2000); // Duración del timeout (ajustar con CSS si es necesario)
+        }, 2000); // Duración del timeout
 
     } catch (error) {
         console.error("Error en playNextVideo:", error);
         isTransitioning = false; // Asegurar reset del flag
         // Revertir estado al anterior en caso de error
         const previousVideo = flatList[previousFlatIndex];
-         currentPlayingInfo.flattenedIndex = previousFlatIndex; // Revertir índice
+         currentPlayingInfo.flattenedIndex = previousFlatIndex >= 0 ? previousFlatIndex : -1; // Revertir índice
          currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
          currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
         console.log(`playNextVideo: *** Transición INTERRUMPIDA (Error). Flag=false. Estado revertido a índice ${previousFlatIndex} ***`);
