@@ -785,224 +785,233 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
     const deleteMenu = document.createElement('div');
     deleteMenu.className = 'delete-menu';
     const menuButton = document.createElement('button');
-    menuButton.className = 'delete-menu-button';
+    menuButton.className = 'delete-menu-button'; // El botón de 3 puntos
     menuButton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     const menuContent = document.createElement('div');
-    menuContent.className = 'delete-menu-content'; // Contenedor principal del menú
+    menuContent.className = 'delete-menu-content'; // Contenedor principal del menú (el que aparece/desaparece)
 
- // --- Botones del Menú ---
-    // 1. Eliminar
+    // --- Botones del Menú ---
+    // 1. Eliminar (sin cambios)
     const deleteButton = document.createElement('button');
     deleteButton.className = 'delete-button-item';
     deleteButton.title = 'Eliminar de esta playlist';
     deleteButton.innerHTML = '<i class="fa-solid fa-xmark"></i> Eliminar';
     menuContent.appendChild(deleteButton);
 
-    // 2. Reproducir Despues (antes "Poner Primero")
+    // 2. Reproducir Despues (sin cambios en estructura)
     const playNextButton = document.createElement('button');
-    playNextButton.className = 'play-next-button'; // Nueva clase
+    playNextButton.className = 'play-next-button';
     playNextButton.title = 'Poner después del video actual';
-    // Usamos icono que sugiere "siguiente en la cola"
     playNextButton.innerHTML = '<i class="fa-solid fa-arrow-right-to-line"></i> Reproducir Despues';
     menuContent.appendChild(playNextButton);
 
-    // 3. Mover a otra playlist (con submenú)
-    const moveToPlaylistContainer = document.createElement('div'); // Contenedor para botón y submenú
-    moveToPlaylistContainer.className = 'move-to-playlist-container'; // Clase para posible estilo
-
+    // 3. Mover a otra playlist (MODIFICADO: Sin submenú inline)
     const moveToPlaylistButton = document.createElement('button');
-    moveToPlaylistButton.className = 'move-to-playlist-button';
+    moveToPlaylistButton.className = 'move-to-playlist-button'; // Botón principal
     moveToPlaylistButton.title = 'Mover este video a otra playlist';
     moveToPlaylistButton.innerHTML = '<i class="fa-solid fa-folder-tree"></i> Mover a playlist';
-    moveToPlaylistContainer.appendChild(moveToPlaylistButton);
+    // --- NO AÑADIR EL SUBMENÚ AQUÍ DENTRO ---
+    // const submenu = document.createElement('div'); ... (Eliminar esta parte)
+    menuContent.appendChild(moveToPlaylistButton); // Añadir solo el botón al menú principal
 
-    const submenu = document.createElement('div');
-    submenu.className = 'move-to-playlist-submenu'; // Submenú inicialmente oculto
-    submenu.style.display = 'none';
-    submenu.style.paddingLeft = '15px'; // Indentar submenú
-    moveToPlaylistContainer.appendChild(submenu); // Añadir submenú al contenedor
-
-    menuContent.appendChild(moveToPlaylistContainer); // Añadir contenedor al menú principal
     // --- Añadir menú al item ---
     deleteMenu.appendChild(menuButton);
     deleteMenu.appendChild(menuContent);
     item.appendChild(deleteMenu);
 
-    // Listeners del Menú
- menuButton.addEventListener('click', (event) => {
+    // --- Listeners del Menú Principal (3 puntos) ---
+    menuButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        // Cerrar otros menús antes de abrir/cerrar este
-        document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(mc => {
-             if (mc !== menuContent) mc.style.display = 'none';
-        });
-         // Cerrar submenús abiertos
-         document.querySelectorAll('.move-to-playlist-submenu').forEach(sm => sm.style.display = 'none');
-
-        // Alternar visibilidad de este menú
-        menuContent.style.display = menuContent.style.display === 'block' ? 'none' : 'block';
+        const wasOpen = menuContent.style.display === 'block';
+        // Cerrar TODOS los menús contextuales y popups antes de abrir este
+        closeAllContextMenus();
+        closeMoveToPlaylistPopups(); // Cerrar popups de mover
+        // Abrir/cerrar este menú
+        if (!wasOpen) {
+            menuContent.style.display = 'block';
+             // Posicionar menú si se sale (opcional, puede hacerse con CSS)
+            // const rect = menuContent.getBoundingClientRect();
+            // if (rect.bottom > window.innerHeight) { menuContent.style.bottom = '100%'; menuContent.style.top = 'auto';}
+            // if (rect.right > window.innerWidth) { menuContent.style.right = '100%'; menuContent.style.left = 'auto';}
+        }
     });
 
-    // Listener para Eliminar
+    // --- Listener para Eliminar (sin cambios) ---
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation();
-        deleteVideo(playlistId, video.videoId); // Llama a la función existente
-        menuContent.style.display = 'none'; // Cerrar menú
+        deleteVideo(playlistId, video.videoId);
+        closeAllContextMenus(); // Cerrar menú después de acción
     });
 
-    // Listener para "Reproducir Despues"
+    // --- Listener para "Reproducir Despues" (sin cambios en lógica interna) ---
     playNextButton.addEventListener('click', (event) => {
         event.stopPropagation();
         console.log("Click en 'Reproducir Despues'");
-        menuContent.style.display = 'none'; // Cerrar menú
+        closeAllContextMenus(); // Cerrar menú
 
         const sourceVideoId = video.videoId;
         const sourcePlaylistId = playlistId;
+        // ... (resto de la lógica para calcular targetFlatIndex, targetPlaylistId, targetLocalIndex) ...
+         let targetFlatIndex = currentPlayingInfo.flattenedIndex + 1;
+         if (currentPlayingInfo.flattenedIndex < 0) {
+              const sourceIndexInOwn = playlistsData.find(p=>p.id === sourcePlaylistId)?.videos.findIndex(v=>v.videoId === sourceVideoId);
+              if(sourceIndexInOwn === 0) targetFlatIndex = 1; else targetFlatIndex = 0;
+              console.log(`Nada sonando, moviendo ${sourceVideoId} a índice aplanado ${targetFlatIndex}`);
+         }
+         const flatList = getFlattenedPlaylist();
+         targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length));
 
-        // Obtener índice aplanado actual + 1
-        let targetFlatIndex = currentPlayingInfo.flattenedIndex + 1;
-        console.log(`Índice aplanado actual: ${currentPlayingInfo.flattenedIndex}, Índice objetivo: ${targetFlatIndex}`);
-
-        // Si no hay nada sonando o estamos al principio, target es 1 (segundo lugar)
-        if (currentPlayingInfo.flattenedIndex < 0) {
-             targetFlatIndex = 1; // Mover al segundo lugar si nada suena
-             console.log("Nada sonando, ajustando targetFlatIndex a 1");
-             // Si el video YA es el primero, no hacemos nada (o lo movemos a 1 si hay más)
-             if (sourcePlaylistId === playlistsData[0]?.id && sourcePlaylist.videos[0]?.videoId === sourceVideoId && getFlattenedPlaylist().length > 1) {
-                targetFlatIndex = 1;
-             } else if (sourcePlaylistId === playlistsData[0]?.id && sourcePlaylist.videos[0]?.videoId === sourceVideoId) {
-                 console.log("Ya es el primer video, no se mueve.");
-                 return; // Ya es el primero, no hacer nada
-             } else {
-                  // Si no es el primero, moverlo al principio
-                  targetFlatIndex = 0;
-                  console.log("Nada sonando, moviendo al principio (índice 0)");
-             }
-        }
-
-        const flatList = getFlattenedPlaylist();
-
-        // Asegurar que el índice no se salga de los límites
-         targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length)); // Clamp index
-
-        // Encontrar a qué playlist e índice local corresponde el targetFlatIndex
          let cumulativeIndex = 0;
          let targetLocalIndex = -1;
          let targetPlaylistId = null;
-
          for (const p of playlistsData) {
             const playlistVideoCount = p.videos.length;
-            if (targetFlatIndex < cumulativeIndex + playlistVideoCount) {
-                // El índice destino cae dentro de esta playlist 'p'
+            const endOfPlaylistIndex = cumulativeIndex + playlistVideoCount;
+            // Si el índice cae aquí O si es el índice justo después de la última playlist
+            if (targetFlatIndex < endOfPlaylistIndex || (targetFlatIndex === endOfPlaylistIndex && p === playlistsData[playlistsData.length -1]) ) {
                 targetPlaylistId = p.id;
-                targetLocalIndex = targetFlatIndex - cumulativeIndex; // Índice dentro de p.videos
+                targetLocalIndex = targetFlatIndex - cumulativeIndex;
+                 // Asegurarse que el índice local no exceda el tamaño + 1 (para añadir al final)
+                 targetLocalIndex = Math.min(targetLocalIndex, p.videos.length);
                 break;
             }
             cumulativeIndex += playlistVideoCount;
          }
 
-         // Si no se encontró (ej. targetFlatIndex == flatList.length),
-         // el destino es el final de la última playlist
-         if (targetPlaylistId === null && playlistsData.length > 0) {
-             const lastPlaylist = playlistsData[playlistsData.length - 1];
-             targetPlaylistId = lastPlaylist.id;
-             targetLocalIndex = lastPlaylist.videos.length; // Añadir al final
-             console.log(`Target es el final de la última playlist: ${targetPlaylistId}`);
-         }
-
-
-        if (targetPlaylistId !== null && targetLocalIndex !== -1) {
+         if (targetPlaylistId !== null && targetLocalIndex !== -1) {
              console.log(`Moviendo ${sourceVideoId} (de ${sourcePlaylistId}) a Playlist ${targetPlaylistId} en índice local ${targetLocalIndex}`);
-             // Llamar a la función de mover video
               moveVideo(sourceVideoId, sourcePlaylistId, targetPlaylistId, targetLocalIndex);
          } else {
               console.error("No se pudo determinar la playlist/índice destino para 'Reproducir Despues'.");
                mostrarMensajeFlotante("Error al calcular la posición para 'Reproducir Despues'.");
          }
-
-
     });
 
-    // Listener para botón "Mover a playlist" (para mostrar submenú)
+    // --- Listener para botón "Mover a playlist" (MODIFICADO) ---
     moveToPlaylistButton.addEventListener('click', (event) => {
-        event.stopPropagation(); // <--- IMPORTANTE: Detener la propagación del evento
+        event.stopPropagation(); // Detener la propagación del evento de click
+        console.log("Click en 'Mover a playlist'");
 
-        // Referencia al submenú específico de este botón
-        const currentSubmenu = moveToPlaylistContainer.querySelector('.move-to-playlist-submenu');
-        if (!currentSubmenu) return; // Salir si no se encuentra
+        // Cerrar el menú principal donde está este botón
+        // menuContent.style.display = 'none'; // Opcional: cerrarlo inmediatamente
 
-        // Ocultar TODOS los OTROS submenús antes de decidir qué hacer con este
-        document.querySelectorAll('.move-to-playlist-submenu').forEach(sm => {
-             if(sm !== currentSubmenu) {
-                  sm.style.display = 'none';
-             }
-        });
-         // También cerrar el menú principal padre si el submenú se va a mostrar/ocultar
-         // const parentMenuContent = moveToPlaylistButton.closest('.delete-menu-content');
-
-        const isCurrentlyVisible = currentSubmenu.style.display === 'block';
-
-        if (isCurrentlyVisible) {
-             currentSubmenu.style.display = 'none'; // Ocultar si ya está visible
-             return;
-        }
-
-        // --- Poblar el submenú dinámicamente ---
-        currentSubmenu.innerHTML = ''; // Limpiar opciones previas
-        const sourcePlaylistId = playlistId;
-        const sourceVideoId = video.videoId;
-        let otherPlaylistsExist = false;
-
-        console.log("Poblando submenú para mover desde:", sourcePlaylistId); // Log
-
-        playlistsData.forEach(p => {
-            if (p.id !== sourcePlaylistId) { // Mostrar solo OTRAS playlists
-                otherPlaylistsExist = true;
-                const targetButton = document.createElement('button');
-                targetButton.className = 'submenu-playlist-target';
-                targetButton.dataset.targetPlaylistId = p.id;
-                targetButton.textContent = p.name;
-                targetButton.title = `Mover a "${p.name}"`;
-
-                targetButton.addEventListener('click', (ev) => {
-                    ev.stopPropagation(); // Detener propagación también aquí
-                    const targetPId = ev.target.dataset.targetPlaylistId;
-                    console.log(`Mover ${sourceVideoId} de ${sourcePlaylistId} a ${targetPId}`);
-                    const targetInsertionIndex = 0; // Mover al inicio por simplicidad
-
-                    moveVideo(sourceVideoId, sourcePlaylistId, targetPId, targetInsertionIndex);
-
-                    // Cerrar TODO el menú contextual después de la acción
-                    const parentMenuContent = moveToPlaylistButton.closest('.delete-menu-content');
-                    if(parentMenuContent) parentMenuContent.style.display = 'none';
-                    currentSubmenu.style.display = 'none'; // Asegurarse que el submenú se cierre
-                });
-                currentSubmenu.appendChild(targetButton);
-            }
-        });
-
-        if (!otherPlaylistsExist) {
-             // Mostrar mensaje si no hay otras listas
-             const noOptionsMsg = document.createElement('span');
-             noOptionsMsg.textContent = 'No hay otras playlists.';
-             noOptionsMsg.style.padding = '5px 8px'; // Darle padding similar a botones
-             noOptionsMsg.style.display = 'block'; // Asegurar que ocupe espacio
-             noOptionsMsg.style.color = '#888';
-             noOptionsMsg.style.fontSize = '0.9em';
-             currentSubmenu.appendChild(noOptionsMsg);
-        }
-
-        // --- Mostrar el submenú ---
-        currentSubmenu.style.display = 'block';
-        console.log("Submenú desplegado para:", sourcePlaylistId); // Log
-
-        // NO CERRAR EL MENÚ PRINCIPAL AQUÍ, solo mostrar el submenú
-        // if(parentMenuContent) parentMenuContent.style.display = 'block'; // Asegurarse que el padre esté visible
-
+        // Llamar a la nueva función que muestra el menú flotante
+        showMoveToPlaylistPopup(menuButton, // Posicionar relativo al botón de 3 puntos
+                                 video.videoId,
+                                 playlistId);
     });
 
     // Devolver el elemento item completo
-    return item;  
+    return item;
+// Fin de createPlaylistItemElement
 }
+// --- NUEVA: Función para mostrar Popup "Mover a Playlist" ---
+function showMoveToPlaylistPopup(anchorElement, sourceVideoId, sourcePlaylistId) {
+    // Cerrar cualquier otro popup de este tipo abierto
+    closeMoveToPlaylistPopups();
+    // Cerrar menús contextuales principales también
+    closeAllContextMenus();
+
+    const menu = document.createElement('div');
+    // Usar clase similar al popup de añadir para reutilizar estilos
+    menu.className = 'move-to-playlist-popup-menu add-to-playlist-menu'; // Reutilizar clase
+
+    // Filtrar playlists destino (todas menos la actual)
+    const targetPlaylists = playlistsData.filter(p => p.id !== sourcePlaylistId);
+
+    if (targetPlaylists.length === 0) {
+        mostrarMensajeFlotante("No hay otras playlists a las que mover.");
+        return; // No mostrar menú si no hay destino
+    }
+
+    // Crear título para el popup (opcional)
+    const title = document.createElement('div');
+    title.textContent = "Mover video a:";
+    title.className = 'move-to-playlist-popup-title'; // Clase para estilo
+    menu.appendChild(title);
+
+
+    targetPlaylists.forEach(playlist => {
+        const item = document.createElement('button');
+        // Usar clase similar al popup de añadir para reutilizar estilos
+        item.className = 'move-to-playlist-popup-item add-to-playlist-menu-item'; // Reutilizar clase
+        item.dataset.targetPlaylistId = playlist.id;
+        item.innerHTML = `
+            <img src="${playlist.thumbnailUrl}" alt="" loading="lazy">
+            <span>${playlist.name}</span>
+        `;
+        item.title = `Mover a "${playlist.name}"`;
+
+        item.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const targetPId = event.currentTarget.dataset.targetPlaylistId;
+            console.log(`Mover ${sourceVideoId} de ${sourcePlaylistId} a ${targetPId}`);
+            const targetInsertionIndex = 0; // Mover al inicio de la lista destino
+
+            moveVideo(sourceVideoId, sourcePlaylistId, targetPId, targetInsertionIndex);
+            closeMoveToPlaylistPopups(); // Cerrar este popup
+        });
+        menu.appendChild(item);
+    });
+
+    // Posicionar el menú cerca del botón de 3 puntos (anchorElement)
+    document.body.appendChild(menu);
+    const anchorRect = anchorElement.getBoundingClientRect();
+
+    // Calcular posición inicial (ej. debajo y alineado a la izquierda del botón de 3 puntos)
+    let top = window.scrollY + anchorRect.bottom + 2;
+    let left = window.scrollX + anchorRect.left;
+
+    menu.style.position = 'absolute';
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.minWidth = `${anchorRect.width + 50}px`; // Ancho mínimo basado en botón
+
+    // --- Ajustar Posición para que quepa en pantalla ---
+    // Retrasar ligeramente el chequeo para asegurar que el menú tenga dimensiones
+    requestAnimationFrame(() => {
+        const menuRect = menu.getBoundingClientRect();
+
+        // Ajustar horizontalmente si se sale
+        if (menuRect.right > window.innerWidth - 10) {
+            left = window.scrollX + anchorRect.right - menuRect.width; // Alinear a la derecha
+            menu.style.left = `${left}px`;
+        }
+        if (menuRect.left < 10) { // Asegurar que no se salga por la izquierda
+            menu.style.left = '10px';
+        }
+
+        // Ajustar verticalmente si se sale por abajo
+        if (menuRect.bottom > window.innerHeight - 10) {
+            top = window.scrollY + anchorRect.top - menuRect.height - 2; // Poner encima
+             menu.style.top = `${top}px`;
+        }
+         if (menuRect.top < 10) { // Asegurar que no se salga por arriba
+            menu.style.top = '10px';
+        }
+    });
+
+
+    // Añadir listener para cerrar si se hace click fuera
+    setTimeout(() => { // Delay para evitar autocierre
+         document.addEventListener('click', closeMoveToPlaylistPopups, { once: true, capture: true });
+         // Detener propagación en el menú mismo
+         menu.addEventListener('click', e => e.stopPropagation());
+    }, 10); // Aumentar delay si es necesario
+}
+
+// --- NUEVA: Función para cerrar TODOS los popups de "Mover a" ---
+function closeMoveToPlaylistPopups() {
+    document.querySelectorAll('.move-to-playlist-popup-menu').forEach(menu => menu.remove());
+}
+
+// --- NUEVA: Función para cerrar TODOS los menús contextuales (3 puntos) ---
+function closeAllContextMenus() {
+     document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(menu => {
+          menu.style.display = 'none';
+     });
+}
+
 // --- NUEVA: Mover video DENTRO de una playlist ---
 function moveVideoWithinPlaylist(playlistId, videoId, targetIndex) {
      const playlist = playlistsData.find(p => p.id === playlistId);
@@ -1296,8 +1305,7 @@ function enableDragAndDrop() {
         });
     });
 }
-
-// --- NUEVA Función Unificada para Mover Videos (dentro y entre playlists) ---
+// --- Función Unificada para Mover Videos (dentro y entre playlists) ---
 function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
     if (!videoId || !sourcePlaylistId || !targetPlaylistId) {
         console.error("moveVideo: Argumentos inválidos.");
@@ -2089,11 +2097,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cerrar menús contextuales si se hace click fuera
 document.addEventListener('click', (event) => {
-    // Comprobar si el click fue FUERA de cualquier botón que abre un menú
-    if (!event.target.closest('.delete-menu-button')) {
-        const openMenus = document.querySelectorAll('#playlistContainer .delete-menu-content');
-        openMenus.forEach(menu => menu.style.display = 'none');
+    // Cerrar menús contextuales si el click es fuera de ellos
+    if (!event.target.closest('.delete-menu')) {
+        closeAllContextMenus();
     }
+    // Cerrar popups de mover si el click es fuera de ellos
+     if (!event.target.closest('.move-to-playlist-popup-menu')) {
+        closeMoveToPlaylistPopups();
+    }
+     // Cerrar popups de añadir desde búsqueda si el click es fuera
+      if (!event.target.closest('.add-to-playlist-menu')) {
+        closeAddToPlaylistMenus(); // Asumiendo que tienes esta función
+    }
+
 }, true); // Usar fase de captura
 
 console.log("app.js cargado y listo.");
