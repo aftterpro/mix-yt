@@ -29,24 +29,53 @@ let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
 let lastSeekEndTime = -1; // Último punto de salto para evitar bucles
 let lastSeekVideoId = null; // Video ID asociado al último salto
 
+// --- Variable global para controlar timeouts de mensajes ---
+let activeMessageTimeout = null;
+let activeMessageFadeoutTimeout = null;
 // Mensaje flotante 
 function mostrarMensajeFlotante(mensaje) {
+    const container = document.getElementById('floatingMessageContainer');
+    if (!container) {
+        console.error("Contenedor de mensajes flotantes no encontrado.");
+        // Fallback: añadir al body (puede solaparse)
+         const fallbackDiv = document.createElement('div');
+         fallbackDiv.textContent = mensaje;
+         fallbackDiv.className = 'mensaje-flotante'; // Usar la misma clase
+         document.body.appendChild(fallbackDiv);
+          setTimeout(() => { // Simple timeout para fallback
+             fallbackDiv.remove();
+          }, 6000);
+        return;
+    }
+
+    // --- Opción: Limpiar mensaje anterior inmediatamente ---
+    // if (container.firstChild) {
+    //     container.removeChild(container.firstChild);
+    //     clearTimeout(activeMessageTimeout); // Limpiar timeouts asociados
+    //     clearTimeout(activeMessageFadeoutTimeout);
+    // }
+     // --- Opción: Permitir varios, pero gestionar timeouts ---
+     clearTimeout(activeMessageTimeout); // Limpiar timeout de desaparición del *último* mensaje
+     clearTimeout(activeMessageFadeoutTimeout); // Limpiar timeout de fadeout del *último* mensaje
+
+    // Crear nuevo mensaje
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'mensaje-flotante';
-    // Insertar después del contenedor de playlist para que no interfiera con scroll
-    const playlistContainerElement = document.getElementById('playlistContainer');
-    if (playlistContainerElement) {
-         playlistContainerElement.insertAdjacentElement('afterend', mensajeDiv);
-    } else {
-        document.body.appendChild(mensajeDiv); // Fallback
-    }
-    setTimeout(() => {
+
+    // Añadir al contenedor
+    container.appendChild(mensajeDiv); // Añadir al final (o .prepend() para inicio)
+
+    // Gestionar desaparición
+    activeMessageFadeoutTimeout = setTimeout(() => {
         mensajeDiv.classList.add('fadeOut');
-        setTimeout(() => {
-            mensajeDiv.remove();
-        }, 1000); // Tiempo para que termine la animación fadeOut
-    }, 6000); // Duración visible del mensaje: 6 segundos
+        // Eliminar del DOM después de la animación de fadeOut
+        activeMessageTimeout = setTimeout(() => {
+            if (mensajeDiv.parentNode) { // Comprobar si aún existe
+                 mensajeDiv.remove();
+            }
+        }, 500); // Coincidir con la duración de la transición de opacidad en CSS
+    }, 6000); // Tiempo visible: 6 segundos
 }
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
 
