@@ -380,14 +380,6 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     background-color: #383838; /* Fondo ligeramente diferente */
     border-radius: 4px;
     margin-top: 4px; /* Espacio sobre el submenú */
-    /* Position absolute si quieres que flote sobre otros elementos del menú */
-    /* position: absolute; */
-    /* left: 100%; */ /* Posicionar a la derecha del menú principal */
-    /* top: 0; */
-    /* min-width: 150px; */
-    /* box-shadow: 3px 3px 8px rgba(0,0,0,0.3); */
-    /* border: 1px solid #555; */
-    /* z-index: 12; */ /* Sobre el menú principal */
     padding: 5px; /* Padding interno */
     max-height: 150px; /* Altura máxima con scroll si hay muchas playlists */
     overflow-y: auto; /* Scroll si es necesario */
@@ -397,7 +389,6 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
 .move-to-playlist-submenu::-webkit-scrollbar { width: 5px; }
 .move-to-playlist-submenu::-webkit-scrollbar-thumb { background-color: #666; border-radius: 3px;}
 .move-to-playlist-submenu::-webkit-scrollbar-track { background-color: #383838;}
-
 
 /* Botones dentro del submenú (nombres de playlist) */
 .submenu-playlist-target {
@@ -442,7 +433,6 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     flex-grow: 1;
     overflow: hidden;
 }
-
 /* Contenedor del input de búsqueda */
 #search-panel .search-container {
      margin-bottom: var(--spacing-md);
@@ -673,8 +663,65 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
      margin: 5px 0;
      border-radius: 4px;
 }
+/* --- Estilos Menú Emergente "Añadir a Playlist" (Resultados Búsqueda) --- */
+.add-to-playlist-menu {
+    position: absolute; /* Posicionado por JS */
+    z-index: 950; /* Encima de resultados, debajo de mensajes flotantes/menús principales */
+    background-color: #383838; /* Fondo oscuro */
+    border: 1px solid #555;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    padding: 5px;
+    min-width: 180px; /* Ancho mínimo */
+    max-width: 250px; /* Ancho máximo */
+    max-height: 200px; /* Altura máxima con scroll */
+    overflow-y: auto; /* Scroll si hay muchas playlists */
+    scrollbar-width: thin;
+    scrollbar-color: #666 #383838;
+}
+.add-to-playlist-menu::-webkit-scrollbar { width: 5px; }
+.add-to-playlist-menu::-webkit-scrollbar-thumb { background-color: #666; border-radius: 3px;}
+.add-to-playlist-menu::-webkit-scrollbar-track { background-color: #383838;}
 
+.add-to-playlist-menu-item {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    color: #ddd;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 0.85em;
+    border-radius: 4px;
+    margin-bottom: 2px; /* Pequeño espacio entre items */
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.add-to-playlist-menu-item:last-child {
+    margin-bottom: 0;
+}
 
+.add-to-playlist-menu-item:hover {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.add-to-playlist-menu-item img {
+    width: 25px; /* Miniatura pequeña */
+    height: 25px;
+    object-fit: cover;
+    border-radius: 3px;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.add-to-playlist-menu-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+}
 /* ---- Utility Classes ---- */
 .hidden {
     /* display: none !important; */ /* Evitar usar display si se anima opacidad/altura */
