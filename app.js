@@ -1838,8 +1838,8 @@ function parseDuration(durationInput) {
 const pipedInstances = [ // Lista de instancias Piped
      "https://api.piped.private.coffee",
     "https://pipedapi.reallyaweso.me",
-    "https://pipedapi.ducks.party",
-    "https://pipedapi.adminforge.de"
+    "https://pipedapi.ducks.party"
+   
 ];
 function getRandomPipedInstance() {
     const randomIndex = Math.floor(Math.random() * pipedInstances.length);
