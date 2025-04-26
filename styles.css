@@ -585,29 +585,41 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     visibility: visible;
     transform: translateY(0);
 }
-
-/* ---- MENSAJE FLOTANTE ---- */
-.mensaje-flotante {
+/* Contenedor para Mensajes Flotantes */
+#floatingMessageContainer {
     position: fixed;
-    bottom: 50px; /* Subir un poco para no chocar con footer */
+    bottom: 60px; /* Encima del footer */
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.85); /* Más opaco */
+    z-index: 1005; /* Encima del footer y otros elementos */
+    width: 90%; /* Ancho máximo */
+    max-width: 500px; /* Ancho máximo específico */
+    display: flex;
+    flex-direction: column; /* Apilar mensajes si decides permitir múltiples */
+    align-items: center;
+    pointer-events: none; /* No interferir con clics debajo */
+}
+/* Estilo base del mensaje flotante (ajustado) */
+.mensaje-flotante {
+    background-color: rgba(0, 0, 0, 0.85);
     color: white;
     padding: 10px 20px;
     border-radius: 5px;
-    z-index: 1001; /* Sobre el footer */
+    margin-top: 5px; /* Espacio si hay múltiples */
     opacity: 1;
-    transition: opacity 1s ease-out, bottom 0.5s ease;
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out; /* Transición suave */
+    transform: translateY(0);
     font-size: 0.9em;
-    max-width: 90%;
     box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-}
-.mensaje-flotante.fadeOut {
-    opacity: 0;
-    bottom: 30px; /* Bajar al desaparecer */
+    pointer-events: all; /* Permitir eventos en el mensaje mismo si es necesario */
+    width: fit-content; /* Ajustar al contenido */
+    max-width: 100%;
 }
 
+.mensaje-flotante.fadeOut {
+    opacity: 0;
+    transform: translateY(10px); /* Mover ligeramente hacia abajo al desaparecer */
+}
 /* ---- Spinner pequeño para "Cargar Más" ---- */
 .loading-spinner-small {
     display: flex;
