@@ -29,8 +29,7 @@ let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
 let lastSeekEndTime = -1; // Último punto de salto para evitar bucles
 let lastSeekVideoId = null; // Video ID asociado al último salto
 
-
-// Mensaje flotante (Optimizado)
+// Mensaje flotante 
 function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
@@ -151,14 +150,6 @@ function onPlayerStateChange(event) {
          updateCurrentPlayingIndex();
          // Llamar a checkAndSkipSegment forzando el chequeo (ignora isTransitioning)
          checkAndSkipSegment(event.target, true); 
-     } else if (playerState === YT.PlayerState.ENDED) {
-          console.log('Video finalizado en Player', changedPlayerNum);
-        if (changedPlayerNum === currentPlayer) {
-            lastSeekEndTime = -1;
-            playNextVideo();
-        } else {
-             console.log(`Video en player inactivo ${changedPlayerNum} terminó. Ignorando.`);
-        }
      } else if (playerState === YT.PlayerState.PAUSED) {
         console.log('Video en pausa en Player', changedPlayerNum);
     }
