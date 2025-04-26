@@ -663,7 +663,27 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
 
     return item;
 }
+// --- NUEVA: Mover video DENTRO de una playlist ---
+function moveVideoWithinPlaylist(playlistId, videoId, targetIndex) {
+     const playlist = playlistsData.find(p => p.id === playlistId);
+    if (!playlist) return;
 
+    const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
+    if (videoIndex === -1) return;
+
+    // Clamp targetIndex
+    targetIndex = Math.max(0, Math.min(targetIndex, playlist.videos.length -1));
+
+    if(videoIndex === targetIndex) return; // No mover si ya está ahí
+
+    const [movedVideo] = playlist.videos.splice(videoIndex, 1); // Quitar video
+    playlist.videos.splice(targetIndex, 0, movedVideo); // Insertar en nueva posición
+
+    console.log(`Video ${videoId} movido a índice ${targetIndex} en playlist ${playlistId}`);
+    updatePlaylistsUI(); // Actualizar UI
+    // Recalcular índice aplanado si es necesario
+     updateCurrentPlayingIndex();
+}
 // --- Función para alternar expansión/colapso ---
 // app.js
 
