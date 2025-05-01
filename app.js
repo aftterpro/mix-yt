@@ -1,4 +1,3 @@
-
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
@@ -8,15 +7,12 @@ let playersInitialized = false; // Estado global para saber si ambos reproductor
 let youtubeAPIReady = false;
 let isTransitioning = false; // Flag para estado de transición
 
-// --- NUEVA ESTRUCTURA DE DATOS ---
 let playlistsData = []; // Array principal para almacenar todas las playlists [{id, name, thumbnailUrl, videos:[], isExpanded}, ...]
 let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
     playlistId: null,
     videoId: null,
     flattenedIndex: -1 // Índice en la lista aplanada para reproducción
 };
-// --- FIN NUEVA ESTRUCTURA ---
-
 // Variables para Búsqueda y Scroll Infinito
 let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
 let nextPageContext = null; // Para guardar información de la siguiente página (si la API la provee)
@@ -150,7 +146,6 @@ function onPlayerStateChange(event) {
     }
 }
 // Módulo: Interacción con API de Búsqueda (Piped)
-
 const performSearch = async (query, nextPage = null) => {
     if (!resultsDiv) return;
 
@@ -173,7 +168,6 @@ const performSearch = async (query, nextPage = null) => {
         if (nextPage) {
             apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`; // Usar token/página
         }
-
         const response = await fetch(apiUrl);
 
         // Mejor manejo de errores HTTP
@@ -225,7 +219,6 @@ const displaySearchResultsPiped = (results, append = false) => {
     if (!append) {
         resultsDiv.innerHTML = '';
     }
-
     if (!results || !results.items || !Array.isArray(results.items)) {
         if (!append && (!results || results.items?.length === 0)) { // Mostrar solo si es búsqueda inicial y no hay NADA
             resultsDiv.innerHTML = "<p>No se encontraron resultados.</p>";
@@ -325,7 +318,6 @@ function handleSearchResultAddClick(event, videoData) {
     event.stopPropagation(); // Detener propagación
 
     const addButton = event.currentTarget; // El botón que fue clickeado
-
     // Filtrar playlists cargadas por el usuario (no la manual si está vacía)
     const userLoadedPlaylists = playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
 
@@ -451,11 +443,7 @@ function showAddToPlaylistMenu(buttonElement, videoData) {
 // --- NUEVA: Función para cerrar todos los menús emergentes de añadir ---
 function closeAddToPlaylistMenus() {
     document.querySelectorAll('.add-to-playlist-menu').forEach(menu => menu.remove());
-    // Quitar listener global si existe (aunque 'once: true' ayuda)
-    // document.removeEventListener('click', closeAddToPlaylistMenus, { capture: true });
 }
-
-
 // --- NUEVA: Función para añadir a una Playlist ESPECÍFICA ---
 function addVideoToSpecificPlaylist(videoData, targetPlaylistId) {
     const targetPlaylist = playlistsData.find(p => p.id === targetPlaylistId);
@@ -1213,10 +1201,6 @@ function enableDragAndDrop() {
                    targetItem.parentNode.insertBefore(placeholder, targetItem.nextSibling);
               }
         });
-
-        // DRAG ENTER/LEAVE (menos fiable que dragover para placeholder)
-        // Se puede omitir si dragover funciona bien para el placeholder
-
         // DROP: Cuando se SUELTA sobre otro item
         item.addEventListener('drop', (event) => {
             event.preventDefault();
@@ -1245,7 +1229,6 @@ function enableDragAndDrop() {
               if (offsetY >= targetRect.height / 2) {
                    targetIndex++; // Insertar después
               }
-
 
             console.log(`Drop: Video ${droppedVideoId} (from ${draggedVideoData.sourcePlaylistId}) sobre item ${targetItem.dataset.videoId} (Playlist ${targetPlaylistId}, índice ${targetIndex})`);
 
@@ -1693,12 +1676,7 @@ async function monitorPlayers() {
         const timeRemaining = effectiveDuration - currentTime;
         const roundedTimeRemaining = Math.floor(timeRemaining);
 
-        // Log de cuenta regresiva (opcional, puede ser ruidoso)
-        // if (roundedTimeRemaining >= 0 && roundedTimeRemaining <= CROSSFADE_DURATION + 10) {
-        //     console.log(`Monitor: Player ${currentPlayer} (${videoId}). Base: ${durationSource}(${effectiveDuration.toFixed(1)}s). Tiempo Crossfade Aprox: ${roundedTimeRemaining}s.`);
-        // }
-
-        // Evaluar condición de Crossfade
+       // Evaluar condición de Crossfade
         if (timeRemaining <= CROSSFADE_DURATION && timeRemaining >= -1) { // Permitir un pequeño margen negativo
             console.log(`Monitor: *** Condición crossfade CUMPLIDA (Player ${currentPlayer}, ${videoId}). Restante: ${timeRemaining.toFixed(1)}s. Llamando playNextVideo... ***`);
             playNextVideo();
@@ -2054,11 +2032,6 @@ async function fetchDataWithRetry(url, options = {}, maxRetries = 2, retryDelay 
 async function getPlaylistInfo(playlistId) {
     const instanceUrl = getRandomPipedInstance();
     const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
-    // Usar un proxy CORS si es necesario (AllOrigins es una opción)
-    // const proxyUrl = 'https://api.allorigins.win/raw?url=';
-    // const proxiedUrl = `${proxyUrl}${encodeURIComponent(targetUrl)}`;
-    // console.log("Obteniendo playlist desde:", proxiedUrl); // O targetUrl si no usas proxy
-
     try {
         // Pasar directamente targetUrl si no necesitas proxy
         const data = await fetchDataWithRetry(targetUrl);
