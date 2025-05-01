@@ -1429,7 +1429,7 @@ async function playNextVideo() { // async por si futuras modificaciones usan awa
 
         // 12. Timeout para completar transición Lógica, Visual y de AUDIO
         setTimeout(() => {
-            console.log(`playNextVideo: TIMEOUT (${currentTimeoutDuration}ms) iniciado para índice ${currentFlatIndex}.`);
+            console.log(`playNextVideo:  iniciado para índice ${currentFlatIndex}.`);
             try {
                 // a. Limpieza visual y parada del player anterior
                 if (currentPlayerElement) {
