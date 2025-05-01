@@ -6,7 +6,6 @@ let monitorInterval; // Declarar fuera para controlar el intervalo
 let playersInitialized = false; // Estado global para saber si ambos reproductores están listos
 let youtubeAPIReady = false;
 let isTransitioning = false; // Flag para estado de transición
-let isTransitioning = false; // Flag para estado de transición visual/lógica
 let isAudioFading = false; // NUEVO: Flag específico para la duración del fundido de audio
 
 let playlistsData = []; // Array principal para almacenar todas las playlists [{id, name, thumbnailUrl, videos:[], isExpanded}, ...]
