@@ -1751,10 +1751,6 @@ async function monitorPlayers() {
 }
 // --- SponsorBlock: Chequear y Saltar Segmento ---
 async function checkAndSkipSegment(playerInstance, forceCheck = false) {
-// app.js
-
-// --- REEMPLAZAR checkAndSkipSegment ---
-async function checkAndSkipSegment(playerInstance, forceCheck = false) {
     // Guardas iniciales
     if ((isTransitioning || isAudioFading) && !forceCheck) {
         // console.log(`checkAndSkipSegment: Bloqueado (T:${isTransitioning}, A:${isAudioFading}, F:${forceCheck})`);
