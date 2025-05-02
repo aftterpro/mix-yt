@@ -1340,63 +1340,70 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 }
 
 // Módulo: Reproducción y Crossfade (Adaptado Parcialmente)
-async function playNextVideo() { // async por si futuras modificaciones usan await
-    const currentFlatIndex = currentPlayingInfo.flattenedIndex; // Índice actual antes de cambiar
-    console.log(`playNextVideo: Llamado. Índice aplanado actual: ${currentFlatIndex}`);
+async function playNextVideo() { // Async por si se necesita await en el futuro
+    const currentFlatIndex = currentPlayingInfo.flattenedIndex; // Índice actual ANTES de cambiar
+    console.log(`playNextVideo [Data]: Llamado. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}`);
 
-    // 1. Verificar si ya hay una transición en curso
+    // 1. Verificar si ya hay una transición en curso (visual o de audio)
+    //    La guarda en monitorPlayers/checkAndSkipSegment usará isAudioFading.
+    //    Aquí solo chequeamos isTransitioning para evitar iniciar DOS transiciones playNextVideo a la vez.
     if (isTransitioning) {
-        console.warn("playNextVideo: Transición ya en progreso, cancelando llamada.");
+        console.warn("playNextVideo [Data]: Transición principal ya en progreso, cancelando.");
         return;
     }
 
-    // 2. Obtener la lista aplanada actual y verificar si hay videos
+    // 2. Obtener lista aplanada y verificar si hay videos
     const flatList = getFlattenedPlaylist();
     if (flatList.length === 0) {
-        console.log("playNextVideo: No hay videos para reproducir.");
-        stopMonitoring(); // Detener monitoreo si no hay nada que hacer
-        // Quizás resetear estado de reproducción
+        console.log("playNextVideo [Data]: No hay videos en la lista aplanada.");
+        stopMonitoring();
+        // Resetear botón play, etc.
         reproduccionIniciada = false;
         document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
         document.getElementById('botonPlay').disabled = true;
+        currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null }; // Resetear info
+        updatePlaylistsUI(); // Limpiar resaltado
         return;
     }
 
-    // 3. Calcular el índice del siguiente video
+    // 3. Calcular siguiente índice
     let nextIndex = currentFlatIndex + 1;
 
-    // 4. Verificar si llegamos al final de la lista
+    // 4. Verificar fin de lista
     if (nextIndex >= flatList.length) {
-        console.log('playNextVideo: Fin de la lista aplanada detectado.');
-        askToRepeatPlaylist(); // Preguntar si se desea repetir
-        return; // Salir si no se repite
+        console.log('playNextVideo [Data]: Fin de la lista aplanada detectado.');
+        askToRepeatPlaylist();
+        return;
     }
 
-    // --- INICIO DE LA TRANSICIÓN ---
-    isTransitioning = true;
-    const previousVideoIdForCleanup = currentPlayingInfo.videoId; // Guardar ID anterior para limpieza
-    console.log(`playNextVideo: *** Transición INICIADA desde índice aplanado ${currentFlatIndex}. Flag=true. ***`);
+    // --- INICIO DE LA TRANSICIÓN PRINCIPAL ---
+    isTransitioning = true; // Marcar inicio de la transición lógica/visual
+    const previousVideoIdForCleanup = currentPlayingInfo.videoId; // Guardar ID anterior
+    console.log(`playNextVideo [Data]: *** Transición PRINCIPAL INICIADA desde índice aplanado ${currentFlatIndex}. Flag isTransitioning=true. ***`);
 
     try {
         // 5. Obtener datos del siguiente video y validar
         const nextVideo = flatList[nextIndex];
         if (!nextVideo || !nextVideo.videoId) {
-             // Lanzar error para activar el bloque catch y revertir
              throw new Error(`Siguiente video inválido en índice aplanado ${nextIndex}.`);
         }
         const nextVideoId = nextVideo.videoId;
 
-        // 6. Actualizar el estado global INMEDIATAMENTE (antes de cargas asíncronas)
-        currentPlayingInfo.flattenedIndex = nextIndex;
-        currentPlayingInfo.videoId = nextVideoId;
-        currentPlayingInfo.playlistId = nextVideo.sourcePlaylistId;
-
-        console.log(`playNextVideo: Estado actualizado. Cargando SIGUIENTE video (${nextVideoId}), índice aplanado=${nextIndex}.`);
+        // 6. Actualizar estado global LÓGICO inmediatamente
+        //    (El índice real se confirmará cuando el video empiece a sonar)
+        const intendedNextPlayingInfo = {
+             flattenedIndex: nextIndex,
+             videoId: nextVideo.videoId,
+             playlistId: nextVideo.sourcePlaylistId
+        };
+        // Podríamos actualizar currentPlayingInfo aquí, pero es más seguro esperar a onPlayerStateChange(PLAYING)
+        // Por ahora, solo lo usamos para cargar el video correcto.
+        console.log(`playNextVideo [Data]: Estado lógico preparado para índice ${nextIndex} (Video: ${nextVideoId}).`);
 
         // 7. Identificar reproductores
-        const currentPlayerLogicalNum = currentPlayer; // Guardar el número lógico actual
-        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2;
-        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1; // El player que recibirá el video
+        const currentPlayerLogicalNum = currentPlayer; // Player lógico actual
+        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2; // El que va a parar/ocultarse
+        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;     // El que va a cargar/mostrar
         const currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
         const nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
 
@@ -1406,38 +1413,39 @@ async function playNextVideo() { // async por si futuras modificaciones usan awa
         }
 
         // 9. Cargar el video en el reproductor destino
-        // Esta acción puede causar un corte de audio en el reproductor actual
+        console.log(`playNextVideo [Data]: Llamando a loadVideoById('${nextVideoId}') en Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
         nextPlayerInstance.loadVideoById(nextVideoId);
+        // Puede causar corte de audio en previousPlayerInstance aquí.
+
+        // Asegurar visibilidad del contenedor del nuevo player
         if (nextPlayerElement) {
-            nextPlayerElement.classList.remove('hidden'); // Asegurar que el contenedor del player sea visible
-        } else {
-             console.warn("Elemento DOM para nextPlayerElement no encontrado.");
-        }
+            nextPlayerElement.classList.remove('hidden');
+        } else { console.warn("Elemento DOM para nextPlayerElement no encontrado."); }
 
-        // 10. Actualizar UI para resaltar el que *va* a sonar (opcional, mejora visual)
-        // updatePlaylistsUI(); // Puede ser intensivo, quizás esperar a onPlayerStateChange
+        // 10. Actualizar UI para reflejar el cambio *intencionado* (opcional)
+        //     Podría ser confuso si la carga falla, mejor esperar a PLAYING state.
+        //     currentPlayingInfo = intendedNextPlayingInfo; // Actualizar aquí si se quiere resaltado inmediato
+        //     updatePlaylistsUI();
 
-        // 11. Iniciar transición VISUAL
+        // 11. Iniciar transición VISUAL (CSS)
         if (currentPlayerElement) {
             currentPlayerElement.classList.add('fade-out');
-        } else {
-             console.warn("Elemento DOM para currentPlayerElement no encontrado.");
-        }
+        } else { console.warn("Elemento DOM para currentPlayerElement no encontrado."); }
         if (nextPlayerElement) {
             nextPlayerElement.classList.add('fade-in');
         }
 
         // 12. Timeout para completar transición Lógica, Visual y de AUDIO
+        const transitionTimeoutDuration = 2000; // 2 segundos para la parte visual/lógica
         setTimeout(() => {
-            console.log(`playNextVideo:  iniciado para índice ${currentFlatIndex}.`);
+            console.log(`playNextVideo [Data]: TIMEOUT (${transitionTimeoutDuration}ms) iniciado para índice ${currentFlatIndex}.`);
             try {
                 // a. Limpieza visual y parada del player anterior
                 if (currentPlayerElement) {
                     try {
-                         // Detener video explícitamente ANTES de ocultar
                          if(previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
+                            console.log(`playNextVideo [Data]: stopVideo() llamado en Player ${currentPlayerLogicalNum}`);
                             previousPlayerInstance.stopVideo();
-                            console.log(`playNextVideo: stopVideo() llamado en Player ${currentPlayerLogicalNum}`);
                          }
                     } catch(e) { console.warn("Error deteniendo video anterior:", e); }
                     currentPlayerElement.classList.remove('fade-out');
@@ -1447,16 +1455,19 @@ async function playNextVideo() { // async por si futuras modificaciones usan awa
                 if (nextPlayerElement) {
                     nextPlayerElement.classList.remove('fade-in');
                 }
-                // --- c. Cambiar player activo LÓGICO ---
-                currentPlayer = currentPlayer === 1 ? 2 : 1;
-                console.log(`playNextVideo: Timeout - currentPlayer lógico cambiado a ${currentPlayer}.`);
 
-                // --- d. Iniciar crossfade de AUDIO ahora ---
+                // --- c. Cambiar player activo LÓGICO ---
+                // ¡Importante! Este cambio es necesario para que crossfadeAudio sepa qué players fundir
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                console.log(`playNextVideo [Data]: Timeout - currentPlayer lógico cambiado a ${currentPlayer}.`);
+
+                // --- d. Iniciar crossfade de AUDIO AHORA ---
+                // crossfadeAudio usará la bandera isAudioFading para proteger su duración
                 crossfadeAudio();
 
                 // --- e. Limpieza de datos del video ANTERIOR ---
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
-                    console.log(`playNextVideo: Timeout - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
+                    console.log(`playNextVideo [Data]: Timeout - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
                     delete segmentosCache[previousVideoIdForCleanup];
                 }
                 if (lastSeekVideoId === previousVideoIdForCleanup) {
@@ -1465,58 +1476,64 @@ async function playNextVideo() { // async por si futuras modificaciones usan awa
 
             } catch (timeoutError) {
                 console.error("Error dentro del setTimeout de playNextVideo:", timeoutError);
-                 // Intentar resetear flags incluso si hay error en el timeout
+                 // Resetear flags si hay error aquí
                  isTransitioning = false;
-                 isAudioFading = false; // Asegurar reseteo si crossfade no termina bien
+                 isAudioFading = false; // Forzar reseteo por si crossfade no inició/terminó
             } finally {
-                // --- f. Marcar fin SOLO de la transición principal ---
-                // La bandera isAudioFading se controla en crossfadeAudio
+                // --- f. Marcar fin SOLO de la transición PRINCIPAL/VISUAL ---
                 isTransitioning = false;
-                console.log(`playNextVideo: *** Transición PRINCIPAL Finalizada (Timeout para índice ${currentFlatIndex}). Flag=false. ***`);
-                // No forzar updateCurrentPlayingIndex aquí, esperar al evento PLAYING del nuevo video.
+                console.log(`playNextVideo [Data]: *** Transición PRINCIPAL Finalizada (Timeout para índice ${currentFlatIndex}). Flag isTransitioning=false. ***`);
+                // La bandera isAudioFading la controla crossfadeAudio.
+                // La actualización final de currentPlayingInfo la hará onPlayerStateChange(PLAYING).
             }
-        }, 2000); // Usar la duración definida para la limpieza visual/lógica
+        }, transitionTimeoutDuration);
 
     } catch (error) {
         console.error("Error CRÍTICO durante playNextVideo:", error);
-        // --- Revertir estado en caso de error grave ANTES del timeout ---
-        isTransitioning = false; // Asegurar reset del flag principal
-        // Intentar obtener datos previos para revertir
-        const previousVideo = flatList[currentFlatIndex]; // Usar índice antes del intento de incremento
+        // --- Revertir estado LÓGICO en caso de error grave ANTES del timeout ---
+        isTransitioning = false;
+        const previousVideo = flatList[currentFlatIndex]; // Usar índice ANTES del intento de incremento
          currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
          currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
          currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
-        console.log(`playNextVideo: *** Transición INTERRUMPIDA (Error). Flag=false. Estado REVERTIDO a índice ${currentFlatIndex} ***`);
+        console.log(`playNextVideo [Data]: *** Transición INTERRUMPIDA (Error). Flag=false. Estado REVERTIDO a índice ${currentFlatIndex} ***`);
         mostrarMensajeFlotante(`Error al cambiar de video: ${error.message}`);
-        // Re-renderizar UI para asegurar consistencia visual
+        // Re-renderizar UI para mostrar estado revertido
         updatePlaylistsUI();
-        // Detener monitoreo si la transición falló? Podría ser buena idea.
-        stopMonitoring();
-        // Quizás intentar reiniciar la reproducción del video 'anterior'? (Complejo)
+        stopMonitoring(); // Detener monitoreo
     }
 }
-// --- Crossfade Audio con Preload ---
 function crossfadeAudio() {
-    const previousPlayer = currentPlayer === 1 ? player2 : player1;
-    const nextPlayer = currentPlayer === 1 ? player1 : player2;
+    // Obtener referencias a los players basado en el 'currentPlayer' LÓGICO actual
+    // (que ya se cambió en el setTimeout de playNextVideo ANTES de llamar a esta función)
+    const previousPlayer = currentPlayer === 1 ? player2 : player1; // El que AHORA está inactivo (recién cambiado)
+    const nextPlayer = currentPlayer === 1 ? player1 : player2;     // El que AHORA está activo (recién cambiado)
     const fadeStartTime = Date.now();
 
     if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
         console.error("Crossfade Audio: Reproductores inválidos al inicio.");
-        isAudioFading = false; // Asegurar que se resetee si falla al inicio
+        isAudioFading = false; // Asegurar reseteo si falla
         return;
     }
 
     console.log(`Crossfade START @ ${new Date(fadeStartTime).toLocaleTimeString()}: Fading Out Player ${previousPlayer === player1 ? 1:2}, Fading In Player ${nextPlayer === player1 ? 1:2}`);
     isAudioFading = true; // <<<--- MARCAR INICIO DE AUDIO FADE
 
+    // Asegurarse que el player que entra tenga volumen 0 al iniciar el fade
+    // y el que sale tenga 100 (aunque esto debería ser así por defecto)
+    try {
+      nextPlayer.setVolume(0);
+      previousPlayer.setVolume(100);
+    } catch (e) { console.warn("Error setting initial fade volumes:", e); }
+
+
     let currentVolume = 100;
     let nextVolume = 0;
-    const crossfadeSteps = CROSSFADE_DURATION * 5; // 5 pasos por segundo
+    const crossfadeSteps = CROSSFADE_DURATION * 5;
     const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100;
-    const intervalTime = crossfadeSteps > 0 ? 200 : 100; // 200ms
+    const intervalTime = crossfadeSteps > 0 ? 200 : 100; // 200ms = 5 pasos/segundo
 
-    // Limpiar intervalo anterior si existe
+    // Limpiar intervalo anterior si existe (por si acaso)
     if (window.crossfadeIntervalId) {
         clearInterval(window.crossfadeIntervalId);
         console.log("Crossfade: Cleared previous interval.");
@@ -1536,9 +1553,8 @@ function crossfadeAudio() {
         nextVolume = Math.min(100, nextVolume + volumeStep);
 
         try {
-            // Asegurarse de que los métodos aún existan (la instancia podría destruirse)
-            if(previousPlayer && previousPlayer.setVolume) previousPlayer.setVolume(currentVolume);
-            if(nextPlayer && nextPlayer.setVolume) nextPlayer.setVolume(nextVolume);
+            if(previousPlayer.setVolume) previousPlayer.setVolume(currentVolume);
+            if(nextPlayer.setVolume) nextPlayer.setVolume(nextVolume);
         } catch (e) {
              console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Error setting volume:`, e);
              clearInterval(intervalId);
@@ -1555,31 +1571,10 @@ function crossfadeAudio() {
             console.log(`Crossfade audio TERMINADO @ ${new Date(fadeEndTime).toLocaleTimeString()} (Duración: ${(fadeEndTime - fadeStartTime)/1000}s).`);
             isAudioFading = false; // <<<--- MARCAR FIN DE AUDIO FADE
 
-            // --- PRELOAD NEXT VIDEO (N+2) ---
-            // (La lógica de preload se mantiene igual aquí)
-            const preloadFlatIndex = currentPlayingInfo.flattenedIndex + 1;
-            console.log(`Crossfade END: Intentando pre-cargar video en índice aplanado: ${preloadFlatIndex}`);
-            const flatList = getFlattenedPlaylist();
-            if (preloadFlatIndex < flatList.length) {
-                const preloadVideo = flatList[preloadFlatIndex];
-                if (preloadVideo && preloadVideo.videoId) {
-                    const preloadVideoId = preloadVideo.videoId;
-                    const preloadPlayer = previousPlayer;
-                    const preloadPlayerNum = preloadPlayer === player1 ? 1 : 2;
-                    if (preloadPlayer && typeof preloadPlayer.loadVideoById === 'function') {
-                        console.log(`Crossfade END: Pre-cargando video ID ${preloadVideoId} (índice ${preloadFlatIndex}) en Player ${preloadPlayerNum}.`);
-                        try {
-                            preloadPlayer.loadVideoById(preloadVideoId);
-                        } catch (e) {
-                            console.error(`Error pre-cargando video ${preloadVideoId} en Player ${preloadPlayerNum}:`, e);
-                        }
-                    } else { console.warn(`Crossfade END: Pre-carga fallida. Player ${preloadPlayerNum} inválido.`); }
-                } else { console.warn(`Crossfade END: Pre-carga fallida. Datos de video inválidos en índice ${preloadFlatIndex}.`); }
-            } else { console.log(`Crossfade END: No hay más videos para pre-cargar.`); }
-            // --- END PRELOAD ---
+            // --- NO HAY PRELOAD AQUÍ (basado en el código que proporcionaste) ---
         }
     }, intervalTime);
-    window.crossfadeIntervalId = intervalId; // Guardar ID para posible limpieza externa
+    window.crossfadeIntervalId = intervalId;
 }
 // --- Preguntar para repetir ---
 function askToRepeatPlaylist() {
@@ -1666,10 +1661,6 @@ function stopMonitoring() {
     }
 }
 async function monitorPlayers() {
-    if (isTransitioning || !playersInitialized) {
-        console.log("Monitor: Pausado (transición o no inicializado).");
-        return;
-    }
     // Añadir chequeo de isAudioFading
     if (isTransitioning || isAudioFading || !playersInitialized) { // <<<--- AÑADIR isAudioFading
        console.log(`Monitor: Pausado (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, Initialized: ${playersInitialized})`);
@@ -1680,7 +1671,11 @@ async function monitorPlayers() {
         // console.log("Monitor: Player activo no válido.");
         return; // Salir si el player activo no es válido
     }
-
+   // Ahora monitorPlayers se detiene si la transición principal O el fundido de audio están activos
+    if (isTransitioning || isAudioFading || !playersInitialized) { // <<<--- AÑADIR isAudioFading
+        // console.log(`Monitor: Pausado (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, Initialized: ${playersInitialized})`);
+        return;
+    } 
     const playerState = activePlayer.getPlayerState();
     if (playerState !== YT.PlayerState.PLAYING) {
         // console.log("Monitor: Player activo no está reproduciendo.");
@@ -1755,100 +1750,84 @@ async function monitorPlayers() {
     }
 }
 // --- SponsorBlock: Chequear y Saltar Segmento ---
-async function checkAndSkipSegment(playerInstance, forceCheck = false) { // Añadir parámetro
-       // Añadir chequeo de isAudioFading a la guarda existente
+async function checkAndSkipSegment(playerInstance, forceCheck = false) {
+    // Añadir chequeo de isAudioFading a la guarda existente
     if ((isTransitioning || isAudioFading) && !forceCheck) { // <<<--- AÑADIR isAudioFading
-          console.log(`checkAndSkipSegment: Bloqueado (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, Force: ${forceCheck})`);
+         // console.log(`checkAndSkipSegment: Bloqueado (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, Force: ${forceCheck})`);
          return;
     }
-    if (isTransitioning && !forceCheck) { // <<<< MODIFICAR GUARDA
-        console.log("checkAndSkipSegment: Bloqueado por transición.");
+     if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
+         console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
          return;
-    }
-    if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function') return;
-
-    let videoId;
-    let currentTime;
-    try {
-        const videoData = playerInstance.getVideoData();
-        if (!videoData || !videoData.video_id) return; // Salir si no hay ID
-        videoId = videoData.video_id;
-        currentTime = playerInstance.getCurrentTime();
-    } catch (e) {
-        console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", e);
-        return;
-    }
-
-    // Reiniciar lastSeek si el video cambió
-    if (lastSeekVideoId !== videoId) {
-        lastSeekEndTime = -1;
-        lastSeekVideoId = videoId;
-        // console.log("checkAndSkipSegment: Video cambiado a", videoId);
-    }
-
-    // Obtener segmentos (usar caché o buscar)
-    let segmentos = segmentosCache[videoId];
-    if (!segmentos && segmentosCache[videoId] !== null) { // Si no está en caché Y no es null (ya intentado)
-         // console.log(`checkAndSkipSegment: Obteniendo segmentos SB para ${videoId}`);
-         try {
-            segmentos = await obtenerSegmentosSponsorBlock(videoId);
-            segmentosCache[videoId] = segmentos || null; // Guardar resultado (o null si no hay)
-             if (segmentos && segmentos.length > 0) {
-                  // Ordenar por tiempo de inicio una sola vez al obtenerlos
-                 segmentos.sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
-                 console.log("Segmentos cacheados y ordenados para", videoId, ":", segmentos);
-             } else {
-                 console.log("No se encontraron segmentos SB para", videoId);
-             }
-         } catch(e) {
-             console.error("Error obteniendo segmentos SB:", e);
-             segmentosCache[videoId] = null; // Marcar como fallido para no reintentar constantemente
-             segmentos = null;
+     }
+    // ... (resto de la función checkAndSkipSegment igual que la proporcionada por ti) ...
+     let currentTime;
+     let videoId;
+     try {
+         currentTime = playerInstance.getCurrentTime();
+         const videoData = playerInstance.getVideoData();
+         if (!videoData || !videoData.video_id) {
+             console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
+             return;
          }
-    } else if (segmentosCache[videoId] === null) {
-         segmentos = null; // Ya se intentó y no se encontraron/hubo error
-    }
+         videoId = videoData.video_id;
+     } catch (error) {
+         console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
+         return;
+     }
+     if (lastSeekVideoId !== videoId) {
+         lastSeekEndTime = -1;
+         lastSeekVideoId = videoId;
+     }
+     // Obtener segmentos (usar caché o buscar y ordenar)
+     let segmentos = segmentosCache[videoId];
+      if (segmentos === undefined) { // Solo buscar si es undefined (aún no intentado)
+          console.log(`checkAndSkipSegment: Obteniendo segmentos SB por primera vez para ${videoId}`);
+          segmentos = await obtenerSegmentosSponsorBlock(videoId);
+          if (segmentos && segmentos.length > 0) {
+              segmentos.sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
+              segmentosCache[videoId] = segments; // Guardar array ordenado
+              console.log("Segmentos cacheados y ordenados para", videoId, ":", segmentos.length);
+          } else {
+              segmentosCache[videoId] = null; // Marcar como null si no hay o error
+              segmentos = null;
+              console.log("No se encontraron segmentos SB (o hubo error) para", videoId);
+          }
+      } else if(segmentos && !Array.isArray(segmentos)) {
+           // Si está en caché pero no es un array (podría ser null), tratar como sin segmentos
+           segmentos = null;
+      }
 
+     // Lógica de salto
+     if (segmentos && segmentos.length > 0) {
+         for (const segmento of segmentos) {
+             const startTime = parseFloat(segmento.startTime);
+             const endTime = parseFloat(segmento.endTime);
+             if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) continue;
+             const isInSegment = (startTime === 0 && currentTime >= 0 && currentTime < endTime) ||
+                               (startTime > 0 && currentTime >= startTime && currentTime < endTime);
 
-    // Lógica de salto
-    if (segmentos && segmentos.length > 0) {
-        for (const segmento of segmentos) {
-            const startTime = parseFloat(segmento.startTime);
-            const endTime = parseFloat(segmento.endTime);
-
-            if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) continue;
-
-            // Condición de estar dentro del segmento
-            const isInSegment = (currentTime >= startTime && currentTime < endTime);
-
-            if (isInSegment) {
-                // Saltar solo si NO acabamos de saltar a ESTE punto final
-                if (lastSeekEndTime !== endTime) {
-                    console.log(`SPONSORBLOCK SKIP: Saltando segmento (${segmento.category}) en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
-                    mostrarMensajeFlotante(`SponsorBlock: Saltando ${segmento.category}...`);
-                    try {
+             if (isInSegment) {
+                 if (lastSeekEndTime !== endTime) {
+                     // Mover log aquí para asegurar que solo se muestra si se intenta saltar
+                     console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando segmento (${segmento.category}) en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                     mostrarMensajeFlotante(`SponsorBlock: Saltando ${segmento.category}...`);
+                     try {
                         playerInstance.seekTo(endTime, true);
-                         lastSeekEndTime = endTime; // Recordar a dónde saltamos
-                         lastSeekVideoId = videoId; // Recordar para qué video
-                    } catch (e) {
-                         console.error("Error ejecutando seekTo:", e);
-                    }
+                        lastSeekEndTime = endTime;
+                        lastSeekVideoId = videoId;
+                     } catch(e) { console.error("Error en seekTo:", e); }
 
-                    break; // Salir del bucle for después de saltar
-                } else {
-                    // console.log(`SPONSORBLOCK SKIP: Ya estábamos en un seek a ${endTime}, ignorando.`);
-                }
-
-            } else {
-                 // Si el tiempo actual ya superó el punto al que habíamos saltado,
-                 // reseteamos lastSeekEndTime para permitir futuros saltos a ese mismo punto si fuera necesario.
-                 if (lastSeekEndTime === endTime && currentTime >= endTime) {
-                      // console.log(`SPONSORBLOCK SKIP: Tiempo (${currentTime.toFixed(1)}) superó el último salto a ${endTime.toFixed(1)}. Reseteando lastSeekEndTime.`);
-                      lastSeekEndTime = -1;
+                     break; // Salir del bucle for después de saltar
                  }
-            }
-        }
-    }
+             } else {
+                   if (lastSeekEndTime === endTime && currentTime >= endTime) {
+                       // console.log(`Reseteando lastSeekEndTime (${lastSeekEndTime}) porque currentTime (${currentTime}) superó el punto.`);
+                       lastSeekEndTime = -1; // Resetear si ya pasamos el punto al que saltamos
+                   }
+             }
+         }
+     }
 }
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
