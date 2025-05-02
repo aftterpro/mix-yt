@@ -710,7 +710,6 @@ async function handlePlaylistLoaded(playlistInfo) { // Marcar como async si usa 
     if (manualPlaylistIndex !== -1) {
         // Si existe la playlist 'manual', insertar la nueva DESPUÉS de ella
         playlistsData.splice(manualPlaylistIndex + 1, 0, newPlaylist);
-        console.log(`Playlist '${newPlaylist.name}' insertada después de 'manual'.`);
     } else {
         // Si no existe 'manual', añadir al final (o al principio si se prefiere)
         playlistsData.push(newPlaylist);
@@ -2208,7 +2207,6 @@ async function getPlaylistInfo(playlistId) {
         if (!data || !data.relatedStreams) {
             throw new Error("La respuesta de la API no contiene videos válidos.");
         }
-        console.log("Playlist info obtenida:", data.name, `(${data.relatedStreams.length} streams)`);
         // Devolver data completa, handlePlaylistLoaded extraerá lo necesario
         return data;
     } catch (error) {
@@ -2254,5 +2252,3 @@ document.addEventListener('click', (event) => {
     }
 
 }, true); // Usar fase de captura
-
-console.log("app.js cargado y listo.");
