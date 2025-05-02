@@ -1435,26 +1435,40 @@ async function playNextVideo() {
         }
         const nextVideoId = nextVideo.videoId;
 
-        const currentPlayerLogicalNum = currentPlayer;
-        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2;
-        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;
+        // Identify players based on the *current* logical player
+        const currentPlayerLogicalNum = currentPlayer; // Player currently making sound (should fade out)
+        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2; // The player currently playing
+        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;     // The player that will play next
+
         const currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
         const nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
 
-        if (!nextPlayerInstance || typeof nextPlayerInstance.cueVideoById !== 'function' || typeof nextPlayerInstance.playVideo !== 'function') {
-             throw new Error("Destination player (nextPlayerInstance) invalid or API functions missing.");
+        if (!previousPlayerInstance || typeof previousPlayerInstance.setVolume !== 'function' ||
+            !nextPlayerInstance || typeof nextPlayerInstance.cueVideoById !== 'function' || typeof nextPlayerInstance.playVideo !== 'function' || typeof nextPlayerInstance.setVolume !== 'function') {
+             throw new Error("Player instances or required API functions missing.");
         }
 
-        // --- CORRECTION 2: Use cueVideoById instead of loadVideoById ---
-        // This should prepare the video without immediately affecting audio output of the other player.
+        // --- Prepare the next video (cue it) ---
         console.log(`playNextVideo [Data]: Calling cueVideoById('${nextVideoId}') on Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
         nextPlayerInstance.cueVideoById(nextVideoId);
-        // ------------------------------------------------------------
 
-        // Ensure the container of the new player is visible
+        // Ensure the container of the next player is ready and visual fade starts
         if (nextPlayerElement) {
-            nextPlayerElement.classList.remove('hidden', 'fade-out'); // Ensure no hiding/fade classes
+            nextPlayerElement.classList.remove('hidden', 'fade-out');
         } else { console.warn("DOM element for nextPlayerElement not found."); }
+        if (currentPlayerElement) {
+            currentPlayerElement.classList.add('fade-out');
+        } else { console.warn("DOM element for currentPlayerElement not found."); }
+        if (nextPlayerElement) {
+             nextPlayerElement.classList.remove('fade-in');
+            nextPlayerElement.classList.add('fade-in');
+        }
+
+        // --- Set initial volumes BEFORE the timeout and crossfade ---
+        // Ensure the current player is at full volume (it should be, but explicit set helps)
+        try { previousPlayerInstance.setVolume(100); } catch(e) { console.warn("Error setting previous player volume to 100:", e); }
+        // Ensure the next player is muted before it starts playing
+        try { nextPlayerInstance.setVolume(0); } catch(e) { console.warn("Error setting next player volume to 0:", e); e.name = "SetVolumeErrorBeforeTimeout"; throw e; }
 
 
         // Update logical state immediately for UI highlight
@@ -1466,24 +1480,16 @@ async function playNextVideo() {
         console.log(`playNextVideo [Data]: Logical state updated to index ${nextIndex} (Video: ${nextVideoId}).`);
         updatePlaylistsUI(); // Update UI highlight based on the new logical state
 
-        // Start VISUAL transition (CSS classes)
-        if (currentPlayerElement) {
-            currentPlayerElement.classList.add('fade-out');
-        } else { console.warn("DOM element for currentPlayerElement not found."); }
-        if (nextPlayerElement) {
-             nextPlayerElement.classList.remove('fade-in'); // Remove in case it was there
-            nextPlayerElement.classList.add('fade-in');
-        }
 
-        // Timeout to coordinate the rest of the transition
-        const transitionTimeoutDuration = CROSSFADE_DURATION * 1000; // Use CROSSFADE_DURATION for visual fade time
-        console.log(`playNextVideo [Data]: TIMEOUT (${transitionTimeoutDuration}ms) started for index ${nextIndex}.`);
+        // Timeout to coordinate the rest of the transition and audio fade
+        const visualFadeDurationMs = CROSSFADE_DURATION * 1000; // Use CROSSFADE_DURATION for visual fade time
+        console.log(`playNextVideo [Data]: TIMEOUT (${visualFadeDurationMs}ms) started for index ${nextIndex}.`);
 
         setTimeout(() => {
             console.log(`playNextVideo [Data]: TIMEOUT callback executed for index ${nextIndex}.`);
             try {
-                // --- CORRECTION 2/3: Play the cued video AND start audio crossfade ---
-                // Start playing the cued video immediately within the timeout.
+                // --- Start playing the cued video AND start audio crossfade here ---
+                 // Start playing the cued video immediately within the timeout.
                  try {
                     if (nextPlayerInstance && typeof nextPlayerInstance.playVideo === 'function') {
                         // Only try to play if not already playing (API might auto-play after cue in some cases)
@@ -1498,29 +1504,41 @@ async function playNextVideo() {
                     }
                  } catch(e) { console.warn("Error calling playVideo on next player in timeout:", e); }
 
-                 // Now that the next video is attempting to play, start the audio crossfade.
-                 // crossfadeAudio will manage fading volumes over CROSSFADE_DURATION.
-                crossfadeAudio();
+                 // --- CORRECTION: Switch the logical currentPlayer *before* calling crossfadeAudio ---
+                 // This ensures crossfadeAudio gets the correct references for fading.
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                console.log(`playNextVideo [Data]: Timeout - Logical currentPlayer switched to ${currentPlayer}.`);
+                 // -----------------------------------------------------------------------------------
 
-                // --- CORRECTION 3: RE-EVALUATE stopVideo timing ---
+                 // Now that the next video is attempting to play and currentPlayer is switched, start the audio crossfade.
+                 // crossfadeAudio will use the *new* currentPlayer value to determine previous/next.
+                 // crossfadeAudio itself manages the fading volumes over CROSSFADE_DURATION.
+                crossfadeAudio(); // This function manages the audio fading over CROSSFADE_DURATION
+
+                // --- Handle stopping the previous video ---
                 // Let the crossfade audio handle the volume reduction.
-                // Explicitly stopping the previous player might cause a hard cut if the fade isn't perfect.
-                // It might be safer to just let its volume go to 0 and hide it visually.
-                // Or, if stopping is necessary, do it *after* the audio fade is complete (controlled by isAudioFading flag or another timeout).
-                // For now, let's COMMENT OUT the stopVideo call to test if it resolves the audio cut.
+                // We can stop the previous video *after* the audio fade is complete,
+                // or rely on the volume being 0 and hiding it visually.
+                // Let's keep the stopVideo commented out for now as it was suspected of causing cuts.
+                // If uncommenting, consider putting it in a *separate* timeout after CROSSFADE_DURATION
+                // or inside the crossfadeAudio interval's completion logic.
+
                 /*
-                if (currentPlayerElement) {
-                     try {
-                         if(previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
-                            console.log(`playNextVideo [Data]: Timeout - stopVideo() called on Player ${currentPlayerLogicalNum}`);
-                            previousPlayerInstance.stopVideo();
-                         } else {
-                            console.log(`playNextVideo [Data]: Timeout - Previous Player ${currentPlayerLogicalNum} already stopped or invalid.`);
-                         }
-                    } catch(e) { console.warn("Error stopping previous video:", e); }
+                if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
+                     // Delay stopping the previous video until the crossfade is likely finished
+                     setTimeout(() => {
+                         try {
+                             console.log(`playNextVideo [Data]: Delayed stopVideo() called on Player ${currentPlayerLogicalNum}`);
+                             // Check if it's still the 'previous' player and not already stopped
+                             if ( (currentPlayer === 1 ? player2 : player1) === previousPlayerInstance && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
+                                previousPlayerInstance.stopVideo();
+                             }
+                         } catch(e) { console.warn("Error stopping previous video after delay:", e); }
+                     }, CROSSFADE_DURATION * 1000 + 100); // Add a small buffer
                 }
                 */
-                // -----------------------------------------------
+                // ----------------------------------------
+
 
                 // Cleanup visual of the old player container
                 if (currentPlayerElement) {
@@ -1531,11 +1549,6 @@ async function playNextVideo() {
                 if (nextPlayerElement) {
                     nextPlayerElement.classList.remove('fade-in');
                 }
-
-                // --- Switch LOGICAL active player ---
-                // This switch is crucial for the *next* cycle of monitorPlayers and crossfadeAudio.
-                currentPlayer = currentPlayer === 1 ? 2 : 1;
-                console.log(`playNextVideo [Data]: Timeout - Logical currentPlayer switched to ${currentPlayer}.`);
 
                 // Cleanup data from the PREVIOUS video
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
@@ -1551,19 +1564,18 @@ async function playNextVideo() {
             } catch (timeoutError) {
                 console.error("Error inside playNextVideo setTimeout callback:", timeoutError);
                  isTransitioning = false;
-                 isAudioFading = false; // Ensure audio fade flag is also reset
+                 isAudioFading = false;
                  console.log(`playNextVideo [Data]: *** Transition INTERRUPTED (Timeout Error). Flags reset. ***`);
             } finally {
-                // The isTransitioning flag is now reset in onPlayerStateChange when the *new* player starts playing.
+                // isTransitioning is now reset in onPlayerStateChange when the *new* player starts playing.
                 console.log(`playNextVideo [Data]: Timeout callback FINISHED for index ${nextIndex}.`);
             }
-        }, transitionTimeoutDuration); // The timeout duration for the visual fade
+        }, visualFadeDurationMs); // The timeout duration matches the visual fade
 
     } catch (error) {
         console.error("CRITICAL Error during playNextVideo:", error);
-        // Revert logical state on serious error BEFORE the timeout
         isTransitioning = false;
-        isAudioFading = false; // Ensure audio fade flag is also reset
+        isAudioFading = false;
         const previousVideo = flatList[currentFlatIndex];
          currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
          currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
@@ -1590,26 +1602,22 @@ function crossfadeAudio() {
 
     if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
         console.error("Crossfade Audio: Invalid players at start.");
-        isAudioFading = false; // Ensure reset if invalid
+        isAudioFading = false;
         return;
     }
 
     console.log(`Crossfade START @ ${new Date(fadeStartTime).toLocaleTimeString()}: Fading Out Player ${previousPlayer === player1 ? 1:2}, Fading In Player ${nextPlayer === player1 ? 1:2}`);
     isAudioFading = true; // <<<--- MARK START OF AUDIO FADE
 
-    try {
-      // Ensure the player that is entering has volume 0 at the start of the fade
-      // and the one that is leaving has 100 (this should be the default)
-      nextPlayer.setVolume(0);
-      previousPlayer.setVolume(100);
-    } catch (e) { console.warn("Error setting initial fade volumes:", e); }
+    // Volumes are set to 100/0 just before the timeout in playNextVideo.
+    // The interval will now manage the fade.
 
+    let currentVolume = 100; // Start fade-out from 100
+    let nextVolume = 0;      // Start fade-in from 0
 
-    let currentVolume = 100;
-    let nextVolume = 0;
-    const crossfadeSteps = Math.max(1, Math.floor(CROSSFADE_DURATION * 10)); // More steps for smoother fade (10 per second)
+    const crossfadeSteps = Math.max(1, Math.floor(CROSSFADE_DURATION * 10)); // 10 steps per second
     const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100;
-    const intervalTime = crossfadeSteps > 0 ? Math.max(10, Math.floor(CROSSFADE_DURATION * 1000 / crossfadeSteps)) : 100; // Calculate interval based on steps and duration
+    const intervalTime = crossfadeSteps > 0 ? Math.max(10, Math.floor(CROSSFADE_DURATION * 1000 / crossfadeSteps)) : 100; // Calculate interval time
 
     if (window.crossfadeIntervalId) {
         clearInterval(window.crossfadeIntervalId);
@@ -1630,9 +1638,9 @@ function crossfadeAudio() {
         nextVolume = Math.min(100, nextVolume + volumeStep);
 
         try {
-            // Only set volume if the player instance is still valid and available
-            if(previousPlayer && typeof previousPlayer.setVolume === 'function') previousPlayer.setVolume(currentVolume);
-            if(nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(nextVolume);
+            // Only set volume if the player instance is still valid
+            if(previousPlayer) previousPlayer.setVolume(currentVolume);
+            if(nextPlayer) nextPlayer.setVolume(nextVolume);
         } catch (e) {
              console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Error setting volume:`, e);
              clearInterval(intervalId);
@@ -1648,23 +1656,11 @@ function crossfadeAudio() {
             console.log(`Crossfade audio FINISHED @ ${new Date(fadeEndTime).toLocaleTimeString()} (Duration: ${(fadeEndTime - fadeStartTime)/1000}s).`);
             isAudioFading = false; // <<<--- MARK END OF AUDIO FADE
 
-             // --- Optional: Add a callback or event here if something needs to happen exactly when audio fade ends ---
-             // For example, stopping the previous video if it wasn't done earlier:
-             /*
-             const finalPreviousPlayer = currentPlayer === 1 ? player2 : player1; // Player that was faded out
-              if (finalPreviousPlayer && typeof finalPreviousPlayer.stopVideo === 'function') {
-                   try {
-                        console.log(`Crossfade End: Calling stopVideo() on faded-out Player ${finalPreviousPlayer === player1 ? 1:2}.`);
-                        finalPreviousPlayer.stopVideo();
-                   } catch(e) { console.warn("Crossfade End: Error stopping faded-out video:", e); }
-              }
-              */
-             // ----------------------------------------------------------------------------------------------------
+             // Optional: Add a callback or event here if something needs to happen exactly when audio fade ends
         }
     }, intervalTime);
     window.crossfadeIntervalId = intervalId;
 }
-
 // --- Preguntar para repetir ---
 function askToRepeatPlaylist() {
     // Usar confirm() o un modal más elegante
