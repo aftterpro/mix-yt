@@ -1751,83 +1751,117 @@ async function monitorPlayers() {
 }
 // --- SponsorBlock: Chequear y Saltar Segmento ---
 async function checkAndSkipSegment(playerInstance, forceCheck = false) {
-    // Añadir chequeo de isAudioFading a la guarda existente
-    if ((isTransitioning || isAudioFading) && !forceCheck) { // <<<--- AÑADIR isAudioFading
-         // console.log(`checkAndSkipSegment: Bloqueado (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, Force: ${forceCheck})`);
-         return;
+// app.js
+
+// --- REEMPLAZAR checkAndSkipSegment ---
+async function checkAndSkipSegment(playerInstance, forceCheck = false) {
+    // Guardas iniciales
+    if ((isTransitioning || isAudioFading) && !forceCheck) {
+        // console.log(`checkAndSkipSegment: Bloqueado (T:${isTransitioning}, A:${isAudioFading}, F:${forceCheck})`);
+        return;
     }
-     if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
-         console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
-         return;
-     }
-    // ... (resto de la función checkAndSkipSegment igual que la proporcionada por ti) ...
-     let currentTime;
-     let videoId;
-     try {
-         currentTime = playerInstance.getCurrentTime();
-         const videoData = playerInstance.getVideoData();
-         if (!videoData || !videoData.video_id) {
-             console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
-             return;
-         }
-         videoId = videoData.video_id;
-     } catch (error) {
-         console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
-         return;
-     }
-     if (lastSeekVideoId !== videoId) {
-         lastSeekEndTime = -1;
-         lastSeekVideoId = videoId;
-     }
-     // Obtener segmentos (usar caché o buscar y ordenar)
-     let segmentos = segmentosCache[videoId];
-      if (segmentos === undefined) { // Solo buscar si es undefined (aún no intentado)
-          console.log(`checkAndSkipSegment: Obteniendo segmentos SB por primera vez para ${videoId}`);
-          segmentos = await obtenerSegmentosSponsorBlock(videoId);
-          if (segmentos && segmentos.length > 0) {
-              segmentos.sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
-              segmentosCache[videoId] = segments; // Guardar array ordenado
-              console.log("Segmentos cacheados y ordenados para", videoId, ":", segmentos.length);
-          } else {
-              segmentosCache[videoId] = null; // Marcar como null si no hay o error
-              segmentos = null;
-              console.log("No se encontraron segmentos SB (o hubo error) para", videoId);
-          }
-      } else if(segmentos && !Array.isArray(segmentos)) {
-           // Si está en caché pero no es un array (podría ser null), tratar como sin segmentos
-           segmentos = null;
-      }
+    if (!playerInstance || typeof playerInstance.getCurrentTime !== 'function' || typeof playerInstance.seekTo !== 'function' || typeof playerInstance.getVideoData !== 'function') {
+        console.warn("checkAndSkipSegment: Instancia de reproductor inválida.");
+        return;
+    }
 
-     // Lógica de salto
-     if (segmentos && segmentos.length > 0) {
-         for (const segmento of segmentos) {
-             const startTime = parseFloat(segmento.startTime);
-             const endTime = parseFloat(segmento.endTime);
-             if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) continue;
-             const isInSegment = (startTime === 0 && currentTime >= 0 && currentTime < endTime) ||
-                               (startTime > 0 && currentTime >= startTime && currentTime < endTime);
+    // Obtener datos del video actual
+    let currentTime;
+    let videoId;
+    try {
+        currentTime = playerInstance.getCurrentTime();
+        const videoData = playerInstance.getVideoData();
+        if (!videoData || !videoData.video_id) {
+            // console.warn("checkAndSkipSegment: Datos de video no disponibles aún.");
+            return; // Esperar a que estén disponibles
+        }
+        videoId = videoData.video_id;
+    } catch (error) {
+        console.error("checkAndSkipSegment: Error obteniendo datos del reproductor", error);
+        return;
+    }
 
-             if (isInSegment) {
-                 if (lastSeekEndTime !== endTime) {
-                     // Mover log aquí para asegurar que solo se muestra si se intenta saltar
-                     console.log(`SPONSORBLOCK SKIP (checkAndSkip): Saltando segmento (${segmento.category}) en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
-                     mostrarMensajeFlotante(`SponsorBlock: Saltando ${segmento.category}...`);
-                     try {
-                        playerInstance.seekTo(endTime, true);
-                        lastSeekEndTime = endTime;
-                        lastSeekVideoId = videoId;
-                     } catch(e) { console.error("Error en seekTo:", e); }
+    // Reiniciar último salto si el video cambió
+    if (lastSeekVideoId !== videoId) {
+        lastSeekEndTime = -1;
+        lastSeekVideoId = videoId;
+    }
 
-                     break; // Salir del bucle for después de saltar
+    // Obtener segmentos (usar caché o buscar)
+    let segmentos = segmentosCache[videoId]; // Variable con 'o'
+
+    // Solo buscar en API si no está en caché (undefined)
+    if (segmentos === undefined) {
+        console.log(`checkAndSkipSegment: Obteniendo segmentos SB por primera vez para ${videoId}`);
+        try {
+            segmentos = await obtenerSegmentosSponsorBlock(videoId); // Asigna a 'segmentos'
+            if (segmentos && segmentos.length > 0) {
+                // Ordenar por tiempo de inicio una vez al obtenerlos
+                segmentos.sort((a, b) => parseFloat(a.startTime) - parseFloat(b.startTime));
+                segmentosCache[videoId] = segmentos; // Guardar array ordenado en caché
+                console.log(`Segmentos SB cacheados y ordenados para ${videoId}: ${segmentos.length}`);
+            } else {
+                segmentosCache[videoId] = null; // Marcar como null (sin segmentos o error)
+                segmentos = null; // Asegurar que 'segmentos' sea null
+                 if(segmentos === null) console.log(`checkAndSkipSegment: No se encontraron segmentos SB válidos para ${videoId} (o hubo error en API).`);
+            }
+        } catch (apiError){
+            console.error(`checkAndSkipSegment: Error llamando a obtenerSegmentosSponsorBlock para ${videoId}:`, apiError);
+             segmentosCache[videoId] = null; // Marcar como fallido
+             segmentos = null;
+        }
+
+    } else if (segmentos && !Array.isArray(segmentos)) {
+         // Si estaba en caché pero no era un array (probablemente null), asegurar que sea null
+         segmentos = null;
+    }
+
+    // --- Lógica de salto ---
+    if (segmentos && segmentos.length > 0) { // Verificar que sea un array con elementos
+        // --- Bucle Corregido ---
+        for (const segmento of segmentos) { // <<<--- CORRECCIÓN: usar 'segmentos'
+        // -----------------------
+            const startTime = parseFloat(segmento.startTime);
+            const endTime = parseFloat(segmento.endTime);
+
+            // Validar segmento
+            if (isNaN(startTime) || isNaN(endTime) || endTime <= startTime) {
+                 // console.warn("Segmento inválido:", segmento);
+                 continue; // Saltar este segmento
+            }
+
+            // Comprobar si el tiempo actual está dentro del segmento
+            const isInSegment = (currentTime >= startTime && currentTime < endTime);
+
+            if (isInSegment) {
+                // Saltar solo si NO acabamos de saltar a ESTE punto final
+                if (lastSeekEndTime !== endTime) {
+                    // Mover el log justo antes del seekTo
+                    console.log(`SPONSORBLOCK SKIP: Saltando segmento (${segmento.category}) en t=${currentTime.toFixed(1)}. Saltando a ${endTime.toFixed(1)}.`);
+                    mostrarMensajeFlotante(`SponsorBlock: Saltando ${segmento.category}...`);
+                    try {
+                        playerInstance.seekTo(endTime, true); // Saltar al final del segmento
+                        lastSeekEndTime = endTime; // Recordar a dónde saltamos
+                        lastSeekVideoId = videoId; // Recordar para qué video
+                    } catch (seekError) {
+                         console.error(`Error ejecutando seekTo(${endTime}) en ${videoId}:`, seekError);
+                         // Si seekTo falla, evitar reintentar inmediatamente
+                         lastSeekEndTime = endTime; // Aún así marcar como intentado
+                         lastSeekVideoId = videoId;
+                    }
+                    break; // Salir del bucle for después de intentar saltar
+                }
+                 // Si lastSeekEndTime === endTime, significa que ya saltamos aquí, no hacer nada.
+            } else {
+                 // Si el tiempo actual ya superó el punto al que habíamos saltado,
+                 // permitir futuros saltos a ese mismo punto reseteando lastSeekEndTime.
+                 if (lastSeekEndTime === endTime && currentTime >= endTime + 0.1) { // Añadir pequeño buffer
+                      // console.log(`Reseteando lastSeekEndTime (${lastSeekEndTime}) porque currentTime (${currentTime}) superó el punto.`);
+                      lastSeekEndTime = -1;
                  }
-             } else {
-                   if (lastSeekEndTime === endTime && currentTime >= endTime) {
-                       // console.log(`Reseteando lastSeekEndTime (${lastSeekEndTime}) porque currentTime (${currentTime}) superó el punto.`);
-                       lastSeekEndTime = -1; // Resetear si ya pasamos el punto al que saltamos
-                   }
-             }
-         }
-     }
+            }
+        } 
+    } 
 }
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
