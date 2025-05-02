@@ -54,7 +54,6 @@ function loadYouTubeAPI() {
 }
 // Esta función es llamada por la API de YouTube cuando está lista
 function onYouTubeIframeAPIReady() {
-    console.log("API de YouTube cargada y lista.");
     initializePlayers();
 }
 
