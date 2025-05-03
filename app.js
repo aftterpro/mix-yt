@@ -2017,8 +2017,9 @@ function checkAndSkipSegment(player, forceCheck = false) {
         console.log(`checkAndSkipSegment: Video cambió a ${videoId}. Reseteando lastSeekEndTime.`);
         lastSeekEndTime = -1; // Resetear para el nuevo video
         lastSeekVideoId = videoId; // Rastrear videoId actual
-        // Cuando el video cambia, el caché para el video anterior queda, y el nuevo video puede estar undefined o 'fetching'.
-        // La lógica de obtención está abajo.
+        // Cuando el video cambia, el caché para el video anterior queda.
+        // La entrada para el nuevo videoId estará undefined, 'fetching', cacheada, o null de intentos previos fallidos.
+        // La lógica de obtención y procesamiento está abajo.
     } else {
          if (lastSeekEndTime !== -1 && currentTime >= lastSeekEndTime + 0.2) { // Agregar un pequeño buffer
              console.log(`checkAndSkipSegment: Reseteando lastSeekEndTime (${lastSeekEndTime.toFixed(2)}) porque currentTime (${currentTime.toFixed(2)}) pasó el punto.`);
@@ -2031,28 +2032,37 @@ function checkAndSkipSegment(player, forceCheck = false) {
     }
 
     // --- Buscar Segmentos ---
-    const segments = segmentosCache[videoId];
+    const segments = segmentosCache[videoId]; // Obtener el estado actual del caché
 
-    // Si los segmentos aún no están en caché (undefined) o si se están obteniendo ('fetching'),
-    // iniciar la obtención si es undefined y luego salir.
+    // Si segmentosCache[videoId] es undefined, iniciamos la obtención (que establece el estado a 'fetching').
+    // Luego salimos de esta comprobación para esperar el resultado.
     if (segments === undefined) {
         console.log(`checkAndSkipSegment: Segmentos undefined para ${videoId}. Iniciando obtención.`);
-        obtenerSegmentosSponsorBlock(videoId); // Iniciar obtención (asíncrona)
-        return; // Los segmentos no están disponibles AHORA
+        // obtenerSegmentosSponsorBlock establece segmentosCache[videoId] a 'fetching' sincrónicamente
+        // antes de realizar la llamada asíncrona.
+        obtenerSegmentosSponsorBlock(videoId);
+        return; // Salir de checkAndSkipSegment para este tick del monitor
     }
+
+    // Si segmentosCache[videoId] es 'fetching', significa que la obtención está en curso.
+    // Simplemente salimos de esta comprobación para esperar a que termine.
      if (segments === 'fetching') {
          // console.log(`SB Check: Segmentos aún obteniendo para ${videoId}. Esperando.`);
-         return; // La obtención está en curso, esperar
+         return; // Salir de checkAndSkipSegment para este tick del monitor
      }
 
-    // Si llegamos aquí, 'segments' es un array ([]) o [segmentos...].
-    // Si es [], no hay segmentos que verificar.
-    if (!segments || segments.length === 0) {
-        // console.log(`SB Check: No hay segmentos para verificar para ${videoId} (caché vacío).`);
-        return;
+    // --- CORRECCIÓN: Manejar caso null o array vacío ---
+    // Si llegamos aquí, 'segments' es un array ([] o [segmentos...]) o null (si la obtención falló).
+    // Si es null o un array vacío, no hay segmentos que verificar. Salir de esta comprobación.
+    if (segments === null || segments.length === 0) {
+        // console.log(`SB Check: No hay segmentos para verificar para ${videoId} (caché nulo o vacío).`);
+        return; // Salir si null o array vacío
     }
 
-    // Encontrar un segmento que contenga el tiempo actual, excluyendo segmentos que acabamos de saltar.
+    // Si llegamos aquí, 'segments' es un array no vacío [segmentos...].
+    // Proceder a encontrar y saltar segmentos.
+
+    // --- Procesar Segmentos (Si hay) ---
     const segmentToSkip = segments.find(segment => {
         const start = parseFloat(segment.segment[0]);
         const end = parseFloat(segment.segment[1]);
@@ -2068,6 +2078,7 @@ function checkAndSkipSegment(player, forceCheck = false) {
         return isWithinSegment && isAfterLastSeek;
     });
 
+    // Si se encontró un segmento para saltar
     if (segmentToSkip) {
         const segmentStart = parseFloat(segmentToSkip.segment[0]);
         const segmentEnd = parseFloat(segmentToSkip.segment[1]);
@@ -2083,12 +2094,12 @@ function checkAndSkipSegment(player, forceCheck = false) {
             // Y el crossfade AÚN NO ha sido disparado por outro, disparamos playNextVideo.
             if (timeRemainingInSegment <= CROSSFADE_DURATION + 0.5 && timeRemainingInSegment > 0 && !isTransitioning && !hasOutroCrossfadeStarted) {
                  console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en outro.`);
-                 hasOutroCrossfadeStarted = true; // Establecer flag
+                 hasOutroCrossfadeStarted = true; // Establecer flag para evitar doble disparo por outro/tiempo
                  playNextVideo(); // Iniciar crossfade
             } else {
                  console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) fuera de la ventana de crossfade (${CROSSFADE_DURATION}s). No se realiza salto inmediato.`);
             }
-             // NO realizar seekTo para outros.
+             // NO realizar seekTo para outros. Dejar que la reproducción o el crossfade lleguen al final.
 
         } else {
             // --- Manejar Otros Tipos de Segmentos (Sponsor, Self-promo, etc.) ---
@@ -2097,51 +2108,76 @@ function checkAndSkipSegment(player, forceCheck = false) {
 
             try {
                 player.seekTo(skipToTime, true); // Realizar el salto
-                lastSeekEndTime = skipToTime; // Registrar el tiempo de salto
+                lastSeekEndTime = skipToTime; // Registrar el tiempo de salto para evitar re-saltos
             } catch (e) {
                 console.error("SPONSORBLOCK SKIP: Error realizando seekTo:", e);
             }
         }
     }
 
-     // --- hasOutroCrossfadeStarted se resetea en onPlayerStateChange (estado PLAYING) ---
+     // --- hasOutroCrossfadeStarted se resetea en onPlayerStateChange (estado PLAYING del NUEVO video) ---
 }
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
-     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
+    // Si ya hay segmentos en caché (es un array) o ya se está obteniendo ('fetching'), no hacer nada.
+    if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) {
+         // console.log(`SB Fetch: Segmentos ya en caché o obteniendo para ${videoId}. Saliendo.`);
+         return null; // O simplemente return; si la función no necesita retornar un valor aquí
+    }
+
+    // Si llegamos aquí, segmentosCache[videoId] es undefined.
+    // Marcar el estado como 'fetching' SINCRÓNICAMENTE ANTES de la llamada await fetch.
+    segmentosCache[videoId] = 'fetching';
+    console.log(`SB Fetch: Iniciando obtención para ${videoId}. Marcando estado 'fetching'.`);
+
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // Tu userId
     const apiUrl = `/api/segments/${videoId}`; // URL relativa a tu función Netlify
-    console.log(`Llamando a la API local SB: ${apiUrl}`);
+    console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
 
     try {
+        // --- Tu llamada fetch con el encabezado ---
         const response = await fetch(apiUrl, {
-             headers: {
-                  'X-UserID': userId
-             }
+            headers: {
+                'X-UserID': userId // Incluyendo tu encabezado X-UserID
+            }
         });
+
         if (!response.ok) {
-            // El cuerpo del error debería ser manejado por la función Netlify,
-            // aquí solo registramos el status. La función Netlify debe devolver [] para 404.
-             console.error(`Error desde la API SB (${apiUrl}): ${response.status} ${response.statusText}`);
-             // Lanzar error para que sea capturado y marcado como 'null' en caché
-             throw new Error(`API SB Error: ${response.status}`);
+            // Si la respuesta no es exitosa, lanzar un error que será capturado abajo.
+             console.error(`SB Fetch: Error desde la API SB (${apiUrl}): ${response.status} ${response.statusText}`);
+             // Al lanzar el error, el bloque catch se ejecutará y segmentosCache[videoId] se establecerá a null.
+             throw new Error(`API SB Error: ${response.status} ${response.statusText}`);
         }
+
         const data = await response.json();
+
         if (!Array.isArray(data)) {
-             console.warn(`La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
-             return null; // Devolver null si la respuesta no es un array
+             console.warn(`SB Fetch: La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
+             // Si la respuesta no es un array, consideramos que no hay segmentos válidos.
+             // Establecemos segmentosCache[videoId] a null (en el catch de abajo) y retornamos null.
+              throw new Error(`API SB Error: Respuesta no es un array`);
         }
-        console.log(`Segmentos recibidos de API SB para ${videoId}:`, data.length);
+
+        console.log(`SB Fetch: Segmentos recibidos de API SB para ${videoId}: ${data.length}`);
         // Añadir duración del video si viene en el primer segmento (algunas APIs SB lo incluyen)
         if (data.length > 0 && data[0].videoDuration) {
-             console.log(`Duración del video según SB para ${videoId}: ${data[0].videoDuration}s`);
-             // Se puede usar esta duración en monitorPlayers
+             console.log(`SB Fetch: Duración del video según SB para ${videoId}: ${data[0].videoDuration}s`);
+             // Puedes almacenar esto si lo necesitas, por ejemplo: segmentosCache[videoId].videoDuration = data[0].videoDuration;
         }
-        return data; // Devolver array (puede ser vacío)
+
+        // Si todo fue bien y data es un array, almacenarlo en caché
+        segmentosCache[videoId] = data; // Almacenar el array (vacío o con segmentos)
+        return data; // Devolver el array (puede ser vacío)
 
     } catch (error) {
-        console.error(`Error en fetch/procesamiento SB para ${apiUrl}:`, error);
-        return null; // Devolver null en caso de error de red o status no-ok
+        console.error(`SB Fetch: Error en fetch/procesamiento SB para ${apiUrl}:`, error);
+        // En caso de cualquier error (red, status no-ok, respuesta no-array),
+        // establecer segmentosCache[videoId] a null para indicar que falló la obtención
+        // y evitar reintentos de fetch.
+        segmentosCache[videoId] = null; // Establecer a null en caché
+        return null; // Devolver null para indicar el fallo
     }
+    // Después de fetch (exitoso o fallido), segmentosCache[videoId] ya no será 'fetching'.
 }
 
 
