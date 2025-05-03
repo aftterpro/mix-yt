@@ -337,7 +337,7 @@ const displaySearchResultsPiped = (results, append = false) => {
         thumbnailContainer.appendChild(thumbnail);
         if (video.duration && video.duration > 0) {
             const durationSpan = document.createElement('span');
-            durationSpan.textContent = formatDuration2(video.duration);
+            durationSpan.textContent = formatDuration(video.duration);
             durationSpan.classList.add('duration');
             thumbnailContainer.appendChild(durationSpan);
         }
@@ -394,18 +394,20 @@ function handleSearchResultAddClick(event, videoData) {
     event.stopPropagation(); // Detener propagación
 
     const addButton = event.currentTarget; // El botón que fue clickeado
-    // Filtrar playlists cargadas por el usuario (no la manual si está vacía)
-    const userLoadedPlaylists = playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
+// Determine if there are any playlists loaded that are not the empty manual playlist
+ const userLoadedPlaylists = playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
 
-    if (userLoadedPlaylists.length === 0) {
-        // Caso 2 (o inicio): No hay playlists cargadas (o solo manual vacía), añadir directo a manual
-        console.log("Añadiendo directo a playlist manual.");
-        addVideoToManualPlaylist(videoData);
-    } else {
-        // Caso 1 o 3: Hay playlists cargadas, mostrar menú para elegir
-        console.log("Mostrando menú para seleccionar playlist destino.");
-        showAddToPlaylistMenu(addButton, videoData);
-      }
+if (userLoadedPlaylists.length === 0) {
+    // Case: No playlists loaded (or only manual is present and empty). Add directly to the manual playlist.
+    console.log("No loaded playlists or only empty manual, adding direct to manual playlist.");
+    addVideoToManualPlaylist(videoData); // Call the function to add to the manual playlist
+} else {
+    // Case: There are other playlists available. Show the menu to let the user choose.
+    console.log("Showing menu to select destination playlist (Add action).");
+    // Call the new generic popup function with the action type 'add'
+    // No sourcePlaylistId is needed for 'add' from search results.
+    showPlaylistSelectionPopup(addButton, videoData, 'add'); // <-- NEW CALL HERE
+  }
 }
 // --- NUEVA: Función específica para añadir a "Mis Vídeos Añadidos" ---
 function addVideoToManualPlaylist(videoData) {
@@ -448,75 +450,6 @@ function addVideoToManualPlaylist(videoData) {
 
     updatePlaylistsUI(); // Actualizar la UI
     checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
-}
-
-// --- NUEVA: Función para mostrar Menú Emergente de Playlists Destino ---
-function showAddToPlaylistMenu(buttonElement, videoData) {
-    // Cerrar cualquier otro menú emergente similar abierto
-    closeAddToPlaylistMenus();
-
-    const menu = document.createElement('div');
-    menu.className = 'add-to-playlist-menu'; // Clase para estilo
-
-    // Filtrar playlists donde añadir (todas las existentes)
-    const availablePlaylists = playlistsData; // O filtrar si es necesario
-
-    if (availablePlaylists.length === 0) {
-        // Si por alguna razón no hay listas (ni manual), añadir a manual
-        addVideoToManualPlaylist(videoData);
-        return;
-    }
-
-    availablePlaylists.forEach(playlist => {
-        const item = document.createElement('button');
-        item.className = 'add-to-playlist-menu-item';
-        item.dataset.targetPlaylistId = playlist.id;
-        // Miniatura y Título
-        item.innerHTML = `
-            <img src="${playlist.thumbnailUrl}" alt="" loading="lazy">
-            <span>${playlist.name}</span>
-        `;
-        item.title = `Añadir a "${playlist.name}"`;
-
-        item.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const targetPId = event.currentTarget.dataset.targetPlaylistId;
-            console.log(`Añadiendo ${videoData.videoId} a playlist ${targetPId}`);
-            addVideoToSpecificPlaylist(videoData, targetPId); // Llamar a la función de inserción
-            closeAddToPlaylistMenus(); // Cerrar este menú
-        });
-        menu.appendChild(item);
-    });
-
-    // Posicionar el menú cerca del botón
-    document.body.appendChild(menu); // Añadir al body para evitar problemas de overflow
-    const buttonRect = buttonElement.getBoundingClientRect();
-    // Posicionar debajo o encima del botón, centrado horizontalmente
-    menu.style.position = 'absolute';
-    menu.style.top = `${window.scrollY + buttonRect.bottom + 5}px`; // Debajo del botón
-    menu.style.left = `${window.scrollX + buttonRect.left + (buttonRect.width / 2) - (menu.offsetWidth / 2)}px`; // Centrado
-
-    // Ajustar si se sale de la pantalla (simplificado)
-    if (menu.offsetLeft < 10) menu.style.left = '10px';
-    if (menu.offsetLeft + menu.offsetWidth > window.innerWidth - 10) {
-         menu.style.left = `${window.innerWidth - menu.offsetWidth - 10}px`;
-    }
-     // Si se sale por abajo, ponerlo encima
-     if(menu.offsetTop + menu.offsetHeight > window.innerHeight - 10) {
-         menu.style.top = `${window.scrollY + buttonRect.top - menu.offsetHeight - 5}px`;
-     }
-    // Añadir listener para cerrar si se hace click fuera
-    setTimeout(() => { // Pequeño delay para evitar que se cierre por el mismo click que lo abrió
-         document.addEventListener('click', closeAddToPlaylistMenus, { once: true, capture: true });
-         // Detener propagación en el menú mismo para evitar cierre inmediato
-         menu.addEventListener('click', e => e.stopPropagation());
-    }, 0);
-
-}
-
-// --- NUEVA: Función para cerrar todos los menús emergentes de añadir ---
-function closeAddToPlaylistMenus() {
-    document.querySelectorAll('.add-to-playlist-menu').forEach(menu => menu.remove());
 }
 // --- NUEVA: Función para añadir a una Playlist ESPECÍFICA ---
 function addVideoToSpecificPlaylist(videoData, targetPlaylistId) {
@@ -575,15 +508,6 @@ function checkAndEnablePlayButton() {
          botonPlay.disabled = false;
      }
 }
-
-// Función auxiliar para formatear duración (Segundos -> MM:SS)
-function formatDuration2(durationInSeconds) {
-    if (isNaN(durationInSeconds) || durationInSeconds <= 0) return "0:00";
-    const minutes = Math.floor(durationInSeconds / 60);
-    const seconds = Math.floor(durationInSeconds % 60);
-    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-}
-
 // --- Scroll Infinito ---
 const handleScroll = () => {
     if (isLoadingMore || !nextPageContext || !currentSearchQuery) {
@@ -872,7 +796,6 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
     moveToPlaylistButton.title = 'Mover este video a otra playlist';
     moveToPlaylistButton.innerHTML = '<i class="fa-solid fa-folder-tree"></i> Mover a playlist';
     // --- NO AÑADIR EL SUBMENÚ AQUÍ DENTRO ---
-    // const submenu = document.createElement('div'); ... (Eliminar esta parte)
     menuContent.appendChild(moveToPlaylistButton); // Añadir solo el botón al menú principal
 
     // --- Añadir menú al item ---
@@ -881,21 +804,33 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
     item.appendChild(deleteMenu);
 
     // --- Listeners del Menú Principal (3 puntos) ---
-    menuButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        const wasOpen = menuContent.style.display === 'block';
-        // Cerrar TODOS los menús contextuales y popups antes de abrir este
-        closeAllContextMenus();
-        closeMoveToPlaylistPopups(); // Cerrar popups de mover
-        // Abrir/cerrar este menú
-        if (!wasOpen) {
-            menuContent.style.display = 'block';
-             // Posicionar menú si se sale (opcional, puede hacerse con CSS)
-            // const rect = menuContent.getBoundingClientRect();
-            // if (rect.bottom > window.innerHeight) { menuContent.style.bottom = '100%'; menuContent.style.top = 'auto';}
-            // if (rect.right > window.innerWidth) { menuContent.style.right = '100%'; menuContent.style.left = 'auto';}
-        }
-    });
+moveToPlaylistButton.addEventListener('click', (event) => {
+    event.stopPropagation(); // Stop propagation from the button click
+    console.log("Click on 'Mover a playlist'");
+
+    // Define the video data and source playlist ID needed for the move action
+    const sourceVideoId = video.videoId; // Get video ID from the video object passed to createPlaylistItemElement
+    const sourcePlaylistId = playlistId; // Get playlist ID from the parameter passed to createPlaylistItemElement
+
+    // Create a simplified videoData object needed by the generic popup handler
+    // The moveVideo function ultimately only needs the videoId, but passing more context can be helpful.
+    const videoDataForMove = {
+        videoId: sourceVideoId,
+        title: video.title,
+        thumbnail: video.thumbnail,
+        duration: video.duration,
+    };
+
+    // Call the new generic popup function with:
+    // - The menuButton (3 dots button) as the anchor element for positioning
+    // - The video data for the video being moved
+    // - The action type 'move'
+    // - The sourcePlaylistId from which the video is being moved
+    showPlaylistSelectionPopup(menuButton, // Anchor to the 3-dots button element
+                                 videoDataForMove,
+                                 'move', // Indicate move action
+                                 sourcePlaylistId); // Pass source playlist ID
+});
 
     // --- Listener para Eliminar (sin cambios) ---
     deleteButton.addEventListener('click', (event) => {
@@ -947,152 +882,166 @@ function createPlaylistItemElement(video, playlistId, playingVideoId) {
                mostrarMensajeFlotante("Error al calcular la posición para 'Reproducir Despues'.");
          }
     });
-
-    // --- Listener para botón "Mover a playlist" (MODIFICADO) ---
-    moveToPlaylistButton.addEventListener('click', (event) => {
-        event.stopPropagation(); // Detener la propagación del evento de click
-        console.log("Click en 'Mover a playlist'");
-
-        // Cerrar el menú principal donde está este botón
-        // menuContent.style.display = 'none'; // Opcional: cerrarlo inmediatamente
-
-        // Llamar a la nueva función que muestra el menú flotante
-        showMoveToPlaylistPopup(menuButton, // Posicionar relativo al botón de 3 puntos
-                                 video.videoId,
-                                 playlistId);
-    });
-
-    // Devolver el elemento item completo
     return item;
-// Fin de createPlaylistItemElement
-}
-// --- NUEVA: Función para mostrar Popup "Mover a Playlist" ---
-function showMoveToPlaylistPopup(anchorElement, sourceVideoId, sourcePlaylistId) {
-    // Cerrar cualquier otro popup de este tipo abierto
-    closeMoveToPlaylistPopups();
-    // Cerrar menús contextuales principales también
+} // Fin de createPlaylistItemElement
+// --- NEW: Generic Playlist Selection Popup ---
+// Handles both "Add to Playlist" and "Move to Playlist"
+function showPlaylistSelectionPopup(anchorElement, videoData, actionType, sourcePlaylistId = null) {
+    // Close any other open popups of this type
+    closePlaylistSelectionPopups();
+    // Also close the main context menus (3 dots menu) to avoid overlap
     closeAllContextMenus();
 
     const menu = document.createElement('div');
-    // Usar clase similar al popup de añadir para reutilizar estilos
-    menu.className = 'move-to-playlist-popup-menu add-to-playlist-menu'; // Reutilizar clase
+    // Use a specific class for this popup type, reuse styling from add-to-playlist-menu
+    menu.className = 'playlist-selection-popup-menu add-to-playlist-menu';
 
-    // Filtrar playlists destino (todas menos la actual)
-    const targetPlaylists = playlistsData.filter(p => p.id !== sourcePlaylistId);
+    let availablePlaylists = playlistsData; // Start with all playlists
+    let popupTitleText = '';
+    let itemClickHandler = null;
 
-    if (targetPlaylists.length === 0) {
-        mostrarMensajeFlotante("No hay otras playlists a las que mover.");
-        return; // No mostrar menú si no hay destino
+    if (actionType === 'add') {
+        // Logic for adding from search results
+        popupTitleText = "Add video to:";
+        // No filtering needed, allow adding to any playlist including manual
+        // The addVideoToSpecificPlaylist function handles duplicate checks.
+        availablePlaylists = playlistsData;
+
+        itemClickHandler = (event) => {
+            event.stopPropagation(); // Prevent event from bubbling further
+            const targetPId = event.currentTarget.dataset.targetPlaylistId;
+            console.log(`Adding ${videoData.videoId} to playlist ${targetPId}`);
+            // Call the function that handles adding to a specific playlist
+            addVideoToSpecificPlaylist(videoData, targetPId);
+            // Close the popup after an item is clicked
+            closePlaylistSelectionPopups();
+        };
+
+    } else if (actionType === 'move') {
+        // Logic for moving from within a playlist
+        popupTitleText = "Move video to:";
+        // Filter out the source playlist itself, as you can't move a video to the playlist it's already in via this menu.
+        availablePlaylists = playlistsData.filter(p => p.id !== sourcePlaylistId);
+
+        // If there are no other playlists to move to, show a message and don't show the popup.
+        if (availablePlaylists.length === 0) {
+            mostrarMensajeFlotante("No other playlists to move to.");
+            return;
+        }
+
+        itemClickHandler = (event) => {
+            event.stopPropagation(); // Prevent event from bubbling further
+            const targetPId = event.currentTarget.dataset.targetPlaylistId;
+            console.log(`Moving ${videoData.videoId} from ${sourcePlaylistId} to ${targetPId}`);
+            // When moving via this menu, insert at the start of the target list (index 0)
+            const targetInsertionIndex = 0;
+            // Use the general moveVideo function which handles source and target playlists
+            moveVideo(videoData.videoId, sourcePlaylistId, targetPId, targetInsertionIndex);
+            // Close the popup after an item is clicked
+            closePlaylistSelectionPopups();
+        };
+    } else {
+        // Handle case where actionType is invalid
+        console.error("showPlaylistSelectionPopup: Invalid actionType:", actionType);
+        return;
     }
 
-    // Crear título para el popup (opcional)
+     // Create the title element for the popup
     const title = document.createElement('div');
-    title.textContent = "Mover video a:";
-    title.className = 'move-to-playlist-popup-title'; // Clase para estilo
+    title.textContent = popupTitleText;
+    // Use styling from both move and add titles for flexibility
+    title.className = 'playlist-selection-popup-title move-to-playlist-popup-title add-to-playlist-popup-title';
     menu.appendChild(title);
 
-
-    targetPlaylists.forEach(playlist => {
+    // Create buttons for each available playlist
+    availablePlaylists.forEach(playlist => {
         const item = document.createElement('button');
-        // Usar clase similar al popup de añadir para reutilizar estilos
-        item.className = 'move-to-playlist-popup-item add-to-playlist-menu-item'; // Reutilizar clase
-        item.dataset.targetPlaylistId = playlist.id;
+        // Use styling from previous item types
+        item.className = 'playlist-selection-popup-item add-to-playlist-menu-item';
+        item.dataset.targetPlaylistId = playlist.id; // Store the target playlist ID on the button
+
+        // Add thumbnail and name to the button
         item.innerHTML = `
-            <img src="${playlist.thumbnailUrl}" alt="" loading="lazy">
+            <img src="${playlist.thumbnailUrl || 'https://via.placeholder.com/50?text=?'}"" alt="" loading="lazy">
             <span>${playlist.name}</span>
         `;
-        item.title = `Mover a "${playlist.name}"`;
+        item.title = `${popupTitleText} "${playlist.name}"`; // Dynamic button title attribute
 
-        item.addEventListener('click', (event) => {
-            event.stopPropagation();
-            const targetPId = event.currentTarget.dataset.targetPlaylistId;
-            console.log(`Mover ${sourceVideoId} de ${sourcePlaylistId} a ${targetPId}`);
-            const targetInsertionIndex = 0; // Mover al inicio de la lista destino
-
-            moveVideo(sourceVideoId, sourcePlaylistId, targetPId, targetInsertionIndex);
-            closeMoveToPlaylistPopups(); // Cerrar este popup
-        });
+        // Add the previously defined click handler
+        item.addEventListener('click', itemClickHandler);
         menu.appendChild(item);
     });
 
-    // Posicionar el menú cerca del botón de 3 puntos (anchorElement)
+    // --- Positioning Logic ---
+    // Append the menu to the body to avoid overflow issues within smaller containers
     document.body.appendChild(menu);
+    // Get the position of the element that triggered the popup (e.g., the '+' or '...' button)
     const anchorRect = anchorElement.getBoundingClientRect();
 
-    // Calcular posición inicial (ej. debajo y alineado a la izquierda del botón de 3 puntos)
-    let top = window.scrollY + anchorRect.bottom + 2;
+    // Calculate initial position (e.g., aligned to the left/bottom of the anchor element)
+    let top = window.scrollY + anchorRect.bottom + 2; // 2px padding below anchor
     let left = window.scrollX + anchorRect.left;
 
     menu.style.position = 'absolute';
     menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
-    menu.style.minWidth = `${anchorRect.width + 50}px`; // Ancho mínimo basado en botón
+    // Set a minimum width based on the anchor element, plus some padding
+    menu.style.minWidth = `${anchorRect.width + 50}px`;
+    menu.style.zIndex = '1000'; // Ensure it's above other content
 
-    // --- Ajustar Posición para que quepa en pantalla ---
-    // Retrasar ligeramente el chequeo para asegurar que el menú tenga dimensiones
+    // --- Adjust Position to fit on screen ---
+    // Use requestAnimationFrame to ensure the menu is in the DOM and has dimensions before calculating adjustments
     requestAnimationFrame(() => {
         const menuRect = menu.getBoundingClientRect();
 
-        // Ajustar horizontalmente si se sale
-        if (menuRect.right > window.innerWidth - 10) {
-            left = window.scrollX + anchorRect.right - menuRect.width; // Alinear a la derecha
-            menu.style.left = `${left}px`;
+        // Adjust horizontally if it goes off the right edge
+        if (menuRect.right > window.innerWidth - 10) { // 10px margin from the right edge
+            // Align the right edge of the menu with the right edge of the anchor (or near it)
+            left = window.scrollX + anchorRect.right - menuRect.width;
+            // Ensure it doesn't go off the left edge after adjusting
+            menu.style.left = `${Math.max(10, left)}px`;
         }
-        if (menuRect.left < 10) { // Asegurar que no se salga por la izquierda
+        // Adjust horizontally if it goes off the left edge (less common if aligning left, but good practice)
+        if (menuRect.left < 10) {
             menu.style.left = '10px';
         }
 
-        // Ajustar verticalmente si se sale por abajo
-        if (menuRect.bottom > window.innerHeight - 10) {
-            top = window.scrollY + anchorRect.top - menuRect.height - 2; // Poner encima
-             menu.style.top = `${top}px`;
+        // Adjust vertically if it goes off the bottom edge
+        if (menuRect.bottom > window.innerHeight - 10) { // 10px margin from the bottom edge
+            // Position the menu above the anchor element
+            top = window.scrollY + anchorRect.top - menuRect.height - 2; // 2px padding above anchor
+            // Ensure it doesn't go off the top edge after adjusting
+             menu.style.top = `${Math.max(10, top)}px`;
         }
-         if (menuRect.top < 10) { // Asegurar que no se salga por arriba
+         // Adjust vertically if it goes off the top edge (less common)
+         if (menuRect.top < 10) {
             menu.style.top = '10px';
         }
     });
 
 
-    // Añadir listener para cerrar si se hace click fuera
-    setTimeout(() => { // Delay para evitar autocierre
-         document.addEventListener('click', closeMoveToPlaylistPopups, { once: true, capture: true });
-         // Detener propagación en el menú mismo
+    // --- Add listener to close if clicked outside ---
+    // Use a small timeout to prevent the click that opened the menu from immediately closing it
+    setTimeout(() => {
+         // Add a one-time event listener on the document during the capture phase
+         // The capture phase ensures the click is intercepted before it reaches elements inside the menu.
+         document.addEventListener('click', closePlaylistSelectionPopups, { once: true, capture: true });
+         // Stop propagation of clicks *inside* the menu itself to prevent the document listener from triggering
          menu.addEventListener('click', e => e.stopPropagation());
-    }, 10); // Aumentar delay si es necesario
+    }, 10); // 10ms delay should be sufficient
+
 }
 
-// --- NUEVA: Función para cerrar TODOS los popups de "Mover a" ---
-function closeMoveToPlaylistPopups() {
-    document.querySelectorAll('.move-to-playlist-popup-menu').forEach(menu => menu.remove());
+// --- NEW: Generic function to close playlist selection popups ---
+// Finds all elements with the class 'playlist-selection-popup-menu' and removes them from the DOM.
+function closePlaylistSelectionPopups() {
+    document.querySelectorAll('.playlist-selection-popup-menu').forEach(menu => menu.remove());
 }
-
 // --- NUEVA: Función para cerrar TODOS los menús contextuales (3 puntos) ---
 function closeAllContextMenus() {
      document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(menu => {
           menu.style.display = 'none';
      });
-}
-
-// --- NUEVA: Mover video DENTRO de una playlist ---
-function moveVideoWithinPlaylist(playlistId, videoId, targetIndex) {
-     const playlist = playlistsData.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
-    if (videoIndex === -1) return;
-
-    // Clamp targetIndex
-    targetIndex = Math.max(0, Math.min(targetIndex, playlist.videos.length -1));
-
-    if(videoIndex === targetIndex) return; // No mover si ya está ahí
-
-    const [movedVideo] = playlist.videos.splice(videoIndex, 1); // Quitar video
-    playlist.videos.splice(targetIndex, 0, movedVideo); // Insertar en nueva posición
-
-    console.log(`Video ${videoId} movido a índice ${targetIndex} en playlist ${playlistId}`);
-    updatePlaylistsUI(); // Actualizar UI
-    // Recalcular índice aplanado si es necesario
-     updateCurrentPlayingIndex();
 }
 // --- Función para alternar expansión/colapso ---
 function togglePlaylistExpansion(playlistId) {
@@ -2345,17 +2294,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Cerrar menús contextuales si se hace click fuera
 document.addEventListener('click', (event) => {
-    // Cerrar menús contextuales si el click es fuera de ellos
+    // Close contextual menus (the 3 dots menu) if the click target is not inside a .delete-menu
     if (!event.target.closest('.delete-menu')) {
         closeAllContextMenus();
     }
-    // Cerrar popups de mover si el click es fuera de ellos
-     if (!event.target.closest('.move-to-playlist-popup-menu')) {
-        closeMoveToPlaylistPopups();
+    // Close the generic playlist selection popups if the click target is not inside a .playlist-selection-popup-menu
+    // Ensure this new class is used for both Add and Move popups (which it is in the new code)
+    if (!event.target.closest('.playlist-selection-popup-menu')) {
+        closePlaylistSelectionPopups(); // <-- NEW CALL HERE
     }
-     // Cerrar popups de añadir desde búsqueda si el click es fuera
-      if (!event.target.closest('.add-to-playlist-menu')) {
-        closeAddToPlaylistMenus(); // Asumiendo que tienes esta función
-    }
-
-}, true); // Usar fase de captura
+}, true); // Keep using the capture phase for better reliability
