@@ -1,13 +1,7 @@
 /* --- Variables relacionadas con efectos / crossfade --- */
 :root {
   --crossfade-duration: 15s; /* ESTE VALOR DEBE COINCIDIR CON TU VARIABLE JS CROSSFADE_DURATION */
-  /* ... otras variables relacionadas con efectos si las tienes ... */
 }
-
-/* --- Estilos para los Estados del Efecto Crossfade --- */
-/* Estos definen los VALORES OBJETIVO (opacity, filter, z-index) que el reproductor alcanzará */
-/* cuando se le apliquen las clases .fade-out, .fade-in o .hidden. */
-
 /* Estado para el reproductor que se está desvaneciendo (OUT) */
 /* Cuando un elemento .video-player tiene la clase .fade-out */
 .fade-out {
@@ -15,15 +9,12 @@
     filter: blur(8px); /* Objetivo: desenfoque */
     z-index: 1; /* <-- CORREGIDO: Debe estar POR DEBAJO del reproductor entrante durante la transición */
 }
-
-/* Estado para el reproductor que está apareciendo (IN) */
 /* Cuando un elemento .video-player tiene la clase .fade-in */
 .fade-in {
     opacity: 1; /* Objetivo: opacidad 1 (completamente visible) */
     filter: blur(0px); /* Objetivo: sin desenfoque */
     z-index: 2; /* <-- CORREGIDO: Debe estar POR ENCIMA del reproductor saliente durante la transición */
 }
-
 /* Estado para el reproductor que está completamente OCULTO (después de fade out) */
 /* Cuando un elemento .video-player tiene la clase .hidden */
 .hidden {
@@ -32,21 +23,4 @@
     display: none !important; /* <-- AGREGADO: Eliminar del flujo del documento cuando no está activo */
     pointer-events: none !important; /* Evitar cualquier evento de ratón/táctil */
     z-index: 0; /* Enviar al fondo cuando no está activo */
-    /* No se necesita propiedad transition aquí, ya que display cambia inmediatamente */
 }
-
-/* ... otras reglas en efecto.css ... */
-/* La regla .video-player NO debe estar aquí si la moviste a styles.css */
-/* Si usas IDs directamente, las reglas #player1.fade-out, #player2.fade-out, etc. estarían aquí */
-/* Ejemplo si usas IDs en lugar de la clase .video-player: */
-/*
-#player1.fade-out, #player2.fade-out {
-    opacity: 0; filter: blur(8px); z-index: 1;
-}
-#player1.fade-in, #player2.fade-in {
-    opacity: 1; filter: blur(0px); z-index: 2;
-}
-#player1.hidden, #player2.hidden {
-    opacity: 0 !important; visibility: hidden !important; display: none !important; pointer-events: none !important; z-index: 0;
-}
-*/
