@@ -135,147 +135,102 @@ function onPlayerError(event) {
     }
 }
 function onPlayerStateChange(event) {
-   const playerState = event.data; // El nuevo estado del reproductor (número)
-    // Determinar qué reproductor disparó el evento (Player 1 o Player 2)
+    const playerState = event.data;
     const changedPlayerNum = event.target === player1 ? 1 : 2;
-    // Obtener el ID del video en el reproductor que disparó el evento
-    const videoId = event.target.getVideoData()?.video_id; // Usar optional chaining para seguridad
-    // Obtener una referencia al objeto del reproductor que disparó el evento
+    const videoId = event.target.getVideoData()?.video_id;
     const playerInstance = event.target;
 
-     // --- Manejar Estado PLAYING ---
      if (playerState === YT.PlayerState.PLAYING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO. Video: ${videoId || 'Unknown ID'}`);
 
-         // Buscar el video en nuestra lista aplanada de playlists basándose en su ID
          const flatList = getFlattenedPlaylist();
          const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
 
-         // Si el ID del video está disponible y se encuentra en nuestros datos de playlists
          if (videoId && playingVideoIndex !== -1) {
-              // Este es un video conocido que comienza a reproducir. Actualizar nuestra información de seguimiento.
               const playingVideoObject = flatList[playingVideoIndex];
               currentPlayingInfo.videoId = videoId;
               currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
               currentPlayingInfo.flattenedIndex = playingVideoIndex;
               console.log(`onPlayerStateChange: Información de reproducción actual actualizada vía cambio de estado: ${playingVideoIndex} (Video: ${videoId})`);
-              updatePlaylistsUI(); // Actualizar la UI para resaltar el video que está reproduciendo
+              updatePlaylistsUI();
 
-             // --- CORRECCIÓN: Establecer currentPlayer aquí como la fuente definitiva ---
-             // Cuando un video conocido comienza a reproducir, *ese* reproductor es el reproductor actual que debe ser monitoreado.
-             // Este es el lugar más fiable para cambiar el reproductor lógico actual.
              if (currentPlayer !== changedPlayerNum) {
                   console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum}.`);
-                  currentPlayer = changedPlayerNum; // Establecer currentPlayer al número del reproductor que acaba de comenzar a reproducir
+                  currentPlayer = changedPlayerNum;
              }
 
-             // Resetear el flag isTransitioning.
-             // Cuando un video conocido comienza a reproducir, señala que cualquier fase de transición que condujo a esta reproducción ha terminado.
              if (isTransitioning) {
                  console.log(`onPlayerStateChange: Video conocido (${videoId}) comenzó a reproducir. Reseteando flag isTransitioning.`);
-                 isTransitioning = false; // Marcar el fin del proceso de transición
+                 isTransitioning = false;
              }
 
               // --- CORRECCIÓN: Resetear hasOutroCrossfadeStarted cuando un NUEVO video comienza a reproducir ---
-             // Este flag debe ser reseteado cuando la transición al siguiente video es completa (confirmada por el estado PLAYING).
              console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted.`);
              hasOutroCrossfadeStarted = false; // Resetear el flag
 
          } else if (videoId && playingVideoIndex === -1) {
-             // Un video comenzó a reproducir, pero su ID no se encontró en nuestros datos de playlists actuales.
              console.warn(`onPlayerStateChange: Video desconocido (${videoId}) comenzó a reproducir en Player ${changedPlayerNum}.`);
-             // Actualizar currentPlayingInfo para reflejar que un video desconocido está reproduciendo.
               currentPlayingInfo.videoId = videoId;
-              currentPlayingInfo.playlistId = null; // Playlist es desconocida
-              currentPlayingInfo.flattenedIndex = -1; // Índice es desconocido
-               updatePlaylistsUI(); // Actualizar UI (probablemente eliminará el resaltado)
-               // Actualizar currentPlayer para que coincida con el reproductor que comenzó a reproducir el video desconocido
+              currentPlayingInfo.playlistId = null;
+              currentPlayingInfo.flattenedIndex = -1;
+               updatePlaylistsUI();
                if (currentPlayer !== changedPlayerNum) {
                    console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} basándose en video desconocido.`);
                     currentPlayer = changedPlayerNum;
                }
-                // Resetear flag hasOutroCrossfadeStarted incluso para videos desconocidos que comienzan a reproducir
                 console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted para video desconocido.`);
                 hasOutroCrossfadeStarted = false;
 
          } else {
-              // El reproductor entró en estado PLAYING, pero videoId aún no está disponible. Esperar.
                console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO, pero el videoId aún no está disponible.`);
-               // NO resetear flags ni cambiar currentPlayer aquí. Esperar a que el videoId esté disponible.
          }
 
-          // Independientemente de si es un video conocido, si un reproductor entra en estado PLAYING,
-          // verificar segmentos de SponsorBlock iniciales si tenemos el video ID.
+          // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING
           if (videoId) {
-             checkAndSkipSegment(event.target, true); // Usar forceCheck=true para asegurar que se ejecute
+             checkAndSkipSegment(event.target, true);
           }
 
-     // --- Manejar Estado PAUSED ---
      } else if (playerState === YT.PlayerState.PAUSED) {
         console.log('onPlayerStateChange: Video pausado en Player', changedPlayerNum);
-         // Si el reproductor que fue pausado es el reproductor lógico actualmente activo,
-         // y la reproducción fue iniciada.
          if (changedPlayerNum === currentPlayer && reproduccionIniciada) {
-             // Agregar lógica aquí si es necesario cuando el video *actual* está pausado
+             // Handled by button
          }
-
-     // --- Manejar Estado BUFFERING ---
      } else if (playerState === YT.PlayerState.BUFFERING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está BUFFERING. Video: ${videoId || 'Unknown ID'}`);
-         // Este estado se espera después de playVideo() y antes de PLAYING.
 
-     // --- Manejar Estado CUED ---
      } else if (playerState === YT.PlayerState.CUED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está CUED. Video: ${videoId || 'Unknown ID'}`);
-         // Este estado es el predeterminado después de cueVideoById().
-         // Sin embargo, si un reproductor entra en estado CUED *después* de que se llamó a playVideo() en él,
-         // indica un posible problema.
 
-         // --- CORRECCIÓN: Si el reproductor debía REPRODUCIR pero entró en CUED ---
-         // Verificar si este es el reproductor que se esperaba que fuera el reproductor 'siguiente' durante una transición.
-         const intendedNextPlayerNum = currentPlayer === 1 ? 2 : 1; // El número del reproductor que playNextVideo intentó iniciar
-         // Asegurarse de que currentPlayingInfo.flattenedIndex sea válido
-         const intendedNextVideoId = currentPlayingInfo.flattenedIndex !== -1 ? getFlattenedPlaylist()[currentPlayingInfo.flattenedIndex]?.videoId : null; // El videoId que playNextVideo intentó
+         const intendedNextPlayerNum = currentPlayer === 1 ? 2 : 1;
+         const intendedNextVideoId = currentPlayingInfo.flattenedIndex !== -1 ? getFlattenedPlaylist()[currentPlayingInfo.flattenedIndex]?.videoId : null;
 
-         // Si el reproductor que entró en estado CUED es el siguiente previsto,
-         // y el video coincide, y estamos en una transición: intentar reintento.
          if (changedPlayerNum === intendedNextPlayerNum && videoId === intendedNextVideoId && isTransitioning) {
              console.warn(`onPlayerStateChange: Reproductor siguiente previsto (${changedPlayerNum}) entró en estado CUED inesperadamente después de la llamada a playVideo() durante la transición. Video: ${videoId}. Intentando playVideo() de nuevo.`);
-             // Reintentar llamar a playVideo() después de un pequeño retraso.
              setTimeout(() => {
                  try {
-                     // Verificar si el reproductor sigue válido y aún en estado CUED antes de reintentar
                      if (playerInstance && typeof playerInstance.playVideo === 'function' && playerInstance.getPlayerState() === YT.PlayerState.CUED) {
                           console.log(`onPlayerStateChange: Reintentando playVideo() en Player ${changedPlayerNum} desde estado CUED.`);
-                         playerInstance.playVideo(); // Llamar playVideo de nuevo
+                         playerInstance.playVideo();
                      } else {
                           console.log(`onPlayerStateChange: No se reintenta playVideo() - Player ${changedPlayerNum} ya no está en estado CUED o es inválido.`);
                      }
                  } catch(e) { console.error("onPlayerStateChange: Error reintentando playVideo desde estado CUED:", e); }
-             }, 500); // Reintentar después de 500ms
+             }, 500);
          } else if (playerState === YT.PlayerState.CUED) {
-              // Si un reproductor entra en CUED pero no es el siguiente previsto durante una transición,
-              // es normal.
                console.log(`onPlayerStateChange: Player ${changedPlayerNum} entró en estado CUED normalmente. Video: ${videoId || 'Unknown ID'}.`);
          }
 
-
-     // --- Manejar Estado ENDED ---
      } else if (playerState === YT.PlayerState.ENDED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} estado ENDED. Video: ${videoId || 'Unknown ID'}`);
          const endedVideoMatchesCurrent = (videoId && currentPlayingInfo.videoId === videoId);
 
-         // Si el video actual terminó inesperadamente (no por una transición/fundido en curso), disparar siguiente.
-         // Verificar flags isTransitioning y isAudioFading para asegurar que no estamos ya manejando el final via crossfade.
          if (endedVideoMatchesCurrent && !isTransitioning && !isAudioFading) {
              console.log(`onPlayerStateChange: Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
              playNextVideo();
          } else if (changedPlayerNum !== currentPlayer) {
-             // Si un reproductor que NO es el actual termina, es probablemente el video anterior.
              console.log(`onPlayerStateChange: Otro player ${changedPlayerNum} estado ENDED. Video: ${videoId}. (No es el reproductor activo actual)`);
          }
     }
-    // Otros estados como UNSTARTED (Sin iniciar) no suelen requerir manejo específico aquí.
 }
 // Módulo: Interacción con API de Búsqueda (Piped)
 const performSearch = async (query, nextPage = null) => {
@@ -1966,17 +1921,12 @@ function monitorPlayers() {
     // Log opcional para depuración:
     // console.log(`Monitor: Corriendo (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, hasOutroCrossfadeStarted: ${hasOutroCrossfadeStarted}, Initialized: ${playersInitialized}, reproduccionIniciada: ${reproduccionIniciada})`);
 
-    // Solo monitorear si los reproductores están inicializados y la reproducción ha comenzado
-    // Los flags de transición controlan acciones dentro del monitor, no lo pausan completamente.
     if (!playersInitialized || !reproduccionIniciada) {
-         // console.log("Monitor: Pausado (No inicializado o reproducción no iniciada)");
         return; // No ejecutar la lógica de monitoreo si no está listo
     }
 
-    // Obtener el reproductor activo (el que lógicamente está reproduciendo el video actual)
     const activePlayer = (currentPlayer === 1) ? player1 : player2;
 
-    // Validar el reproductor activo
     if (!activePlayer || typeof activePlayer.getPlayerState !== 'function' || typeof activePlayer.getCurrentTime !== 'function' || typeof activePlayer.getDuration !== 'function' || typeof activePlayer.getVideoData !== 'function') {
         console.warn("Monitor: El reproductor activo es inválido.");
         stopMonitoring(); // Detener el monitoreo si el reproductor activo es inválido
@@ -1988,25 +1938,24 @@ function monitorPlayers() {
     const videoDuration = activePlayer.getDuration();
     const videoId = activePlayer.getVideoData()?.video_id; // Obtener videoId de forma segura
 
-    // Solo proceder con comprobaciones basadas en tiempo si tenemos datos de video y duración válidos
     if (!videoId || isNaN(videoDuration) || videoDuration <= 0) {
-        // console.log("Monitor: No hay datos de video o duración válida.");
         checkAndSkipSegment(activePlayer); // Aún así, verificar SponsorBlock incluso si la duración es extraña
         return; // No se pueden realizar comprobaciones basadas en tiempo
     }
 
      // Asegurarse de que los segmentos de SponsorBlock se obtengan y almacenen en caché si no lo están ya
+     // La lógica para evitar bucles de fetch está en checkAndSkipSegment y obtenerSegmentosSponsorBlock
     if (!segmentosCache[videoId]) {
-        // console.log(`Monitor: Segmentos SB no cacheados para ${videoId}. Obteniendo.`);
-        // Esta llamada asíncrona ocurre en segundo plano. El monitoreo continúa.
-        obtenerSegmentosSponsorBlock(videoId);
-        // checkAndSkipSegment(activePlayer); // La llamada ya está abajo incondicionalmente, no es necesario aquí
-        // No se necesitan acciones adicionales aquí, el próximo tick del monitor verificará si ya están.
+        // Llamar a checkAndSkipSegment para iniciar la obtención si es necesario
+         checkAndSkipSegment(activePlayer);
+         // No es necesario retornar, checkAndSkipSegment maneja la lógica si los segmentos aún no están listos
+    } else if (segmentosCache[videoId] === 'fetching') {
+         // Si está obteniendo, simplemente esperar al próximo tick.
+          checkAndSkipSegment(activePlayer); // Aún llamamos para que checkAndSkipSegment maneje el estado 'fetching'
+    } else {
+        // Si los segmentos están en caché ([] o [segmentos...]), verificar y saltar
+         checkAndSkipSegment(activePlayer);
     }
-
-    // --- Verificar y Saltar Segmentos de SponsorBlock ---
-    // Esta función ahora maneja la lógica específica para segmentos "outro".
-    checkAndSkipSegment(activePlayer);
 
 
     // --- Verificar Tiempo Restante para Disparar Crossfade (Disparo basado en tiempo) ---
@@ -2017,9 +1966,9 @@ function monitorPlayers() {
     // console.log(`Monitor: Tiempo restante: ${timeRemaining.toFixed(1)}s`);
 
     // Disparar el crossfade basado en el tiempo restante SOLAMENTE si:
-    // 1. El reproductor está realmente en estado PLAYING (no pausado, cargando, terminado, etc.)
-    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer (ej. 0.5s)
-    // 3. El tiempo restante es mayor que 0 (para evitar disparos al final absoluto)
+    // 1. El reproductor está realmente en estado PLAYING
+    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer
+    // 3. El tiempo restante es mayor que 0
     // 4. NO estamos ya en un proceso de transición (`isTransitioning` es false)
     // 5. El crossfade AÚN NO ha sido disparado por la lógica de detección de "outro" (`hasOutroCrossfadeStarted` es false)
     if (playerState === YT.PlayerState.PLAYING &&
@@ -2029,17 +1978,13 @@ function monitorPlayers() {
         !hasOutroCrossfadeStarted) // Crucial: No disparar si un "outro" ya lo hizo
          {
         console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en tiempo.`);
-         // No necesitamos establecer hasOutroCrossfadeStarted aquí, ya que este es el disparo basado en tiempo, no por "outro".
         playNextVideo();
     }
 
     // --- Salvaguarda: Considerar detener el reproductor inactivo si sigue sonando inesperadamente ---
-    // Esta es una comprobación adicional. La limpieza de la transición debería detenerlo.
     const inactivePlayer = (currentPlayer === 1) ? player2 : player1; // El reproductor que NO es el lógico actual
      if (inactivePlayer && typeof inactivePlayer.getPlayerState === 'function' && typeof inactivePlayer.stopVideo === 'function') {
         const inactiveState = inactivePlayer.getPlayerState();
-         // Si el reproductor inactivo está en estado PLAYING, Y NO estamos en un proceso de transición o fundido de audio,
-         // Y (doble comprobación) no es el reproductor que lógicamente debería estar activo, detenerlo.
         if (inactiveState === YT.PlayerState.PLAYING &&
             !isTransitioning && !isAudioFading &&
              inactivePlayer !== activePlayer)
@@ -2049,144 +1994,117 @@ function monitorPlayers() {
                 inactivePlayer.stopVideo();
             } catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
         }
-         // Si el reproductor inactivo está CUED, tal vez limpiarlo? Menos crítico, pero posible.
-         /*
-         if (inactiveState === YT.PlayerState.CUED && inactivePlayer !== activePlayer) {
-              console.log("Monitor: Reproductor inactivo está CUED. Limpiando video.");
-              try { inactivePlayer.cueVideoById(null); } catch(e) { console.error("Monitor: Error limpiando reproductor inactivo:", e); }
-         }
-         */
     }
 }
-
 // --- SponsorBlock: Chequear y Saltar Segmento ---
 function checkAndSkipSegment(player, forceCheck = false) {
     const currentTime = player.getCurrentTime();
     const videoId = player.getVideoData()?.video_id;
 
-    // Salir si no hay ID de video o tiempo actual válido
     if (!videoId || isNaN(currentTime)) {
         // console.log("SB Check: No hay videoId o currentTime válido.");
         return;
     }
 
-    // Solo verificar si el reproductor está activamente reproduciendo o cargando hacia la reproducción,
-    // O si se fuerza la comprobación (ej. al cambiar a estado PLAYING).
-     const playerState = player.getPlayerState();
+    const playerState = player.getPlayerState();
     if (playerState !== YT.PlayerState.PLAYING && playerState !== YT.PlayerState.BUFFERING && !forceCheck) {
          // console.log(`SB Check: Reproductor no reproduciendo o cargando (Estado: ${playerState}). Saltando comprobación.`);
-         // Permitir forceCheck incluso si no está reproduciendo (ej. en el cambio inicial a estado PLAYING)
         return;
     }
 
-
     // --- Manejar el seguimiento del último salto ---
-    // Verificar si el video ha cambiado o si es la primera comprobación para este video.
     if (videoId !== lastSeekVideoId) {
         console.log(`checkAndSkipSegment: Video cambió a ${videoId}. Reseteando lastSeekEndTime.`);
-        lastSeekEndTime = -1; // Resetear el tiempo del último salto para el nuevo video
-        lastSeekVideoId = videoId; // Rastrear el videoId actual que se está verificando
-        // Necesitar obtener y cachear los segmentos para el nuevo video si no están ya.
-        if (!segmentosCache[videoId]) {
-            console.log(`checkAndSkipSegment: Obteniendo segmentos SB por primera vez para ${videoId}`);
-            obtenerSegmentosSponsorBlock(videoId); // Obtener segmentos de forma asíncrona
-             // Los segmentos podrían no estar disponibles inmediatamente. El próximo tick del monitor verificará de nuevo.
-             // No se necesita 'return' aquí, la lógica más abajo simplemente no encontrará segmentos si no están listos.
-        }
+        lastSeekEndTime = -1; // Resetear para el nuevo video
+        lastSeekVideoId = videoId; // Rastrear videoId actual
+        // Cuando el video cambia, el caché para el video anterior queda, y el nuevo video puede estar undefined o 'fetching'.
+        // La lógica de obtención está abajo.
     } else {
-         // Para el mismo video, verificar si ya pasamos el punto del último salto.
-         // Esto evita que se dispare la lógica de salto inmediatamente después de un seekTo.
-         if (lastSeekEndTime !== -1 && currentTime >= lastSeekEndTime + 0.2) { // Agregar un pequeño buffer (0.2s)
+         if (lastSeekEndTime !== -1 && currentTime >= lastSeekEndTime + 0.2) { // Agregar un pequeño buffer
              console.log(`checkAndSkipSegment: Reseteando lastSeekEndTime (${lastSeekEndTime.toFixed(2)}) porque currentTime (${currentTime.toFixed(2)}) pasó el punto.`);
-             lastSeekEndTime = -1; // Limpiar el último salto una vez que lo hemos pasado
+             lastSeekEndTime = -1; // Limpiar último salto
          }
-          // Si lastSeekEndTime NO es -1, significa que acabamos de realizar un salto y debemos esperar.
          if (lastSeekEndTime !== -1) {
              // console.log(`SB Check: Esperando después de salto previo (${lastSeekEndTime.toFixed(2)}).`);
-             return; // No verificar nuevos segmentos justo después de un salto
+             return; // No verificar segmentos justo después de un salto
          }
     }
 
-
     // --- Buscar Segmentos ---
-    // Obtener segmentos del caché (será undefined si no se han obtenido todavía)
     const segments = segmentosCache[videoId];
 
-    // Si no hay segmentos cacheados o la lista está vacía, no hay nada que verificar/saltar.
+    // Si los segmentos aún no están en caché (undefined) o si se están obteniendo ('fetching'),
+    // iniciar la obtención si es undefined y luego salir.
+    if (segments === undefined) {
+        console.log(`checkAndSkipSegment: Segmentos undefined para ${videoId}. Iniciando obtención.`);
+        obtenerSegmentosSponsorBlock(videoId); // Iniciar obtención (asíncrona)
+        return; // Los segmentos no están disponibles AHORA
+    }
+     if (segments === 'fetching') {
+         // console.log(`SB Check: Segmentos aún obteniendo para ${videoId}. Esperando.`);
+         return; // La obtención está en curso, esperar
+     }
+
+    // Si llegamos aquí, 'segments' es un array ([]) o [segmentos...].
+    // Si es [], no hay segmentos que verificar.
     if (!segments || segments.length === 0) {
-        // console.log(`SB Check: No hay segmentos cacheados para ${videoId}.`);
-         // Si los segmentos se obtuvieron de forma asíncrona, no estarán aquí todavía.
-         // Si la obtención falló o no hay segmentos, simplemente no saltamos.
+        // console.log(`SB Check: No hay segmentos para verificar para ${videoId} (caché vacío).`);
         return;
     }
 
     // Encontrar un segmento que contenga el tiempo actual, excluyendo segmentos que acabamos de saltar.
     const segmentToSkip = segments.find(segment => {
-        // Asegurar que los tiempos de segmento sean números válidos
         const start = parseFloat(segment.segment[0]);
         const end = parseFloat(segment.segment[1]);
 
         if (isNaN(start) || isNaN(end)) {
              console.warn(`SB Check: Se encontraron tiempos de segmento inválidos para ${videoId}:`, segment);
-             return false; // Saltar segmento inválido
+             return false;
         }
 
-        // Verificar si el tiempo actual está dentro del segmento (inicio <= currentTime < fin)
         const isWithinSegment = currentTime >= start && currentTime < end;
-
-        // Verificar si el final de este segmento es después del tiempo del último salto
-        // Esto previene que intentemos saltar repetidamente el mismo segmento que acabamos de saltear.
         const isAfterLastSeek = lastSeekEndTime === -1 || end > lastSeekEndTime;
 
-        // Devolver true si el tiempo actual está dentro del segmento Y el final del segmento es después del último salto
         return isWithinSegment && isAfterLastSeek;
     });
 
-    // Si se encontró un segmento para saltar
     if (segmentToSkip) {
         const segmentStart = parseFloat(segmentToSkip.segment[0]);
         const segmentEnd = parseFloat(segmentToSkip.segment[1]);
-        const segmentType = segmentToSkip.category; // Tipo de segmento (sponsor, outro, etc.)
+        const segmentType = segmentToSkip.category;
 
         // --- Manejar Segmentos Outro Específicamente ---
-        // Para los outros, no saltamos directamente al final del video.
-        // Disparamos el crossfade cuando el tiempo actual está dentro de la ventana del final del outro.
         if (segmentType === 'outro') {
-            const timeRemainingInSegment = segmentEnd - currentTime; // Tiempo restante DENTRO del segmento outro
+            const timeRemainingInSegment = segmentEnd - currentTime;
             console.log(`SPONSORBLOCK OUTRO: Segmento outro detectado (${segmentType}) de ${segmentStart.toFixed(1)}s a ${segmentEnd.toFixed(1)}s. Tiempo restante en el outro: ${timeRemainingInSegment.toFixed(1)}s.`);
 
-            // Si el tiempo restante en el segmento outro es menor o igual que la duración del crossfade
-            // MÁS un pequeño buffer (para dar margen), Y NO estamos ya en transición,
-            // Y el crossfade AÚN NO ha sido disparado por la lógica de outro (para evitar doble disparo),
-            // disparamos playNextVideo.
+            // Si el tiempo restante en el outro está dentro de la ventana de crossfade (+ buffer),
+            // Y NO estamos ya en transición,
+            // Y el crossfade AÚN NO ha sido disparado por outro, disparamos playNextVideo.
             if (timeRemainingInSegment <= CROSSFADE_DURATION + 0.5 && timeRemainingInSegment > 0 && !isTransitioning && !hasOutroCrossfadeStarted) {
                  console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en outro.`);
-                 hasOutroCrossfadeStarted = true; // Establecer este flag para indicar que el outro disparó el crossfade
-                 playNextVideo(); // Iniciar el crossfade y la carga del siguiente video
+                 hasOutroCrossfadeStarted = true; // Establecer flag
+                 playNextVideo(); // Iniciar crossfade
             } else {
-                 // Si el tiempo restante en el outro es mayor que la ventana de crossfade,
-                 // simplemente dejamos que el video siga reproduciendo.
-                 // El monitor principal (por tiempo restante en el video total) o el final natural del outro
-                 // terminarán disparando el crossfade si es necesario.
                  console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) fuera de la ventana de crossfade (${CROSSFADE_DURATION}s). No se realiza salto inmediato.`);
             }
-             // IMPORTANTE: NO realizar un seekTo aquí para segmentos "outro". Dejar que la reproducción normal o el crossfade manejen el final.
+             // NO realizar seekTo para outros.
 
         } else {
             // --- Manejar Otros Tipos de Segmentos (Sponsor, Self-promo, etc.) ---
-            // Para estos tipos, queremos saltar INMEDIATAMENTE al final del segmento.
-            const skipToTime = segmentEnd; // El punto de salto es el final del segmento
+            const skipToTime = segmentEnd;
              console.log(`SPONSORBLOCK SKIP: Saltando segmento (${segmentType}) de ${segmentStart.toFixed(1)}s a ${segmentEnd.toFixed(1)}s. Saltando a ${skipToTime.toFixed(1)}s.`);
 
             try {
-                player.seekTo(skipToTime, true); // Realizar el salto. El 'true' es para permitir que el reproductor se detenga/ponga en pausa si es necesario al buscar.
-                lastSeekEndTime = skipToTime; // Registrar el tiempo al que saltamos para evitar re-saltos
-                // No es necesario establecer hasOutroCrossfadeStarted para saltos que no sean "outro".
+                player.seekTo(skipToTime, true); // Realizar el salto
+                lastSeekEndTime = skipToTime; // Registrar el tiempo de salto
             } catch (e) {
                 console.error("SPONSORBLOCK SKIP: Error realizando seekTo:", e);
             }
         }
     }
+
+     // --- hasOutroCrossfadeStarted se resetea en onPlayerStateChange (estado PLAYING) ---
 }
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
