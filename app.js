@@ -786,155 +786,224 @@ function updatePlaylistsUI() {
 
 // --- Helper para crear elemento de Video en Playlist ---
 function createPlaylistItemElement(video, playlistId, playingVideoId) {
+    // Crear el contenedor principal para el item de la playlist
     const item = document.createElement('div');
     item.className = 'playlist-item';
-    item.draggable = true;
-    item.dataset.videoId = video.videoId;
-    item.dataset.playlistId = playlistId;
+    item.draggable = true; // Permitir arrastrar para drag and drop
+    item.dataset.videoId = video.videoId; // Almacenar ID del video en el dataset
+    item.dataset.playlistId = playlistId; // Almacenar ID de la playlist en el dataset
 
+    // Contenedor para la imagen (thumbnail)
     const imageContainer = document.createElement('div');
     imageContainer.className = 'image-container';
     const img = document.createElement('img');
-    img.src = video.thumbnail;
-    img.alt = video.title;
-    img.className = 'drag-handle';
-    img.loading = 'lazy';
+    img.src = video.thumbnail; // URL del thumbnail
+    img.alt = video.title; // Texto alternativo para accesibilidad
+    img.className = 'drag-handle'; // Clase para usar como manejador de arrastre
+    img.loading = 'lazy'; // Carga perezosa para optimización
     imageContainer.appendChild(img);
 
-    // Resaltar si está sonando
+    // Resaltar si el video está sonando actualmente
     if (video.videoId === playingVideoId) {
-        item.classList.add('playing');
-        const icon = document.createElement('i');
+        item.classList.add('playing'); // Agregar clase 'playing' al item
+        const icon = document.createElement('i'); // Icono de volumen/sonando
         icon.className = 'fa-solid fa-volume-high playing-icon';
         imageContainer.appendChild(icon);
     }
-    item.appendChild(imageContainer);
+    item.appendChild(imageContainer); // Añadir contenedor de imagen al item principal
 
+    // Contenedor para el texto (título y duración)
     const textContainer = document.createElement('div');
+    // Usar innerHTML para agregar fácilmente múltiples párrafos con estilos inline básicos
     textContainer.innerHTML = `
         <p style="margin: 0; font-size: 12px; font-weight: bold;" title="${video.title}">${video.title}</p>
         <p style="margin: 0; font-size: 10px; color: #999;">Duración: ${formatDuration(video.duration)}</p>
     `;
-    item.appendChild(textContainer);
+    item.appendChild(textContainer); // Añadir contenedor de texto al item principal
 
-    // --- Menú ---
-    const deleteMenu = document.createElement('div');
+    // --- Estructura del Menú Contextual (los 3 puntos) ---
+    const deleteMenu = document.createElement('div'); // Contenedor para el botón y el contenido del menú
     deleteMenu.className = 'delete-menu';
-    const menuButton = document.createElement('button');
-    menuButton.className = 'delete-menu-button'; // El botón de 3 puntos
+    const menuButton = document.createElement('button'); // El botón de 3 puntos que abre/cierra el menú
+    menuButton.className = 'delete-menu-button';
     menuButton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-    const menuContent = document.createElement('div');
-    menuContent.className = 'delete-menu-content'; // Contenedor principal del menú (el que aparece/desaparece)
+    const menuContent = document.createElement('div'); // Contenedor principal del contenido del menú (las opciones: Eliminar, Mover, etc.)
+    menuContent.className = 'delete-menu-content'; // Asegúrate de que tu CSS oculte esto por defecto (display: none;)
 
     // --- Botones del Menú ---
-    // 1. Eliminar (sin cambios)
+
+    // 1. Botón "Eliminar"
     const deleteButton = document.createElement('button');
-    deleteButton.className = 'delete-button-item';
+    deleteButton.className = 'delete-button-item'; // Clase para estilizar los items del menú
     deleteButton.title = 'Eliminar de esta playlist';
     deleteButton.innerHTML = '<i class="fa-solid fa-xmark"></i> Eliminar';
-    menuContent.appendChild(deleteButton);
+    menuContent.appendChild(deleteButton); // Añadir botón Eliminar al contenido del menú
 
-    // 2. Reproducir Despues (sin cambios en estructura)
+    // 2. Botón "Reproducir Después"
     const playNextButton = document.createElement('button');
-    playNextButton.className = 'play-next-button';
+    playNextButton.className = 'play-next-button'; // Clase para estilizar
     playNextButton.title = 'Poner después del video actual';
     playNextButton.innerHTML = '<i class="fa-solid fa-arrow-right-to-line"></i> Reproducir Despues';
-    menuContent.appendChild(playNextButton);
+    menuContent.appendChild(playNextButton); // Añadir botón Reproducir Después al contenido del menú
 
-    // 3. Mover a otra playlist (MODIFICADO: Sin submenú inline)
+    // 3. Botón "Mover a otra playlist" (Este disparará el popup genérico)
     const moveToPlaylistButton = document.createElement('button');
-    moveToPlaylistButton.className = 'move-to-playlist-button'; // Botón principal
+    moveToPlaylistButton.className = 'move-to-playlist-button'; // Clase para estilizar
     moveToPlaylistButton.title = 'Mover este video a otra playlist';
     moveToPlaylistButton.innerHTML = '<i class="fa-solid fa-folder-tree"></i> Mover a playlist';
-    // --- NO AÑADIR EL SUBMENÚ AQUÍ DENTRO ---
-    menuContent.appendChild(moveToPlaylistButton); // Añadir solo el botón al menú principal
+    menuContent.appendChild(moveToPlaylistButton); // Añadir botón Mover a playlist al contenido del menú
 
-    // --- Añadir menú al item ---
+
+    // --- Añadir el botón del menú y el contenido del menú al contenedor deleteMenu ---
     deleteMenu.appendChild(menuButton);
     deleteMenu.appendChild(menuContent);
+    // Añadir el contenedor deleteMenu (que contiene el botón y el menú desplegable) al item principal
     item.appendChild(deleteMenu);
 
-    // --- Listeners del Menú Principal (3 puntos) ---
-moveToPlaylistButton.addEventListener('click', (event) => {
-    event.stopPropagation(); // Stop propagation from the button click
-    console.log("Click on 'Mover a playlist'");
+    // --- Listeners de Eventos ---
 
-    // Define the video data and source playlist ID needed for the move action
-    const sourceVideoId = video.videoId; // Get video ID from the video object passed to createPlaylistItemElement
-    const sourcePlaylistId = playlistId; // Get playlist ID from the parameter passed to createPlaylistItemElement
+    // --- Listener para el botón de 3 puntos (menuButton) ---
+    // Este listener controla la visibilidad del contenido del menú (menuContent)
+    menuButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Detener la propagación para que el click no cierre inmediatamente el menú via el listener global
 
-    // Create a simplified videoData object needed by the generic popup handler
-    // The moveVideo function ultimately only needs the videoId, but passing more context can be helpful.
-    const videoDataForMove = {
-        videoId: sourceVideoId,
-        title: video.title,
-        thumbnail: video.thumbnail,
-        duration: video.duration,
-    };
+        // Cerrar cualquier otro menú contextual abierto antes de abrir este
+        // Asegúrate de que tu función closeAllContextMenus() cierre todos los elementos con la clase .delete-menu-content
+        closeAllContextMenus();
 
-    // Call the new generic popup function with:
-    // - The menuButton (3 dots button) as the anchor element for positioning
-    // - The video data for the video being moved
-    // - The action type 'move'
-    // - The sourcePlaylistId from which the video is being moved
-    showPlaylistSelectionPopup(menuButton, // Anchor to the 3-dots button element
-                                 videoDataForMove,
-                                 'move', // Indicate move action
-                                 sourcePlaylistId); // Pass source playlist ID
-});
+        // Alternar la visualización del contenido de este menú específico
+        // Verificar el estilo de visualización actual o si tiene la clase 'visible'
+        if (menuContent.style.display === 'block' || menuContent.classList.contains('visible')) {
+            // Si está visible, ocultarlo
+            menuContent.style.display = 'none';
+            menuContent.classList.remove('visible'); // Eliminar clase si la usas para estilizar
+        } else {
+            // Si está oculto, mostrarlo
+            menuContent.style.display = 'block';
+            // Opcional: Posicionar el menú relativo al botón si tu CSS no lo hace (ajustar valores si es necesario)
+            // menuContent.style.position = 'absolute'; // Si el contenedor padre (deleteMenu) tiene relative/absolute
+            // menuContent.style.top = `${menuButton.offsetHeight}px`; // Posicionar justo debajo del botón
+            // menuContent.style.left = '0'; // Alinear a la izquierda del botón
 
-    // --- Listener para Eliminar (sin cambios) ---
+            menuContent.classList.add('visible'); // Agregar clase si la usas para estilizar
+        }
+    });
+    // --- Listener para el botón "Eliminar" (sin cambios en lógica interna) ---
     deleteButton.addEventListener('click', (event) => {
-        event.stopPropagation();
-        deleteVideo(playlistId, video.videoId);
-        closeAllContextMenus(); // Cerrar menú después de acción
+        event.stopPropagation(); // Evitar que el click dentro del menú cierre el menú globalmente
+        deleteVideo(playlistId, video.videoId); // Llamar a tu función para eliminar el video
+        closeAllContextMenus(); // Cerrar el menú después de realizar la acción
     });
 
-    // --- Listener para "Reproducir Despues" (sin cambios en lógica interna) ---
+    // --- Listener para el botón "Reproducir Despues" (lógica de mover/insertar) ---
     playNextButton.addEventListener('click', (event) => {
-        event.stopPropagation();
+        event.stopPropagation(); // Evitar que el click dentro del menú cierre el menú globalmente
         console.log("Click en 'Reproducir Despues'");
-        closeAllContextMenus(); // Cerrar menú
+        closeAllContextMenus(); // Cerrar el menú
 
-        const sourceVideoId = video.videoId;
-        const sourcePlaylistId = playlistId;
-        // ... (resto de la lógica para calcular targetFlatIndex, targetPlaylistId, targetLocalIndex) ...
-         let targetFlatIndex = currentPlayingInfo.flattenedIndex + 1;
-         if (currentPlayingInfo.flattenedIndex < 0) {
-              const sourceIndexInOwn = playlistsData.find(p=>p.id === sourcePlaylistId)?.videos.findIndex(v=>v.videoId === sourceVideoId);
-              if(sourceIndexInOwn === 0) targetFlatIndex = 1; else targetFlatIndex = 0;
-              console.log(`Nada sonando, moviendo ${sourceVideoId} a índice aplanado ${targetFlatIndex}`);
-         }
-         const flatList = getFlattenedPlaylist();
-         targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length));
+        const sourceVideoId = video.videoId; // ID del video a mover
+        const sourcePlaylistId = playlistId; // ID de la playlist de origen
 
-         let cumulativeIndex = 0;
-         let targetLocalIndex = -1;
-         let targetPlaylistId = null;
-         for (const p of playlistsData) {
+        // --- Lógica para calcular la posición de "Reproducir Después" ---
+        let targetFlatIndex;
+        // Si no hay nada sonando (-1), ponerlo al inicio o después del primero si ya hay algo
+        if (currentPlayingInfo.flattenedIndex < 0) {
+             // Si el video a reproducir después es el primero de su propia playlist y no hay nada sonando, ponerlo en el índice aplanado 0.
+             // Si no, ponerlo en el índice aplanado 0 (será el primero).
+             const sourcePlaylist = playlistsData.find(p => p.id === sourcePlaylistId);
+             const sourceIndexInOwn = sourcePlaylist ? sourcePlaylist.videos.findIndex(v => v.videoId === sourceVideoId) : -1;
+
+             // Si es el primer video de su playlist O la playlist de origen es la manual (donde se añaden nuevos)
+             if (sourceIndexInOwn === 0 || sourcePlaylistId === 'manual') {
+                  targetFlatIndex = 0; // Ponerlo al principio absoluto
+             } else {
+                  targetFlatIndex = 0; // Si no es el primer video de su playlist, ponerlo al principio absoluto también
+             }
+            console.log(`Nada sonando, moviendo ${sourceVideoId} a índice aplanado ${targetFlatIndex}`);
+        } else {
+             // Si ya hay algo sonando, ponerlo justo después del video actual
+             targetFlatIndex = currentPlayingInfo.flattenedIndex + 1;
+             console.log(`Sonando ${currentPlayingInfo.videoId}, moviendo ${sourceVideoId} a índice aplanado ${targetFlatIndex} (después del actual).`);
+        }
+        // Asegurarse de que el índice aplanado destino no exceda el tamaño total de la lista
+        const flatList = getFlattenedPlaylist();
+        targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length)); // Permite añadir al final (índice == length)
+
+
+        // --- Lógica para encontrar la playlist destino y el índice local a partir del índice aplanado ---
+        let cumulativeIndex = 0;
+        let targetLocalIndex = -1; // Índice dentro de la playlist destino
+        let targetPlaylistId = null; // ID de la playlist destino
+
+        for (const p of playlistsData) {
             const playlistVideoCount = p.videos.length;
             const endOfPlaylistIndex = cumulativeIndex + playlistVideoCount;
-            // Si el índice cae aquí O si es el índice justo después de la última playlist
+
+            // Si el índice aplanado destino cae dentro de esta playlist O
+            // si el índice aplanado destino es justo al final de esta playlist Y es la última playlist,
+            // significa que el video debe insertarse aquí.
             if (targetFlatIndex < endOfPlaylistIndex || (targetFlatIndex === endOfPlaylistIndex && p === playlistsData[playlistsData.length -1]) ) {
                 targetPlaylistId = p.id;
-                targetLocalIndex = targetFlatIndex - cumulativeIndex;
-                 // Asegurarse que el índice local no exceda el tamaño + 1 (para añadir al final)
-                 targetLocalIndex = Math.min(targetLocalIndex, p.videos.length);
-                break;
-            }
-            cumulativeIndex += playlistVideoCount;
-         }
+                targetLocalIndex = targetFlatIndex - cumulativeIndex; // El índice local es la diferencia
 
-         if (targetPlaylistId !== null && targetLocalIndex !== -1) {
-             console.log(`Moviendo ${sourceVideoId} (de ${sourcePlaylistId}) a Playlist ${targetPlaylistId} en índice local ${targetLocalIndex}`);
-              moveVideo(sourceVideoId, sourcePlaylistId, targetPlaylistId, targetLocalIndex);
-         } else {
-              console.error("No se pudo determinar la playlist/índice destino para 'Reproducir Despues'.");
-               mostrarMensajeFlotante("Error al calcular la posición para 'Reproducir Despues'.");
-         }
+                // Asegurarse de que el índice local no exceda el tamaño actual de la playlist (para añadir al final)
+                targetLocalIndex = Math.min(targetLocalIndex, p.videos.length);
+
+                break; // Encontramos la playlist destino, salimos del bucle
+            }
+            cumulativeIndex += playlistVideoCount; // Sumar el tamaño de la playlist actual
+        }
+
+        // Ejecutar la función de movimiento si se encontró una playlist y un índice destino válidos
+        if (targetPlaylistId !== null && targetLocalIndex !== -1) {
+             // Asegurarse de que no estamos intentando moverlo a la misma posición de donde viene
+             const sourcePlaylist = playlistsData.find(p => p.id === sourcePlaylistId);
+             const sourceLocalIndex = sourcePlaylist ? sourcePlaylist.videos.findIndex(v => v.videoId === sourceVideoId) : -1;
+
+             if (!(sourcePlaylistId === targetPlaylistId && sourceLocalIndex === targetLocalIndex)) {
+                console.log(`Moviendo ${sourceVideoId} (de ${sourcePlaylistId}) a Playlist ${targetPlaylistId} en índice local ${targetLocalIndex} para 'Reproducir Después'`);
+                moveVideo(sourceVideoId, sourcePlaylistId, targetPlaylistId, targetLocalIndex); // Llamar a la función general de mover
+             } else {
+                  console.log(`Video ${sourceVideoId} ya está en la posición de 'Reproducir Después', no se mueve.`);
+             }
+        } else {
+            console.error("createPlaylistItemElement: No se pudo determinar la playlist/índice destino para 'Reproducir Despues'.");
+            mostrarMensajeFlotante("Error al calcular la posición para 'Reproducir Después'.");
+        }
     });
+    // --- Listener para el botón "Mover a playlist" (MODIFICADO) ---
+    // Este listener dispara la nueva función genérica de popup de selección de playlist.
+    // Ya lo modificaste en un paso anterior, solo asegúrate de que este es el código que tienes.
+    moveToPlaylistButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Detener la propagación del evento de click
+        console.log("Click en 'Mover a playlist'");
+
+        // Define los datos del video y el ID de la playlist de origen necesarios para la acción de mover
+        const sourceVideoId = video.videoId; // Obtener ID del video del objeto 'video' pasado a la función
+        const sourcePlaylistId = playlistId; // Obtener ID de la playlist del parámetro 'playlistId'
+
+        // Crear un objeto videoData simplificado necesario por el manejador del popup genérico
+        // La función moveVideo eventualmente solo necesita el videoId, pero pasar más contexto puede ser útil.
+        const videoDataForMove = {
+            videoId: sourceVideoId,
+            title: video.title,
+            thumbnail: video.thumbnail,
+            duration: video.duration,
+        };
+
+        // Llamar a la nueva función genérica que muestra el popup de selección de playlist con:
+        // - El botón del menú (el de 3 puntos) como elemento de anclaje para el posicionamiento
+        // - Los datos del video que se está moviendo
+        // - El tipo de acción 'move'
+        // - El sourcePlaylistId desde el cual se está moviendo el video
+        showPlaylistSelectionPopup(menuButton, // Anclaje al elemento del botón de 3 puntos
+                                     videoDataForMove,
+                                     'move', // Indicar que la acción es 'mover'
+                                     sourcePlaylistId); // Pasar el ID de la playlist de origen
+    });
+    // Devolver el elemento item completo que fue creado
     return item;
-} // Fin de createPlaylistItemElement
+}
 // --- NEW: Generic Playlist Selection Popup ---
 // Handles both "Add to Playlist" and "Move to Playlist"
 function showPlaylistSelectionPopup(anchorElement, videoData, actionType, sourcePlaylistId = null) {
