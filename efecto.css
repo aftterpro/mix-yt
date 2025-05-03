@@ -1,47 +1,52 @@
-/* Estilo base para ambos reproductores */
-.video-player {
-    position: absolute; /* Correcto: Necesario para superponerlos */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 1;
-    filter: blur(0px);
-    /* Transición: Opacidad y filtro con duración que coincida con JS */
-    /* Ajusta '15s' aquí para que coincida con tu variable CROSSFADE_DURATION en JS */
-    transition: opacity 15s cubic-bezier(0.4, 0, 0.2, 1), filter 15s cubic-bezier(0.4, 0, 0.2, 1);
-    /* O si usas variable CSS: */
-    /* transition: opacity var(--crossfade-duration) cubic-bezier(0.4, 0, 0.2, 1), filter var(--crossfade-duration) cubic-bezier(0.4, 0, 0.2, 1); */
-    will-change: opacity, filter;
-    z-index: 1; /* z-index predeterminado */
-    background-color: #000;
-    overflow: hidden;
-}
-
-/* Estado para el reproductor que se desvanece (OUT) */
-.fade-out {
-    opacity: 0; /* Se desvanece a 0 */
-    filter: blur(8px);
-    z-index: 1; /* <-- CORREGIDO: Debe estar DEBAJO del que entra durante el desvanecimiento */
-}
-
-/* Estado para el reproductor que aparece (IN) */
-.fade-in {
-    opacity: 1; /* Se funde a 1 */
-    filter: blur(0px);
-    z-index: 2; /* <-- CORREGIDO: Debe estar ENCIMA del que sale durante la transición */
-}
-
-/* Estado para el reproductor que está completamente oculto */
-.hidden {
-    opacity: 0 !important;
-    filter: blur(8px);
-    z-index: 0;
-    pointer-events: none;
-    display: none; /* Si tu clase .hidden hace esto, asegúrate de que esté aquí */
-}
-
-/* Si usas una variable CSS para la duración */
+/* --- Variables relacionadas con efectos / crossfade --- */
 :root {
-  --crossfade-duration: 15s; /* Asegúrate de que este valor coincida exactamente con tu CROSSFADE_DURATION en JS */
+  --crossfade-duration: 15s; /* ESTE VALOR DEBE COINCIDIR CON TU VARIABLE JS CROSSFADE_DURATION */
+  /* ... otras variables relacionadas con efectos si las tienes ... */
 }
+
+/* --- Estilos para los Estados del Efecto Crossfade --- */
+/* Estos definen los VALORES OBJETIVO (opacity, filter, z-index) que el reproductor alcanzará */
+/* cuando se le apliquen las clases .fade-out, .fade-in o .hidden. */
+
+/* Estado para el reproductor que se está desvaneciendo (OUT) */
+/* Cuando un elemento .video-player tiene la clase .fade-out */
+.fade-out {
+    opacity: 0; /* Objetivo: opacidad 0 (completamente transparente) */
+    filter: blur(8px); /* Objetivo: desenfoque */
+    z-index: 1; /* <-- CORREGIDO: Debe estar POR DEBAJO del reproductor entrante durante la transición */
+}
+
+/* Estado para el reproductor que está apareciendo (IN) */
+/* Cuando un elemento .video-player tiene la clase .fade-in */
+.fade-in {
+    opacity: 1; /* Objetivo: opacidad 1 (completamente visible) */
+    filter: blur(0px); /* Objetivo: sin desenfoque */
+    z-index: 2; /* <-- CORREGIDO: Debe estar POR ENCIMA del reproductor saliente durante la transición */
+}
+
+/* Estado para el reproductor que está completamente OCULTO (después de fade out) */
+/* Cuando un elemento .video-player tiene la clase .hidden */
+.hidden {
+    opacity: 0 !important; /* Asegurarse de que sea invisible */
+    visibility: hidden !important; /* También ocultar para lectores de pantalla, etc. */
+    display: none !important; /* <-- AGREGADO: Eliminar del flujo del documento cuando no está activo */
+    pointer-events: none !important; /* Evitar cualquier evento de ratón/táctil */
+    z-index: 0; /* Enviar al fondo cuando no está activo */
+    /* No se necesita propiedad transition aquí, ya que display cambia inmediatamente */
+}
+
+/* ... otras reglas en efecto.css ... */
+/* La regla .video-player NO debe estar aquí si la moviste a styles.css */
+/* Si usas IDs directamente, las reglas #player1.fade-out, #player2.fade-out, etc. estarían aquí */
+/* Ejemplo si usas IDs en lugar de la clase .video-player: */
+/*
+#player1.fade-out, #player2.fade-out {
+    opacity: 0; filter: blur(8px); z-index: 1;
+}
+#player1.fade-in, #player2.fade-in {
+    opacity: 1; filter: blur(0px); z-index: 2;
+}
+#player1.hidden, #player2.hidden {
+    opacity: 0 !important; visibility: hidden !important; display: none !important; pointer-events: none !important; z-index: 0;
+}
+*/
