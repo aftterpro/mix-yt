@@ -2135,17 +2135,16 @@ async function obtenerSegmentosSponsorBlock(videoId) {
     console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
 
     try {
-        // --- Tu llamada fetch con el encabezado ---
+        // Tu llamada fetch con el encabezado
         const response = await fetch(apiUrl, {
             headers: {
-                'X-UserID': userId // Incluyendo tu encabezado X-UserID
+                'X-UserID': userId // Tu encabezado X-UserID
             }
         });
 
         if (!response.ok) {
-            // Si la respuesta no es exitosa, lanzar un error que será capturado abajo.
              console.error(`SB Fetch: Error desde la API SB (${apiUrl}): ${response.status} ${response.statusText}`);
-             // Al lanzar el error, el bloque catch se ejecutará y segmentosCache[videoId] se establecerá a null.
+             // Lanzar error para que sea capturado y la caché se marque como null.
              throw new Error(`API SB Error: ${response.status} ${response.statusText}`);
         }
 
@@ -2153,34 +2152,63 @@ async function obtenerSegmentosSponsorBlock(videoId) {
 
         if (!Array.isArray(data)) {
              console.warn(`SB Fetch: La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
-             // Si la respuesta no es un array, consideramos que no hay segmentos válidos.
-             // Establecemos segmentosCache[videoId] a null (en el catch de abajo) y retornamos null.
+             // Si la respuesta no es un array, lanzar error para marcar caché como null.
               throw new Error(`API SB Error: Respuesta no es un array`);
         }
 
-        console.log(`SB Fetch: Segmentos recibidos de API SB para ${videoId}: ${data.length}`);
-        // Añadir duración del video si viene en el primer segmento (algunas APIs SB lo incluyen)
-        if (data.length > 0 && data[0].videoDuration) {
-             console.log(`SB Fetch: Duración del video según SB para ${videoId}: ${data[0].videoDuration}s`);
-             // Puedes almacenar esto si lo necesitas, por ejemplo: segmentosCache[videoId].videoDuration = data[0].videoDuration;
+        console.log(`SB Fetch: Segmentos recibidos de API SB para ${videoId} (crudos): ${data.length}`);
+
+        // --- NUEVA LÓGICA DE VALIDACIÓN DE SEGMENTOS ---
+        const validSegments = data.filter(segment => {
+            // 1. Verificar que el segmento existe y tiene la propiedad 'segment'
+            if (!segment || !segment.segment) {
+                console.warn(`SB Fetch: Segmento inválido detectado (falta propiedad 'segment'):`, segment);
+                return false; // Filtrar segmento inválido
+            }
+
+            // 2. Verificar que segment.segment es un array y tiene al menos 2 elementos
+            if (!Array.isArray(segment.segment) || segment.segment.length < 2) {
+                 console.warn(`SB Fetch: Segmento inválido detectado ('segment' no es un array [start, end]):`, segment);
+                 return false; // Filtrar segmento inválido
+            }
+
+            // 3. Verificar que los primeros dos elementos de segment.segment son números válidos
+            const start = parseFloat(segment.segment[0]);
+            const end = parseFloat(segment.segment[1]);
+            if (isNaN(start) || isNaN(end)) {
+                 console.warn(`SB Fetch: Segmento inválido detectado (tiempos no son números):`, segment);
+                 return false; // Filtrar segmento inválido
+            }
+
+            // Si pasa todas las comprobaciones, el segmento es válido
+            return true;
+        });
+
+        console.log(`SB Fetch: Segmentos válidos después de validación para ${videoId}: ${validSegments.length}`);
+        // Opcional: Ordenar segmentos válidos por tiempo de inicio
+        // validSegments.sort((a, b) => parseFloat(a.segment[0]) - parseFloat(b.segment[0]));
+
+        // Añadir duración del video si viene en el primer segmento válido (algunas APIs SB lo incluyen)
+        if (validSegments.length > 0 && validSegments[0].videoDuration) {
+             console.log(`SB Fetch: Duración del video según SB para ${videoId}: ${validSegments[0].videoDuration}s`);
+             // Puedes almacenar esta duración si la necesitas, por ejemplo: segmentosCache[videoId].videoDuration = validSegments[0].videoDuration;
         }
 
-        // Si todo fue bien y data es un array, almacenarlo en caché
-        segmentosCache[videoId] = data; // Almacenar el array (vacío o con segmentos)
-        return data; // Devolver el array (puede ser vacío)
+
+        // Almacenar los SEGMENTOS VÁLIDOS (el array filtrado) en caché
+        segmentosCache[videoId] = validSegments; // Almacenar el array (puede ser vacío si ninguno fue válido)
+        return validSegments; // Devolver el array filtrado (puede ser vacío)
 
     } catch (error) {
         console.error(`SB Fetch: Error en fetch/procesamiento SB para ${apiUrl}:`, error);
-        // En caso de cualquier error (red, status no-ok, respuesta no-array),
+        // En caso de cualquier error (red, status no-ok, respuesta no-array, error de validación),
         // establecer segmentosCache[videoId] a null para indicar que falló la obtención
-        // y evitar reintentos de fetch.
+        // y evitar reintentos de fetch en checkAndSkipSegment.
         segmentosCache[videoId] = null; // Establecer a null en caché
         return null; // Devolver null para indicar el fallo
     }
     // Después de fetch (exitoso o fallido), segmentosCache[videoId] ya no será 'fetching'.
 }
-
-
 // Módulo: Manejo de Eventos y Botones
 
 // --- Botón Play/Pause Principal --- (Asumiendo que botonPlay ahora también pausa)
