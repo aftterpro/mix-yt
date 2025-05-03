@@ -1,43 +1,47 @@
 /* Estilo base para ambos reproductores */
 .video-player {
-    position: absolute; /* Necesario para superponerlos */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 1;
-    filter: blur(0px);
-    /* Transición más larga y con easing suave */
-    transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1), filter 1.8s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: opacity, filter; /* Optimización para el navegador */
-    z-index: 1; /* Por defecto, uno encima del otro */
-    background-color: #000; /* Fondo negro para evitar transparencias raras durante el fade */
-    overflow: hidden; /* Asegura que nada se salga */
+    position: absolute; /* Correcto: Necesario para superponerlos */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+    filter: blur(0px);
+    /* Transición: Opacidad y filtro con duración que coincida con JS */
+    /* Ajusta '15s' aquí para que coincida con tu variable CROSSFADE_DURATION en JS */
+    transition: opacity 15s cubic-bezier(0.4, 0, 0.2, 1), filter 15s cubic-bezier(0.4, 0, 0.2, 1);
+    /* O si usas variable CSS: */
+    /* transition: opacity var(--crossfade-duration) cubic-bezier(0.4, 0, 0.2, 1), filter var(--crossfade-duration) cubic-bezier(0.4, 0, 0.2, 1); */
+    will-change: opacity, filter;
+    z-index: 1; /* z-index predeterminado */
+    background-color: #000;
+    overflow: hidden;
 }
 
 /* Estado para el reproductor que se desvanece (OUT) */
 .fade-out {
-    opacity: 0;
-    filter: blur(8px); /* Añade desenfoque al desaparecer */
-    z-index: 2; /* Se pone momentáneamente encima para que el fade-out sea visible */
-    /* El que está debajo (.fade-in) se revelará a medida que este se desvanece */
+    opacity: 0; /* Se desvanece a 0 */
+    filter: blur(8px);
+    z-index: 1; /* <-- CORREGIDO: Debe estar DEBAJO del que entra durante el desvanecimiento */
 }
 
 /* Estado para el reproductor que aparece (IN) */
 .fade-in {
-    /* Este reproductor viene desde el estado .hidden (opacity: 0, filter: blur(...)) */
-    /* Al quitar .hidden y añadir .fade-in, la transición base de .video-player se activa */
-    opacity: 1;
-    filter: blur(0px); /* Termina sin desenfoque */
-    z-index: 1; /* Permanece detrás del .fade-out durante la transición */
+    opacity: 1; /* Se funde a 1 */
+    filter: blur(0px);
+    z-index: 2; /* <-- CORREGIDO: Debe estar ENCIMA del que sale durante la transición */
 }
 
 /* Estado para el reproductor que está completamente oculto */
 .hidden {
-    opacity: 0 !important; /* Forza la opacidad a 0 */
-    filter: blur(8px);    /* Mantenlo desenfocado mientras está oculto */
-    z-index: 0;           /* Envíalo al fondo */
-    pointer-events: none; /* Deshabilita cualquier interacción */
-    /* No necesita transición aquí, el cambio de estado es inmediato */
-    /* La transición se aplica cuando se quita esta clase */
+    opacity: 0 !important;
+    filter: blur(8px);
+    z-index: 0;
+    pointer-events: none;
+    display: none; /* Si tu clase .hidden hace esto, asegúrate de que esté aquí */
+}
+
+/* Si usas una variable CSS para la duración */
+:root {
+  --crossfade-duration: 15s; /* Asegúrate de que este valor coincida exactamente con tu CROSSFADE_DURATION en JS */
 }
