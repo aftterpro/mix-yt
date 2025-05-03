@@ -64,7 +64,6 @@ html, body {
     left: 0;
     width: 100%;
     height: 100%;
-    /* Estado inicial de opacidad y filtro */
     opacity: 1;
     filter: blur(0px);
     background-color: #000;
@@ -73,7 +72,7 @@ html, body {
     /* Define CÓMO se animan los cambios en propiedades como opacity y filter */
     /* LA DURACIÓN (15s) DEBE COINCIDIR CON EL VALOR DE TU VARIABLE JAVASCRIPT CROSSFADE_DURATION */
     /* Si usas la variable CSS --crossfade-duration, asegúrate de que esté definida correctamente en efecto.css */
-    transition: opacity var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1), filter var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1);
+transition: opacity var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1), filter var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1);
 
     will-change: opacity, filter; /* Sugerencia al navegador para optimización */
     z-index: 1; /* z-index base. Las clases de efecto lo modificarán durante la transición. */
