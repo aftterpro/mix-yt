@@ -140,51 +140,75 @@ function onPlayerStateChange(event) {
 
      if (playerState === YT.PlayerState.PLAYING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} is PLAYING. Video: ${videoId || 'Unknown ID'}`);
-         // Update current playing info when the active player confirms PLAYING state
-         if (videoId && changedPlayerNum === currentPlayer) {
-             console.log(`onPlayerStateChange: Confirming PLAYING state for current Player ${changedPlayerNum}. Updating info.`);
-             const flatList = getFlattenedPlaylist();
-             const newFlatIndex = flatList.findIndex(v => v.videoId === videoId);
 
-             if (newFlatIndex !== -1) {
-                  const currentVideoObject = flatList[newFlatIndex];
-                  currentPlayingInfo.videoId = videoId;
-                  currentPlayingInfo.playlistId = currentVideoObject.sourcePlaylistId;
-                  currentPlayingInfo.flattenedIndex = newFlatIndex;
-                  console.log(`Current playing index updated via state change: ${newFlatIndex} (Video: ${videoId})`);
-                  updatePlaylistsUI();
-             } else {
-                  console.warn(`onPlayerStateChange: Video ${videoId} started playing, but not found in the updated flattened list.`);
-                   currentPlayingInfo.flattenedIndex = -1;
-                    currentPlayingInfo.videoId = videoId;
-                    currentPlayingInfo.playlistId = null;
+         // --- CORRECTION: Update current playing info and reset transition flag
+         // when *any* player with a known videoId enters the PLAYING state.
+         const flatList = getFlattenedPlaylist();
+         const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
+
+         if (videoId && playingVideoIndex !== -1) {
+              // This is a known video starting to play.
+              // Update currentPlayingInfo to this video's details.
+              const playingVideoObject = flatList[playingVideoIndex];
+              currentPlayingInfo.videoId = videoId;
+              currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
+              currentPlayingInfo.flattenedIndex = playingVideoIndex;
+              console.log(`Current playing info updated via state change: ${playingVideoIndex} (Video: ${videoId})`);
+              // Update UI to reflect the new highlighted video
+              updatePlaylistsUI();
+
+             // --- CORRECTION: Set currentPlayer here as the definitive source ---
+             // When a known video starts playing, *that* player is the current one.
+             if (currentPlayer !== changedPlayerNum) {
+                  console.log(`onPlayerStateChange: Setting currentPlayer to ${changedPlayerNum}.`);
+                  currentPlayer = changedPlayerNum; // Set currentPlayer to the player that just started playing
              }
 
-             // Reset isTransitioning flag here if a new video has successfully started playing
+             // Reset the isTransitioning flag when a known video starts playing.
+             // This is a reliable signal that the transition phase is complete.
              if (isTransitioning) {
-                 console.log(`onPlayerStateChange: New video (${videoId}) started playing. Resetting isTransitioning flag.`);
+                 console.log(`onPlayerStateChange: Known video (${videoId}) started playing. Resetting isTransitioning flag.`);
                  isTransitioning = false;
              }
 
-         } else if (videoId && changedPlayerNum !== currentPlayer) {
-               console.log(`onPlayerStateChange: Other player ${changedPlayerNum} is PLAYING. Video: ${videoId}. (Logical currentPlayer is ${currentPlayer})`);
+         } else if (videoId && playingVideoIndex === -1) {
+             // A video started playing, but it's not in our flattened list.
+             console.warn(`onPlayerStateChange: Unknown video (${videoId}) started playing on Player ${changedPlayerNum}.`);
+              currentPlayingInfo.videoId = videoId;
+              currentPlayingInfo.playlistId = null;
+              currentPlayingInfo.flattenedIndex = -1;
+               updatePlaylistsUI();
+               if (currentPlayer !== changedPlayerNum) {
+                   console.log(`onPlayerStateChange: Setting currentPlayer to ${changedPlayerNum} based on unknown video.`);
+                    currentPlayer = changedPlayerNum; // Update currentPlayer to match reality
+               }
+         } else {
+              // Player entered PLAYING state, but no videoId available yet. Wait.
+               console.log(`onPlayerStateChange: Player ${changedPlayerNum} is PLAYING, but videoId is not available yet.`);
+               // Do NOT change currentPlayer or isTransitioning here. Wait for videoId.
          }
 
-         // Check for skips immediately when playback starts (forceCheck=true might be needed here if initial skips are missed)
-          if (videoId) {
-             // Let the monitor handle subsequent checks. A forceCheck here might be redundant
-             // if the monitor runs frequently. Let's rely on the monitor for now.
-             // checkAndSkipSegment(event.target, true); // Optional: Uncomment if initial skips are still missed
+
+         // Call checkAndSkipSegment for the player that just entered the PLAYING state
+         // Use forceCheck=true to ensure it runs even if isTransitioning is still true briefly.
+          if (videoId) { // Only check if we have a video ID
+             checkAndSkipSegment(event.target, true); // Check for skips immediately when playback starts
           }
+
+
      } else if (playerState === YT.PlayerState.PAUSED) {
         console.log('Video paused on Player', changedPlayerNum);
          if (changedPlayerNum === currentPlayer && reproduccionIniciada) {
-            // Handled by button
+             // Handled by button
          }
     } else if (playerState === YT.PlayerState.ENDED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} state is ENDED. Video: ${videoId || 'Unknown ID'}`);
-         if (changedPlayerNum === currentPlayer && !isTransitioning && !isAudioFading) {
-             console.log(`onPlayerStateChange: Current player ENDED unexpectedly for video ${videoId}. Attempting playNextVideo.`);
+         // If the video that ended matches the currently expected video, and we are not already transitioning,
+         // trigger playNextVideo as a fallback.
+         const endedVideoMatchesCurrent = (videoId && currentPlayingInfo.videoId === videoId);
+
+         if (endedVideoMatchesCurrent && !isTransitioning && !isAudioFading) {
+             console.log(`onPlayerStateChange: Current video (${videoId}) ENDED unexpectedly. Attempting playNextVideo.`);
              playNextVideo();
          } else if (changedPlayerNum !== currentPlayer) {
              console.log(`onPlayerStateChange: Other player ${changedPlayerNum} state is ENDED. Video: ${videoId}. (Not the current active player)`);
@@ -194,7 +218,7 @@ function onPlayerStateChange(event) {
     } else if (playerState === YT.PlayerState.CUED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} is CUED. Video: ${videoId || 'Unknown ID'}`);
          // This state is expected for the next player after cueVideoById is called.
-         // No immediate action needed here usually, playback will be triggered by playVideo() in the timeout.
+         // No immediate action needed here usually, playback will be triggered by playVideo() in playNextVideo.
     }
 }
 // Módulo: Interacción con API de Búsqueda (Piped)
@@ -1398,7 +1422,6 @@ async function playNextVideo() {
         return;
     }
 
-    // Set isTransitioning flag early and reliably
     isTransitioning = true;
     console.log(`playNextVideo [Data]: *** Main Transition STARTED from flattened index ${currentFlatIndex}. Flag isTransitioning=true. ***`);
 
@@ -1411,7 +1434,7 @@ async function playNextVideo() {
         document.getElementById('botonPlay').disabled = true;
         currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null };
         updatePlaylistsUI();
-        isTransitioning = false; // Reset flag on early exit
+        isTransitioning = false;
         console.log(`playNextVideo [Data]: *** Transition ABORTED (No videos). Flag isTransitioning=false. ***`);
         return;
     }
@@ -1421,7 +1444,7 @@ async function playNextVideo() {
     if (nextIndex >= flatList.length) {
         console.log('playNextVideo [Data]: End of flattened list detected.');
         askToRepeatPlaylist();
-        isTransitioning = false; // Reset flag on end of list
+        isTransitioning = false;
         console.log(`playNextVideo [Data]: *** Transition ENDED (End of list). Flag isTransitioning=false. ***`);
         return;
     }
@@ -1445,33 +1468,28 @@ async function playNextVideo() {
 
         if (!previousPlayerInstance || typeof previousPlayerInstance.setVolume !== 'function' ||
             !nextPlayerInstance || typeof nextPlayerInstance.cueVideoById !== 'function' || typeof nextPlayerInstance.playVideo !== 'function' || typeof nextPlayerInstance.setVolume !== 'function') {
-             throw new Error("Player instances or required API functions missing.");
+             throw new Error("Player instances or required API functions missing for crossfade.");
         }
 
-        // --- Prepare the next video (cue it) ---
+        // --- Step 1: Prepare the next video (cue it) ---
         console.log(`playNextVideo [Data]: Calling cueVideoById('${nextVideoId}') on Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
         nextPlayerInstance.cueVideoById(nextVideoId);
 
-        // Ensure the container of the next player is ready and visual fade starts
+        // Ensure the container of the next player is ready and layered correctly for visual overlap
         if (nextPlayerElement) {
-            nextPlayerElement.classList.remove('hidden', 'fade-out');
+            nextPlayerElement.classList.remove('hidden', 'fade-out'); // Ensure it's visible and not fading out
+            // CSS should handle z-index for layering: incoming player (nextPlayerElement) needs higher z-index
         } else { console.warn("DOM element for nextPlayerElement not found."); }
-        if (currentPlayerElement) {
-            currentPlayerElement.classList.add('fade-out');
-        } else { console.warn("DOM element for currentPlayerElement not found."); }
-        if (nextPlayerElement) {
-             nextPlayerElement.classList.remove('fade-in');
-            nextPlayerElement.classList.add('fade-in');
-        }
-
-        // --- Set initial volumes BEFORE the timeout and crossfade ---
-        // Ensure the current player is at full volume (it should be, but explicit set helps)
-        try { previousPlayerInstance.setVolume(100); } catch(e) { console.warn("Error setting previous player volume to 100:", e); }
-        // Ensure the next player is muted before it starts playing
-        try { nextPlayerInstance.setVolume(0); } catch(e) { console.warn("Error setting next player volume to 0:", e); e.name = "SetVolumeErrorBeforeTimeout"; throw e; }
 
 
-        // Update logical state immediately for UI highlight
+        // --- Step 2: Set initial volumes BEFORE starting playback/fade ---
+        // The previous player should be at full volume (or whatever it was at)
+        // The next player should be muted before its playback starts for the fade-in
+        try { previousPlayerInstance.setVolume(previousPlayerInstance.getVolume() || 100); } catch(e) { console.warn("Error getting/setting previous player volume, defaulting to 100:", e); previousPlayerInstance.setVolume(100); }
+        try { nextPlayerInstance.setVolume(0); } catch(e) { console.warn("Error setting next player volume to 0:", e); }
+
+        // Update logical state immediately for UI highlight (shows the *next* video as pending/current)
+        // This happens here so the UI updates visually right away.
         currentPlayingInfo = {
              flattenedIndex: nextIndex,
              videoId: nextVideo.videoId,
@@ -1481,78 +1499,98 @@ async function playNextVideo() {
         updatePlaylistsUI(); // Update UI highlight based on the new logical state
 
 
-        // Timeout to coordinate the rest of the transition and audio fade
-        const visualFadeDurationMs = CROSSFADE_DURATION * 1000; // Use CROSSFADE_DURATION for visual fade time
-        console.log(`playNextVideo [Data]: TIMEOUT (${visualFadeDurationMs}ms) started for index ${nextIndex}.`);
+        // --- Step 3: Start the Visual and Audio Transitions CONCURRENTLY ---
 
+        // Apply CSS classes to start visual fade-out on current player and fade-in on next player
+        if (currentPlayerElement) {
+            currentPlayerElement.classList.add('fade-out');
+        } else { console.warn("DOM element for currentPlayerElement not found."); }
+        if (nextPlayerElement) {
+             nextPlayerElement.classList.remove('fade-in'); // Remove in case it was there
+            nextPlayerElement.classList.add('fade-in');
+        }
+
+        // Start playing the cued video on the next player
+        // This needs to happen so its audio stream is available to fade in.
+         try {
+            if (nextPlayerInstance && typeof nextPlayerInstance.playVideo === 'function') {
+                 console.log(`playNextVideo [Data]: Calling playVideo() on Player ${currentPlayerLogicalNum === 1 ? 2 : 1} to start playback for fade-in.`);
+                 nextPlayerInstance.playVideo();
+                 // Audio will start but volume is 0 due to setVolume(0) above.
+            } else {
+                 console.warn(`playNextVideo [Data]: Next Player instance invalid or playVideo missing, cannot start playback for fade.`);
+                  throw new Error("Failed to start playback on next player."); // Propagate error
+            }
+         } catch(e) {
+             console.error("Error calling playVideo on next player:", e);
+              // Abort transition cleanly
+              isTransitioning = false; // Reset flag
+               // Remove visual classes
+               if (currentPlayerElement) currentPlayerElement.classList.remove('fade-out');
+               if (nextPlayerElement) nextPlayerElement.classList.remove('fade-in');
+               // Revert logical state? Maybe stay on current video?
+                currentPlayingInfo.flattenedIndex = currentFlatIndex; // Revert index
+                currentPlayingInfo.videoId = previousVideoIdForCleanup;
+                currentPlayingInfo.playlistId = flatList[currentFlatIndex]?.sourcePlaylistId || null;
+                updatePlaylistsUI(); // Update UI back
+               throw e; // Re-throw the error
+         }
+
+        // --- CORRECTION: Start Audio Crossfade after a tiny delay ---
+        // Gives the next player a moment to start buffering/preparing audio after playVideo().
+        const audioFadeStartDelay = 50; // Milliseconds delay before starting audio fade
+        console.log(`playNextVideo [Data]: Scheduling crossfadeAudio in ${audioFadeStartDelay}ms.`);
         setTimeout(() => {
-            console.log(`playNextVideo [Data]: TIMEOUT callback executed for index ${nextIndex}.`);
+            console.log(`playNextVideo [Data]: Starting crossfadeAudio.`);
+            // crossfadeAudio will manage fading volumes over CROSSFADE_DURATION.
+            // Pass the specific previous and next player instances.
+             crossfadeAudio(previousPlayerInstance, nextPlayerInstance); // Use the modified crossfadeAudio
+        }, audioFadeStartDelay);
+        // -----------------------------------------------------------
+
+
+        // --- Step 4: Handle Cleanup after Transitions (Visual and Audio) ---
+        // This happens AFTER both the visual fade-out AND the audio fade are complete.
+        // Use the transitionend event on the outgoing player for visual timing.
+
+        let transitionEndHandler = (event) => {
+            // Ensure this listener only fires for the opacity transition on the correct element
+            if (event.propertyName !== 'opacity' || event.target !== currentPlayerElement) {
+                return; // Ignore other transitions or events from wrong elements
+            }
+
+            console.log(`playNextVideo [Data]: transitionend event fired on ${event.target.id} for property ${event.propertyName}. Performing cleanup.`);
+
+            // Remove the event listener to avoid multiple triggers
+            event.target.removeEventListener('transitionend', transitionEndHandler);
+            clearTimeout(transitionEndHandler.fallbackTimeoutId); // Clear the fallback timeout
+
+
+            // --- Cleanup Logic (moved here to happen after visual fade completes) ---
             try {
-                // --- Start playing the cued video AND start audio crossfade here ---
-                 // Start playing the cued video immediately within the timeout.
-                 try {
-                    if (nextPlayerInstance && typeof nextPlayerInstance.playVideo === 'function') {
-                        // Only try to play if not already playing (API might auto-play after cue in some cases)
-                        if (nextPlayerInstance.getPlayerState() !== YT.PlayerState.PLAYING) {
-                             console.log(`playNextVideo [Data]: Timeout - Calling playVideo() on Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
-                             nextPlayerInstance.playVideo();
-                        } else {
-                             console.log(`playNextVideo [Data]: Timeout - Player ${currentPlayerLogicalNum === 1 ? 2 : 1} is already PLAYING.`);
-                        }
-                    } else {
-                         console.log(`playNextVideo [Data]: Timeout - Next Player instance invalid or playVideo missing.`);
-                    }
-                 } catch(e) { console.warn("Error calling playVideo on next player in timeout:", e); }
+                console.log(`playNextVideo [Data]: Transition cleanup started.`);
 
-                 // --- CORRECTION: Switch the logical currentPlayer *before* calling crossfadeAudio ---
-                 // This ensures crossfadeAudio gets the correct references for fading.
-                currentPlayer = currentPlayer === 1 ? 2 : 1;
-                console.log(`playNextVideo [Data]: Timeout - Logical currentPlayer switched to ${currentPlayer}.`);
-                 // -----------------------------------------------------------------------------------
-
-                 // Now that the next video is attempting to play and currentPlayer is switched, start the audio crossfade.
-                 // crossfadeAudio will use the *new* currentPlayer value to determine previous/next.
-                 // crossfadeAudio itself manages the fading volumes over CROSSFADE_DURATION.
-                crossfadeAudio(); // This function manages the audio fading over CROSSFADE_DURATION
-
-                // --- Handle stopping the previous video ---
-                // Let the crossfade audio handle the volume reduction.
-                // We can stop the previous video *after* the audio fade is complete,
-                // or rely on the volume being 0 and hiding it visually.
-                // Let's keep the stopVideo commented out for now as it was suspected of causing cuts.
-                // If uncommenting, consider putting it in a *separate* timeout after CROSSFADE_DURATION
-                // or inside the crossfadeAudio interval's completion logic.
-
-                /*
-                if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
-                     // Delay stopping the previous video until the crossfade is likely finished
-                     setTimeout(() => {
-                         try {
-                             console.log(`playNextVideo [Data]: Delayed stopVideo() called on Player ${currentPlayerLogicalNum}`);
-                             // Check if it's still the 'previous' player and not already stopped
-                             if ( (currentPlayer === 1 ? player2 : player1) === previousPlayerInstance && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
-                                previousPlayerInstance.stopVideo();
-                             }
-                         } catch(e) { console.warn("Error stopping previous video after delay:", e); }
-                     }, CROSSFADE_DURATION * 1000 + 100); // Add a small buffer
-                }
-                */
-                // ----------------------------------------
+                // Stop the previous video explicitly (optional, but ensures cleanup)
+                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
+                      console.log(`playNextVideo [Data]: Cleanup - Calling stopVideo() on previous Player ${currentPlayerLogicalNum}.`);
+                      previousPlayerInstance.stopVideo();
+                 }
 
 
-                // Cleanup visual of the old player container
+                // Hide the old player container completely
                 if (currentPlayerElement) {
-                    currentPlayerElement.classList.remove('fade-out');
+                    currentPlayerElement.classList.remove('fade-out', 'fade-in'); // Remove any fade classes
                     currentPlayerElement.classList.add('hidden'); // Hide container
                 }
-                // Cleanup visual of the new player (remove fade-in)
+                // Remove fade-in class from the new player container (it should be fully visible now)
                 if (nextPlayerElement) {
                     nextPlayerElement.classList.remove('fade-in');
+                     // Ensure the next player is at default z-index or layer if adjusted by CSS
                 }
 
                 // Cleanup data from the PREVIOUS video
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
-                    console.log(`playNextVideo [Data]: Timeout - Cleaning up SB cache for PREVIOUS video: ${previousVideoIdForCleanup}`);
+                    console.log(`playNextVideo [Data]: Cleanup - Cleaning up SB cache for PREVIOUS video: ${previousVideoIdForCleanup}`);
                     delete segmentosCache[previousVideoIdForCleanup];
                 }
                 // Reset lastSeek if it was for the previous video
@@ -1561,19 +1599,90 @@ async function playNextVideo() {
                      lastSeekVideoId = null;
                 }
 
-            } catch (timeoutError) {
-                console.error("Error inside playNextVideo setTimeout callback:", timeoutError);
-                 isTransitioning = false;
-                 isAudioFading = false;
-                 console.log(`playNextVideo [Data]: *** Transition INTERRUPTED (Timeout Error). Flags reset. ***`);
+            } catch (cleanupError) {
+                 console.error("Error during transitionend cleanup:", cleanupError);
+                 // Ensure flags are reset even on cleanup error
+                 isTransitioning = false; // Reset main transition flag
+                 // isAudioFading should be false already or handled by its interval
+                 console.log(`playNextVideo [Data]: *** Transition Cleanup INTERRUPTED (Error). Flag isTransitioning reset. ***`);
             } finally {
-                // isTransitioning is now reset in onPlayerStateChange when the *new* player starts playing.
-                console.log(`playNextVideo [Data]: Timeout callback FINISHED for index ${nextIndex}.`);
+                 // The isTransitioning flag is also reset in onPlayerStateChange when the *new* player starts playing.
+                 // This provides a second guarantee. We don't reset it here in 'finally' anymore.
+                 console.log(`playNextVideo [Data]: Transitionend cleanup FINISHED.`);
+                 // The logical currentPlayer switch now happens in onPlayerStateChange
             }
-        }, visualFadeDurationMs); // The timeout duration matches the visual fade
+        };
+
+        // Add the event listener for the opacity transition on the element that is fading out
+        if (currentPlayerElement) {
+            console.log(`playNextVideo [Data]: Adding transitionend listener to ${currentPlayerElement.id}`);
+            currentPlayerElement.addEventListener('transitionend', transitionEndHandler);
+
+            // --- Add a fallback setTimeout in case transitionend doesn't fire ---
+            const fallbackTimeoutMs = CROSSFADE_DURATION * 1000 + 200; // Duration of visual fade + buffer
+            console.log(`playNextVideo [Data]: Setting fallback setTimeout (${fallbackTimeoutMs}ms).`);
+            const fallbackTimeoutId = setTimeout(() => {
+                console.warn(`playNextVideo [Data]: Fallback setTimeout triggered after ${fallbackTimeoutMs}ms. Assuming transition failed or didn't fire.`);
+                // Remove the transitionend listener if the timeout is triggered
+                if (currentPlayerElement) {
+                     currentPlayerElement.removeEventListener('transitionend', transitionEndHandler);
+                }
+                // Execute the cleanup logic directly, indicating it's a fallback
+                // Pass a mock event object that looks like a transitionend for opacity on the correct target
+                transitionEndHandler({ propertyName: 'opacity', target: currentPlayerElement, isFallback: true });
+            }, fallbackTimeoutMs);
+
+             // Store the timeout ID so the transitionEndHandler can clear it
+             transitionEndHandler.fallbackTimeoutId = fallbackTimeoutId;
+
+        } else {
+            // If the element isn't found, execute the cleanup logic immediately
+            console.warn("playNextVideo [Data]: currentPlayerElement not found for transition, executing cleanup immediately.");
+            try {
+                 // Manually execute the core cleanup logic
+                 console.log(`playNextVideo [Data]: Executing post-transition logic immediately.`);
+
+                 // Stop previous video
+                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
+                      console.log(`playNextVideo [Data]: Calling stopVideo() on previous Player ${currentPlayerLogicalNum} immediately.`);
+                      previousPlayerInstance.stopVideo();
+                 }
+
+                 // Hide the intended previous player element if found
+                 const intendedPreviousElement = document.getElementById(`player${currentPlayerLogicalNum}`);
+                 if (intendedPreviousElement) {
+                      intendedPreviousElement.classList.remove('fade-out', 'fade-in');
+                      intendedPreviousElement.classList.add('hidden');
+                 }
+                  // Remove fade-in from next player element
+                  if (nextPlayerElement) {
+                      nextPlayerElement.classList.remove('fade-in');
+                  }
+
+                 // Cleanup data (already handled above in the main try block, but good to be safe)
+                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
+                      delete segmentosCache[previousVideoIdForCleanup];
+                 }
+                 if (lastSeekVideoId === previousVideoIdForCleanup) {
+                       lastSeekEndTime = -1;
+                       lastSeekVideoId = null;
+                 }
+                 // Flags were already reset on critical error before this immediate path
+
+            } catch (immediateError) {
+                 console.error("Error during immediate post-transition logic:", immediateError);
+            } finally {
+                 isAudioFading = false;
+                 // isTransitioning was already reset on critical error
+                 console.log(`playNextVideo [Data]: Flags reset after immediate logic execution.`);
+                 // Logical currentPlayer switch happens in onPlayerStateChange
+            }
+        }
+
 
     } catch (error) {
         console.error("CRITICAL Error during playNextVideo:", error);
+        // Ensure flags are reset and state is reverted on critical error before transition starts
         isTransitioning = false;
         isAudioFading = false;
         const previousVideo = flatList[currentFlatIndex];
@@ -1588,11 +1697,7 @@ async function playNextVideo() {
          reproduccionIniciada = false;
     }
 }
-function crossfadeAudio() {
-    // Get player references based on the *logical* 'currentPlayer'
-    // which was ALREADY switched in the playNextVideo timeout BEFORE calling this function.
-    const previousPlayer = currentPlayer === 1 ? player2 : player1; // The one that is NOW inactive (just switched)
-    const nextPlayer = currentPlayer === 1 ? player1 : player2;     // The one that is NOW active (just switched)
+function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
     const fadeStartTime = Date.now();
 
     if (isAudioFading) {
@@ -1600,20 +1705,29 @@ function crossfadeAudio() {
          return;
     }
 
+    // Use the players passed as arguments
+    const previousPlayer = playerToFadeOut;
+    const nextPlayer = playerToFadeIn;
+
     if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-        console.error("Crossfade Audio: Invalid players at start.");
-        isAudioFading = false;
+        console.error("Crossfade Audio: Invalid players passed as arguments.");
+        isAudioFading = false; // Ensure reset if invalid
         return;
     }
 
+    // Log which players are being faded based on their internal reference (player1/player2)
     console.log(`Crossfade START @ ${new Date(fadeStartTime).toLocaleTimeString()}: Fading Out Player ${previousPlayer === player1 ? 1:2}, Fading In Player ${nextPlayer === player1 ? 1:2}`);
     isAudioFading = true; // <<<--- MARK START OF AUDIO FADE
 
-    // Volumes are set to 100/0 just before the timeout in playNextVideo.
-    // The interval will now manage the fade.
+    // Initial volumes are set in playNextVideo just before calling this.
+    // The interval will now manage the fade from those initial volumes.
 
-    let currentVolume = 100; // Start fade-out from 100
-    let nextVolume = 0;      // Start fade-in from 0
+    let currentVolume = previousPlayer.getVolume(); // Start fade-out from its current volume
+    let nextVolume = nextPlayer.getVolume();      // Start fade-in from its current volume (should be 0)
+
+    currentVolume = Math.max(0, Math.min(100, currentVolume)); // Ensure starting volumes are within 0-100
+    nextVolume = Math.max(0, Math.min(100, nextVolume));
+
 
     const crossfadeSteps = Math.max(1, Math.floor(CROSSFADE_DURATION * 10)); // 10 steps per second
     const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100;
@@ -1626,19 +1740,18 @@ function crossfadeAudio() {
     }
 
     const intervalId = setInterval(() => {
-        if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Invalid players, stopping fade.`);
+         if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
+             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Invalid players in interval, stopping fade.`);
              clearInterval(intervalId);
              window.crossfadeIntervalId = null;
              isAudioFading = false; // <<<--- RESET FLAG ON ERROR
              return;
         }
 
-        currentVolume = Math.max(0, currentVolume - volumeStep);
-        nextVolume = Math.min(100, nextVolume + volumeStep);
+        currentVolume = Math.max(0, currentVolume - volumeStep); // Decrease fade-out player volume
+        nextVolume = Math.min(100, nextVolume + volumeStep);      // Increase fade-in player volume
 
         try {
-            // Only set volume if the player instance is still valid
             if(previousPlayer) previousPlayer.setVolume(currentVolume);
             if(nextPlayer) nextPlayer.setVolume(nextVolume);
         } catch (e) {
@@ -1655,8 +1768,6 @@ function crossfadeAudio() {
             const fadeEndTime = Date.now();
             console.log(`Crossfade audio FINISHED @ ${new Date(fadeEndTime).toLocaleTimeString()} (Duration: ${(fadeEndTime - fadeStartTime)/1000}s).`);
             isAudioFading = false; // <<<--- MARK END OF AUDIO FADE
-
-             // Optional: Add a callback or event here if something needs to happen exactly when audio fade ends
         }
     }, intervalTime);
     window.crossfadeIntervalId = intervalId;
