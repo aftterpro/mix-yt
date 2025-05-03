@@ -58,12 +58,32 @@ html, body {
     height: 0;
     overflow: hidden;
 }
+.video-player {
+    position: absolute; /* Requerido para apilarse dentro de #videoContainer (relative) */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Estado inicial de opacidad y filtro */
+    opacity: 1;
+    filter: blur(0px);
+    background-color: #000;
+    overflow: hidden;
 
-.video-player { /* Estilo base movido a efecto.css */
-   /* position: absolute; */ /* Asegúrate que esté en efecto.css */
-   /* ... resto de estilos base en efecto.css ... */
+    /* Define CÓMO se animan los cambios en propiedades como opacity y filter */
+    /* LA DURACIÓN (15s) DEBE COINCIDIR CON EL VALOR DE TU VARIABLE JAVASCRIPT CROSSFADE_DURATION */
+    /* Si usas la variable CSS --crossfade-duration, asegúrate de que esté definida correctamente en efecto.css */
+    transition: opacity var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1), filter var(--crossfade-duration, 15s) cubic-bezier(0.4, 0, 0.2, 1);
+
+    will-change: opacity, filter; /* Sugerencia al navegador para optimización */
+    z-index: 1; /* z-index base. Las clases de efecto lo modificarán durante la transición. */
 }
 
+/* Asegúrate de que tengas una regla para mostrar los reproductores cuando no están .hidden */
+/* Si usas IDs directamente en lugar de la clase .video-player, puede que necesites esto */
+#player1:not(.hidden), #player2:not(.hidden) {
+     display: block; /* Asegura que se muestren cuando no están ocultos por display: none */
+}
 .player-controls {
     display: flex;
     justify-content: center;
