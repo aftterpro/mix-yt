@@ -1,6 +1,6 @@
 /* --- Variables relacionadas con efectos / crossfade --- */
 :root {
-  --crossfade-duration: 15s; /* ESTE VALOR DEBE COINCIDIR CON TU VARIABLE JS CROSSFADE_DURATION */
+  --crossfade-duration: 7s; /* ESTE VALOR DEBE COINCIDIR CON TU VARIABLE JS CROSSFADE_DURATION */
 }
 /* Estado para el reproductor que se está desvaneciendo (OUT) */
 /* Cuando un elemento .video-player tiene la clase .fade-out */
