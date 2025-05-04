@@ -1,3 +1,5 @@
+
+
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
@@ -15,14 +17,6 @@ let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
     videoId: null,
     flattenedIndex: -1 // Índice en la lista aplanada para reproducción
 };
-let pendingVisualTransition = {
-    playerNum: null, // 1 o 2 (el número del reproductor que debería entrar visualmente)
-    outgoingElement: null, // Elemento DOM del reproductor que se desvanece (sale)
-    incomingElement: null, // Elemento DOM del reproductor que aparece (entra)
-    // Puedes añadir videoId aquí para una comprobación extra si es necesario
-    // outgoingVideoId: null, // Video ID del reproductor saliente
-    // incomingVideoId: null  // Video ID del reproductor entrante (nextVideoId)
-}
 // Variables para Búsqueda y Scroll Infinito
 let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
 let nextPageContext = null; // Para guardar información de la siguiente página (si la API la provee)
@@ -144,179 +138,9 @@ function onPlayerError(event) {
 }
 function onPlayerStateChange(event) {
     const playerState = event.data;
-    const changedPlayerNum = event.target === player1 ? 1 : 2; // Número del reproductor que cambió de estado
-    const videoId = event.target.getVideoData()?.video_id; // ID del video en ese reproductor
-    const playerInstance = event.target; // Instancia del reproductor que cambió de estado
-
-     // --- Lógica para Disparar la Transición Visual cuando el Reproductor Entrante está Listo ---
-     // Verificar si este reproductor que cambió de estado es el que está registrado en pendingVisualTransition.
-     // Si es así, y alcanza BUFFERING o PLAYING, disparar la animación visual.
-     // IMPORTANTE: Limpiar pendingVisualTransition justo DESPUÉS de disparar la animación.
-
-     if (pendingVisualTransition.playerNum === changedPlayerNum && // ¿Es el reproductor que esperamos para la transición visual?
-         (playerState === YT.PlayerState.BUFFERING || playerState === YT.PlayerState.PLAYING) && // ¿Alcanzó un estado listo para mostrar video?
-         pendingVisualTransition.playerNum !== null) // ¿Hay una transición visual pendiente activa? (Protección extra)
-         {
-
-          // Agregar una comprobación extra de videoId. Asegurarse de que el video ID del reproductor
-          // que entró en BUFFERING/PLAYING coincide con el video ID que intentamos hacer transición (ya en currentPlayingInfo.videoId).
-          // currentPlayingInfo.videoId ya fue actualizado al video entrante en playNextVideo
-          const intendedNextVideoId = currentPlayingInfo.videoId;
-
-          if (!videoId || videoId !== intendedNextVideoId) {
-               console.warn(`onPlayerStateChange [Visual]: Player ${changedPlayerNum} (${videoId}) entró en BUFFERING/PLAYING, pero no coincide con el video entrante esperado (${intendedNextVideoId}). No disparando transición visual para este video.`);
-               // NO limpiar pendingVisualTransition aquí. Esperar al video correcto o a la próxima llamada a playNextVideo.
-               // Todavía procesar otra lógica de estado abajo para este reproductor.
-          } else {
-               // ¡Este es el reproductor entrante esperado (${changedPlayerNum}) entrando en BUFFERING/PLAYING con el video correcto (${videoId})!
-               // ¡Es hora de disparar la transición visual!
-
-               console.log(`onPlayerStateChange [Visual]: Reproductor entrante ${changedPlayerNum} (${videoId}) entró en BUFFERING/PLAYING. Disparando transición visual.`);
-
-               // Obtener los elementos DOM que fueron registrados en pendingVisualTransition
-               const outgoingElement = pendingVisualTransition.outgoingElement; // Elemento saliente
-               const incomingElement = pendingVisualTransition.incomingElement; // Elemento entrante
-
-               if (outgoingElement && incomingElement) {
-                   // Aplicar las clases CSS para iniciar la animación de desvanecimiento y fundido
-                   // Asegurarse de que el elemento entrante esté visible y no oculto antes de aplicar fade-in
-                   incomingElement.classList.remove('hidden'); // Asegurar visibilidad inicial
-                   outgoingElement.classList.add('fade-out'); // Iniciar desvanecimiento en el saliente
-                   incomingElement.classList.remove('fade-out'); // Limpiar por si acaso
-                   incomingElement.classList.add('fade-in'); // Iniciar fundido en el entrante
-
-                   // Nota: El z-index correcto para .fade-in (mayor que .fade-out) debe estar definido en tu CSS.
-
-
-                   // --- Adjuntar Manejador transitionend y setTimeout de Respaldo (Lógica movida de playNextVideo) ---
-                   // Adjuntar el listener al elemento saliente (el que se desvanece a opacidad 0).
-                    let transitionEndHandler = (event) => {
-                        // Asegurarse de que este listener solo se dispare para la transición de 'opacity' en el elemento correcto (el reproductor saliente)
-                        if (event.propertyName !== 'opacity' || event.target !== outgoingElement) {
-                            // console.log(`onPlayerStateChange [Visual]: Ignorando transitionend en ${event.target.id} para propiedad ${event.propertyName}. Esperando opacity en ${outgoingElement.id}.`);
-                            return; // Ignorar eventos de transición para otras propiedades o en otros elementos
-                        }
-                        console.log(`onPlayerStateChange [Visual]: Evento transitionend disparado en ${event.target.id} por propiedad ${event.propertyName}. Realizando limpieza FINAL.`);
-                        // Eliminar el event listener después de que se dispare
-                        event.target.removeEventListener('transitionend', transitionEndHandler);
-                        // Limpiar el timeout de respaldo asociado
-                        clearTimeout(transitionEndHandler.fallbackTimeoutId);
-
-
-                        // --- Lógica de Limpieza FINAL (Después de que el Desvanecimiento Visual se Completa) ---
-                        // Esta lógica marca el fin de la transición GENERAL.
-                        try {
-                            console.log(`onPlayerStateChange [Visual]: Limpieza FINAL de transición visual iniciada.`);
-
-                            // Detener explícitamente el video anterior (el que acaba de desvanecerse).
-                            // Obtener la instancia del reproductor que LÓGICAMENTE estaba sonando antes de la transición.
-                            // Este es el reproductor cuyo elemento es 'outgoingElement'.
-                             const previousPlayerInstance = (outgoingElement.id === 'player1') ? player1 : player2;
-
-                            // Solo intentar detener si la instancia es válida y no está ya terminada
-                            // Añadir un pequeño retraso para asegurar que stopVideo no interfiera con el inicio del nuevo video? (Probar si es necesario)
-                             // setTimeout(() => { ... stopVideo() ... }, 50);
-                             if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
-                                  console.log(`onPlayerStateChange [Visual]: Limpieza - Llamando a stopVideo() en Player saliente ${outgoingElement.id}.`);
-                                  previousPlayerInstance.stopVideo();
-                             } else {
-                                  // console.log(`onPlayerStateChange [Visual]: Limpieza - No se llama stopVideo() en Player saliente ${outgoingElement.id} (no válido o ya ENDED).`);
-                             }
-
-
-                            // Ocultar completamente el contenedor del reproductor antiguo después del desvanecimiento
-                            if (outgoingElement) {
-                                outgoingElement.classList.remove('fade-out', 'fade-in'); // Eliminar clases de desvanecimiento
-                                outgoingElement.classList.add('hidden'); // Ocultar completamente (con display: none)
-                            }
-                            // Eliminar la clase fade-in del contenedor del nuevo reproductor (ya debería estar completamente visible)
-                            if (incomingElement) {
-                                incomingElement.classList.remove('fade-in', 'fade-out'); // Limpiar clases de desvanecimiento
-                                 // Asegurarse de que el z-index o capa del reproductor entrante sea el predeterminado si se ajustó con CSS
-                                 // incomingElement.style.zIndex = ''; // Si tu CSS usa z-index en .fade-in
-                            }
-
-                            // La limpieza de caché SB del video anterior (eliminación de caché)
-                            // y el reseteo de lastSeek para ese video
-                            // se manejan en playNextVideo en un setTimeout.
-
-                        } catch (cleanupError) {
-                             console.error("onPlayerStateChange [Visual]: Error durante la limpieza FINAL de transitionend:", cleanupError);
-                        } finally {
-                             console.log(`onPlayerStateChange [Visual]: Limpieza FINAL de transitionend COMPLETADA.`);
-                             // Aquí es donde se resetean los flags que indican que la transición GENERAL ha terminado.
-                             isTransitioning = false; // La transición visual y general ha terminado.
-                             // isAudioFading se gestiona dentro de crossfadeAudio.
-                             // hasOutroCrossfadeStarted se resetea al entrar en PLAYING del nuevo video.
-                        }
-                    };
-
-                   // Adjuntar el event listener para el final de la transición de opacidad en el elemento saliente
-                    outgoingElement.addEventListener('transitionend', transitionEndHandler);
-
-                   // --- Agregar un setTimeout de respaldo por si transitionend no se dispara (ej. si la duración es 0 o se interrumpe) ---
-                    const fallbackTimeoutMs = CROSSFADE_DURATION * 1000 + 200; // Duración en ms + un pequeño buffer (ej. 200ms)
-                    console.log(`onPlayerStateChange [Visual]: Estableciendo setTimeout de respaldo (${fallbackTimeoutMs}ms).`);
-                    // Almacenar el ID del timeout en la propia función manejadora para que pueda ser limpiado si transitionend se dispara primero.
-                    transitionEndHandler.fallbackTimeoutId = setTimeout(() => {
-                        console.warn(`onPlayerStateChange [Visual]: setTimeout de respaldo disparado después de ${fallbackTimeoutMs}ms.`);
-                        // Si el timeout se dispara, eliminar el listener de transitionend para evitar que se dispare después.
-                        if (outgoingElement) {
-                             outgoingElement.removeEventListener('transitionend', transitionEndHandler);
-                        }
-                        // Ejecutar la lógica de limpieza directamente, simulando el evento transitionend.
-                        // Pasamos propiedades básicas del evento original para que la lógica de limpieza funcione.
-                        transitionEndHandler({ propertyName: 'opacity', target: outgoingElement, isFallback: true });
-                    }, fallbackTimeoutMs);
-
-
-               } else {
-                    // Si los elementos DOM (outgoing/incoming) no se encontraron al disparar la transición visual (error inesperado),
-                    // ejecutar la lógica de limpieza inmediatamente como respaldo.
-                    console.warn("onPlayerStateChange [Visual]: Elementos DOM (outgoing/incoming) para transición visual no encontrados al disparar. Ejecutando limpieza inmediata como respaldo.");
-                     try {
-                         console.log(`onPlayerStateChange [Visual]: Ejecutando lógica post-transición inmediata.`);
-                          // Intentar detener el reproductor saliente previsto
-                         // El reproductor saliente previsto es el que NO acaba de entrar en BUFFERING/PLAYING.
-                         const previousPlayerInstance = (changedPlayerNum === 1) ? player2 : player1;
-                         if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
-                              console.log(`onPlayerStateChange [Visual]: Llamando a stopVideo() en Player saliente previsto inmediatamente.`);
-                              previousPlayerInstance.stopVideo();
-                         }
-                          // Intentar ocultar el elemento saliente previsto
-                         const intendedOutgoingElement = document.getElementById(`player${changedPlayerNum === 1 ? 2 : 1}`);
-                          if (intendedOutgoingElement) {
-                               intendedOutgoingElement.classList.remove('fade-out', 'fade-in');
-                               intendedOutgoingElement.classList.add('hidden');
-                          }
-                          // Asegurarse de que el elemento entrante no quede oculto/desvaneciéndose si se encontró
-                          if (incomingElement) { incomingElement.classList.remove('fade-in', 'fade-out', 'hidden'); }
-
-                          // La limpieza de caché SB del video anterior también se programa en playNextVideo.
-
-                     } catch(immediateError) {
-                          console.error("onPlayerStateChange [Visual]: Error durante la lógica post-transición inmediata:", immediateError);
-                     } finally {
-                          // Resetear flags generales aquí también, ya que la transición visual no pudo dispararse o completarse normalmente.
-                          isTransitioning = false;
-                          isAudioFading = false;
-                          hasOutroCrossfadeStarted = false; // Asumimos que si falló la transición visual, este flag también se limpia
-                          console.log(`onPlayerStateChange [Visual]: Limpieza inmediata FINALIZADA. Flags reseteados.`);
-                     }
-               }
-
-               // Limpiar el estado de transición visual pendiente *después* de disparar (o intentar disparar) la transición visual.
-               // Ya no estamos esperando una transición visual pendiente para este reproductor.
-               pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
-               console.log("onPlayerStateChange [Visual]: Estado de transición visual pendiente limpiado.");
-          }
-     }
-
-
-     // --- Lógica Principal de Manejo de Estados ---
-     // Esta parte se ejecuta independientemente de si se disparó una transición visual arriba.
-     // Actualiza el estado lógico (currentPlayingInfo, currentPlayer) y resetea flags generales cuando
-     // un video *conocido* alcanza el estado PLAYING.
+    const changedPlayerNum = event.target === player1 ? 1 : 2;
+    const videoId = event.target.getVideoData()?.video_id;
+    const playerInstance = event.target;
 
      if (playerState === YT.PlayerState.PLAYING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO. Video: ${videoId || 'Unknown ID'}`);
@@ -324,164 +148,91 @@ function onPlayerStateChange(event) {
          const flatList = getFlattenedPlaylist();
          const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
 
-         // Si el ID del video está disponible y se encuentra en nuestros datos de playlists (es un video conocido)
          if (videoId && playingVideoIndex !== -1) {
               const playingVideoObject = flatList[playingVideoIndex];
-              // Actualizar currentPlayingInfo al video que acaba de comenzar a reproducir.
               currentPlayingInfo.videoId = videoId;
               currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
               currentPlayingInfo.flattenedIndex = playingVideoIndex;
-              console.log(`onPlayerStateChange: Información de reproducción actual actualizada vía cambio de estado PLAYING: ${playingVideoIndex} (Video: ${videoId})`);
-              updatePlaylistsUI(); // Actualizar UI para resaltar el video que ahora está sonando
+              console.log(`onPlayerStateChange: Información de reproducción actual actualizada vía cambio de estado: ${playingVideoIndex} (Video: ${videoId})`);
+              updatePlaylistsUI();
 
-             // Establecer currentPlayer al número del reproductor que acaba de comenzar a reproducir este video conocido.
              if (currentPlayer !== changedPlayerNum) {
-                  console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} en estado PLAYING.`);
+                  console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum}.`);
                   currentPlayer = changedPlayerNum;
              }
 
-             // NOTA: Los flags generales (isTransitioning, isAudioFading, hasOutroCrossfadeStarted)
-             // AHORA se resetean en la lógica de limpieza FINAL de la transición visual
-             // (en el manejador transitionend o el timeout de respaldo), NO NECESARIAMENTE AQUÍ.
-             // Sin embargo, si la transición visual no se dispara por alguna razón (ej. no hay elementos DOM),
-             // la lógica de limpieza inmediata de respaldo también los resetea.
-             // Mantengamos un reset aquí como SALVAGUARDA adicional si la lógica visual falla por completo,
-             // pero la fuente principal de reseteo es el fin de la animación visual.
+             if (isTransitioning) {
+                 console.log(`onPlayerStateChange: Video conocido (${videoId}) comenzó a reproducir. Reseteando flag isTransitioning.`);
+                 isTransitioning = false;
+             }
 
-             // Salvaguarda: Si isTransitioning es true aquí, pero pendingVisualTransition ya es null (significa que el disparo visual ocurrió)
-             // y de alguna forma no se reseteó al final, podríamos resetearlo.
-             // Pero la lógica actual en la limpieza FINAL es más fiable.
-             // Resetear solo hasOutroCrossfadeStarted aquí parece más seguro, ya que está ligado al trigger de SB.
-
-              // Resetear hasOutroCrossfadeStarted cuando el NUEVO video conocido comienza a reproducir.
-              // Esto es importante para que el próximo segmento 'outro' pueda disparar otra transición.
+              // --- CORRECCIÓN: Resetear hasOutroCrossfadeStarted cuando un NUEVO video comienza a reproducir ---
              console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted.`);
-             hasOutroCrossfadeStarted = false;
-
+             hasOutroCrossfadeStarted = false; // Resetear el flag
 
          } else if (videoId && playingVideoIndex === -1) {
-             // Un video desconocido comenzó a reproducir.
              console.warn(`onPlayerStateChange: Video desconocido (${videoId}) comenzó a reproducir en Player ${changedPlayerNum}.`);
-             // Actualizar currentPlayingInfo para reflejar que un video desconocido está reproduciendo.
               currentPlayingInfo.videoId = videoId;
-              currentPlayingInfo.playlistId = null; // Playlist es desconocida
-              currentPlayingInfo.flattenedIndex = -1; // Índice es desconocido
-               updatePlaylistsUI(); // Actualizar UI (probablemente eliminará el resaltado anterior)
-               // Establecer currentPlayer para el reproductor del video desconocido.
+              currentPlayingInfo.playlistId = null;
+              currentPlayingInfo.flattenedIndex = -1;
+               updatePlaylistsUI();
                if (currentPlayer !== changedPlayerNum) {
-                   console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} basándose en video desconocido en estado PLAYING.`);
+                   console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} basándose en video desconocido.`);
                     currentPlayer = changedPlayerNum;
                }
-                // Resetear flags generales de transición incluso para videos desconocidos que comienzan a reproducir.
-                // Esto es una SALVAGUARDA por si un video desconocido interrumpe un crossfade.
-                console.log(`onPlayerStateChange: Reseteando flags isTransitioning, isAudioFading, hasOutroCrossfadeStarted para video desconocido.`);
-                isTransitioning = false; // Asumimos que la transición general se interrumpe
-                isAudioFading = false;
+                console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted para video desconocido.`);
                 hasOutroCrossfadeStarted = false;
-                // Limpiar el estado visual pendiente si un video desconocido interrumpe el flujo.
-                 pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
-
 
          } else {
-               // El reproductor entró en estado PLAYING, pero videoId aún no está disponible.
                console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO, pero el videoId aún no está disponible.`);
-               // NO resetear flags ni cambiar currentPlayer aquí. Esperar a que el videoId esté disponible (en un futuro evento PLAYING o BUFFERING).
-               // El disparo de la transición visual arriba ya ocurrió si estaba pendiente para este reproductor y alcanzó BUFFERING/PLAYING con videoId.
          }
 
-          // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING para verificar segmentos iniciales.
-          if (videoId) { // Asegurarse de tener el videoId antes de intentar verificar segmentos
-             checkAndSkipSegment(event.target, true); // Usar forceCheck=true
+          // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING
+          if (videoId) {
+             checkAndSkipSegment(event.target, true);
           }
 
      } else if (playerState === YT.PlayerState.PAUSED) {
         console.log('onPlayerStateChange: Video pausado en Player', changedPlayerNum);
-         // Si el reproductor pausado es el actual y la reproducción inició
          if (changedPlayerNum === currentPlayer && reproduccionIniciada) {
-             // Lógica al pausar el video principal (ej. actualizar botón de play/pause)
+             // Handled by button
          }
-
      } else if (playerState === YT.PlayerState.BUFFERING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está BUFFERING. Video: ${videoId || 'Unknown ID'}`);
-         // El disparo de la transición visual está al inicio de esta función si hay una transición pendiente para este reproductor y alcanza BUFFERING.
-         // Si el videoId aún no está disponible en este estado BUFFERING, el disparo visual podría no ocurrir hasta PLAYING.
 
      } else if (playerState === YT.PlayerState.CUED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está CUED. Video: ${videoId || 'Unknown ID'}`);
-         // Este estado es el predeterminado después de cueVideoById().
-         // Si un reproductor entra en CUED *después* de playVideo(), indica un posible problema.
 
-         // --- Lógica de Reintento para Estado CUED Inesperado ---
-         // Verificar si este reproductor que entró en estado CUED es el que se esperaba que fuera el 'siguiente' durante una transición en curso.
-         // Esto lo sabemos si pendingVisualTransition.playerNum es igual a changedPlayerNum.
-         // currentPlayingInfo.videoId ya fue actualizado al video entrante en playNextVideo.
-         const intendedNextVideoId = currentPlayingInfo.videoId;
+         const intendedNextPlayerNum = currentPlayer === 1 ? 2 : 1;
+         const intendedNextVideoId = currentPlayingInfo.flattenedIndex !== -1 ? getFlattenedPlaylist()[currentPlayingInfo.flattenedIndex]?.videoId : null;
 
-
-         // Si el reproductor que entró en estado CUED ES el que esperamos para la transición (según pendingVisualTransition)
-         // Y el ID del video coincide con el que intentamos cargar/reproducir (si el videoId está disponible)
-         // Y estamos en el proceso general de transición (`isTransitioning` es true) // Menos fiable que pendingVisualTransition
-         // Usamos pendingVisualTransition.playerNum !== null como indicador de transición general iniciada.
-         if (changedPlayerNum === pendingVisualTransition.playerNum && // ¿Este es el player que espera la transición visual?
-             (videoId === intendedNextVideoId || !videoId) && // ¿El video coincide o aún no tenemos el ID?
-             pendingVisualTransition.playerNum !== null // ¿Hay una transición general pendiente?
-             ) {
-             console.warn(`onPlayerStateChange: Reproductor siguiente previsto (${changedPlayerNum}) entró en estado CUED inesperadamente después de la llamada a playVideo() durante la transición. Video: ${videoId || 'Unknown ID'}. Intentando playVideo() de nuevo.`);
-             // Reintentar llamar a playVideo() después de un pequeño retraso.
+         if (changedPlayerNum === intendedNextPlayerNum && videoId === intendedNextVideoId && isTransitioning) {
+             console.warn(`onPlayerStateChange: Reproductor siguiente previsto (${changedPlayerNum}) entró en estado CUED inesperadamente después de la llamada a playVideo() durante la transición. Video: ${videoId}. Intentando playVideo() de nuevo.`);
              setTimeout(() => {
                  try {
-                     // Verificar si el reproductor sigue válido y *aún* en estado CUED antes de reintentar
                      if (playerInstance && typeof playerInstance.playVideo === 'function' && playerInstance.getPlayerState() === YT.PlayerState.CUED) {
                           console.log(`onPlayerStateChange: Reintentando playVideo() en Player ${changedPlayerNum} desde estado CUED.`);
-                         playerInstance.playVideo(); // Llamar playVideo de nuevo
+                         playerInstance.playVideo();
                      } else {
                           console.log(`onPlayerStateChange: No se reintenta playVideo() - Player ${changedPlayerNum} ya no está en estado CUED o es inválido.`);
                      }
                  } catch(e) { console.error("onPlayerStateChange: Error reintentando playVideo desde estado CUED:", e); }
-             }, 500); // Reintentar después de 500ms
+             }, 500);
          } else if (playerState === YT.PlayerState.CUED) {
-              // Si un reproductor entra en CUED pero NO es el que esperamos para la transición (pendingVisualTransition.playerNum es null o diferente),
-              // es probable que sea el reproductor anterior siendo "limpiado" o preparado por la API después de stopVideo(). Es normal.
                console.log(`onPlayerStateChange: Player ${changedPlayerNum} entró en estado CUED normalmente. Video: ${videoId || 'Unknown ID'}.`);
          }
 
-
      } else if (playerState === YT.PlayerState.ENDED) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} estado ENDED. Video: ${videoId || 'Unknown ID'}`);
-         // Determinar si el video que terminó es el que lógicamente estaba sonando antes de que se llamara playNextVideo.
-         // currentPlayingInfo ya fue actualizado al siguiente video en playNextVideo.
-         // Necesitamos el ID del video ANTERIOR para saber si *ese* video terminó inesperadamente.
-         // La limpieza FINAL (cuando la animación visual termina) se encarga de detener el reproductor anterior explícitamente.
-         // Este ENDED para el reproductor anterior puede ocurrir DESPUÉS de stopVideo().
+         const endedVideoMatchesCurrent = (videoId && currentPlayingInfo.videoId === videoId);
 
-         // Comprobar si el video que terminó ES el video que LÓGICAMENTE estaba sonando *justo antes* de que se llamara a playNextVideo.
-         // No tenemos el ID del video anterior fácilmente aquí.
-         // Una aproximación: Si el reproductor que terminó NO es el reproductor LÓGICO actual (currentPlayer),
-         // Y NO hay una transición general en curso (verificada por pendingVisualTransition).
-         // Esto podría indicar que el video anterior terminó por sí solo inesperadamente.
-         if (changedPlayerNum !== currentPlayer && pendingVisualTransition.playerNum === null) {
-              console.log(`onPlayerStateChange: Otro player ${changedPlayerNum} estado ENDED. Video: ${videoId || 'Unknown ID'}. (No es el reproductor activo actual y no hay transición general en curso).`);
-              // Si el video que terminó fue el que lógicamente estaba sonando ANTES (el que debía desvanecerse),
-              // y la transición *no* se inició por alguna razón, esto podría ser un problema.
-              // Sin embargo, si la transición sí se inició (pendingVisualTransition no es null), este ENDED
-              // es esperado para el reproductor saliente después de que stopVideo sea llamado en la limpieza FINAL.
-         }
-         // Si el video que terminó ES el reproductor LÓGICO actual (currentPlayer),
-         // Y NO estamos en una transición general en curso, significa que el video actual terminó inesperadamente.
-         // currentPlayingInfo.videoId apunta al video que supuestamente *debería* estar sonando.
-         const currentLogicalVideoId = currentPlayingInfo.videoId; // Video que *debería* estar sonando AHORA
-         const endedVideoMatchesCurrentLogical = (videoId && currentLogicalVideoId === videoId);
-
-         if (endedVideoMatchesCurrentLogical && pendingVisualTransition.playerNum === null && !isAudioFading) {
-             console.log(`onPlayerStateChange: Video actual LÓGICO (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
-             // Disparar la transición al siguiente video.
+         if (endedVideoMatchesCurrent && !isTransitioning && !isAudioFading) {
+             console.log(`onPlayerStateChange: Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
              playNextVideo();
-         } else {
-             // Si el video que terminó no es el actual lógico, o hay una transición en curso, este ENDED es esperado o irrelevante para el trigger principal.
-              console.log(`onPlayerStateChange: Player ${changedPlayerNum} estado ENDED (${videoId || 'Unknown ID'}). (No es el reproductor actual lógico terminando inesperadamente O hay transición/fundido en curso).`);
+         } else if (changedPlayerNum !== currentPlayer) {
+             console.log(`onPlayerStateChange: Otro player ${changedPlayerNum} estado ENDED. Video: ${videoId}. (No es el reproductor activo actual)`);
          }
     }
-    // Otros estados como UNSTARTED (Sin iniciar) no suelen requerir manejo específico aquí.
 }
 // Módulo: Interacción con API de Búsqueda (Piped)
 const performSearch = async (query, nextPage = null) => {
@@ -1694,248 +1445,304 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 // Módulo: Reproducción y Crossfade (Adaptado Parcialmente)
 async function playNextVideo() {
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
-    console.log(`playNextVideo [Data]: Llamada. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}, pendingVisualTransition=${pendingVisualTransition.playerNum !== null}`);
+    console.log(`playNextVideo [Data]: Llamada. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}`);
 
-    // Protección para evitar iniciar una nueva transición si ya hay una transición visual pendiente o en curso.
-    // Usamos pendingVisualTransition.playerNum como el indicador principal de una transición general iniciada.
-    if (pendingVisualTransition.playerNum !== null) {
-        console.warn("playNextVideo [Data]: Transición general ya en curso (pendingVisualTransition no es null), cancelando nueva llamada.");
+    // Protección para evitar iniciar una nueva transición si ya hay una activa
+    if (isTransitioning) {
+        console.warn("playNextVideo [Data]: Transición principal ya en curso, cancelando.");
         return;
     }
 
-    // A partir de aquí, una nueva transición GENERAL comienza.
-    // Establecer isTransitioning a true para indicar que el proceso general de playNextVideo ha iniciado.
-    isTransitioning = true;
+    isTransitioning = true; // Marcar el inicio del proceso de transición
     console.log(`playNextVideo [Data]: *** Transición PRINCIPAL INICIADA desde índice aplanado ${currentFlatIndex}. Flag isTransitioning=true. ***`);
-
 
     const flatList = getFlattenedPlaylist();
     if (flatList.length === 0) {
         console.log("playNextVideo [Data]: No hay videos en la lista aplanada.");
-        // Manejar el fin de la reproducción si la lista está vacía
         stopMonitoring();
         reproduccionIniciada = false;
-        // Asegúrate de que los IDs de botones son correctos en tu HTML si ajustas UI aquí
-        // document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
-        // document.getElementById('botonPlay').disabled = true;
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+        document.getElementById('botonPlay').disabled = true;
         currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null };
         updatePlaylistsUI();
-        // Resetear flags al salir temprano
-        isTransitioning = false;
-        isAudioFading = false;
-        hasOutroCrossfadeStarted = false;
-         // Limpiar estado visual pendiente (ya es null, pero por seguridad)
-        pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
+        isTransitioning = false; // Resetear flag al salir temprano
         console.log(`playNextVideo [Data]: *** Transición ABORTADA (Sin videos). Flag isTransitioning=false. ***`);
         return;
     }
 
-    // Determinar el índice del siguiente video
     let nextIndex = currentFlatIndex + 1;
 
-    // Si llegamos al final de la lista, preguntar al usuario si desea repetir o detener.
     if (nextIndex >= flatList.length) {
         console.log('playNextVideo [Data]: Fin de la lista aplanada detectado.');
-        // askToRepeatPlaylist() debe manejar la UI y flags si es necesario, y posiblemente llamar a playVideoByIndex(0) si se repite.
         askToRepeatPlaylist();
-        // Resetear flags al llegar al final de la lista (la transición no continúa a un siguiente video)
-        isTransitioning = false;
-        isAudioFading = false;
-        hasOutroCrossfadeStarted = false;
-         // Limpiar estado visual pendiente
-        pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
+        isTransitioning = false; // Resetear flag al llegar al final
         console.log(`playNextVideo [Data]: *** Transición FINALIZADA (Fin de lista). Flag isTransitioning=false. ***`);
         return;
     }
 
-    // Guardar ID del video saliente para limpieza posterior (en el manejador transitionend/timeout)
-    const previousVideoIdForCleanup = currentPlayingInfo.videoId;
-    // NOTA: currentPlayingInfo se actualizará más abajo al siguiente video LÓGICO.
+    const previousVideoIdForCleanup = currentPlayingInfo.videoId; // Guardar ID del video saliente para limpieza
 
     try {
-        // Obtener el objeto del siguiente video
         const nextVideo = flatList[nextIndex];
         if (!nextVideo || !nextVideo.videoId) {
              throw new Error(`Video siguiente inválido en el índice aplanado ${nextIndex}.`);
         }
-        const nextVideoId = nextVideo.videoId; // ID del video que sonará a continuación
+        const nextVideoId = nextVideo.videoId;
 
-        // Identificar instancias y elementos DOM de los reproductores basándose en el reproductor lógico actual.
-        // El reproductor lógico actual (currentPlayer) es el que está sonando AHORA y debe desvanecerse (saliendo).
-        // El otro reproductor será el que sonará A CONTINUACIÓN (entrando).
-        const currentPlayerLogicalNum = currentPlayer; // El número del reproductor que está sonando lógicamente AHORA
-        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2; // Instancia del reproductor saliente
-        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;     // Instancia del reproductor entrante
-        const nextPlayerLogicalNum = (currentPlayerLogicalNum === 1) ? 2 : 1; // El número lógico del reproductor entrante
+        // Identificar reproductores basándose en el reproductor lógico actual (el que va a desvanecerse)
+        const currentPlayerLogicalNum = currentPlayer; // Número del reproductor que está sonando (debería desvanecerse)
+        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2; // La instancia del reproductor actual
+        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;     // La instancia del reproductor que sonará después
 
         // Obtener los elementos DOM correspondientes para aplicar clases CSS
-        const currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`); // Elemento DOM saliente
-        const nextPlayerElement = document.getElementById(`player${nextPlayerLogicalNum}`);     // Elemento DOM entrante
+        const currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
+        const nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
 
-
-        // Validar instancias de reproductores y métodos requeridos para la transición.
-        if (!previousPlayerInstance || typeof previousPlayerInstance.setVolume !== 'function' || typeof previousPlayerInstance.getVolume !== 'function' || typeof previousPlayerInstance.stopVideo !== 'function' ||
+        // Validar instancias de reproductores y métodos requeridos
+        if (!previousPlayerInstance || typeof previousPlayerInstance.setVolume !== 'function' || typeof previousPlayerInstance.getVolume !== 'function' ||
             !nextPlayerInstance || typeof nextPlayerInstance.cueVideoById !== 'function' || typeof nextPlayerInstance.playVideo !== 'function' || typeof nextPlayerInstance.setVolume !== 'function' || typeof nextPlayerInstance.getPlayerState !== 'function') {
              throw new Error("Instancias de reproductores o funciones de API requeridas faltan para el crossfade.");
         }
 
-        // Validar elementos DOM requeridos.
-        if (!currentPlayerElement || !nextPlayerElement) {
-             throw new Error("Elementos DOM de reproductores no encontrados para la transición visual.");
-        }
-
-        // --- Paso 1: Preparar el siguiente video (cargarlo sin reproducir aún) ---
-        // Usamos cueVideoById para cargar el video pero no iniciará la reproducción inmediatamente.
-        console.log(`playNextVideo [Data]: Llamando a cueVideoById('${nextVideoId}') en Player ${nextPlayerLogicalNum}.`);
+        // --- Paso 1: Preparar el siguiente video (cargarlo sin reproducir) ---
+        console.log(`playNextVideo [Data]: Llamando a cueVideoById('${nextVideoId}') en Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
         nextPlayerInstance.cueVideoById(nextVideoId);
 
-
-        // --- Paso 2: Asegurarse de que el contenedor del siguiente reproductor esté listo para ser visible ---
-        // Antes de que se dispare la transición visual (en onPlayerStateChange),
-        // el elemento del reproductor entrante debe estar en un estado donde pueda volverse visible.
-        // Quitamos la clase 'hidden' y cualquier clase residual de desvanecimiento.
-        // La opacidad y el z-index iniciales deben estar definidos en tu CSS para .video-player (opacity: 1, z-index: 1).
-        nextPlayerElement.classList.remove('hidden'); // Asegurar que no esté display: none o visibility: hidden
-        nextPlayerElement.classList.remove('fade-out', 'fade-in'); // Limpiar clases residuales
-
-        // El elemento saliente debe estar visible y sin clases de desvanecimiento al inicio del proceso.
-        // Su desvanecimiento se iniciará cuando el nuevo video esté listo visualmente.
-        currentPlayerElement.classList.remove('hidden');
-        currentPlayerElement.classList.remove('fade-out', 'fade-in');
+        // Asegurarse de que el contenedor del siguiente reproductor esté listo y en la capa correcta para la superposición visual
+        // Debe estar visible y no en estado de desvanecimiento antes de que comience la transición.
+        if (nextPlayerElement) {
+            nextPlayerElement.classList.remove('hidden', 'fade-out'); // Asegurarse de que esté visible y no desvaneciéndose
+            // El CSS debería manejar el z-index para la superposición: el reproductor entrante (nextPlayerElement) necesita un z-index más alto
+        } else { console.warn("playNextVideo [Data]: Elemento DOM para nextPlayerElement no encontrado."); }
 
 
-        // --- Paso 3: Establecer volúmenes iniciales ANTES de iniciar la reproducción/fundido ---
-        // El reproductor saliente debe estar a volumen completo.
-        // El reproductor entrante debe estar silenciado (volumen 0).
-        try { previousPlayerInstance.setVolume(previousPlayerInstance.getVolume() || 100); console.log(`playNextVideo [Data]: Volumen inicial reproductor previo (saliendo): ${previousPlayerInstance.getVolume()}`); } catch(e) { console.warn("playNextVideo [Data]: Error obteniendo/estableciendo volumen de reproductor previo, por defecto 100:", e); previousPlayerInstance.setVolume(100); }
-        try { nextPlayerInstance.setVolume(0); console.log(`playNextVideo [Data]: Volumen inicial reproductor siguiente (entrando): 0`);} catch(e) { console.warn("playNextVideo [Data]: Error estableciendo volumen de reproductor siguiente a 0:", e); }
+        // --- Paso 2: Establecer volúmenes iniciales ANTES de iniciar la reproducción/desvanecimiento ---
+        // Asegurarse de que el reproductor anterior esté a volumen completo (o al que tenía) al inicio del desvanecimiento.
+        // Asegurarse de que el reproductor siguiente esté silenciado (volumen 0) antes de que comience su reproducción para el fundido de entrada.
+        try { previousPlayerInstance.setVolume(previousPlayerInstance.getVolume() || 100); console.log(`playNextVideo [Data]: Volumen inicial reproductor previo: ${previousPlayerInstance.getVolume()}`); } catch(e) { console.warn("playNextVideo [Data]: Error obteniendo/estableciendo volumen de reproductor previo, por defecto 100:", e); previousPlayerInstance.setVolume(100); }
+        try { nextPlayerInstance.setVolume(0); console.log(`playNextVideo [Data]: Volumen inicial reproductor siguiente: 0`);} catch(e) { console.warn("playNextVideo [Data]: Error estableciendo volumen de reproductor siguiente a 0:", e); }
 
-
-        // --- Paso 4: Actualizar el estado lógico y la UI inmediatamente ---
-        // Esto actualiza currentPlayingInfo al *siguiente* video para el resaltado en la UI,
-        // incluso si el video aún no está sonando visualmente.
+        // Actualizar el estado lógico inmediatamente para el resaltado en la UI.
+        // Esto actualiza currentPlayingInfo a los detalles del *siguiente* video.
         currentPlayingInfo = {
              flattenedIndex: nextIndex,
-             videoId: nextVideoId,
+             videoId: nextVideo.videoId,
              playlistId: nextVideo.sourcePlaylistId
         };
         console.log(`playNextVideo [Data]: Estado lógico actualizado a índice ${nextIndex} (Video: ${nextVideoId}).`);
-        updatePlaylistsUI(); // Actualizar el resaltado en la UI
+        updatePlaylistsUI(); // Actualizar el resaltado en la UI basado en el nuevo estado lógico
 
 
-        // --- Paso 5: Iniciar la Reproducción del Siguiente Video y Programar el Fundido de Audio ---
+        // --- Paso 3: Iniciar las Transiciones Visual y de Audio SIMULTÁNEAMENTE ---
 
+        // Aplicar clases CSS para iniciar el desvanecimiento visual en el reproductor actual y el fundido de entrada en el siguiente.
+        // Esto debería activar las transiciones CSS definidas en tu hoja de estilos.
+        if (currentPlayerElement) {
+            currentPlayerElement.classList.add('fade-out');
+        } else { console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado."); }
+        if (nextPlayerElement) {
+             nextPlayerElement.classList.remove('fade-in'); // Eliminar por si estaba de un intento previo
+            nextPlayerElement.classList.add('fade-in');
+        }
+
+        // Iniciar la reproducción del video cargado en el siguiente reproductor.
+        // Esto es necesario ahora para que su flujo de audio esté disponible (a volumen 0).
          try {
-            console.log(`playNextVideo [Data]: Estado de Player ${nextPlayerLogicalNum} ANTES de playVideo(): ${nextPlayerInstance.getPlayerState()}`);
+            console.log(`playNextVideo [Data]: Estado de Player ${currentPlayerLogicalNum === 1 ? 2 : 1} ANTES de playVideo(): ${nextPlayerInstance.getPlayerState()}`); // Log estado antes
             if (nextPlayerInstance && typeof nextPlayerInstance.playVideo === 'function') {
-                 console.log(`playNextVideo [Data]: Llamando a playVideo() en Player ${nextPlayerLogicalNum} para iniciar reproducción para fundido de entrada.`);
+                 console.log(`playNextVideo [Data]: Llamando a playVideo() en Player ${currentPlayerLogicalNum === 1 ? 2 : 1} para iniciar reproducción para fundido de entrada.`);
                  nextPlayerInstance.playVideo();
-                 // La API de YouTube comenzará a cargar y preparar el video y audio, aunque el volumen esté en 0.
-                 // onPlayerStateChange debería capturar BUFFERING y luego PLAYING para este reproductor.
+                 // El audio comenzará a cargar/reproducir, pero su volumen es 0 debido a setVolume(0) anterior.
+                 // El manejador onPlayerStateChange debería eventualmente capturar BUFFERING y luego PLAYING.
             } else {
-                 console.warn(`playNextVideo [Data]: Instancia de reproductor siguiente inválida o playVideo falta.`);
-                  throw new Error("Fallo al iniciar reproducción en reproductor siguiente.");
+                 console.warn(`playNextVideo [Data]: Instancia de reproductor siguiente inválida o playVideo falta, no se puede iniciar reproducción para fundido.`);
+                  throw new Error("Fallo al iniciar reproducción en reproductor siguiente."); // Propagar error al bloque catch
             }
-             console.log(`playNextVideo [Data]: Estado de Player ${nextPlayerLogicalNum} DESPUÉS de playVideo(): ${nextPlayerInstance.getPlayerState()}`);
+             console.log(`playNextVideo [Data]: Estado de Player ${currentPlayerLogicalNum === 1 ? 2 : 1} DESPUÉS de playVideo(): ${nextPlayerInstance.getPlayerState()}`); // Log estado después
          } catch(e) {
              console.error("playNextVideo [Data]: Error llamando a playVideo en reproductor siguiente:", e);
-              // Si falla playVideo, resetear flags y estado
-              isTransitioning = false; // Resetear el flag general de transición
-              isAudioFading = false; // Resetear el flag de fundido de audio
-              hasOutroCrossfadeStarted = false; // Resetear flag de outro
-               // Limpiar clases visuales que pudieron haberse aplicado por error temprano (aunque no deberían con este código)
-               if (currentPlayerElement) currentPlayerElement.classList.remove('fade-out', 'fade-in', 'hidden');
-               if (nextPlayerElement) nextPlayerElement.classList.remove('fade-in', 'fade-out', 'hidden');
-               // Revertir estado lógico a lo que estaba sonando antes del intento fallido
-               const flatListIfAvailable = getFlattenedPlaylist();
-               const previousVideo = flatListIfAvailable.length > currentFlatIndex && currentFlatIndex >= 0 ? flatListIfAvailable[currentFlatIndex] : null;
-               currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
-               currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
-               currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
-               updatePlaylistsUI(); // Actualizar UI de vuelta
-               mostrarMensajeFlotante(`Error CRÍTICO iniciando video ${nextVideoId}: ${e.message}`);
-               // Limpiar estado de transición visual pendiente que pudo haberse preparado
-               pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
-               // Decide si quieres detener completamente aquí o solo reportar el error
-               // stopMonitoring(); reproduccionIniciada = false; // Considerar que la reproducción se detuvo lógicamente
-               throw e; // Volver a lanzar para que se capture arriba si es necesario
+              // Si playVideo falla, abortar la transición limpiamente
+              isTransitioning = false; // Resetear el flag principal de transición
+               // Eliminar clases visuales que pudieran haberse aplicado
+               if (currentPlayerElement) currentPlayerElement.classList.remove('fade-out');
+               if (nextPlayerElement) nextPlayerElement.classList.remove('fade-in');
+               // Revertir estado lógico? Tal vez quedarse en el video actual?
+                currentPlayingInfo.flattenedIndex = currentFlatIndex; // Revertir índice
+                currentPlayingInfo.videoId = previousVideoIdForCleanup;
+                currentPlayingInfo.playlistId = flatList[currentFlatIndex]?.sourcePlaylistId || null;
+                updatePlaylistsUI(); // Actualizar UI de vuelta
+               throw e; // Volver a lanzar el error para que sea capturado por el try/catch principal
          }
 
-
-        // Programar el inicio del Fundido de Audio después de un pequeño retraso.
-        // Este retraso da tiempo al reproductor de YouTube para comenzar a cargar/preparar el audio
-        // después de la llamada a playVideo() antes de ajustar su volumen.
-        const audioFadeStartDelay = 50; // Milisegundos
+        // Iniciar el Fundido de Audio después de un pequeño retraso.
+        // Este retraso da al reproductor de YouTube un momento para comenzar a cargar/preparar el flujo de audio
+        // después de la llamada a playVideo(), antes de que comencemos a ajustar su volumen.
+        const audioFadeStartDelay = 50; // Milisegundos de retraso antes de iniciar el fundido de audio (ajustar si es necesario)
         console.log(`playNextVideo [Data]: Programando crossfadeAudio en ${audioFadeStartDelay}ms.`);
-        // crossfadeAudio gestiona el flag isAudioFading internamente.
         setTimeout(() => {
             console.log(`playNextVideo [Data]: Iniciando crossfadeAudio.`);
-             crossfadeAudio(previousPlayerInstance, nextPlayerInstance); // Inicia el fundido de volúmenes
-        }, audioFadeStartDelay);
+            // Llamar a la función crossfadeAudio, pasando las instancias específicas de reproductores involucradas.
+            // crossfadeAudio gestionará el desvanecimiento de volúmenes durante el CROSSFADE_DURATION definido.
+             crossfadeAudio(previousPlayerInstance, nextPlayerInstance); // Usar la función crossfadeAudio modificada
+        }, audioFadeStartDelay); // Retraso antes de iniciar el fundido de audio
 
 
-        // --- Paso 6: Preparar el Estado para la Transición Visual (Aplazada) ---
-        // NO aplicamos clases visuales AQUÍ. Eso se hará en onPlayerStateChange
-        // cuando el reproductor entrante esté listo para mostrar contenido (BUFFERING o PLAYING).
-        // Registramos en pendingVisualTransition qué reproductores/elementos están involucrados y qué reproductor # es el entrante.
-        // El simple hecho de que pendingVisualTransition.playerNum NO sea null indica que una transición general está en curso.
-        pendingVisualTransition = {
-            playerNum: nextPlayerLogicalNum, // El número del reproductor entrante que esperamos
-            outgoingElement: currentPlayerElement, // Elemento DOM saliente
-            incomingElement: nextPlayerElement, // Elemento DOM entrante
-            // outgoingVideoId: previousVideoIdForCleanup, // Video ID saliente para limpieza (si se necesita acceder aquí)
-            // incomingVideoId: nextVideoId // Video ID entrante (si se necesita acceder aquí)
+        // --- Paso 4: Manejar la Limpieza después de las Transiciones (Al completar el Desvanecimiento Visual) ---
+        // Esta parte se activa por el final de la transición de desvanecimiento visual en el reproductor saliente.
+        // Maneja tareas como detener el video antiguo, ocultar su contenedor y limpiar datos.
+
+        let transitionEndHandler = (event) => {
+            // Asegurarse de que este listener solo se dispare para la transición de 'opacity' en el elemento correcto (el reproductor saliente)
+            // Esto evita que se dispare en otras posibles transiciones (como z-index) o elementos.
+            if (event.propertyName !== 'opacity' || event.target !== currentPlayerElement) {
+                return; // Ignorar si no es la transición de opacity o no es el elemento que estamos desvaneciendo
+            }
+
+            console.log(`playNextVideo [Data]: Evento transitionend disparado en ${event.target.id} por propiedad ${event.propertyName}. Realizando limpieza.`);
+
+            // Eliminar el event listener para evitar que se dispare múltiples veces
+            event.target.removeEventListener('transitionend', transitionEndHandler);
+            // Limpiar el timeout de respaldo, ya que el evento transitionend se disparó exitosamente
+            clearTimeout(transitionEndHandler.fallbackTimeoutId);
+
+
+            // --- Lógica de Limpieza (Esto se ejecuta después de que el desvanecimiento visual se completa) ---
+            try {
+                console.log(`playNextVideo [Data]: Limpieza de transición iniciada.`);
+
+                // Detener explícitamente el video anterior.
+                // Esto es más seguro ahora que su audio se ha desvanecido.
+                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
+                      console.log(`playNextVideo [Data]: Limpieza - Llamando a stopVideo() en Player previo ${currentPlayerLogicalNum}.`);
+                      previousPlayerInstance.stopVideo();
+                 }
+
+                // Ocultar completamente el contenedor del reproductor antiguo después del desvanecimiento
+                if (currentPlayerElement) {
+                    currentPlayerElement.classList.remove('fade-out', 'fade-in'); // Eliminar cualquier clase de desvanecimiento
+                    currentPlayerElement.classList.add('hidden'); // Ocultar completamente el contenedor
+                }
+                // Eliminar la clase fade-in del contenedor del nuevo reproductor (ya debería estar completamente visible)
+                if (nextPlayerElement) {
+                    nextPlayerElement.classList.remove('fade-in');
+                     // Asegurarse de que el siguiente reproductor esté en z-index o capa predeterminada si se ajustó con CSS
+                }
+
+                // Limpieza de datos (como caché de SponsorBlock) relacionada con el video ANTERIOR
+                if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
+                    console.log(`playNextVideo [Data]: Limpieza - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
+                    delete segmentosCache[previousVideoIdForCleanup];
+                }
+                // Restablecer el seguimiento del último salto si fue para el video que acaba de terminar
+                if (lastSeekVideoId === previousVideoIdForCleanup) {
+                     lastSeekEndTime = -1;
+                     lastSeekVideoId = null;
+                }
+
+            } catch (cleanupError) {
+                 console.error("playNextVideo [Data]: Error durante la limpieza de transitionend:", cleanupError);
+                 // Si la limpieza falla, intentar asegurar que los flags se reseteen como salvaguarda.
+                 // isTransitioning se resetea principalmente en onPlayerStateChange cuando el NUEVO video comienza a reproducir.
+                 isAudioFading = false; // El fundido de audio también debería haber terminado o detenerse a estas alturas
+                 console.log(`playNextVideo [Data]: *** Limpieza de Transición INTERRUMPIDA (Error). isAudioFading reseteado. ***`);
+            } finally {
+                 // Este bloque se ejecuta después del try/catch en el manejador transitionend.
+                 // El reseteo del flag principal isTransitioning ocurre en onPlayerStateChange cuando el NUEVO reproductor entra en estado PLAYING.
+                 console.log(`playNextVideo [Data]: Limpieza de transitionend FINALIZADA.`);
+                 // El cambio lógico de currentPlayer se maneja en onPlayerStateChange cuando el nuevo reproductor confirma el estado PLAYING.
+            }
         };
-        console.log(`playNextVideo [Data]: Transición visual aplazada. Esperando estado BUFFERING/PLAYING en Player ${pendingVisualTransition.playerNum}.`);
-        // --- Paso 7: La Limpieza Final (stopVideo, ocultar elemento, reset de flags GENERALES) se disparará cuando la Transición Visual termine ---
-        // (El manejador transitionEndHandler o el setTimeout de respaldo en onPlayerStateChange se encargarán de esto).
 
-         // Limpiar SponsorBlock del video anterior después de un breve retraso para no interferir con el inicio del nuevo video.
-         // Esto se hace mejor aquí en playNextVideo ya que tenemos acceso fácil a previousVideoIdForCleanup.
-         const cleanupDelayMs = 500; // ms después de iniciar playNextVideo
-         console.log(`playNextVideo [Data]: Programando limpieza de caché SB del video anterior (${previousVideoIdForCleanup}) en ${cleanupDelayMs}ms.`);
-         setTimeout(() => {
-              if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
-                   console.log(`playNextVideo [Data]: Limpieza - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
-                   delete segmentosCache[previousVideoIdForCleanup];
-                   // También puedes resetear lastSeek si estaba relacionado con el video anterior
-                    if (lastSeekVideoId === previousVideoIdForCleanup) {
-                         console.log(`playNextVideo [Data]: Limpieza - Reseteando lastSeekEndTime y lastSeekVideoId para video ANTERIOR: ${previousVideoIdForCleanup}.`);
-                         lastSeekEndTime = -1;
-                         lastSeekVideoId = null;
-                    }
-              } else {
-                   console.log(`playNextVideo [Data]: Limpieza - No se encontró caché SB para video ANTERIOR (${previousVideoIdForCleanup}) en caché o ya fue limpiado.`);
-              }
-         }, cleanupDelayMs);
+        // Agregar el event listener para el evento transitionend en el elemento que se está desvaneciendo (currentPlayerElement)
+        if (currentPlayerElement) {
+            console.log(`playNextVideo [Data]: Agregando listener de transitionend a ${currentPlayerElement.id}`);
+            currentPlayerElement.addEventListener('transitionend', transitionEndHandler);
+
+            // --- Agregar un setTimeout de respaldo por si transitionend no se dispara ---
+            // Esta es una medida de seguridad para navegadores o escenarios donde el evento transitionend podría no dispararse de forma fiable.
+            // La duración de respaldo debe ser ligeramente mayor que la duración de la transición CSS.
+            const fallbackTimeoutMs = CROSSFADE_DURATION * 1000 + 200; // CROSSFADE_DURATION en ms + pequeño buffer
+            console.log(`playNextVideo [Data]: Estableciendo setTimeout de respaldo (${fallbackTimeoutMs}ms).`);
+            const fallbackTimeoutId = setTimeout(() => {
+                console.warn(`playNextVideo [Data]: setTimeout de respaldo disparado después de ${fallbackTimeoutMs}ms. Asumiendo que la transición falló o no se disparó.`);
+                // Si el timeout se dispara, eliminar el listener de transitionend (si se había agregado)
+                if (currentPlayerElement) {
+                     currentPlayerElement.removeEventListener('transitionend', transitionEndHandler);
+                }
+                // Ejecutar la lógica de limpieza directamente, omitiendo el evento transitionend.
+                // Pasar un objeto de evento simulado que parezca un transitionend para opacity en el elemento correcto
+                // El flag isFallback puede usarse dentro del manejador si es necesario.
+                transitionEndHandler({ propertyName: 'opacity', target: currentPlayerElement, isFallback: true });
+            }, fallbackTimeoutMs);
+
+             // Almacenar el ID del timeout en la propia función manejadora para que pueda ser limpiado desde dentro del manejador
+             transitionEndHandler.fallbackTimeoutId = fallbackTimeoutId;
+
+        } else {
+            // Si el elemento del reproductor saliente no se encuentra por alguna razón, ejecutar la lógica de limpieza inmediatamente como respaldo.
+            console.warn("playNextVideo [Data]: currentPlayerElement no encontrado para transición, ejecutando limpieza inmediatamente como respaldo.");
+            try {
+                 console.log(`playNextVideo [Data]: Ejecutando lógica post-transición inmediatamente.`);
+
+                 // Detener el video anterior inmediatamente
+                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
+                      console.log(`playNextVideo [Data]: Llamando a stopVideo() en Player previo ${currentPlayerLogicalNum} inmediatamente.`);
+                      previousPlayerInstance.stopVideo();
+                 }
+
+                 // Ocultar el elemento del reproductor anterior previsto si se encuentra en el DOM
+                 const intendedPreviousElement = document.getElementById(`player${currentPlayerLogicalNum}`);
+                 if (intendedPreviousElement) {
+                      intendedPreviousElement.classList.remove('fade-out', 'fade-in');
+                      intendedPreviousElement.classList.add('hidden');
+                 }
+                  // Eliminar fade-in del elemento del reproductor siguiente si se encuentra
+                  if (nextPlayerElement) {
+                      nextPlayerElement.classList.remove('fade-in');
+                  }
+
+                 // Limpieza de datos (ya manejada arriba en el bloque try principal, pero bueno ser seguro)
+                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
+                      delete segmentosCache[previousVideoIdForCleanup];
+                 }
+                 if (lastSeekVideoId === previousVideoIdForCleanup) {
+                       lastSeekEndTime = -1;
+                       lastSeekVideoId = null;
+                 }
+                 // Los flags ya se resetearon en error crítico antes de esta ruta inmediata
+
+            } catch (immediateError) {
+                 console.error("playNextVideo [Data]: Error durante la lógica post-transición inmediata:", immediateError);
+            } finally {
+                 isAudioFading = false; // Asumir que el fundido de audio no comenzaría o completaría limpiamente aquí
+                 // isTransitioning ya se reseteó en error crítico al inicio de playNextVideo si ocurrió un error crítico temprano.
+                 console.log(`playNextVideo [Data]: Flags reseteados después de ejecución de lógica inmediata.`);
+                 // El cambio lógico de currentPlayer se maneja en onPlayerStateChange cuando el siguiente reproductor confirma el estado PLAYING.
+            }
+        }
 
 
     } catch (error) {
         console.error("playNextVideo [Data]: Error CRÍTICO durante playNextVideo:", error);
-        // Asegurarse de que los flags se reseteen y el estado se revierta en caso de error CRÍTICO
-        // antes de que comience la transición o si falla temprano.
-        isTransitioning = false; // Resetear el flag general de transición
-        isAudioFading = false;
-        hasOutroCrossfadeStarted = false; // Resetear flag de outro
-         // Limpiar clases visuales que pudieron haberse aplicado por error temprano (aunque no deberían con este código)
-        if (currentPlayerElement) currentPlayerElement.classList.remove('fade-out', 'fade-in', 'hidden');
-        if (nextPlayerElement) nextPlayerElement.classList.remove('fade-in', 'fade-out', 'hidden');
-        // Revertir estado lógico a lo que estaba sonando antes del intento fallido
-        const flatListIfAvailable = getFlattenedPlaylist(); // Intentar obtener la lista de nuevo por si acaso
-        const previousVideo = flatListIfAvailable.length > currentFlatIndex && currentFlatIndex >= 0 ? flatListIfAvailable[currentFlatIndex] : null; // Usar el índice ANTES del intento de avance
+        // Asegurarse de que los flags se reseteen y el estado se revierta en caso de error crítico *antes* de que comience la transición
+        // Este bloque catch maneja errores que ocurren *antes* de que se configure el manejador transitionend.
+        isTransitioning = false; // Resetear flag principal de transición
+        isAudioFading = false; // Asegurarse de que el flag de fundido de audio también se resetee
+        // Revertir el estado lógico a la información del video que se suponía que estaba reproduciendo antes de este intento de transición fallido
+        const previousVideo = flatList[currentFlatIndex]; // Usar el índice *antes* del intento de incremento
          currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
          currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
          currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
         console.log(`playNextVideo [Data]: *** Transición INTERRUMPIDA (Error Crítico). Flag=false. Estado REVERTIDO a índice ${currentFlatIndex} ***`);
-        mostrarMensajeFlotante(`Error CRÍTICO cambiando video: ${error.message}`);
+        mostrarMensajeFlotante(`Error cambiando video: ${error.message}`);
         updatePlaylistsUI(); // Actualizar la UI para reflejar el estado revertido
-        // Detener el monitoreo en caso de error crítico si la reproducción no puede continuar
-        // stopMonitoring(); reproduccionIniciada = false; // Considerar que la reproducción se detuvo lógicamente
-        // Limpiar cualquier estado de transición visual pendiente que pudo haberse preparado
-        pendingVisualTransition = { playerNum: null, outgoingElement: null, incomingElement: null };
+        stopMonitoring(); // Detener el monitoreo en caso de error crítico
+         // Asegurarse de que el estado del botón sea correcto - ¿tal vez volver al botón de Play?
+         document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+         reproduccionIniciada = false; // Permitir intentar reiniciar con Play
     }
 }
-function crossfadeAudio(playerOut, playerIn) {
+function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
     const fadeStartTime = Date.now();
 
     // Protección contra iniciar un nuevo fundido si ya hay uno en curso
@@ -2098,7 +1905,7 @@ function playFirstVideo() {
 }
 // Módulo: Monitoreo de Reproductores (Adaptado Parcialmente)
 
-function startMonitoring(interval) {
+function startMonitoring() {
     if (!monitorInterval) {
         // Usar intervalo más corto para precisión en saltos y crossfade
         monitorInterval = setInterval(monitorPlayers, 300); // 300ms
@@ -2114,16 +1921,14 @@ function stopMonitoring() {
 }
 function monitorPlayers() {
     // Log opcional para depuración:
-    // console.log(`Monitor: Corriendo (isTransitioning: ${isTransitioning}, isAudioFading: ${isAudioFading}, hasOutroCrossfadeStarted: ${hasOutroCrossfadeStarted}, pendingVisualTransition: ${pendingVisualTransition.playerNum !== null}, Initialized: ${playersInitialized}, reproduccionIniciada: ${reproduccionIniciada})`);
+    // console.log(`Monitor: Corriendo (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, hasOutroCrossfadeStarted: ${hasOutroCrossfadeStarted}, Initialized: ${playersInitialized}, reproduccionIniciada: ${reproduccionIniciada})`);
 
     if (!playersInitialized || !reproduccionIniciada) {
         return; // No ejecutar la lógica de monitoreo si no está listo
     }
 
-    // Obtener el reproductor activo (el que lógicamente está reproduciendo el video actual según currentPlayer)
     const activePlayer = (currentPlayer === 1) ? player1 : player2;
 
-    // Validar el reproductor activo
     if (!activePlayer || typeof activePlayer.getPlayerState !== 'function' || typeof activePlayer.getCurrentTime !== 'function' || typeof activePlayer.getDuration !== 'function' || typeof activePlayer.getVideoData !== 'function') {
         console.warn("Monitor: El reproductor activo es inválido.");
         stopMonitoring(); // Detener el monitoreo si el reproductor activo es inválido
@@ -2135,54 +1940,58 @@ function monitorPlayers() {
     const videoDuration = activePlayer.getDuration();
     const videoId = activePlayer.getVideoData()?.video_id; // Obtener videoId de forma segura
 
-    // Si no hay datos de video válidos, solo verificar SponsorBlock, no triggers basados en tiempo.
     if (!videoId || isNaN(videoDuration) || videoDuration <= 0) {
-        // console.log("Monitor: No hay datos de video o duración válida.");
         checkAndSkipSegment(activePlayer); // Aún así, verificar SponsorBlock incluso si la duración es extraña
         return; // No se pueden realizar comprobaciones basadas en tiempo
     }
 
-     // Llamar a checkAndSkipSegment en cada tick del monitor.
-     // checkAndSkipSegment maneja la obtención de segmentos (estado undefined/'fetching') y el salto (incluyendo outro trigger).
-     checkAndSkipSegment(activePlayer);
+     // Asegurarse de que los segmentos de SponsorBlock se obtengan y almacenen en caché si no lo están ya
+     // La lógica para evitar bucles de fetch está en checkAndSkipSegment y obtenerSegmentosSponsorBlock
+    if (!segmentosCache[videoId]) {
+        // Llamar a checkAndSkipSegment para iniciar la obtención si es necesario
+         checkAndSkipSegment(activePlayer);
+         // No es necesario retornar, checkAndSkipSegment maneja la lógica si los segmentos aún no están listos
+    } else if (segmentosCache[videoId] === 'fetching') {
+         // Si está obteniendo, simplemente esperar al próximo tick.
+          checkAndSkipSegment(activePlayer); // Aún llamamos para que checkAndSkipSegment maneje el estado 'fetching'
+    } else {
+        // Si los segmentos están en caché ([] o [segmentos...]), verificar y saltar
+         checkAndSkipSegment(activePlayer);
+    }
 
 
     // --- Verificar Tiempo Restante para Disparar Crossfade (Disparo basado en tiempo) ---
     // Disparar playNextVideo si el tiempo restante está dentro de la ventana de CROSSFADE_DURATION,
-    // Y NO hay ya una transición GENERAL (verificada por pendingVisualTransition),
-    // Y el crossfade AÚN NO ha sido disparado por la lógica de detección de "outro" (verificada por hasOutroCrossfadeStarted).
+    // Y NO estamos ya en un proceso de transición,
+    // Y el crossfade AÚN NO ha sido disparado por la lógica de detección de "outro".
     const timeRemaining = videoDuration - currentTime;
     // console.log(`Monitor: Tiempo restante: ${timeRemaining.toFixed(1)}s`);
 
-    // Disparar playNextVideo SOLAMENTE si:
+    // Disparar el crossfade basado en el tiempo restante SOLAMENTE si:
     // 1. El reproductor está realmente en estado PLAYING
-    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer (ej. 0.5s)
+    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer
     // 3. El tiempo restante es mayor que 0
-    // 4. NO hay una transición visual PENDIENTE o EN CURSO (`pendingVisualTransition.playerNum` es null)
+    // 4. NO estamos ya en un proceso de transición (`isTransitioning` es false)
     // 5. El crossfade AÚN NO ha sido disparado por la lógica de detección de "outro" (`hasOutroCrossfadeStarted` es false)
     if (playerState === YT.PlayerState.PLAYING &&
         timeRemaining <= CROSSFADE_DURATION + 0.5 && // La ventana comienza CROSSFADE_DURATION + buffer antes del final
         timeRemaining > 0 && // Asegurarse de que el tiempo restante sea positivo
-        pendingVisualTransition.playerNum === null && // Crucial: No disparar si ya hay una transición general en curso (indicado por pendingVisualTransition)
+        !isTransitioning && // Evitar disparar si ya estamos en transición
         !hasOutroCrossfadeStarted) // Crucial: No disparar si un "outro" ya lo hizo
          {
         console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en tiempo.`);
-        // No establecemos hasOutroCrossfadeStarted aquí, ya que este es el trigger basado en tiempo.
         playNextVideo();
     }
 
     // --- Salvaguarda: Considerar detener el reproductor inactivo si sigue sonando inesperadamente ---
-    // Esto es una comprobación adicional. La limpieza de la transición debería detenerlo.
     const inactivePlayer = (currentPlayer === 1) ? player2 : player1; // El reproductor que NO es el lógico actual
      if (inactivePlayer && typeof inactivePlayer.getPlayerState === 'function' && typeof inactivePlayer.stopVideo === 'function') {
         const inactiveState = inactivePlayer.getPlayerState();
-        // Si el reproductor inactivo está en estado PLAYING, Y NO hay una transición general en curso (verificada por pendingVisualTransition),
-        // Y no es el reproductor que lógicamente debería estar activo, detenerlo.
         if (inactiveState === YT.PlayerState.PLAYING &&
-            pendingVisualTransition.playerNum === null && // No hay transición general en curso
-            inactivePlayer !== activePlayer) // Asegurarse de que no intentamos detener el reproductor activo
+            !isTransitioning && !isAudioFading &&
+             inactivePlayer !== activePlayer)
             {
-            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO fuera de transición. Deteniéndolo.");
+            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO fuera de transición/fundido. Deteniéndolo.");
             try {
                 inactivePlayer.stopVideo();
             } catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
@@ -2191,7 +2000,7 @@ function monitorPlayers() {
 }
 // --- SponsorBlock: Chequear y Saltar Segmento ---
 function checkAndSkipSegment(player, forceCheck = false) {
- const currentTime = player.getCurrentTime();
+    const currentTime = player.getCurrentTime();
     const videoId = player.getVideoData()?.video_id;
 
     if (!videoId || isNaN(currentTime)) {
@@ -2206,120 +2015,104 @@ function checkAndSkipSegment(player, forceCheck = false) {
     }
 
     // --- Manejar el seguimiento del último salto ---
-    // Resetea lastSeekEndTime si el video ha cambiado para permitir nuevos saltos.
     if (videoId !== lastSeekVideoId) {
         console.log(`checkAndSkipSegment: Video cambió a ${videoId}. Reseteando lastSeekEndTime.`);
         lastSeekEndTime = -1; // Resetear para el nuevo video
         lastSeekVideoId = videoId; // Rastrear videoId actual
-        // Cuando el video cambia, la entrada de caché para el nuevo videoId estará undefined, 'fetching', cacheada o null.
-        // La lógica de obtención y procesamiento está abajo.
     } else {
-         // Para el mismo video, verificar si ya pasamos el tiempo del último salto registrado.
-         // Esto evita que se dispare la lógica de salto inmediatamente después de un seekTo.
-         if (lastSeekEndTime !== -1 && currentTime >= lastSeekEndTime + 0.2) { // Agregar un pequeño buffer (0.2s)
+         if (lastSeekEndTime !== -1 && currentTime >= lastSeekEndTime + 0.2) { // Agregar un pequeño buffer
              console.log(`checkAndSkipSegment: Reseteando lastSeekEndTime (${lastSeekEndTime.toFixed(2)}) porque currentTime (${currentTime.toFixed(2)}) pasó el punto.`);
-             lastSeekEndTime = -1; // Limpiar el último salto
+             lastSeekEndTime = -1; // Limpiar último salto
          }
-         // Si lastSeekEndTime NO es -1, significa que acabamos de realizar un salto y debemos esperar antes de buscar otro segmento para saltar.
          if (lastSeekEndTime !== -1) {
              // console.log(`SB Check: Esperando después de salto previo (${lastSeekEndTime.toFixed(2)}).`);
-             return; // No verificar segmentos para saltar justo después de un salto.
+             return; // No verificar segmentos justo después de un salto
          }
     }
 
-    // --- Buscar Segmentos en Caché ---
-    const segments = segmentosCache[videoId]; // Obtener el estado actual del caché para este videoId
+    // --- Buscar Segmentos ---
+    const segments = segmentosCache[videoId]; // Obtener el estado actual del caché
 
-    // Si segmentosCache[videoId] es undefined, significa que aún no hemos intentado obtenerlos para este video.
-    // Iniciamos la obtención (que marcará el estado como 'fetching') y luego salimos de esta comprobación para esperar.
+    // Si segmentosCache[videoId] es undefined, iniciamos la obtención (que establece el estado a 'fetching').
     if (segments === undefined) {
         console.log(`checkAndSkipSegment: Segmentos undefined para ${videoId}. Iniciando obtención.`);
-        // obtenerSegmentosSponsorBlock es asíncrona y establece segmentosCache[videoId] a 'fetching' sincrónicamente.
-        obtenerSegmentosSponsorBlock(videoId);
-        return; // Salir de checkAndSkipSegment para este tick del monitor, los segmentos no están listos.
+        obtenerSegmentosSponsorBlock(videoId); // Llamada asíncrona que establece el estado 'fetching'
+        return; // Salir para este tick del monitor
     }
 
-    // Si segmentosCache[videoId] es 'fetching', significa que la obtención está en curso.
-    // Simplemente salimos de esta comprobación para esperar a que termine en un ciclo futuro.
+    // Si segmentosCache[videoId] es 'fetching', simplemente salimos.
      if (segments === 'fetching') {
          // console.log(`SB Check: Segmentos aún obteniendo para ${videoId}. Esperando.`);
-         return; // Salir de checkAndSkipSegment para este tick del monitor.
+         return; // Salir para este tick del monitor
      }
 
+    // --- CORRECCIÓN: Manejar caso null o array vacío ---
     // Si llegamos aquí, 'segments' es un array ([] o [segmentos...]) o null (si la obtención falló).
-    // Si es null o un array vacío, no hay segmentos que verificar. Salir de esta comprobación.
+    // Si es null o un array vacío, no hay segmentos que verificar. Salir.
     if (segments === null || segments.length === 0) {
         // console.log(`SB Check: No hay segmentos para verificar para ${videoId} (caché nulo o vacío).`);
-        return; // Salir si el caché es null o el array está vacío.
+        return; // Salir si null o array vacío
     }
 
     // Si llegamos aquí, 'segments' es un array no vacío [segmentos...].
     // Proceder a encontrar y saltar segmentos.
 
-    // --- Procesar Segmentos (Si hay y son válidos) ---
-    // Buscar un segmento cuyo tiempo actual (currentTime) caiga dentro de su rango [startTime, endTime).
-    // Asegurarse de que el segmento encontrado sea "posterior" al último punto de salto (si hubo uno).
+    // --- Procesar Segmentos (Si hay) ---
     const segmentToSkip = segments.find(segment => {
-        // Leemos los tiempos directamente de las propiedades startTime y endTime (validado en obtenerSegmentosSponsorBlock)
-        const start = segment.startTime;
-        const end = segment.endTime;
-        // No es estrictamente necesario volver a validar isNaN aquí si la validación previa en obtenerSegmentosSponsorBlock fue exitosa.
+        // --- MODIFICACIÓN: Leer los tiempos de las propiedades startTime y endTime ---
+        const start = segment.startTime; // Leer directamente de segment.startTime
+        const end = segment.endTime;     // Leer directamente de segment.endTime
 
-        // Verificar si el tiempo actual está dentro del rango del segmento (inicio <= currentTime < fin)
+        // NOTA: La validación de que start y end son números ya se hizo en obtenerSegmentosSponsorBlock.
+        // No es estrictamente necesario volver a verificar isNaN aquí si la validación previa funcionó.
+
+        // Verificar si el tiempo actual está dentro del segmento (inicio <= currentTime < fin)
         const isWithinSegment = currentTime >= start && currentTime < end;
 
-        // Verificar si el final de este segmento es después del tiempo del último salto.
+        // Verificar si el final de este segmento es después del tiempo del último salto
         const isAfterLastSeek = lastSeekEndTime === -1 || end > lastSeekEndTime;
 
         return isWithinSegment && isAfterLastSeek;
     });
 
-    // Si se encontró un segmento que cumple las condiciones
+    // Si se encontró un segmento para saltar
     if (segmentToSkip) {
-        // Obtenemos los detalles del segmento encontrado
-        const segmentStart = segmentToSkip.startTime; // Tiempo de inicio del segmento
-        const segmentEnd = segmentToSkip.endTime;     // Tiempo de fin del segmento
-        const segmentType = segmentToSkip.category;   // Categoría del segmento (sponsor, outro, etc.)
+        // --- MODIFICACIÓN: Leer los tiempos y tipo de las propiedades directas ---
+        const segmentStart = segmentToSkip.startTime; // Leer directamente de startTime
+        const segmentEnd = segmentToSkip.endTime;     // Leer directamente de endTime
+        const segmentType = segmentToSkip.category;   // Leer directamente de category
 
         // --- Manejar Segmentos Outro Específicamente ---
-        // Si la categoría es "outro", aplicamos la lógica de crossfade.
         if (segmentType === 'outro') {
-            const timeRemainingInSegment = segmentEnd - currentTime; // Tiempo restante dentro del segmento outro
+            const timeRemainingInSegment = segmentEnd - currentTime;
             console.log(`SPONSORBLOCK OUTRO: Segmento outro detectado (${segmentType}) de ${segmentStart.toFixed(1)}s a ${segmentEnd.toFixed(1)}s. Tiempo restante en el outro: ${timeRemainingInSegment.toFixed(1)}s.`);
 
-            // Si el tiempo restante en el segmento outro es menor o igual que la duración del crossfade MÁS un buffer,
-            // Y NO hay una transición GENERAL en curso (verificada por pendingVisualTransition),
-            // Y el crossfade AÚN NO ha sido disparado por la lógica de outro (para evitar doble disparo).
-            // Disparamos playNextVideo para iniciar el crossfade.
-            if (timeRemainingInSegment <= CROSSFADE_DURATION + 0.5 && timeRemainingInSegment > 0 &&
-                pendingVisualTransition.playerNum === null && // No hay transición general en curso
-                !hasOutroCrossfadeStarted) // Evitar doble disparo por outro para el mismo segmento
-                 {
+            // Si el tiempo restante en el outro está dentro de la ventana de crossfade (+ buffer),
+            // Y NO estamos ya en transición, Y el crossfade AÚN NO ha sido disparado por outro, disparamos playNextVideo.
+            if (timeRemainingInSegment <= CROSSFADE_DURATION + 0.5 && timeRemainingInSegment > 0 && !isTransitioning && !hasOutroCrossfadeStarted) {
                  console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en outro.`);
-                 hasOutroCrossfadeStarted = true; // Establecer este flag para indicar que el outro disparó el crossfade (evita el disparo basado en tiempo)
-                 playNextVideo(); // Llamar a playNextVideo para iniciar la transición
+                 hasOutroCrossfadeStarted = true; // Establecer flag
+                 playNextVideo(); // Iniciar crossfade
             } else {
-                 // Si el tiempo restante es mayor que la ventana de crossfade, o ya hay transición/outro trigger, no hacemos nada.
-                 console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) fuera de la ventana de crossfade (${CROSSFADE_DURATION}s) O transición ya en curso. No se realiza salto/disparo inmediato.`);
+                 console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) fuera de la ventana de crossfade (${CROSSFADE_DURATION}s). No se realiza salto inmediato.`);
             }
-             // IMPORTANTE: Para segmentos "outro", NO llamamos a player.seekTo(). Dejamos que la reproducción continúe para que el crossfade ocurra al final del segmento.
+             // NO realizar seekTo para outros.
 
         } else {
-            // --- Manejar Otros Tipos de Segmentos (Sponsor, Self-promo, Intro, etc.) ---
-            // Para todas las demás categorías, realizamos un salto inmediato al final del segmento.
+            // --- Manejar Otros Tipos de Segmentos (Sponsor, Self-promo, etc.) ---
             const skipToTime = segmentEnd; // El punto de salto es el final del segmento
              console.log(`SPONSORBLOCK SKIP: Saltando segmento (${segmentType}) de ${segmentStart.toFixed(1)}s a ${segmentEnd.toFixed(1)}s. Saltando a ${skipToTime.toFixed(1)}s.`);
 
             try {
-                player.seekTo(skipToTime, true); // Realizar el salto. El 'true' permite que el reproductor se detenga/ponga en pausa al buscar si es necesario.
-                lastSeekEndTime = skipToTime; // Registrar el tiempo al que saltamos para evitar que checkAndSkipSegment re-salte inmediatamente el mismo segmento o segmentos superpuestos justo antes de este punto.
+                player.seekTo(skipToTime, true); // Realizar el salto.
+                lastSeekEndTime = skipToTime; // Registrar el tiempo de salto para evitar re-saltos
             } catch (e) {
                 console.error("SPONSORBLOCK SKIP: Error realizando seekTo:", e);
             }
         }
     }
 
-     // --- hasOutroCrossfadeStarted se resetea a false en onPlayerStateChange (estado PLAYING del NUEVO video) ---
+     // --- hasOutroCrossfadeStarted se resetea en onPlayerStateChange (estado PLAYING del NUEVO video) ---
 }
 // --- SponsorBlock: Obtener Segmentos ---
 async function obtenerSegmentosSponsorBlock(videoId) {
