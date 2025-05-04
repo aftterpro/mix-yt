@@ -142,7 +142,8 @@ function onPlayerError(event) {
          setTimeout(playNextVideo, 500); // Pequeño delay antes de saltar
     }
 }
-  const playerState = event.data;
+function onPlayerStateChange(event) {
+    const playerState = event.data;
     const changedPlayerNum = event.target === player1 ? 1 : 2; // Número del reproductor que cambió de estado
     const videoId = event.target.getVideoData()?.video_id; // ID del video en ese reproductor
     const playerInstance = event.target; // Instancia del reproductor que cambió de estado
@@ -310,6 +311,8 @@ function onPlayerError(event) {
                console.log("onPlayerStateChange [Visual]: Estado de transición visual pendiente limpiado.");
           }
      }
+
+
      // --- Lógica Principal de Manejo de Estados ---
      // Esta parte se ejecuta independientemente de si se disparó una transición visual arriba.
      // Actualiza el estado lógico (currentPlayingInfo, currentPlayer) y resetea flags generales cuando
