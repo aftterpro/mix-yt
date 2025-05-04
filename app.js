@@ -2190,6 +2190,7 @@ function monitorPlayers() {
     }
 }
 // --- SponsorBlock: Chequear y Saltar Segmento ---
+function checkAndSkipSegment(player, forceCheck = false) {
  const currentTime = player.getCurrentTime();
     const videoId = player.getVideoData()?.video_id;
 
