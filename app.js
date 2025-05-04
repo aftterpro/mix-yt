@@ -15,7 +15,6 @@ let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
     videoId: null,
     flattenedIndex: -1 // Índice en la lista aplanada para reproducción
 };
-// NUEVO: Objeto para rastrear qué reproductor entrante espera que se dispare la transición visual
 let pendingVisualTransition = {
     playerNum: null, // 1 o 2 (el número del reproductor que debería entrar visualmente)
     outgoingElement: null, // Elemento DOM del reproductor que se desvanece (sale)
