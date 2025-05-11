@@ -172,7 +172,12 @@ function onPlayerStateChange(event) {
     const changedPlayerNum = event.target === player1 ? 1 : 2;
     const videoId = event.target.getVideoData()?.video_id;
     const playerInstance = event.target;
-
+if (event.data === YT.PlayerState.PLAYING && isTransitioning) {
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    isTransitioning = false;
+    isAudioFading = false;
+    console.log("Transición completada. currentPlayer actualizado.");
+}
      if (playerState === YT.PlayerState.PLAYING) {
          console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO. Video: ${videoId || 'Unknown ID'}`);
 
@@ -1783,24 +1788,6 @@ if (nextPlayerElement) {
          reproduccionIniciada = false; // Permitir intentar reiniciar con Play
     }
 }
-function crossfadePlayers(outPlayer, inPlayer) {
-    const outEl = outPlayer.getIframe();
-    const inEl = inPlayer.getIframe();
-
-    outEl.classList.remove('fade-in');
-    outEl.classList.add('fade-out');
-
-    inEl.classList.remove('hidden', 'fade-out');
-    inEl.classList.add('fade-in');
-
-    setTimeout(() => {
-        outEl.classList.add('hidden');
-        outEl.classList.remove('fade-out');
-        isTransitioning = false;
-        isAudioFading = false;
-    }, CROSSFADE_DURATION * 1000);
-}
-
 function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
     const fadeStartTime = Date.now();
 
