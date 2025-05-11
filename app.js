@@ -43,6 +43,39 @@ function mostrarMensajeFlotante(mensaje) {
 }
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
 
+
+// --- Helper Players ---
+function getActivePlayer() {
+    return currentPlayer === 1 ? player1 : player2;
+}
+function getInactivePlayer() {
+    return currentPlayer === 1 ? player2 : player1;
+}
+function getActivePlayerElement() {
+    return document.getElementById(`player${currentPlayer}`);
+}
+function getInactivePlayerElement() {
+    return document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+}
+
+// --- Cache de Playlist Aplanada ---
+let cachedFlatList = [];
+let needsFlatListRefresh = true;
+
+function getFlattenedPlaylist() {
+    if (!needsFlatListRefresh && cachedFlatList.length > 0) return cachedFlatList;
+    cachedFlatList = playlistsData.flatMap(p =>
+        p.videos.map(v => ({ ...v, sourcePlaylistId: p.id }))
+    );
+    needsFlatListRefresh = false;
+    return cachedFlatList;
+}
+
+function markFlatListDirty() {
+    needsFlatListRefresh = true;
+}
+
+
 // Módulo: Carga del API de YouTube (Optimizado)
 function loadYouTubeAPI() {
     if (youtubeAPIReady) return;
