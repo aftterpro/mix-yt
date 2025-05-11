@@ -1542,6 +1542,7 @@ async function playNextVideo() {
         // Asegurarse de que el contenedor del siguiente reproductor esté listo y en la capa correcta para la superposición visual
         // Debe estar visible y no en estado de desvanecimiento antes de que comience la transición.
         if (nextPlayerElement) {
+            
             nextPlayerElement.classList.remove('hidden', 'fade-out'); // Asegurarse de que esté visible y no desvaneciéndose
             // El CSS debería manejar el z-index para la superposición: el reproductor entrante (nextPlayerElement) necesita un z-index más alto
         } else { console.warn("playNextVideo [Data]: Elemento DOM para nextPlayerElement no encontrado."); }
@@ -1564,17 +1565,26 @@ async function playNextVideo() {
         updatePlaylistsUI(); // Actualizar el resaltado en la UI basado en el nuevo estado lógico
 
 
-        // --- Paso 3: Iniciar las Transiciones Visual y de Audio SIMULTÁNEAMENTE ---
+// --- Paso 3: Iniciar las Transiciones Visual y de Audio SIMULTÁNEAMENTE ---
 
-        // Aplicar clases CSS para iniciar el desvanecimiento visual en el reproductor actual y el fundido de entrada en el siguiente.
-        // Esto debería activar las transiciones CSS definidas en tu hoja de estilos.
-        if (currentPlayerElement) {
-            currentPlayerElement.classList.add('fade-out');
-        } else { console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado."); }
-        if (nextPlayerElement) {
-             nextPlayerElement.classList.remove('fade-in'); // Eliminar por si estaba de un intento previo
-            nextPlayerElement.classList.add('fade-in');
-        }
+// Aplicar clases CSS para iniciar el desvanecimiento visual en el reproductor actual y el fundido de entrada en el siguiente.
+// Esto debería activar las transiciones CSS definidas en tu hoja de estilos.
+if (currentPlayerElement) {
+    currentPlayerElement.classList.add('fade-out');
+} else {
+    console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado.");
+}
+
+if (nextPlayerElement) {
+    nextPlayerElement.classList.remove('fade-in', 'fade-out', 'hidden'); // Asegura que esté visible
+    // Forzar repaint antes de aplicar fade-in (mejora compatibilidad visual)
+    requestAnimationFrame(() => {
+        nextPlayerElement.classList.add('fade-in');
+    });
+} else {
+    console.warn("playNextVideo [Data]: Elemento DOM para nextPlayerElement no encontrado.");
+}
+
 
         // Iniciar la reproducción del video cargado en el siguiente reproductor.
         // Esto es necesario ahora para que su flujo de audio esté disponible (a volumen 0).
@@ -1654,10 +1664,10 @@ async function playNextVideo() {
                     currentPlayerElement.classList.add('hidden'); // Ocultar completamente el contenedor
                 }
                 // Eliminar la clase fade-in del contenedor del nuevo reproductor (ya debería estar completamente visible)
-                if (nextPlayerElement) {
-                    nextPlayerElement.classList.remove('fade-in');
-                     // Asegurarse de que el siguiente reproductor esté en z-index o capa predeterminada si se ajustó con CSS
-                }
+        if (nextPlayerElement) {
+        nextPlayerElement.classList.remove('fade-in', 'hidden'); // <-- esta línea
+        nextPlayerElement.classList.add('fade-in');
+        }
 
                 // Limpieza de datos (como caché de SponsorBlock) relacionada con el video ANTERIOR
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
@@ -1773,6 +1783,24 @@ async function playNextVideo() {
          reproduccionIniciada = false; // Permitir intentar reiniciar con Play
     }
 }
+function crossfadePlayers(outPlayer, inPlayer) {
+    const outEl = outPlayer.getIframe();
+    const inEl = inPlayer.getIframe();
+
+    outEl.classList.remove('fade-in');
+    outEl.classList.add('fade-out');
+
+    inEl.classList.remove('hidden', 'fade-out');
+    inEl.classList.add('fade-in');
+
+    setTimeout(() => {
+        outEl.classList.add('hidden');
+        outEl.classList.remove('fade-out');
+        isTransitioning = false;
+        isAudioFading = false;
+    }, CROSSFADE_DURATION * 1000);
+}
+
 function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
     const fadeStartTime = Date.now();
 
