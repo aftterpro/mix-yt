@@ -48,9 +48,7 @@ function mostrarMensajeFlotante(mensaje) {
         }, 1000);
     }, 6000);// 6segundos
 }
-// mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
-
-
+mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
 // --- Helper Players ---
 function getActivePlayer() {
     return currentPlayer === 1 ? player1 : player2;
@@ -81,8 +79,6 @@ function getFlattenedPlaylist() {
 function markFlatListDirty() {
     needsFlatListRefresh = true;
 }
-
-
 // Módulo: Carga del API de YouTube (Optimizado)
 function loadYouTubeAPI() {
     if (youtubeAPIReady) return;
@@ -285,7 +281,6 @@ function onPlayerStateChange(event) {
          }
     }
 }
-
 // Módulo: Interacción con API de Búsqueda (Piped)
 const performSearch = async (query, nextPage = null) => {
     if (!resultsDiv) return;
