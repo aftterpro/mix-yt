@@ -1,5 +1,6 @@
+
 :root {
-  --crossfade-duration: 15s;
+  --crossfade-duration: 7s;
 }
 
 /* Reproductores empalmados y animados */
@@ -10,23 +11,50 @@
   opacity: 1;
   filter: blur(0px);
   background-color: #000;
- transition: opacity var(--crossfade-duration) ease-in-out, filter var(--crossfade-duration) ease-in-out;
+  transition: opacity var(--crossfade-duration) ease-in-out, 
+              filter var(--crossfade-duration) ease-in-out,
+              transform var(--crossfade-duration) ease-in-out,
+              box-shadow var(--crossfade-duration) ease-in-out;
   z-index: 1;
-  will-change: opacity, filter;
+  will-change: opacity, filter, transform, box-shadow;
 }
 
 /* Entrada visual */
 .fade-in {
   opacity: 1;
-  filter: blur(0px);
+  filter: blur(0px) brightness(1.1);
   z-index: 2;
+  transform: scale(1.02) translateY(-1.5%);
+  box-shadow: 0 0 40px rgba(255, 0, 90, 0.2);
 }
 
 /* Salida visual */
 .fade-out {
   opacity: 0;
-  filter: blur(8px);
-  z-index: 1;
+  filter: blur(8px) brightness(0.8);
+  transform: scale(0.98) translateY(1.5%);
+  box-shadow: none;
+}
+
+/* Overlay brillante con mezcla */
+.video-player::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(circle at center, rgba(233,30,99,0.3), transparent 70%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--crossfade-duration);
+}
+
+.fade-in::after {
+  opacity: 1;
+}
+
+.fade-out::after {
+  opacity: 0;
 }
 
 /* Ocultamiento absoluto */
