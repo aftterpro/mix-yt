@@ -1,3 +1,7 @@
+:root {
+  --crossfade-duration: 10s; /* Debe coincidir con app.js */
+}
+
 /* Reproductores empalmados y animados */
 .video-player {
   position: absolute;
@@ -5,34 +9,38 @@
   width: 100%; height: 100%;
   opacity: 1;
   filter: blur(0px);
-  background-color: #000; /* Considera si esto es necesario o si el iframe ya es opaco */
+  background-color: #000; /* Asegúrate de que el fondo del iframe no sea transparente si esto es necesario */
   transition: opacity var(--crossfade-duration) ease-in-out,
               filter var(--crossfade-duration) ease-in-out,
               transform var(--crossfade-duration) ease-in-out;
-              /* box-shadow var(--crossfade-duration) ease-in-out; */ /* Opcional, puede quitarse si no es esencial */
-  z-index: 1; /* Z-index base para reproductores inactivos o después de la transición */
-  will-change: opacity, filter, transform;
+  /* z-index es manejado por JS ahora para mayor control durante la transición */
+  will-change: opacity, filter, transform; /* Avisa al navegador qué se animará */
 }
 
 /* Entrada visual */
 .fade-in {
   opacity: 1;
-  filter: blur(0px) brightness(1.0); /* Brillo normal, sin blur */
-  transform: scale(1); /* Sin escalado o un escalado muy sutil si se desea */
-  /* box-shadow: 0 0 20px rgba(233,30,99,0.1); */ /* Sombra sutil o ninguna */
-  /* z-index: 2;  Controlado por JS para mayor precisión durante la transición */
+  filter: blur(0px) brightness(1.0);
+  transform: scale(1);
 }
 
 /* Salida visual */
 .fade-out {
   opacity: 0;
-  filter: blur(4px) brightness(0.85); /* Blur y brillo sutiles */
-  transform: scale(0.98); /* Encogimiento sutil */
-  /* box-shadow: none; */
-  /* z-index: 1; Controlado por JS */
+  filter: blur(4px) brightness(0.85); /* Puedes ajustar estos valores */
+  transform: scale(0.98); /* Puedes ajustar estos valores */
 }
 
-/* Overlay brillante con mezcla - MANTENER SI TE GUSTA EL EFECTO */
+/* Ocultamiento absoluto */
+.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: -1 !important; /* Asegurar que esté completamente detrás y no interfiera */
+  /* Si display: none no causa problemas, puedes añadirlo: display: none !important; */
+}
+
+/* El efecto ::after puede mantenerse si te gusta visualmente, no debería interferir con la lógica principal de opacidad */
 .video-player::after {
   content: '';
   position: absolute;
@@ -42,24 +50,7 @@
   mix-blend-mode: screen;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--crossfade-duration);
+  transition: opacity var(--crossfade-duration) ease-in-out; /* Sincronizado */
 }
-
-.fade-in::after {
-  opacity: 1; /* O ajusta si es muy intenso */
-}
-
-.fade-out::after {
-  opacity: 0;
-}
-
-/* Ocultamiento absoluto */
-.hidden {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  z-index: 0 !important; /* Asegurar que esté completamente detrás y no interfiera */
-  /* display: none !important; // Considera evitar display:none para prevenir "saltos" de layout si es un problema.
-                                 // opacity y visibility suelen ser suficientes para ocultar visualmente y de interacciones.
-                                 // Si display:none no causa problemas, está bien mantenerlo. */
-}
+.fade-in::after { opacity: 1; }
+.fade-out::after { opacity: 0; }
