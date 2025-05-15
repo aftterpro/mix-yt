@@ -1533,15 +1533,25 @@ async function playNextVideo() {
 
         // --- Paso 3: Iniciar las Transiciones Visual y de Audio SIMULTÁNEAMENTE ---
 
-        // Aplicar clases CSS para iniciar el desvanecimiento visual en el reproductor actual y el fundido de entrada en el siguiente.
-        // Esto debería activar las transiciones CSS definidas en tu hoja de estilos.
-        if (currentPlayerElement) {
-            currentPlayerElement.classList.add('fade-out');
-        } else { console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado."); }
-        if (nextPlayerElement) {
-             nextPlayerElement.classList.remove('fade-in'); // Eliminar por si estaba de un intento previo
-            nextPlayerElement.classList.add('fade-in');
-        }
+// Aplicar clases CSS para iniciar el desvanecimiento visual y manejar z-index
+if (currentPlayerElement) {
+    console.log(`playNextVideo [Visual]: Aplicando 'fade-out' a ${currentPlayerElement.id}`);
+    currentPlayerElement.classList.remove('fade-in', 'hidden'); // Asegurar estado inicial limpio
+    currentPlayerElement.classList.add('fade-out');
+    currentPlayerElement.style.zIndex = '1'; // El que se va, queda detrás del que entra
+} else {
+    console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado.");
+}
+
+if (nextPlayerElement) {
+    console.log(`playNextVideo [Visual]: Aplicando 'fade-in' a ${nextPlayerElement.id}`);
+    nextPlayerElement.classList.remove('fade-out', 'hidden'); // Asegurar estado inicial limpio
+    // void nextPlayerElement.offsetWidth; // Opcional: para forzar reflow si hay problemas de renderizado inmediato
+    nextPlayerElement.classList.add('fade-in');
+    nextPlayerElement.style.zIndex = '2'; // El que entra, se pone encima
+} else {
+    console.warn("playNextVideo [Data]: Elemento DOM para nextPlayerElement no encontrado.");
+}
 
         // Iniciar la reproducción del video cargado en el siguiente reproductor.
         // Esto es necesario ahora para que su flujo de audio esté disponible (a volumen 0).
@@ -1615,16 +1625,28 @@ async function playNextVideo() {
                       previousPlayerInstance.stopVideo();
                  }
 
-                // Ocultar completamente el contenedor del reproductor antiguo después del desvanecimiento
-                if (currentPlayerElement) {
-                    currentPlayerElement.classList.remove('fade-out', 'fade-in'); // Eliminar cualquier clase de desvanecimiento
-                    currentPlayerElement.classList.add('hidden'); // Ocultar completamente el contenedor
-                }
-                // Eliminar la clase fade-in del contenedor del nuevo reproductor (ya debería estar completamente visible)
-                if (nextPlayerElement) {
-                    nextPlayerElement.classList.remove('fade-in');
-                     // Asegurarse de que el siguiente reproductor esté en z-index o capa predeterminada si se ajustó con CSS
-                }
+              console.log(`playNextVideo [Data]: Limpieza de transición iniciada para player saliente ${currentPlayerElement ? currentPlayerElement.id : 'desconocido'}.`);
+
+// Detener explícitamente el video anterior.
+if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
+    console.log(`playNextVideo [Data]: Limpieza - Llamando a stopVideo() en Player previo ${previousPlayerInstance === player1 ? '1' : '2'}.`);
+    previousPlayerInstance.stopVideo();
+}
+
+// Ocultar completamente el contenedor del reproductor antiguo (el que se desvaneció)
+if (currentPlayerElement) {
+    currentPlayerElement.classList.remove('fade-out'); // Quitar clase de desvanecimiento
+    currentPlayerElement.classList.add('hidden');      // Ocultar completamente
+    currentPlayerElement.style.zIndex = '0';         // Resetear z-index a un valor base/oculto
+    console.log(`playNextVideo [VisualClean]: ${currentPlayerElement.id} ocultado y z-index reseteado.`);
+}
+
+// Asegurar que el nuevo reproductor (el que entró) esté correctamente configurado
+if (nextPlayerElement) {
+    nextPlayerElement.classList.remove('fade-in'); // Quitar clase de fundido (ya debería estar opaco)
+    nextPlayerElement.style.zIndex = '1';        // Dejar como player activo base en z-index
+    console.log(`playNextVideo [VisualClean]: ${nextPlayerElement.id} con clase fade-in eliminada y z-index ajustado.`);
+}
 
                 // Limpieza de datos (como caché de SponsorBlock) relacionada con el video ANTERIOR
                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
@@ -2456,7 +2478,7 @@ document.addEventListener('click', (event) => {
 }, true); // Keep using the capture phase for better reliability
 
 // === TRANSICIÓN VISUAL CROSSFADE ===
-function aplicarTransicionVisual(playerEntranteId, playerSalienteId) {
+/**function aplicarTransicionVisual(playerEntranteId, playerSalienteId) {
     const playerEntrante = document.getElementById(playerEntranteId);
     const playerSaliente = document.getElementById(playerSalienteId);
 
@@ -2469,10 +2491,11 @@ function aplicarTransicionVisual(playerEntranteId, playerSalienteId) {
     // Aplicar clases de transición
     playerEntrante.classList.add('fade-in');
     playerSaliente.classList.add('fade-out');
-
+ 
     // Después de la duración del crossfade, ocultar el player saliente
     setTimeout(() => {
         playerSaliente.classList.add('hidden');
         playerSaliente.classList.remove('fade-out');
     }, CROSSFADE_DURATION * 1000); // Usa la constante global
-}
+ }
+ */
