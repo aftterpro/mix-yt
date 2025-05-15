@@ -1,8 +1,3 @@
-
-:root {
-  --crossfade-duration: 15s;
-}
-
 /* Reproductores empalmados y animados */
 .video-player {
   position: absolute;
@@ -10,33 +5,34 @@
   width: 100%; height: 100%;
   opacity: 1;
   filter: blur(0px);
-  background-color: #000;
-  transition: opacity var(--crossfade-duration) ease-in-out, 
+  background-color: #000; /* Considera si esto es necesario o si el iframe ya es opaco */
+  transition: opacity var(--crossfade-duration) ease-in-out,
               filter var(--crossfade-duration) ease-in-out,
-              transform var(--crossfade-duration) ease-in-out,
-              box-shadow var(--crossfade-duration) ease-in-out;
-  z-index: 1;
-  will-change: opacity, filter, transform, box-shadow;
+              transform var(--crossfade-duration) ease-in-out;
+              /* box-shadow var(--crossfade-duration) ease-in-out; */ /* Opcional, puede quitarse si no es esencial */
+  z-index: 1; /* Z-index base para reproductores inactivos o después de la transición */
+  will-change: opacity, filter, transform;
 }
 
 /* Entrada visual */
 .fade-in {
   opacity: 1;
-  filter: blur(0px) brightness(1.1);
-  z-index: 2;
-  transform: scale(1.02) translateY(-1.5%);
-  box-shadow: 0 0 40px rgba(255, 0, 90, 0.2);
+  filter: blur(0px) brightness(1.0); /* Brillo normal, sin blur */
+  transform: scale(1); /* Sin escalado o un escalado muy sutil si se desea */
+  /* box-shadow: 0 0 20px rgba(233,30,99,0.1); */ /* Sombra sutil o ninguna */
+  /* z-index: 2;  Controlado por JS para mayor precisión durante la transición */
 }
 
 /* Salida visual */
 .fade-out {
   opacity: 0;
-  filter: blur(8px) brightness(0.8);
-  transform: scale(0.98) translateY(1.5%);
-  box-shadow: none;
+  filter: blur(4px) brightness(0.85); /* Blur y brillo sutiles */
+  transform: scale(0.98); /* Encogimiento sutil */
+  /* box-shadow: none; */
+  /* z-index: 1; Controlado por JS */
 }
 
-/* Overlay brillante con mezcla */
+/* Overlay brillante con mezcla - MANTENER SI TE GUSTA EL EFECTO */
 .video-player::after {
   content: '';
   position: absolute;
@@ -50,7 +46,7 @@
 }
 
 .fade-in::after {
-  opacity: 1;
+  opacity: 1; /* O ajusta si es muy intenso */
 }
 
 .fade-out::after {
@@ -61,7 +57,9 @@
 .hidden {
   opacity: 0 !important;
   visibility: hidden !important;
-  display: none !important;
   pointer-events: none !important;
-  z-index: 0;
+  z-index: 0 !important; /* Asegurar que esté completamente detrás y no interfiera */
+  /* display: none !important; // Considera evitar display:none para prevenir "saltos" de layout si es un problema.
+                                 // opacity y visibility suelen ser suficientes para ocultar visualmente y de interacciones.
+                                 // Si display:none no causa problemas, está bien mantenerlo. */
 }
