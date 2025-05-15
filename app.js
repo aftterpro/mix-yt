@@ -1,4 +1,3 @@
-
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
@@ -2455,3 +2454,71 @@ document.addEventListener('click', (event) => {
         closePlaylistSelectionPopups(); // <-- NEW CALL HERE
     }
 }, true); // Keep using the capture phase for better reliability
+
+// === TRANSICIÓN VISUAL CROSSFADE ===
+function aplicarTransicionVisual(playerEntranteId, playerSalienteId) {
+    const playerEntrante = document.getElementById(playerEntranteId);
+    const playerSaliente = document.getElementById(playerSalienteId);
+
+    if (!playerEntrante || !playerSaliente) return;
+
+    // Reset clases por si estaban mal
+    playerEntrante.classList.remove('fade-out', 'hidden');
+    playerSaliente.classList.remove('fade-in');
+
+    // Aplicar clases de transición
+    playerEntrante.classList.add('fade-in');
+    playerSaliente.classList.add('fade-out');
+
+    // Después de la duración del crossfade, ocultar el player saliente
+    setTimeout(() => {
+        playerSaliente.classList.add('hidden');
+        playerSaliente.classList.remove('fade-out');
+    }, CROSSFADE_DURATION * 1000); // Usa la constante global
+}
+
+// === VERSIÓN MEJORADA: playNextVideo CON TRANSICIÓN VISUAL ===
+function playNextVideo() {
+    const flatList = getFlattenedPlaylist();
+    if (!flatList || flatList.length === 0) {
+        console.warn("No hay videos en la lista para reproducir.");
+        return;
+    }
+
+    let nextIndex = currentPlayingInfo.flattenedIndex + 1;
+    if (nextIndex >= flatList.length) {
+        console.log("Fin de la lista. No hay más videos.");
+        return;
+    }
+
+    const nextVideo = flatList[nextIndex];
+    const nextVideoId = nextVideo.videoId;
+    const nextPlayer = currentPlayer === 1 ? player2 : player1;
+    const currentPlayerElementId = currentPlayer === 1 ? 'player1' : 'player2';
+    const nextPlayerElementId = currentPlayer === 1 ? 'player2' : 'player1';
+
+    if (!nextVideoId) {
+        console.warn("Video ID inválido para el siguiente video.");
+        return;
+    }
+
+    console.log("Reproduciendo siguiente video:", nextVideo.title || nextVideoId);
+
+    isTransitioning = true;
+
+    // Cargar el siguiente video en el reproductor opuesto
+    nextPlayer.loadVideoById(nextVideoId);
+
+    // Aplicar efecto visual mientras se realiza el cambio
+    aplicarTransicionVisual(nextPlayerElementId, currentPlayerElementId);
+
+    // Cambiar el reproductor activo
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+
+    // Actualizar el índice actual para reflejar el nuevo video
+    currentPlayingInfo.videoId = nextVideoId;
+    currentPlayingInfo.playlistId = nextVideo.sourcePlaylistId;
+    currentPlayingInfo.flattenedIndex = nextIndex;
+
+    updatePlaylistsUI();
+}
