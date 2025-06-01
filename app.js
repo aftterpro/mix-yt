@@ -259,7 +259,7 @@ async function addPlaylistFromUrl(url) {
 
         searchInput2.value = ''; // Limpiar el input
     } catch (e) {
-        showError("Error al añadir playlist/video", e.message);
+        mostrarMensajeFlotante("Error al añadir playlist/video", e.message);
         console.error("Error al añadir playlist/video:", e);
     } finally {
         hideLoadingSpinner();
