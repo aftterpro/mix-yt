@@ -14,7 +14,8 @@ let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
     playlistId: null,
     videoId: null,
     flattenedIndex: -1, // Índice en la lista aplanada para reproducción
-    player: null // Referencia al objeto YT.Player actualmente activo
+    player: null, // Referencia al objeto YT.Player actualmente activo
+    title: null // Título del video actual
 };
 // Variables para Búsqueda y Scroll Infinito
 let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
@@ -52,6 +53,7 @@ let playlistsUnsubscribe; // Función para desuscribirse de los cambios en las p
 const APP_COLLECTION_ID = 'yt-crossmix-app'; // ID de la colección de la app
 
 // Inicialización de Firebase (llamada desde firebase-init.js)
+// Esta función se llama desde firebase-init.js una vez que Firebase y la autenticación están listos.
 window.initFirebase = (firestore, firebaseAuth, user) => {
     db = firestore;
     auth = firebaseAuth;
@@ -59,6 +61,7 @@ window.initFirebase = (firestore, firebaseAuth, user) => {
     console.log('🔥 Firebase inicializado en app.js para el usuario:', currentUser.uid);
 
     // Inicializar la referencia a las playlists del usuario
+    // Las rutas de Firestore son: /artifacts/{appId}/users/{userId}/{your_collection_name}
     userPlaylistsRef = db.collection('artifacts').doc(APP_COLLECTION_ID).collection('users').doc(currentUser.uid).collection('playlists');
 
     // Cargar y escuchar cambios en las playlists
@@ -106,6 +109,46 @@ function showError(message, details = '') {
     console.error('Error:', message, details);
     showFloatingMessage(message + (details ? ` (${details})` : ''), 'error', 5000);
 }
+
+// Módulo: Piped API Helpers (Añadido de nuevo)
+const pipedInstances = [ // Lista de instancias Piped
+    "https://pipedapi.reallyaweso.me",
+    "https://pipedapi.ducks.party",
+    "https://pipedapi.kavin.rocks" // Añadir más instancias para mayor robustez
+];
+
+function getRandomPipedInstance() {
+    const randomIndex = Math.floor(Math.random() * pipedInstances.length);
+    return pipedInstances[randomIndex];
+}
+
+// Función fetch con reintentos (usada por getPlaylistInfo y fetchVideoDetails)
+async function fetchDataWithRetry(url, options = {}, maxRetries = 2, retryDelay = 800) {
+    let retries = 0;
+    while (retries <= maxRetries) {
+        try {
+            console.log(`fetchDataWithRetry: Intento ${retries + 1} para ${url}`);
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                 // Intentar leer cuerpo del error
+                 let errorBodyText = `HTTP error! status: ${response.status}`;
+                 try { errorBodyText = await response.text(); } catch(e){}
+                throw new Error(errorBodyText);
+            }
+            return await response.json(); // Asume que la respuesta es JSON
+        } catch (error) {
+            console.error(`Error fetching ${url}, reintento ${retries + 1}/${maxRetries + 1}:`, error.message);
+            retries++;
+            if (retries <= maxRetries) {
+                await new Promise((resolve) => setTimeout(resolve, retryDelay * retries)); // Incrementar delay
+            } else {
+                 console.error(`fetchDataWithRetry: Fallaron todos los ${maxRetries + 1} intentos para ${url}`);
+                throw error; // Lanza el error después de todos los reintentos
+            }
+        }
+    }
+}
+
 
 // Módulo: YouTube Player API
 function onYouTubeIframeAPIReady() {
@@ -157,11 +200,16 @@ function onPlayerReady(event) {
     if (volumeSlider && event.target.getVolume() !== parseInt(volumeSlider.value)) {
         event.target.setVolume(parseInt(volumeSlider.value));
     }
-    // Si no hay un video cargado, el botón de play puede estar deshabilitado
-    if (event.target.getPlaylist() || event.target.getVideoData().video_id) {
+    // Habilitar botones de reproducción si hay videos cargados
+    const flatVideos = getFlattenedVideos();
+    if (flatVideos.length > 0) {
          playButton.disabled = false;
          nextButton.disabled = false;
          prevButton.disabled = false;
+    } else {
+         playButton.disabled = true;
+         nextButton.disabled = true;
+         prevButton.disabled = true;
     }
 }
 
@@ -671,13 +719,12 @@ async function loadAndListenToPlaylists() {
             // Si es una URL de playlist, cargar sus videos si no están ya en caché o si ha pasado mucho tiempo
             if (playlist.url && playlist.isYoutubePlaylist) {
                 try {
-                    const videoIds = await fetchPlaylistVideos(playlist.url);
-                    // Mapear los IDs a un formato similar al de búsqueda
-                    playlist.videos = videoIds.map(vId => ({
-                        videoId: vId.videoId,
-                        title: vId.title,
-                        duration: vId.duration, // Asegúrate de que esto se obtenga en fetchPlaylistVideos
-                        thumbnail: vId.thumbnail,
+                    const videoDetails = await fetchPlaylistVideos(playlist.url); // Ahora devuelve detalles completos
+                    playlist.videos = videoDetails.map(v => ({
+                        videoId: v.videoId,
+                        title: v.title,
+                        duration: v.duration,
+                        thumbnail: v.thumbnail,
                         playlistId: playlist.id // Asignar el ID de la playlist a cada video
                     }));
                 } catch (e) {
@@ -720,7 +767,7 @@ async function addPlaylistFromUrl(url) {
         let playlistName;
         let thumbnailUrl;
         let isYoutubePlaylist = false;
-        let videosData = [];
+        let videosData = []; // Para playlists de videos individuales
 
         // Validar si es una URL de YouTube Music o YouTube
         const youtubeMusicPlaylistMatch = url.match(/music\.youtube\.com\/playlist\?list=([a-zA-Z0-9_-]+)/);
@@ -730,16 +777,14 @@ async function addPlaylistFromUrl(url) {
             playlistId = youtubeMusicPlaylistMatch ? youtubeMusicPlaylistMatch[1] : youtubePlaylistMatch[1];
             isYoutubePlaylist = true;
 
-            // Para obtener el nombre y la miniatura, se podría usar la API de Piped/YouTube si tuvieras una forma de consultarlo.
-            // Por simplicidad, por ahora, usaremos un nombre genérico o requeriremos al usuario que lo añada.
-            playlistName = `Playlist Externa (${playlistId.substring(0, 5)}...)`;
-            thumbnailUrl = ''; // O se podría intentar cargar una miniatura genérica o de un video de la playlist
+            // Obtener información de la playlist desde Piped para nombre y thumbnail
+            const playlistInfo = await fetchPlaylistDetailsFromPiped(playlistId);
+            playlistName = playlistInfo.name || `Playlist Externa (${playlistId.substring(0, 5)}...)`;
+            thumbnailUrl = playlistInfo.thumbnailUrl || ''; // Usar thumbnail de la playlist
+
             showFloatingMessage(`Se añadió la playlist de YouTube/Piped. Los videos se cargarán al expandirla.`, 'success');
         } else {
             // Asumir que son IDs de videos o una URL que debe ser manejada como video individual
-            // Aquí puedes decidir cómo manejar URLs que no son de playlist
-            showFloatingMessage("URL no reconocida como playlist de YouTube. Añadiendo como video individual si es un ID válido.", "warning");
-            // Para URLs de videos individuales, puedes buscar el video y añadirlo a una nueva playlist "Mis Videos"
             const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
             if (videoIdMatch) {
                 const videoId = videoIdMatch[1];
@@ -766,9 +811,9 @@ async function addPlaylistFromUrl(url) {
         const newPlaylistRef = userPlaylistsRef.doc(); // Crear un nuevo documento con ID automático
         await newPlaylistRef.set({
             name: playlistName,
-            url: url,
+            url: url, // Guardar la URL original
             isYoutubePlaylist: isYoutubePlaylist,
-            videosData: videosData.length > 0 ? videosData : null, // Solo guardar si hay videos individuales
+            videosData: videosData.length > 0 ? videosData : [], // Guardar videos individuales si existen
             thumbnailUrl: thumbnailUrl,
             order: playlistsData.length, // Para mantener el orden
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -787,11 +832,7 @@ async function addPlaylistFromUrl(url) {
 async function fetchVideoDetails(videoId) {
     const instanceUrl = getRandomPipedInstance();
     try {
-        const response = await fetch(`${instanceUrl}/streams/${videoId}`);
-        if (!response.ok) {
-            throw new Error(`Error al obtener detalles del video: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await fetchDataWithRetry(`${instanceUrl}/streams/${videoId}`);
         return {
             videoId: data.videoId,
             title: data.title,
@@ -800,16 +841,28 @@ async function fetchVideoDetails(videoId) {
         };
     } catch (error) {
         console.error("Error fetching video details from Piped:", error);
-        showError("Error al obtener detalles del video.", error.message);
-        return null;
+        throw new Error(`Error al obtener detalles del video: ${error.message}`);
+    }
+}
+
+// Función auxiliar para obtener detalles de una playlist (nombre, thumbnail)
+async function fetchPlaylistDetailsFromPiped(playlistId) {
+    const instanceUrl = getRandomPipedInstance();
+    try {
+        const data = await fetchDataWithRetry(`${instanceUrl}/playlists/${playlistId}`);
+        return {
+            name: data.name,
+            thumbnailUrl: data.thumbnailUrl,
+            relatedStreams: data.relatedStreams // También devolvemos los streams para fetchPlaylistVideos
+        };
+    } catch (error) {
+        console.error(`Error al obtener detalles de la playlist ${playlistId} de Piped:`, error);
+        throw new Error(`Error al obtener detalles de la playlist: ${error.message}`);
     }
 }
 
 
 async function fetchPlaylistVideos(playlistUrl) {
-    // Aquí puedes usar la API de Piped para obtener videos de una playlist.
-    // Ejemplo de cómo construir la URL para Piped, si tuvieras una función para extraer ID de playlist.
-    // Asumiendo que playlistUrl ya tiene el ID de playlist adecuado.
     const playlistIdMatch = playlistUrl.match(/(?:list=|embed\/videoseries\?list=)([a-zA-Z0-9_-]+)/);
     const playlistId = playlistIdMatch ? playlistIdMatch[1] : null;
 
@@ -817,22 +870,18 @@ async function fetchPlaylistVideos(playlistUrl) {
         throw new Error("URL de playlist no válida.");
     }
 
-    const instanceUrl = getRandomPipedInstance();
-    const apiUrl = `${instanceUrl}/playlists/${playlistId}`;
-    
     try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        // Reutilizar fetchPlaylistDetailsFromPiped para obtener los videos también
+        const playlistInfo = await fetchPlaylistDetailsFromPiped(playlistId);
+        if (!playlistInfo || !playlistInfo.relatedStreams) {
+            throw new Error("La respuesta de la API no contiene videos válidos para la playlist.");
         }
-        const data = await response.json();
-        console.log(`Videos obtenidos de Piped para playlist ${playlistId}:`, data.relatedStreams.length);
-        return data.relatedStreams.map(item => ({
+        console.log(`Videos obtenidos de Piped para playlist ${playlistId}: ${playlistInfo.relatedStreams.length}`);
+        return playlistInfo.relatedStreams.map(item => ({
             videoId: item.url.split('v=')[1] || item.url.split('/').pop(), // Asegurar que sea el ID de video
             title: item.title,
             duration: item.duration, // Duración en segundos
             thumbnail: item.thumbnail,
-            // Aquí puedes añadir más datos si los necesitas, como el ID de la playlist padre si fuera una sub-playlist
         }));
     } catch (error) {
         console.error(`Error al obtener videos de la playlist ${playlistId} de Piped:`, error);
@@ -850,7 +899,7 @@ function displayPlaylists() {
         const header = document.createElement('div');
         header.classList.add('playlist-group-header');
         header.innerHTML = `
-            <img src="${playlist.thumbnailUrl || './img/default-playlist.jpg'}" alt="Playlist Thumbnail" class="playlist-group-thumb">
+            <img src="${playlist.thumbnailUrl || 'https://placehold.co/50x50/000000/FFFFFF?text=?'}" alt="Playlist Thumbnail" class="playlist-group-thumb">
             <span class="playlist-group-name">${playlist.name}</span>
             <i class="fas fa-chevron-down expand-icon"></i>
             <div class="playlist-options-menu delete-menu" data-playlist-id="${playlist.id}">
@@ -891,7 +940,7 @@ function displayPlaylists() {
                 const firstVideo = {
                     ...targetPlaylist.videos[0],
                     playlistId: id, // Asegurar que el video tenga la ID de la playlist
-                    flattenedIndex: targetPlaylist.videos[0].flattenedIndex // Asegurar el índice plano
+                    flattenedIndex: getFlattenedVideos().findIndex(v => v.videoId === targetPlaylist.videos[0].videoId && v.playlistId === id)
                 };
                 setCurrentPlayingVideo(firstVideo);
                 loadVideo(firstVideo.videoId, 0);
@@ -917,7 +966,7 @@ function displayPlaylists() {
 
 function renderPlaylistVideos(playlistId, containerElement) {
     const playlist = playlistsData.find(p => p.id === playlistId);
-    if (!playlist || !playlist.videos) {
+    if (!playlist || !playlist.videos || playlist.videos.length === 0) {
         containerElement.innerHTML = `<p class="no-videos-message">No hay videos en esta playlist.</p>`;
         containerElement.style.maxHeight = containerElement.scrollHeight + 'px';
         return;
@@ -927,8 +976,10 @@ function renderPlaylistVideos(playlistId, containerElement) {
     playlist.videos.forEach((video, index) => {
         const videoElement = document.createElement('div');
         videoElement.classList.add('playlist-item');
+        videoElement.draggable = true; // Habilitar arrastre
         videoElement.dataset.videoId = video.videoId;
         videoElement.dataset.playlistId = playlist.id;
+        // Calcular flattenedIndex en el momento de la creación del elemento
         videoElement.dataset.flattenedIndex = getFlattenedVideos().findIndex(v => v.videoId === video.videoId && v.playlistId === playlist.id);
 
 
@@ -1112,7 +1163,8 @@ async function moveVideoToPlaylist(video, currentPlaylistId, targetPlaylistId) {
         await removeVideoFromPlaylist(video.videoId, currentPlaylistId);
 
         showFloatingMessage(`Video movido exitosamente.`, "success");
-    } catch (e) {
+    }
+    catch (e) {
         showError("Error al mover video entre playlists", e.message);
         console.error("Error al mover video entre playlists:", e);
     } finally {
@@ -1192,52 +1244,70 @@ function setCurrentPlayingVideo(video) {
 }
 
 // Módulo: Búsqueda
-async function searchPipedVideos(query, nextPageContext = null) {
+async function searchPipedVideos(query, append = false) { // Añadido 'append' para manejar si se añaden o se reemplazan resultados
     if (isLoadingMore) return; // Evitar llamadas duplicadas
     isLoadingMore = true;
     showLoadingSpinner();
-    resultsDiv.innerHTML = ''; // Limpiar resultados anteriores en una nueva búsqueda
+    
+    if (!append) { // Solo limpiar si es una nueva búsqueda
+        resultsDiv.innerHTML = ''; 
+        nextPageContext = null; // Resetear contexto de paginación para nueva búsqueda
+    }
 
     let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
     if (nextPageContext) {
-        apiUrl += `&nextpage=${encodeURIComponent(JSON.stringify(nextPageContext))}`;
+        apiUrl += `&nextpage=${encodeURIComponent(nextPageContext)}`; // Piped API usa un string para nextPage
     }
 
     console.log("Fetching search results from:", apiUrl); // Log de la URL
     try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
         const data = await response.json();
         console.log("Search results received:", data); // Log de los resultados
 
-        // `nextPageContext` es lo que la API de Piped devuelve para la paginación.
+        // `nextPage` es lo que la API de Piped devuelve para la paginación.
         // Asegúrate de que tu función Netlify lo devuelva correctamente.
-        window.nextPageContext = data.nextPage; // Almacena el contexto para la próxima carga
+        nextPageContext = data.nextPage || null; // Almacena el contexto para la próxima carga
         
-        displaySearchResults(data.items);
+        displaySearchResults(data.items, append); // Pasar 'append' a displaySearchResults
     } catch (e) {
         showError("Error al buscar videos", e.message);
         console.error("Error al buscar videos:", e);
-        resultsDiv.innerHTML = `<p class="error-message">Error al cargar resultados de búsqueda: ${e.message}</p>`;
+        if (!append) { // Solo mostrar mensaje de error si es la búsqueda inicial
+            resultsDiv.innerHTML = `<p class="error-message">Error al cargar resultados de búsqueda: ${e.message}</p>`;
+        }
     } finally {
         hideLoadingSpinner();
         isLoadingMore = false;
     }
 }
 
-function displaySearchResults(items) {
+function displaySearchResults(items, append = false) {
     if (!items || items.length === 0) {
-        resultsDiv.innerHTML = '<p class="no-videos-message">No se encontraron resultados para tu búsqueda.</p>';
+        if (!append) { // Solo mostrar mensaje si no hay resultados en la primera carga
+            resultsDiv.innerHTML = '<p class="no-videos-message">No se encontraron resultados para tu búsqueda.</p>';
+        }
         return;
     }
 
-    resultsDiv.innerHTML = ''; // Clear previous results
+    if (!append) {
+        resultsDiv.innerHTML = ''; // Limpiar resultados anteriores solo si no estamos añadiendo
+    }
+
+    const fragment = document.createDocumentFragment(); // Usar un fragmento para mejor rendimiento
     items.forEach(item => {
         // Filtrar solo videos (Piped también puede devolver otros tipos de ítems)
         if (item.type === 'video') {
             const template = document.getElementById('search-result-template');
+            // Asegúrate de que la plantilla exista
+            if (!template) {
+                console.error("Template 'search-result-template' no encontrada.");
+                return;
+            }
             const clone = document.importNode(template.content, true);
 
             const videoElement = clone.querySelector('.search-result-item');
@@ -1276,9 +1346,10 @@ function displaySearchResults(items) {
                 });
                 loadVideo(videoId, 0);
             });
-            resultsDiv.appendChild(clone);
+            fragment.appendChild(clone);
         }
     });
+    resultsDiv.appendChild(fragment); // Añadir todos los elementos de una vez
 }
 
 // Módulo: Popups y Menús Contextuales
@@ -1301,9 +1372,13 @@ function showAddToPlaylistPopup(video) {
     document.body.appendChild(popup);
 
     // Posicionar popup cerca del searchInput2 o en el centro
-    const inputRect = searchInput2.getBoundingClientRect();
-    popup.style.top = `${inputRect.bottom + 10}px`;
-    popup.style.left = `${inputRect.left}px`;
+    // Usar el botón que disparó el evento para posicionar mejor el popup
+    const targetElement = event.target.closest('.add-to-playlist') || searchInput2;
+    const targetRect = targetElement.getBoundingClientRect();
+    
+    popup.style.top = `${targetRect.bottom + 10}px`;
+    popup.style.left = `${targetRect.left}px`;
+    popup.style.minWidth = `${targetRect.width}px`; // Asegurar que el popup tenga al menos el ancho del botón
 
     // Cerrar el popup
     popup.querySelector('.close-popup-button').addEventListener('click', () => {
@@ -1364,10 +1439,12 @@ function showMoveToPlaylistPopup(video, currentPlaylistId) {
     document.body.appendChild(popup);
 
     // Posicionar popup (ejemplo, ajustar según necesidad)
-    const inputRect = searchInput2.getBoundingClientRect();
-    popup.style.top = `${inputRect.bottom + 10}px`;
-    popup.style.left = `${inputRect.left}px`;
+    const targetElement = event.target.closest('.move-video-button');
+    const targetRect = targetElement.getBoundingClientRect();
 
+    popup.style.top = `${targetRect.bottom + 10}px`;
+    popup.style.left = `${targetRect.left}px`;
+    popup.style.minWidth = `${targetRect.width}px`;
 
     popup.querySelector('.close-popup-button').addEventListener('click', () => {
         popup.remove();
@@ -1578,9 +1655,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listener para scroll infinito en resultados de búsqueda
     resultsContainer.addEventListener('scroll', () => {
-        if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 100 && !isLoadingMore && window.nextPageContext) {
+        if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 100 && !isLoadingMore && nextPageContext) { // Usar nextPageContext global
             console.log("Cargando más resultados...");
-            searchPipedVideos(currentSearchQuery, window.nextPageContext);
+            searchPipedVideos(currentSearchQuery, true); // Pasar 'true' para añadir resultados
         }
     });
 });
@@ -1596,4 +1673,3 @@ document.addEventListener('click', (event) => {
         closePlaylistSelectionPopups();
     }
 }, true); // Keep using the capture phase for better reliability
-
