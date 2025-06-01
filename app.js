@@ -152,7 +152,7 @@ async function loadAndListenToPlaylists() {
                     } catch (e) {
                         console.error(`Error al cargar videos para la playlist ${playlist.name} (${playlist.id}):`, e);
                         playlist.videos = []; // Asegurar que sea un array vacío en caso de error
-                        showError(`No se pudieron cargar videos para la playlist: ${playlist.name}`, e.message);
+                        mostrarMensajeFlotante(`No se pudieron cargar videos para la playlist: ${playlist.name}`, e.message);
                     }
                 } else if (playlist.videosData) { // Si es una playlist de videos individuales
                     playlist.videos = playlist.videosData.map(video => ({
@@ -171,13 +171,13 @@ async function loadAndListenToPlaylists() {
             hideLoadingSpinner();
         }, (error) => {
             console.error("Error al escuchar cambios en las playlists:", error);
-            showError("Error al cargar tus playlists", error.message);
+            mostrarMensajeFlotante("Error al cargar tus playlists", error.message);
             hideLoadingSpinner();
         });
 
     } catch (error) {
         console.error("Error al inicializar la carga de playlists:", error);
-        showError("Error al cargar las playlists.", "error");
+        mostrarMensajeFlotante("Error al cargar las playlists.", "error");
     }
 }
 
@@ -187,7 +187,7 @@ async function loadAndListenToPlaylists() {
  */
 async function addPlaylistFromUrl(url) {
     if (!firebaseReady || !db || !currentUser) {
-        showError("La aplicación no está lista. Por favor, espera a que se cargue completamente.");
+        mostrarMensajeFlotante("La aplicación no está lista. Por favor, espera a que se cargue completamente.");
         console.error("addPlaylistFromUrl: Firebase no está listo.");
         return;
     }
@@ -272,7 +272,7 @@ async function addPlaylistFromUrl(url) {
  */
 async function deletePlaylistFromFirestore(playlistId) {
     if (!db || !currentUser) {
-        showError("Error: Firebase no está listo.", "error");
+        mostrarMensajeFlotante("Error: Firebase no está listo.", "error");
         return;
     }
 
@@ -411,7 +411,7 @@ async function moveVideoInPlaylistInFirestore(video, currentPlaylistId, targetPl
             showFloatingMessage("Video movido a otra playlist.", "success");
         }
     } catch (error) {
-        showError("Error al mover video.", error.message);
+        mostrarMensajeFlotante("Error al mover video.", error.message);
         console.error("Error al mover video:", error);
     } finally {
         hideLoadingSpinner();
@@ -592,7 +592,7 @@ function onPlayerError(event) {
  */
 function loadVideo(videoId, startTime, isCrossfade = false) {
     if (!playersInitialized || (!player1 && !player2)) {
-        showError("Los reproductores de YouTube no están inicializados.");
+        mostrarMensajeFlotante("Los reproductores de YouTube no están inicializados.");
         return;
     }
 
@@ -632,7 +632,7 @@ function loadVideo(videoId, startTime, isCrossfade = false) {
             totalDurationDisplay.textContent = formatTime(activePlayerInstance.getDuration());
         }
     } else {
-        showError("El reproductor activo no está listo para cargar videos. Inténtalo de nuevo.");
+        mostrarMensajeFlotante("El reproductor activo no está listo para cargar videos. Inténtalo de nuevo.");
         console.error(`Active player (${currentPlayer}) is not ready or loadVideoById is not a function.`);
     }
 }
@@ -648,7 +648,7 @@ function getInactivePlayer() {
 
 function playPauseVideo() {
     if (!currentPlayingInfo.player) {
-        showError("No hay video cargado para reproducir/pausar.");
+        mostrarMensajeFlotante("No hay video cargado para reproducir/pausar.");
         return;
     }
 
@@ -662,7 +662,7 @@ function playPauseVideo() {
 
 function playNextVideo() {
     if (!currentPlayingInfo.player) {
-        showError("No hay video cargado para avanzar.");
+        mostrarMensajeFlotante("No hay video cargado para avanzar.");
         return;
     }
 
@@ -708,7 +708,7 @@ function playNextVideo() {
 
 function playPrevVideo() {
     if (!currentPlayingInfo.player) {
-        showError("No hay video cargado para retroceder.");
+        mostrarMensajeFlotante("No hay video cargado para retroceder.");
         return;
     }
 
@@ -1431,7 +1431,7 @@ async function searchPipedVideos(query, append = false) { // Añadido 'append' p
         
         displaySearchResults(data.items, append); // Pasar 'append' a displaySearchResults
     } catch (e) {
-        showError("Error al buscar videos", e.message);
+        mostrarMensajeFlotante("Error al buscar videos", e.message);
         console.error("Error al buscar videos:", e);
         if (!append) { // Solo mostrar mensaje de error si es la búsqueda inicial
             resultsDiv.innerHTML = `<p class="error-message">Error al cargar resultados de búsqueda: ${e.message}</p>`;
@@ -1561,7 +1561,7 @@ function showAddToPlaylistPopup(video) {
                         });
                         showFloatingMessage(`Playlist "${newPlaylistName}" creada y video añadido.`, "success");
                     } catch (e) {
-                        showError("Error al crear nueva playlist", e.message);
+                        mostrarMensajeFlotante("Error al crear nueva playlist", e.message);
                         console.error("Error al crear nueva playlist:", e);
                     } finally {
                         hideLoadingSpinner();
@@ -1628,7 +1628,7 @@ function showMoveToPlaylistPopup(video, currentPlaylistId) {
                         // Eliminar de la playlist actual después de añadir a la nueva
                         await removeVideoFromPlaylistInFirestore(currentPlaylistId, video.videoId);
                     } catch (e) {
-                        showError("Error al crear nueva playlist y mover video", e.message);
+                        mostrarMensajeFlotante("Error al crear nueva playlist y mover video", e.message);
                         console.error("Error al crear nueva playlist y mover video:", e);
                     } finally {
                         hideLoadingSpinner();
@@ -1745,14 +1745,14 @@ function initGoogleApiClient() {
             // y actualizar la UI si es necesario.
         }, (error) => {
             console.error('Error al inicializar Google API client:', error);
-            showError('Error al cargar la integración con Google.', error.details || error.message);
+            mostrarMensajeFlotante('Error al cargar la integración con Google.', error.details || error.message);
         });
     });
 }
 
 async function handleGoogleSignIn() {
     if (!gapi.client || !gapi.auth2) {
-        showError("Google API no está cargada. Intenta recargar la página.");
+        mostrarMensajeFlotante("Google API no está cargada. Intenta recargar la página.");
         return;
     }
 
@@ -1776,7 +1776,7 @@ async function handleGoogleSignIn() {
         if (error.code === 'auth/popup-closed-by-user') {
             showFloatingMessage('Inicio de sesión cancelado.', 'info');
         } else {
-            showError('Error al iniciar sesión con Google.', error.message);
+            mostrarMensajeFlotante('Error al iniciar sesión con Google.', error.message);
         }
     } finally {
         hideLoadingSpinner();
@@ -1842,7 +1842,7 @@ async function fetchAndSaveUserPlaylists() {
         // loadAndListenToPlaylists() se encargará de actualizar la UI
     } catch (error) {
         console.error('Error al extraer playlists de YouTube:', error);
-        showError('Error al extraer tus playlists de YouTube.', error.message);
+        mostrarMensajeFlotante('Error al extraer tus playlists de YouTube.', error.message);
     } finally {
         hideLoadingSpinner();
     }
@@ -1860,7 +1860,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Carga la API de YouTube Iframe.
     // window.onYouTubeIframeAPIReady se llamará automáticamente cuando cargue.
     const tag = document.createElement('script');
-    tag.src = "http://www.youtube.com/iframe_api"; // URL correcta para la API de YouTube
+    tag.src = "https://www.youtube.com/iframe_api"; // URL correcta para la API de YouTube
     const firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
