@@ -51,6 +51,7 @@ let currentUser; // Usuario actual
 let userPlaylistsRef; // Referencia a la colección de playlists del usuario
 let playlistsUnsubscribe; // Función para desuscribirse de los cambios en las playlists
 const APP_COLLECTION_ID = 'yt-crossmix-app'; // ID de la colección de la app
+let firebaseReady = false; // NUEVO: Flag para indicar si Firebase está completamente inicializado
 
 // Inicialización de Firebase (llamada desde firebase-init.js)
 // Esta función se llama desde firebase-init.js una vez que Firebase y la autenticación están listos.
@@ -63,9 +64,17 @@ window.initFirebase = (firestore, firebaseAuth, user) => {
     // Inicializar la referencia a las playlists del usuario
     // Las rutas de Firestore son: /artifacts/{appId}/users/{userId}/{your_collection_name}
     userPlaylistsRef = db.collection('artifacts').doc(APP_COLLECTION_ID).collection('users').doc(currentUser.uid).collection('playlists');
+    console.log('userPlaylistsRef establecido:', userPlaylistsRef);
 
     // Cargar y escuchar cambios en las playlists
     loadAndListenToPlaylists();
+
+    // NUEVO: Habilitar UI una vez que Firebase está listo
+    firebaseReady = true;
+    searchInput.disabled = false;
+    searchInput2.disabled = false;
+    addButton.disabled = false;
+    console.log('UI habilitada: Inputs de búsqueda y botón de añadir playlist.');
 };
 
 // Módulo: Funciones de Utilidad
@@ -756,6 +765,13 @@ async function loadAndListenToPlaylists() {
 
 
 async function addPlaylistFromUrl(url) {
+    // NUEVO: Comprobar si Firebase está listo
+    if (!firebaseReady || !userPlaylistsRef) {
+        showError("La aplicación no está lista. Por favor, espera a que se cargue completamente.");
+        console.error("addPlaylistFromUrl: userPlaylistsRef no está definido o firebaseReady es falso.");
+        return;
+    }
+
     if (!url) {
         showFloatingMessage("Por favor, introduce una URL de playlist.", "warning");
         return;
@@ -1581,6 +1597,11 @@ document.addEventListener('DOMContentLoaded', () => {
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName('script')[0];
     firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // NUEVO: Deshabilitar inputs y botón al inicio
+    searchInput.disabled = true;
+    searchInput2.disabled = true;
+    addButton.disabled = true;
 
     // Event listeners para botones del reproductor
     playButton.addEventListener('click', playPauseVideo);
