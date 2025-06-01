@@ -2,17 +2,14 @@
 <html lang="es"> 
 <head>
     <meta charset="UTF-8">
-
     <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
-    
     <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
-
     <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="./styles.css">
     <link rel="stylesheet" type="text/css" href="./efecto.css">
     <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
@@ -33,9 +30,8 @@
       }
     }
     </script>
-    </head>
+</head>
 <body class="vibe-theme">
-    <!-- Player Container con nueva estructura -->
     <div class="main-player-container">
         <div id="contenedor-player" class="player-wrapper">
             <div id="videoContainer" class="video-container">
@@ -53,9 +49,7 @@
         </div>
     </div>
 
-    <!-- Contenedor principal con estructura mejorada -->
     <div class="container">
-        <!-- Sidebar con nueva estructura -->
         <aside class="sidebar">
             <div class="playlist-header">
                 <h3>Playlist</h3>
@@ -78,11 +72,9 @@
             </div>
 
             <div id="playlistContainer" class="playlist-wrapper">
-                <div id="playlist" class="playlist-items"></div>
-            </div>
+                </div>
         </aside>
 
-        <!-- Contenido principal mejorado -->
         <main class="main-content">
             <section id="search-panel" class="vibe-panel">
                 <div class="search-container">
@@ -98,49 +90,10 @@
         </main>
     </div>
 
-    <!-- Template para items de la playlist -->
-    <template id="playlist-item-template">
-        <div class="playlist-item" draggable="true">
-            <div class="thumbnail-container">
-                <img src="" alt="" class="playlist-thumbnail">
-                <span class="duration"></span>
-            </div>
-            <div class="item-content">
-                <h4 class="item-title"></h4>
-                <div class="item-controls">
-                    <button class="item-move">
-                        <i class="fas fa-grip-vertical"></i>
-                    </button>
-                    <button class="item-delete">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </template>
-
-    <!-- Template para resultados de búsqueda -->
-<template id="search-result-template">
-    <div class="search-result-item">
-        <div class="thumbnail-container">
-            <img src="" alt="" class="result-thumbnail">
-            <span class="duration"></span>
-        </div>
-        <div class="result-details">
-            <h3 class="result-title video-title"></h3>
-            <button class="add-to-playlist">
-                <i class="fa-solid fa-plus"></i>
-                <span class="add-text">Añadir a la playlist</span>
-            </button>
-        </div>
-    </div>
-</template>
-    <!-- Loading Spinner -->
     <div id="loadingSpinner" class="loading-spinner hidden">
         <div class="spinner"></div>
     </div>
 
-    <!-- Error Messages Container -->
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer"></div>
 
