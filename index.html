@@ -80,6 +80,21 @@
                     <div id="results" class="search-results"></div>
                 </div>
             </section>
+            <template id="search-result-template">
+    <div class="search-result-item">
+        <div class="thumbnail-container">
+            <img src="" alt="" class="result-thumbnail">
+            <span class="duration"></span>
+        </div>
+        <div class="result-details">
+            <h3 class="result-title video-title"></h3>
+            <button class="add-to-playlist">
+                <i class="fa-solid fa-plus"></i>
+                <span class="add-text">Añadir a la playlist</span>
+            </button>
+        </div>
+    </div>
+</template>
             <section id="upNextSection" class="up-next-section">
                 <h3>Siguiente en la cola</h3>
                 <div id="upNextList" class="up-next-list">
