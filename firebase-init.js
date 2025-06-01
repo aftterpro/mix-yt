@@ -9,7 +9,15 @@ import { getFirestore, doc, getDoc, setDoc, collection, query, onSnapshot, delet
 // Variables globales proporcionadas por el entorno Canvas (MANDATORIO USAR)
 // Estas variables son inyectadas por el entorno de ejecución de Canvas.
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+  const firebaseConfig = {
+    apiKey: "AIzaSyBR4S1h0RJX42Ki4xgzPJDrbl-Lp094kFU",
+    authDomain: "yt-crossmix-app.firebaseapp.com",
+    projectId: "yt-crossmix-app",
+    storageBucket: "yt-crossmix-app.firebasestorage.app",
+    messagingSenderId: "697969666949",
+    appId: "1:697969666949:web:e49bfec9ffef531264f2ec",
+    measurementId: "G-DNC74HF2MD"
+  };
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
 // Inicializar Firebase
