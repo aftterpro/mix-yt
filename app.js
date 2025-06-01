@@ -1041,7 +1041,7 @@ function fadeAudioIn(player, callback) {
 // Módulo: Piped API Helpers
 const pipedInstances = [ // Lista de instancias Piped
     "https://pipedapi.ducks.party",
-    "https://pipedapi.kavin.rocks" //  "https://pipedapi.reallyaweso.me",  Añadir más instancias para mayor robustez
+    "https://pipedapi.kavin.rocks" //  Añadir más instancias para mayor robustez
 ];
 
 function getRandomPipedInstance() {
