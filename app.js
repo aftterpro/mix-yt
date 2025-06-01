@@ -423,6 +423,23 @@ async function moveVideoInPlaylistInFirestore(video, currentPlaylistId, targetPl
 // === OTRAS FUNCIONES ===
 // ===============================
 
+function mostrarMensajeFlotante(message, type = "info", duration = 3000) {
+    const container = document.getElementById('floatingMessageContainer');
+    if (!container) return;
+
+    const messageElement = document.createElement('div');
+    messageElement.className = `mensaje-flotante ${type}`;
+    messageElement.textContent = message;
+
+    container.appendChild(messageElement);
+
+    setTimeout(() => {
+        messageElement.classList.add('fadeOut');
+        messageElement.addEventListener('transitionend', () => {
+            messageElement.remove();
+        });
+    }, duration);
+}
 // Función para mostrar/ocultar el spinner de carga (desde loadingSpinner.js)
 function showLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
