@@ -1,30 +1,43 @@
+/* botones.css */
 
 /* Estilos para el botón de añadir (MEJORADOS) */
 .add-to-playlist {
-    background-color: #007bff; /* Color de fondo */
-    color: white; /* Color del icono y texto */
+    background-color: var(--accent-color); /* YouTube Red */
+    color: white;
     border: none;
     cursor: pointer;
     font-size: 1em;
-    padding: 5px 10px; /* Ajustar padding */
-    border-radius: 5px; /* Bordes redondeados */
-    display: inline-flex; /* Para alinear icono y texto */
-    align-items: center; /* Centrar verticalmente */
-    transition: background-color 0.3s ease; /* Transición suave */
+    padding: 8px 15px; /* Ajustar padding */
+    border-radius: 20px; /* Más redondeado */
+    display: inline-flex;
+    align-items: center;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .add-to-playlist:hover {
-    background-color: #0056b3; /* Color de fondo al pasar el mouse */
+    background-color: #cc0000; /* Darker red on hover */
+    transform: translateY(-2px);
 }
 
-.add-text{
-    margin-left: 5px; /* Espacio entre el icono y el texto */
+.add-to-playlist:active {
+    transform: translateY(0);
+    box-shadow: none;
 }
 
-/* Estilos para el menú de eliminar en la playlist */
+.add-text {
+    margin-left: 8px; /* Espacio entre el icono y el texto */
+    font-weight: 600;
+}
+
+/* Estilos para el menú de eliminar en la playlist (3 puntos) */
 .delete-menu {
-    position: relative;
-    display: inline-block; /* Para que el menú se ajuste al contenido */
+    position: absolute; /* Changed to absolute for better positioning within playlist-item */
+    right: var(--spacing-unit); /* Align to the right of the playlist item */
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-block;
+    z-index: 5; /* Ensure it's above other playlist item content */
 }
 
 .delete-menu-button {
@@ -32,68 +45,109 @@
     border: none;
     cursor: pointer;
     font-size: 1.2em;
-    padding: 0;
+    padding: 5px;
+    color: var(--text-light);
+    transition: color 0.2s ease, background-color 0.2s ease;
+    border-radius: 50%;
+}
+
+.delete-menu-button:hover {
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .delete-menu-content {
     display: none;
     position: absolute;
-    background-color: rgba(0, 0, 0, 0.7); /* Fondo semi-transparente */
-    min-width: 100px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
-    border-radius: 5px;
-    padding: 5px;
-    right: 0; /* Para que aparezca a la derecha del botón */
+    background-color: rgba(35, 35, 35, 0.95); /* Darker, slightly transparent background */
+    min-width: 150px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+    z-index: 10; /* Higher z-index for the dropdown */
+    border-radius: 8px;
+    padding: 5px 0;
+    right: 0; /* Align to the right of the button */
+    top: 100%; /* Position below the button */
+    margin-top: 5px; /* Small gap */
+    transform-origin: top right;
+    animation: fadeInScale 0.2s ease-out forwards;
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.delete-menu-content.visible {
+    display: block;
 }
 
 .delete-menu-content button {
     background: none;
     border: none;
-    color: white;
+    color: var(--text-color);
     cursor: pointer;
-    display: block; /* Para que los botones se apilen verticalmente */
+    display: flex; /* Use flex for icon and text alignment */
+    align-items: center;
     width: 100%;
     text-align: left;
-    padding: 5px 0;
+    padding: 8px 15px;
+    font-size: 0.95em;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.delete-menu:hover .delete-menu-content {
-    display: block;
+.delete-menu-content button:hover {
+    background-color: var(--accent-color);
+    color: white;
 }
-.move-up-button{
+
+.delete-menu-content button i {
+    margin-right: 10px;
+    font-size: 1.1em;
+}
+
+/* Styles for the generic playlist selection popup */
+.playlist-selection-popup-menu {
+    background-color: rgba(35, 35, 35, 0.98);
+    border-radius: 8px;
+    box-shadow: 0px 8px 20px 0px rgba(0,0,0,0.6);
+    padding: 10px 0;
+    z-index: 1000; /* Ensure it's on top */
+    position: absolute; /* Will be positioned by JS */
+    min-width: 200px;
+    animation: fadeInScale 0.2s ease-out forwards;
+}
+
+.playlist-selection-popup-title {
+    color: var(--text-light);
+    font-size: 0.9em;
+    padding: 5px 15px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.playlist-selection-popup-item {
     background: none;
     border: none;
-    color: white;
+    color: var(--text-color);
     cursor: pointer;
-    display: block; /* Para que los botones se apilen verticalmente */
+    display: flex;
+    align-items: center;
     width: 100%;
     text-align: left;
-    padding: 5px 0;
-}
-.thumbnail-container {
-    position: relative;
-    display: inline-block;
+    padding: 8px 15px;
+    font-size: 0.95em;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.thumbnail {
-    width: 160px; /* Ajusta el tamaño de la miniatura */
-    height: 90px; /* Ajusta el tamaño de la miniatura */
-    object-fit: cover;
-}
-
-.duration {
-    position: absolute;
-    bottom: 4px;
-    right: 4px;
-    background-color: rgba(0, 0, 0, 0.8);
+.playlist-selection-popup-item:hover {
+    background-color: var(--accent-color);
     color: white;
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-size: 12px;
 }
 
-.video-title {
-    font-size: 14px; /* Ajusta el tamaño del título */
-    margin-top: 4px;
+.playlist-selection-popup-item img {
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    margin-right: 10px;
+    object-fit: cover;
 }
