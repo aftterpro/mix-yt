@@ -728,37 +728,70 @@ function updateCurrentlyPlayingVideoUI() {
 
 
 // --- Funciones de Búsqueda ---
+async   const searchYouTube = async (query, nextPage = null) => {
+    if (!resultsDiv) return;
 
-async function searchYouTube() {
-    currentSearchQuery = document.getElementById('searchInput').value;
-    if (!currentSearchQuery.trim()) {
-        mostrarMensajeFlotante("Por favor, introduce un término de búsqueda.");
-        return;
+    // Limpiar y mostrar estado si es búsqueda NUEVA
+    if (!nextPage) {
+        console.log(`Iniciando NUEVA búsqueda para: ${query}`);
+        currentSearchQuery = query; // Guarda la nueva query
+        nextPageContext = null; // Resetea el contexto de paginación
+        resultsDiv.innerHTML = '<p>Buscando...</p>'; // Mostrar "Buscando..."
+    } else {
+        console.log(`Cargando MÁS resultados para: ${currentSearchQuery} (Página: ${nextPage})`);
+        showLoadMoreSpinner(); // Mostrar indicador al cargar más
     }
 
-    showLoadingSpinner(); // Mostrar spinner de carga global
+    isLoadingMore = true; // Marcar como cargando
 
     try {
-        const response = await gapi.client.Youtube.list({
-            'part': 'snippet',
-            'q': currentSearchQuery,
-            'type': 'video',
-            'maxResults': 25, // Número inicial de resultados
-            'videoEmbeddable': 'true' // Asegurarse de que los videos puedan ser incrustados
-        });
+        // Construir URL: Añadir 'nextpage' si existe
+        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}`;
+        if (nextPage) {
+            apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`; // Usar token/página
+        }
+        const response = await fetch(apiUrl);
 
-        const searchResults = response.result.items;
-        nextPageContext = response.result.nextPageToken; // Guardar token para la paginación
+        // Mejor manejo de errores HTTP
+        if (!response.ok) {
+            let errorDetails = `Error: ${response.status} ${response.statusText}`;
+            let errorBody = null;
+            try {
+                errorBody = await response.json(); // Intenta leer cuerpo del error
+                errorDetails = errorBody.error || errorDetails; // Usa mensaje del cuerpo si existe
+                console.error("Error Body from Netlify Function:", errorBody);
+            } catch (e) {
+                console.warn("Could not parse error response body as JSON.");
+                // Si no es JSON, intentar leer como texto
+                try {
+                    errorDetails = await response.text();
+                } catch (e2) { /* Ignorar si falla */}
+            }
+            // Asegurarse que sea un objeto Error
+            const error = new Error(errorDetails);
+            error.status = response.status; // Añadir status al objeto error
+            error.body = errorBody; // Añadir cuerpo si se pudo parsear
+            throw error;
+        }
 
-        renderSearchResults(searchResults, true); // Pasar true para indicar que es una nueva búsqueda
+        const data = await response.json();
+        // Llamar a displaySearchResultsPiped, indicando si se deben añadir (append=true)
+        displaySearchResultsPiped(data, !!nextPage); // append es true si nextPage tiene valor
 
-    } catch (err) {
-        console.error('Error en la búsqueda de YouTube:', err);
-        mostrarMensajeFlotante("Error en la búsqueda de YouTube. Inténtalo de nuevo más tarde.");
-    } finally {
-        hideLoadingSpinner(); // Ocultar spinner
+    } catch (error) {
+        console.error("Error fetching search results (app.js):", error.message, error);
+        const displayError = error.message || "Error desconocido al buscar.";
+        // Mostrar el mensaje de error que ahora viene más detallado
+        if (!nextPage) {
+            resultsDiv.innerHTML = `<p>${displayError}</p>`;
+        } else {
+             mostrarMensajeFlotante(displayError);
+             hideLoadMoreSpinner();
+        }
+        isLoadingMore = false; // Resetea el flag en error
     }
-}
+};
+
 
 function renderSearchResults(results, newSearch = false) {
     const resultsDiv = document.getElementById('results');
