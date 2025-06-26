@@ -43,9 +43,14 @@
                        id="searchInput" 
                        placeholder="Buscar en Piped.video"
                        aria-label="Buscar videos">
-                <button id="extractUserPlaylistButton" class="header-button" title="Extraer playlist de usuario">
-                    <i class="fab fa-google"></i> <span>Extraer Playlists</span>
-                </button>
+<button id="authorize-button" style="display: none;">Iniciar sesión con Google</button>
+<button id="signout-button" style="display: none;">Cerrar sesión</button>
+
+<section id="user-playlists-section">
+    <h2>Mis Playlists de YouTube</h2>
+    <div id="user-playlists-container" class="playlists-grid">
+        </div>
+</section>
             </div>
         </div>
     </header>
