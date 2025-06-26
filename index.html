@@ -10,7 +10,7 @@
     
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' https:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com/iframe_api https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
         style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com;
         font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;
         img-src 'self' https: data:;
@@ -26,22 +26,6 @@
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
 
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "YT CrossMix",
-      "applicationCategory": "Multimedia",
-      "operatingSystem": "All",
-      "description": "Crea mezclas perfectas de tus playlists de YouTube con transiciones suaves.",
-      "url": "https://mix-yt.netlify.app/",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
-    }
-    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
@@ -59,11 +43,6 @@
                 <div class="search-bar-container">
                     <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube..." aria-label="Buscar vídeos">
                     <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
-                </div>
-                <div class="auth-buttons-container">
-                    <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE" data-context="signin" data-ux_mode="popup" data-callback="handleAuthResponse" data-auto_prompt="false"></div>
-                    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left" id="googleSignInButton"></div>
-                    <button id="googleSignOutButton" class="auth-button sign-out-button hidden" title="Cerrar sesión"><i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span></button>
                 </div>
             </div>
         </div>
@@ -90,10 +69,11 @@
         </aside>
         
         <main class="content-area">
-            <section id="searchResultsSection" class="section-card search-results-section hidden">
+            <section id="searchResultsSection" class="section-card search-results-section">
                 <h2 class="section-title">Resultados de Búsqueda</h2>
                 <div id="resultsContainer" class="results-wrapper">
-                    <div id="results" class="search-results-grid"></div>
+                    <div id="results" class="search-results-grid">
+                        </div>
                 </div>
                 <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
             </section>
@@ -102,37 +82,26 @@
 
     <div class="player-bar">
         <div class="player-controls">
-            <button id="botonPrev" class="control-button"><i class="fas fa-backward"></i></button>
+            <button id="botonPrev" class="control-button" disabled><i class="fas fa-backward"></i></button>
             <button id="botonPlay" class="control-button main-play-button"><i class="fas fa-play"></i></button>
-            <button id="botonNext" class="control-button"><i class="fas fa-forward"></i></button>
-            <button id="muteButton" class="control-button volume-button"><i class="fas fa-volume-up"></i></button>
-            <div class="volume-slider-container">
-                <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider">
-            </div>
-            <button id="shuffleButton" class="control-button shuffle-button"><i class="fas fa-shuffle"></i></button>
-            <button id="loopButton" class="control-button loop-button" data-loop-mode="none"><i class="fas fa-repeat"></i></button>
-            <button id="skipIntroButton" class="control-button skip-button"><i class="fas fa-forward-step"></i> Intro</button>
+            <button id="botonNext" class="control-button" disabled><i class="fas fa-forward"></i></button>
+            <button id="botonStop" class="control-button" disabled><i class="fas fa-stop"></i></button>
         </div>
         <div class="progress-bar-container">
-            <span id="currentTimeDisplay" class="time-display">0:00</span>
-            <div id="progressBar" class="progress-bar">
-                <div id="progressFill" class="progress-fill"></div>
-                <div id="progressHandle" class="progress-handle"></div>
+            <span id="timeElapsed" class="time-display">0:00</span>
+            <div class="progress-seek-bar">
+                <div id="progressBar" class="progress-fill"></div>
             </div>
-            <span id="totalDurationDisplay" class="time-display">0:00</span>
+            <span id="timeRemaining" class="time-display">0:00</span>
         </div>
     </div>
 
-    <template id="playlist-template"> ... </template>
-    <template id="playlist-video-template"> ... </template>
-    <template id="search-result-template"> ... </template>
-    <template id="next-in-queue-template"> ... </template>
-
-    <div id="loadingSpinner" class="loading-spinner hidden"> ... </div>
-    <div id="errorContainer" class="error-container hidden"></div>
+    <div id="loadingSpinner" class="loading-spinner hidden"><div class="spinner"></div></div>
     <div id="floatingMessageContainer"></div>
+    <script src="./app.js"></script> <footer class="page-footer">
+      <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>. Creado por <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.</p>
+      <p>Utilizamos la API de <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.</p>
+    </footer>
 
-    <script type="module" src="./app.js"></script>
-    <footer class="page-footer"> ... </footer>
 </body>
 </html>
