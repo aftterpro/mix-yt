@@ -113,3 +113,67 @@ const signoutButton = document.getElementById('signout-button');
 if (signoutButton) {
     signoutButton.addEventListener('click', handleSignoutClick);
 }
+//Extaer playlist
+async function loadUserPlaylists() {
+    try {
+        showLoadingSpinner(); // Asumo que tienes una función para mostrar un spinner de carga
+        const response = await gapi.client.youtube.playlists.list({
+            'part': 'snippet,contentDetails',
+            'mine': true, // Obtener playlists del usuario autenticado
+            'maxResults': 50 // Puedes ajustar esto o implementar paginación
+        });
+
+        hideLoadingSpinner(); // Asumo que tienes una función para ocultar el spinner de carga
+        const userPlaylists = response.result.items;
+        console.log('Playlists del usuario:', userPlaylists);
+
+        const userPlaylistsContainer = document.getElementById('user-playlists-container');
+        userPlaylistsContainer.innerHTML = ''; // Limpiar playlists anteriores
+
+        if (userPlaylists.length === 0) {
+            userPlaylistsContainer.innerHTML = '<p>No se encontraron playlists en tu cuenta de YouTube.</p>';
+            return;
+        }
+
+        // Procesar y mostrar las playlists
+        userPlaylists.forEach(playlist => {
+            const playlistId = playlist.id;
+            const playlistName = playlist.snippet.title;
+            const thumbnailUrl = playlist.snippet.thumbnails.medium ? playlist.snippet.thumbnails.medium.url : 'placeholder.jpg'; // Usar un placeholder si no hay thumbnail
+
+            const playlistCard = document.createElement('div');
+            playlistCard.classList.add('playlist-card');
+            playlistCard.dataset.playlistId = playlistId;
+
+            playlistCard.innerHTML = `
+                <img src="${thumbnailUrl}" alt="${playlistName}" class="playlist-thumbnail">
+                <div class="playlist-info">
+                    <h3>${playlistName}</h3>
+                    <p>${playlist.contentDetails.itemCount} videos</p>
+                    <button class="load-user-playlist-button" data-playlist-id="${playlistId}">Cargar</button>
+                </div>
+            `;
+            userPlaylistsContainer.appendChild(playlistCard);
+        });
+
+        // Añadir event listeners a los botones de cargar playlist
+        userPlaylistsContainer.querySelectorAll('.load-user-playlist-button').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const playlistId = event.target.dataset.playlistId;
+                console.log('Cargar playlist de usuario:', playlistId);
+                // Llama a tu función existente para cargar playlists por ID
+                fetchAndDisplayPlaylist(playlistId, true); // true para indicar que es una playlist de usuario
+                // Opcional: podrías querer limpiar la búsqueda si se carga una playlist de usuario
+                document.getElementById('search-input').value = '';
+                document.getElementById('results').innerHTML = '';
+            });
+        });
+
+    } catch (error) {
+        hideLoadingSpinner();
+        console.error('Error al cargar las playlists del usuario:', error);
+        showFloatingMessage('Error al cargar tus playlists de YouTube. Asegúrate de haber concedido los permisos necesarios.', 'error'); // Asumo que tienes una función para mostrar mensajes flotantes
+        // Podrías mostrar un mensaje de error en la interfaz de usuario
+        document.getElementById('user-playlists-container').innerHTML = '<p>Error al cargar tus playlists.</p>';
+    }
+}
