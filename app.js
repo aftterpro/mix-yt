@@ -1384,8 +1384,6 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.disabled = true;
     searchInput2.disabled = true;
     addButton.disabled = true;
-    extractUserPlaylistButton.disabled = true; // Deshabilitar el nuevo botón al inicio
-
     // Carga la API de YouTube Iframe.
     // window.onYouTubeIframeAPIReady se llamará automáticamente cuando cargue.
     const tag = document.createElement('script');
