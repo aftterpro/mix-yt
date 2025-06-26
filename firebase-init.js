@@ -1,58 +1,115 @@
-// firebase-init.js
-// Importaciones de Firebase desde CDN
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+// app.js
+let googleApiClientReady = false;
 
+function handleCredentialResponse(response) {
+    console.log("Encoded JWT ID token: " + response.credential);
+    // Aquí puedes enviar el response.credential (JWT) a tu backend para verificación si tuvieras uno,
+    // o decodificarlo directamente en el frontend para obtener el ID de usuario de Google.
+    // Para este caso, lo usaremos para inicializar gapi con el token.
+    const decodedToken = parseJwt(response.credential);
+    console.log("Decoded Token:", decodedToken);
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBR4S1h0RJX42Ki4xgzPJDrbl-Lp094kFU",
-    authDomain: "yt-crossmix-app.firebaseapp.com",
-    projectId: "yt-crossmix-app",
-    storageBucket: "yt-crossmix-app.firebasestorage.app",
-    messagingSenderId: "697969666949",
-    appId: "1:697969666949:web:e49bfec9ffef531264f2ec",
-    measurementId: "G-DNC74HF2MD"
-  };
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-const userIdDisplay = document.getElementById('userIdDisplay');
-
-console.log('firebase-init.js: Iniciando monitoreo de estado de autenticación...');
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        console.log('firebase-init.js: Usuario autenticado:', user.uid);
-        if (user.isAnonymous && !localStorage.getItem('anonUid')) {
-            localStorage.setItem('anonUid', user.uid);
-        }
-        if (userIdDisplay) {
-            userIdDisplay.textContent = `User ID: ${user.uid}`;
-        }
-
-        if (window.initFirebase) {
-            console.log('firebase-init.js: Llamando a window.initFirebase...');
-            window.initFirebase(db, auth, user);
-        } else {
-            console.warn('firebase-init.js: window.initFirebase NO ESTÁ DEFINIDO aún.');
-        }
-    } else {
-        console.log('firebase-init.js: No hay usuario autenticado. Intentando autenticación anónima...');
-        try {
-            const credential = await signInAnonymously(auth);
-            console.log('firebase-init.js: Autenticación anónima exitosa:', credential.user.uid);
-            if (userIdDisplay) {
-                userIdDisplay.textContent = `User ID: ${credential.user.uid}`;
-            }
-        } catch (error) {
-            console.error('firebase-init.js: Error en autenticación anónima:', error);
-            if (userIdDisplay) {
-                userIdDisplay.textContent = `Error User ID: ${error.message}`;
-            }
-        }
+    if (decodedToken && decodedToken.sub) {
+        // Asumiendo que `gapi` ya está cargado y disponible
+        // Esto es solo para propósitos de demostración. gapi.client.youtube necesita un token de acceso, no un ID token.
+        // Para obtener playlists, necesitarás un token de acceso, que el nuevo GSI no te da directamente.
+        // Revertiremos a la forma antigua de gapi.auth2 para obtener el token de acceso.
+        initGoogleAPIClient(response.credential); // Usaremos esta función para procesar el token y autenticar gapi
     }
+}
+
+// Función para decodificar JWT (necesaria si usas el nuevo GSI para inspeccionar el token)
+function parseJwt (token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("Error decoding JWT:", e);
+        return null;
+    }
+};
+
+
+function initGoogleAuth() {
+    // Usaremos la API gapi.auth2 para obtener el token de acceso necesario para la YouTube Data API
+    gapi.load('client:auth2', () => {
+        gapi.client.init({
+            apiKey: 'TU_API_KEY_DE_YOUTUBE_DATA_API', // Tu API Key si la usas para acceso público (no necesaria para datos de usuario logueado)
+            clientId: 'TU_CLIENT_ID_DE_GOOGLE', // ¡Este es tu CLIENT ID de OAuth 2.0!
+            scope: 'https://www.googleapis.com/auth/youtube.readonly', // Scope para leer playlists y videos
+            discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest"]
+        }).then(() => {
+            googleApiClientReady = true;
+            console.log('Google API client and Auth2 initialized.');
+
+            // Agrega un listener para el estado de autenticación
+            gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+            updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+
+        }, (error) => {
+            console.error('Error initializing Google API client:', error);
+        });
+    });
+}
+
+
+function updateSigninStatus(isSignedIn) {
+    if (isSignedIn) {
+        console.log('Usuario ha iniciado sesión.');
+        // Muestra la interfaz de usuario de playlists
+        document.getElementById('authorize-button').style.display = 'none';
+        document.getElementById('signout-button').style.display = 'block';
+        // Llama a la función para cargar las playlists del usuario
+        loadUserPlaylists();
+    } else {
+        console.log('Usuario no ha iniciado sesión.');
+        // Muestra el botón de inicio de sesión
+        document.getElementById('authorize-button').style.display = 'block';
+        document.getElementById('signout-button').style.display = 'none';
+        // Oculta las playlists del usuario
+        document.getElementById('user-playlists-section').innerHTML = '<p>Inicia sesión con Google para ver tus playlists.</p>';
+    }
+}
+
+// Función para iniciar sesión (se llama al hacer clic en el botón de "Iniciar sesión con Google")
+function handleAuthClick() {
+    if (googleApiClientReady) {
+        gapi.auth2.getAuthInstance().signIn();
+    } else {
+        console.error('Google API client not ready yet.');
+        showFloatingMessage('Error: Google API no está lista. Inténtalo de nuevo.', 'error');
+    }
+}
+
+// Función para cerrar sesión
+function handleSignoutClick() {
+    if (googleApiClientReady) {
+        gapi.auth2.getAuthInstance().signOut();
+        playlistsData = []; // Limpia las playlists
+        document.getElementById('playlists-container').innerHTML = ''; // Limpia la visualización
+        showFloatingMessage('Sesión cerrada.', 'info');
+    } else {
+        console.error('Google API client not ready yet.');
+    }
+}
+
+// Cargar las APIs de Google cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    initGoogleAuth();
 });
 
-console.log('firebase-init.js: Finalizando script de inicialización.');
+// Configurar el botón de inicio de sesión
+const authorizeButton = document.getElementById('authorize-button');
+if (authorizeButton) {
+    authorizeButton.addEventListener('click', handleAuthClick);
+}
+
+// Configurar el botón de cerrar sesión
+const signoutButton = document.getElementById('signout-button');
+if (signoutButton) {
+    signoutButton.addEventListener('click', handleSignoutClick);
+}
