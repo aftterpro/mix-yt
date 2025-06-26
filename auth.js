@@ -12,9 +12,23 @@ function gisInitalize() {
         callback: tokenResponseCallback,
     });
     // Intenta iniciar sesión silenciosamente si el usuario ya ha dado permiso antes.
-    tokenClient.requestAccessToken({prompt: 'none'});
+    // Esto NO ejecutará el callback si no hay sesión previa activa.
+    // Si hay una sesión previa, setToken ya se habrá llamado.
+    // Lo que necesitamos es saber si estamos autenticados al cargar la página.
+    checkAuth(); // Llama a una función para verificar el estado de autenticación al inicio
 }
-
+async function checkAuth() {
+    const token = gapi.client.getToken();
+    if (token) {
+        console.log("Ya autenticado con token existente.");
+        updateUI(true);
+        // Si ya estamos autenticados, cargar las playlists
+        await getPlaylists(); // <--- IMPORTANTE: Llama getPlaylists aquí también
+    } else {
+        console.log("No autenticado o token expirado.");
+        updateUI(false);
+    }
+}
 function gapiInitialize() {
     gapi.load('client', () => {
         gapi.client.init({}).then(() => {
@@ -38,10 +52,12 @@ function handleAuthClick() {
 async function tokenResponseCallback(tokenResponse) {
     if (tokenResponse && tokenResponse.access_token) {
         gapi.client.setToken(tokenResponse);
+        console.log("Acceso concedido. Token:", tokenResponse.access_token);
         updateUI(true);
-        await fetchUserPlaylists();
+        // DESPUÉS de un inicio de sesión exitoso, cargar las playlists del usuario
+        await getPlaylists(); // <--- ASEGÚRATE DE QUE ESTA LLAMADA ESTÉ AQUÍ
     } else {
-        console.error("No se pudo obtener el token de acceso.");
+        console.error("No se obtuvo el token de acceso.");
         updateUI(false);
     }
 }
