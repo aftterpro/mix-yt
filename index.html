@@ -3,21 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
-    <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
-    <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
-    
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self' https:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com/iframe_api https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
-        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com;
-        font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;
-        img-src 'self' https: data:;
-        connect-src 'self' https: wss:;
-        frame-src https://www.youtube.com https://accounts.google.com;
-    ">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="./styles.css">
@@ -26,8 +11,8 @@
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
 
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
 </head>
 <body class="yt-music-theme">
 
@@ -39,69 +24,55 @@
     <header class="main-header">
         <div class="header-content">
             <h1 class="app-title">YT CrossMix</h1>
-            <div class="search-and-auth">
-                <div class="search-bar-container">
-                    <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube..." aria-label="Buscar vídeos">
-                    <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
-                </div>
+            <div class="search-bar-container">
+                <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube..." aria-label="Buscar vídeos">
+                <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
+            </div>
+            <div class="auth-buttons-container">
+                <button id="googleSignInButton" class="auth-button" disabled>
+                    <i class="fab fa-google"></i> Iniciar sesión con Google
+                </button>
+                <button id="googleSignOutButton" class="auth-button sign-out-button hidden">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                </button>
             </div>
         </div>
     </header>
 
     <div class="main-layout-container">
-        <aside class="sidebar">
-            <section class="section-card user-playlists-section">
-                <h2 class="section-title">Mi Biblioteca</h2>
-                <div class="add-playlist-input-container">
-                    <input type="text" id="playlistIdInput" placeholder="Añadir ID o URL de Playlist">
-                    <button id="addPlaylistButton" class="add-button"><i class="fas fa-plus"></i></button>
-                </div>
-                <div id="playlistsContainer" class="playlists-container">
-                    <p class="no-playlists-message">Aún no hay playlists añadidas.</p>
-                </div>
-            </section>
-            <section class="section-card next-in-queue-section">
-                <h2 class="section-title">Siguiente en la Cola</h2>
-                <div id="nextInQueueContainer" class="next-in-queue-content">
-                    <p class="no-next-message">No hay videos en la cola.</p>
-                </div>
-            </section>
-        </aside>
-        
-        <main class="content-area">
-            <section id="searchResultsSection" class="section-card search-results-section">
-                <h2 class="section-title">Resultados de Búsqueda</h2>
-                <div id="resultsContainer" class="results-wrapper">
-                    <div id="results" class="search-results-grid">
-                        </div>
-                </div>
-                <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
-            </section>
-        </main>
+      <aside class="sidebar">
+          <section class="section-card user-playlists-section">
+              <h2 class="section-title">Mi Biblioteca</h2>
+              <div class="add-playlist-input-container">
+                  <input type="text" id="playlistIdInput" placeholder="Añadir ID o URL de Playlist">
+                  <button id="addPlaylistButton" class="add-button"><i class="fas fa-plus"></i></button>
+              </div>
+              <div id="playlistsContainer" class="playlists-container">
+                  <p class="no-playlists-message">Inicia sesión para ver tus playlists o añade una manualmente.</p>
+              </div>
+          </section>
+          <section class="section-card next-in-queue-section">
+              <h2 class="section-title">Siguiente en la Cola</h2>
+              <div id="nextInQueueContainer" class="next-in-queue-content">
+                  <p class="no-next-message">No hay videos en la cola.</p>
+              </div>
+          </section>
+      </aside>
+      
+      <main class="content-area">
+          <section id="searchResultsSection" class="section-card search-results-section">
+              <h2 class="section-title">Resultados de Búsqueda</h2>
+              <div id="resultsContainer" class="results-wrapper">
+                  <div id="results" class="search-results-grid"></div>
+              </div>
+              <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
+          </section>
+      </main>
     </div>
+    
+    <div class="player-bar">...</div>
 
-    <div class="player-bar">
-        <div class="player-controls">
-            <button id="botonPrev" class="control-button" disabled><i class="fas fa-backward"></i></button>
-            <button id="botonPlay" class="control-button main-play-button"><i class="fas fa-play"></i></button>
-            <button id="botonNext" class="control-button" disabled><i class="fas fa-forward"></i></button>
-            <button id="botonStop" class="control-button" disabled><i class="fas fa-stop"></i></button>
-        </div>
-        <div class="progress-bar-container">
-            <span id="timeElapsed" class="time-display">0:00</span>
-            <div class="progress-seek-bar">
-                <div id="progressBar" class="progress-fill"></div>
-            </div>
-            <span id="timeRemaining" class="time-display">0:00</span>
-        </div>
-    </div>
-
-    <div id="loadingSpinner" class="loading-spinner hidden"><div class="spinner"></div></div>
-    <div id="floatingMessageContainer"></div>
-    <script src="./app.js"></script> <footer class="page-footer">
-      <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>. Creado por <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.</p>
-      <p>Utilizamos la API de <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.</p>
-    </footer>
-
+    <script src="./auth.js"></script> <script src="./app.js"></script>
+    <footer class="page-footer">...</footer>
 </body>
 </html>
