@@ -1,4 +1,5 @@
-// Módulo: Configuración y Variables Globales
+// app.js - Módulo: Configuración y Variables Globales
+
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
 let currentPlayer = 1;
@@ -19,1585 +20,987 @@ let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
 let isLoadingMore = false; // Flag para evitar cargas múltiples simultáneas
 let nextPageContext = null; // Para guardar información de la siguiente página (si la API la provee)
 let currentSearchQuery = ''; // Guarda la última consulta realizada
-const resultsContainer = document.getElementById('resultsContainer'); // Contenedor scrollable
+const resultsContainer = document.getElementById('resultsContainer'); // Contenedor scrollable (asegúrate de que este ID existe en tu HTML)
 const resultsDiv = document.getElementById('results'); // Contenedor de la grilla
 
 // Variables para SponsorBlock y Seek
-let segmentosCache = {}; // Objeto para almacenar los segmentos por videoId
-let lastSeekEndTime = -1; // Último punto de salto para evitar bucles
-let lastSeekVideoId = null; // Video ID asociado al último salto
+let segmentosCache = {}; // Objeto para cachear segmentos de SponsorBlock por ID de video
+let isSponsorBlockActive = true; // Estado para activar/desactivar SponsorBlock
+let currentSegments = []; // Segmentos del video actualmente en reproducción
+let skipInterval; // Intervalo para verificar si se debe saltar un segmento
 
-function mostrarMensajeFlotante(mensaje) {
-    const mensajeDiv = document.createElement('div');
-    mensajeDiv.textContent = mensaje;
-    mensajeDiv.className = 'mensaje-flotante';
+// --- Funciones de Reproductor de YouTube ---
 
-    // CORRECCIÓN: Cambiar 'playlistContainer' a 'playlists-container' y añadir verificación
-    const playlistContainer = document.getElementById('playlists-container'); // Obtener referencia al contenedor
-    
-    if (playlistContainer) { // Verificar si el elemento existe
-        playlistContainer.insertAdjacentElement('afterend', mensajeDiv); // Insertar después del contenedor
-    } else {
-        console.error("Error: El elemento 'playlists-container' no se encontró en el DOM para insertar el mensaje. Insertando en el body."); // Mensaje de error útil
-        document.body.insertAdjacentElement('beforeend', mensajeDiv); // Fallback: Insertar al final del body
-    }
-
-    setTimeout(() => {
-        mensajeDiv.classList.add('fadeOut');
-        setTimeout(() => {
-            mensajeDiv.remove();
-        }, 1000);
-    }, 6000); // 6 segundos
-}
-// mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!"); // Comentado para no molestar siempre
-
-// Módulo: Carga del API de YouTube (Optimizado)
-function loadYouTubeAPI() {
-    if (youtubeAPIReady) return;
-    youtubeAPIReady = true;
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api'; // URL oficial
-    script.async = true;
-    document.head.appendChild(script); // Añadir al head
-    // La función onYouTubeIframeAPIReady será llamada automáticamente por la API
-}
-// Esta función es llamada por la API de YouTube cuando está lista
+// Función que se ejecuta cuando la API de YouTube Player está lista
 function onYouTubeIframeAPIReady() {
-    initializePlayers();
+    console.log("YouTube Iframe API Ready.");
+    playersInitialized = true; // Marcar que los reproductores pueden ser creados
+    initializePlayers(); // Inicializar los reproductores
 }
 
+// Función para inicializar o crear los reproductores
 function initializePlayers() {
-    if (player1 && player2) return; // Evitar reinicialización
+    if (!playersInitialized) return; // Esperar a que la API esté lista
 
     player1 = new YT.Player('player1', {
         height: '100%',
         width: '100%',
         playerVars: {
-             'playsinline': 1 // Importante para móviles
+            'autoplay': 0, // No autoplay inicialmente
+            'controls': 0, // Sin controles nativos
+            'disablekb': 1, // Deshabilitar controles de teclado
+            'fs': 0, // No permitir pantalla completa
+            'iv_load_policy': 3, // Ocultar anotaciones
+            'modestbranding': 1, // Logo YouTube pequeño
+            'rel': 0, // No mostrar videos relacionados al final
+            'showinfo': 0, // No mostrar info del video
+            'enablejsapi': 1, // Habilitar JS API
+            'loop': 0 // No loop por defecto, se maneja manualmente para playlists
         },
         events: {
             'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
+            'onStateChange': onPlayerStateChange
         }
     });
+
     player2 = new YT.Player('player2', {
         height: '100%',
         width: '100%',
-         playerVars: {
-             'playsinline': 1
+        playerVars: {
+            'autoplay': 0,
+            'controls': 0,
+            'disablekb': 1,
+            'fs': 0,
+            'iv_load_policy': 3,
+            'modestbranding': 1,
+            'rel': 0,
+            'showinfo': 0,
+            'enablejsapi': 1,
+            'loop': 0
         },
         events: {
             'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
+            'onStateChange': onPlayerStateChange
         }
     });
 }
 
 function onPlayerReady(event) {
-    // Verificar si AMBOS están listos
-    if (player1 && typeof player1.getPlayerState === 'function' &&
-        player2 && typeof player2.getPlayerState === 'function') {
-        if (!playersInitialized) {
-            playersInitialized = true;
-            console.log("Ambos reproductores listos.");
-            // Habilitar botón Play solo si hay videos cargados
-             const flatList = getFlattenedPlaylist();
-            document.getElementById('botonPlay').disabled = flatList.length === 0;
-        }
-    }
-    // Iniciar monitor solo UNA VEZ cuando los players estén listos
-    if (playersInitialized && !monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 300); // Chequear cada 300ms
-        console.log('Monitor iniciado (intervalo: 300ms)');
-    }
+    // console.log(`Player ${event.target.getIframe().id} ready.`);
+    // Opcional: Cargar un video inicial si es necesario
+    // event.target.loadVideoById('dQw4w9WgXcQ'); // Rick Astley for testing
+    // Si tienes alguna lógica para iniciar la reproducción al cargar, irá aquí.
 }
 
-function onPlayerError(event) {
-    console.error("Error del reproductor:", event.data, "Player:", event.target === player1 ? '1' : '2');
-    let videoTitle = "este video";
-    try {
-      // Intentar obtener el título del video que falló
-      const videoData = event.target.getVideoData();
-      if(videoData && videoData.title) {
-        videoTitle = `"${videoData.title}"`;
-      }
-    } catch (e) { /* Ignorar si no se puede obtener */}
-
-    let errorMsg = `Ocurrió un error desconocido (${event.data}) al reproducir ${videoTitle}.`;
-    switch (event.data) {
-        case 2: errorMsg = `Error: ID de video inválido para ${videoTitle}.`; break;
-        case 5: errorMsg = `Error al reproducir ${videoTitle}. (Posible problema de HTML5 o derechos).`; break;
-        case 100: errorMsg = `Error: Video ${videoTitle} no encontrado.`; break;
-        case 101:
-        case 150: errorMsg = `Error: El propietario de ${videoTitle} no permite la reproducción incrustada.`; break;
-    }
-    mostrarMensajeFlotante(errorMsg);
-
-    // Intentar saltar al siguiente si el error impide la reproducción
-    if ([2, 5, 100, 101, 150].includes(event.data)) {
-         console.log("Intentando saltar al siguiente video debido a error...");
-         // Llamar a playNextVideo SIN argumentos debería funcionar con la lógica adaptada
-         setTimeout(playNextVideo, 500); // Pequeño delay antes de saltar
-    }
-}
 function onPlayerStateChange(event) {
-    const playerState = event.data;
-    const changedPlayerNum = event.target === player1 ? 1 : 2;
-    const videoId = event.target.getVideoData()?.video_id;
-    const playerInstance = event.target;
+    const player = event.target;
+    const playerId = player.getIframe().id;
+    // console.log(`Player ${playerId} state changed: ${event.data}`);
 
-     if (playerState === YT.PlayerState.PLAYING) {
-         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO. Video: ${videoId || 'Unknown ID'}`);
-
-         const flatList = getFlattenedPlaylist();
-         const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
-
-         if (videoId && playingVideoIndex !== -1) {
-              const playingVideoObject = flatList[playingVideoIndex];
-              currentPlayingInfo.videoId = videoId;
-              currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
-              currentPlayingInfo.flattenedIndex = playingVideoIndex;
-              console.log(`onPlayerStateChange: Información de reproducción actual actualizada vía cambio de estado: ${playingVideoIndex} (Video: ${videoId})`);
-              updatePlaylistsUI();
-
-             if (currentPlayer !== changedPlayerNum) {
-                  console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum}.`);
-                  currentPlayer = changedPlayerNum;
-             }
-
-             if (isTransitioning) {
-                 console.log(`onPlayerStateChange: Video conocido (${videoId}) comenzó a reproducir. Reseteando flag isTransitioning.`);
-                 isTransitioning = false;
-             }
-
-              // --- CORRECCIÓN: Resetear hasOutroCrossfadeStarted cuando un NUEVO video comienza a reproducir ---
-             console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted.`);
-             hasOutroCrossfadeStarted = false; // Resetear el flag
-
-         } else if (videoId && playingVideoIndex === -1) {
-             console.warn(`onPlayerStateChange: Video desconocido (${videoId}) comenzó a reproducir en Player ${changedPlayerNum}.`);
-              currentPlayingInfo.videoId = videoId;
-              currentPlayingInfo.playlistId = null;
-              currentPlayingInfo.flattenedIndex = -1;
-               updatePlaylistsUI();
-               if (currentPlayer !== changedPlayerNum) {
-                   console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} basándose en video desconocido.`);
-                    currentPlayer = changedPlayerNum;
-               }
-                console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted para video desconocido.`);
-                hasOutroCrossfadeStarted = false;
-
-         } else {
-               console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO, pero el videoId aún no está disponible.`);
-         }
-
-          // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING
-          if (videoId) {
-             checkAndSkipSegment(event.target, true);
-          }
-
-     } else if (playerState === YT.PlayerState.PAUSED) {
-        console.log('onPlayerStateChange: Video pausado en Player', changedPlayerNum);
-         // if (changedPlayerNum === currentPlayer && reproduccionIniciada) {
-         //     // Handled by button
-         // }
-     } else if (playerState === YT.PlayerState.BUFFERING) {
-         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está BUFFERING. Video: ${videoId || 'Unknown ID'}`);
-
-     } else if (playerState === YT.PlayerState.CUED) {
-         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está CUED. Video: ${videoId || 'Unknown ID'}`);
-
-         const intendedNextPlayerNum = currentPlayer === 1 ? 2 : 1;
-         const intendedNextVideoId = currentPlayingInfo.flattenedIndex !== -1 ? getFlattenedPlaylist()[currentPlayingInfo.flattenedIndex]?.videoId : null;
-
-         if (changedPlayerNum === intendedNextPlayerNum && videoId === intendedNextVideoId && isTransitioning) {
-             console.warn(`onPlayerStateChange: Reproductor siguiente previsto (${changedPlayerNum}) entró en estado CUED inesperadamente después de la llamada a playVideo() durante la transición. Video: ${videoId}. Intentando playVideo() de nuevo.`);
-             setTimeout(() => {
-                 try {
-                     if (playerInstance && typeof playerInstance.playVideo === 'function' && playerInstance.getPlayerState() === YT.PlayerState.CUED) {
-                          console.log(`onPlayerStateChange: Reintentando playVideo() en Player ${changedPlayerNum} desde estado CUED.`);
-                         playerInstance.playVideo();
-                     } else {
-                          console.log(`onPlayerStateChange: No se reintenta playVideo() - Player ${changedPlayerNum} ya no está en estado CUED o es inválido.`);
-                     }
-                 } catch(e) { console.error("onPlayerStateChange: Error reintentando playVideo desde estado CUED:", e); }
-             }, 500);
-         } else if (playerState === YT.PlayerState.CUED) {
-               console.log(`onPlayerStateChange: Player ${changedPlayerNum} entró en estado CUED normalmente. Video: ${videoId || 'Unknown ID'}.`);
-         }
-
-     } else if (playerState === YT.PlayerState.ENDED) {
-         console.log(`onPlayerStateChange: Player ${changedPlayerNum} estado ENDED. Video: ${videoId || 'Unknown ID'}`);
-         const endedVideoMatchesCurrent = (videoId && currentPlayingInfo.videoId === videoId);
-
-         if (endedVideoMatchesCurrent && !isTransitioning && !isAudioFading) {
-             console.log(`onPlayerStateChange: Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
-             playNextVideo();
-         } else if (changedPlayerNum !== currentPlayer) {
-             console.log(`onPlayerStateChange: Otro player ${changedPlayerNum} estado ENDED. Video: ${videoId}. (No es el reproductor activo actual)`);
-         }
+    // Manejar el crossfade cuando un video termina (estado ENDED)
+    if (event.data === YT.PlayerState.ENDED) {
+        console.log(`Video en ${playerId} ha terminado. Preparando crossfade.`);
+        // Si no hay más videos en la playlist, detener.
+        if (currentPlayingInfo.playlistId && currentPlayingInfo.flattenedIndex !== -1) {
+            const currentPlaylist = playlistsData.find(p => p.id === currentPlayingInfo.playlistId);
+            if (currentPlaylist && currentPlayingInfo.flattenedIndex < currentPlaylist.videos.length - 1) {
+                // Hay un siguiente video, iniciar el crossfade.
+                startCrossfade(playerId);
+            } else {
+                console.log("Último video de la playlist terminado.");
+                // Ocultar reproductores y resetear UI si es el último video de una playlist
+                player1.stopVideo(); // Asegúrate de detener ambos
+                player2.stopVideo();
+                document.getElementById('player1').classList.add('hidden');
+                document.getElementById('player2').classList.add('hidden');
+                // Podrías reiniciar currentPlayingInfo aquí
+                currentPlayingInfo = { playlistId: null, videoId: null, flattenedIndex: -1 };
+                // Actualizar UI del reproductor a estado inactivo
+                document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+                stopMonitor(); // Detener el monitoreo de tiempo
+                updateProgressBar(0, 0); // Resetear barra de progreso
+            }
+        }
+    } else if (event.data === YT.PlayerState.PLAYING) {
+        // Cuando un video empieza a reproducirse, iniciar el monitoreo del tiempo.
+        if (!monitorInterval) {
+            startMonitor();
+        }
+        // Asegúrate de que el botón de play muestre pausa
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-pause"></i>';
+    } else if (event.data === YT.PlayerState.PAUSED) {
+        stopMonitor();
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+    } else if (event.data === YT.PlayerState.BUFFERING) {
+        // Opcional: Mostrar algún indicador de carga
+    } else if (event.data === YT.PlayerState.CUED) {
+        // Video cargado y listo para reproducir
     }
 }
-// Módulo: Interacción con API de Búsqueda (Piped)
-const performSearch = async (query, nextPage = null) => {
-    if (!resultsDiv) return;
 
-    // Limpiar y mostrar estado si es búsqueda NUEVA
-    if (!nextPage) {
-        console.log(`Iniciando NUEVA búsqueda para: ${query}`);
-        currentSearchQuery = query; // Guarda la nueva query
-        nextPageContext = null; // Resetea el contexto de paginación
-        resultsDiv.innerHTML = '<p>Buscando...</p>'; // Mostrar "Buscando..."
-    } else {
-        console.log(`Cargando MÁS resultados para: ${currentSearchQuery} (Página: ${nextPage})`);
-        showLoadMoreSpinner(); // Mostrar indicador al cargar más
+
+// --- Funciones de Crossfade ---
+
+async function startCrossfade(finishedPlayerId) {
+    if (isTransitioning) return; // Evitar transiciones simultáneas
+    isTransitioning = true;
+    hasOutroCrossfadeStarted = false; // Resetear el flag de SponsorBlock
+
+    const nextPlayer = (finishedPlayerId === 'player1') ? player2 : player1;
+    const currentActivePlayer = (finishedPlayerId === 'player1') ? player1 : player2;
+
+    const nextVideoInfo = getNextVideoInPlaylist();
+    if (!nextVideoInfo) {
+        console.log("No hay siguiente video en la playlist para el crossfade.");
+        isTransitioning = false;
+        // Limpiar después del último video
+        currentActivePlayer.stopVideo();
+        nextPlayer.stopVideo();
+        document.getElementById('player1').classList.add('hidden');
+        document.getElementById('player2').classList.add('hidden');
+        currentPlayingInfo = { playlistId: null, videoId: null, flattenedIndex: -1 };
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+        stopMonitor();
+        updateProgressBar(0, 0);
+        return;
     }
 
-    isLoadingMore = true; // Marcar como cargando
+    // Actualizar currentPlayingInfo al siguiente video ANTES de cargar
+    currentPlayingInfo.videoId = nextVideoInfo.id;
+    currentPlayingInfo.flattenedIndex++; // Avanzar el índice
 
     try {
-        // Construir URL: Añadir 'nextpage' si existe
-        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}`;
-        if (nextPage) {
-            apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`; // Usar token/página
-        }
-        const response = await fetch(apiUrl);
+        // Asegurarse de que el siguiente reproductor esté visible pero con opacidad 0
+        const nextPlayerElement = document.getElementById(nextPlayer.getIframe().id);
+        nextPlayerElement.classList.remove('hidden'); // Asegurarse de que no esté 'display: none'
+        nextPlayerElement.classList.add('fade-in'); // Aplicar estilo fade-in
 
-        // Mejor manejo de errores HTTP
-        if (!response.ok) {
-            let errorDetails = `Error: ${response.status} ${response.statusText}`;
-            let errorBody = null;
-            try {
-                errorBody = await response.json(); // Intenta leer cuerpo del error
-                errorDetails = errorBody.error || errorDetails; // Usa mensaje del cuerpo si existe
-                console.error("Error Body from Netlify Function:", errorBody);
-            } catch (e) {
-                console.warn("Could not parse error response body as JSON.");
-                // Si no es JSON, intentar leer como texto
-                try {
-                    errorDetails = await response.text();
-                } catch (e2) { /* Ignorar si falla */}
-            }
-            // Asegurarse que sea un objeto Error
-            const error = new Error(errorDetails);
-            error.status = response.status; // Añadir status al objeto error
-            error.body = errorBody; // Añadir cuerpo si se pudo parsear
-            throw error;
-        }
+        await nextPlayer.loadVideoById(nextVideoInfo.id);
+        nextPlayer.setVolume(0); // Empezar mudo
+        nextPlayer.playVideo();
 
-        const data = await response.json();
-        // Llamar a displaySearchResultsPiped, indicando si se deben añadir (append=true)
-        displaySearchResultsPiped(data, !!nextPage); // append es true si nextPage tiene valor
+        // Aplicar la clase 'fade-out' al reproductor actual
+        const currentActivePlayerElement = document.getElementById(currentActivePlayer.getIframe().id);
+        currentActivePlayerElement.classList.add('fade-out');
+
+        // Swap de z-index: traer el nuevo al frente, el viejo al fondo
+        currentActivePlayerElement.style.zIndex = '2';
+        nextPlayerElement.style.zIndex = '3';
+
+        // Animar el volumen: de 0 a 100 para nextPlayer, de 100 a 0 para currentActivePlayer
+        isAudioFading = true; // Indicar que el audio está en transición
+        animateVolume(currentActivePlayer, 100, 0, CROSSFADE_DURATION * 1000);
+        animateVolume(nextPlayer, 0, 100, CROSSFADE_DURATION * 1000);
+
+        // Esperar a que la animación de crossfade termine
+        setTimeout(() => {
+            currentActivePlayer.stopVideo(); // Detener el video anterior completamente
+            currentActivePlayerElement.classList.remove('fade-out');
+            currentActivePlayerElement.classList.add('hidden'); // Ocultar completamente
+            currentActivePlayerElement.style.zIndex = '2'; // Resetear z-index
+
+            nextPlayerElement.classList.remove('fade-in'); // Quitar la clase de transición
+            nextPlayerElement.style.zIndex = '3'; // Asegurar que esté en frente
+
+            isTransitioning = false;
+            isAudioFading = false; // La transición de audio ha terminado
+
+            // Actualizar el reproductor "actual" para la siguiente ronda
+            currentPlayer = (currentPlayer === 1) ? 2 : 1;
+            console.log(`Crossfade completo. Reproductor actual: ${nextPlayer.getIframe().id}`);
+
+            // Actualizar el estilo de 'currently-playing-video' en la UI
+            updateCurrentlyPlayingVideoUI();
+
+            // Cargar segmentos de SponsorBlock para el nuevo video
+            fetchAndApplySponsorBlockSegments(nextVideoInfo.id);
+
+        }, CROSSFADE_DURATION * 1000); // Duración de la transición en ms
 
     } catch (error) {
-        console.error("Error fetching search results (app.js):", error.message, error);
-        const displayError = error.message || "Error desconocido al buscar.";
-        // Mostrar el mensaje de error que ahora viene más detallado
-        if (!nextPage) {
-            resultsDiv.innerHTML = `<p>${displayError}</p>`;
-        } else {
-             mostrarMensajeFlotante(displayError);
-             hideLoadMoreSpinner();
-        }
-        isLoadingMore = false; // Resetea el flag en error
-    }
-};
-
-// --- Función para mostrar resultados ---
-const displaySearchResultsPiped = (results, append = false) => {
-    if (!resultsDiv) {
-        console.error("Results div not found!");
-        return;
-    }
-    if (!append) {
-        resultsDiv.innerHTML = '';
-    }
-    if (!results || !results.items || !Array.isArray(results.items)) {
-        if (!append && (!results || results.items?.length === 0)) { // Mostrar solo si es búsqueda inicial y no hay NADA
-            resultsDiv.innerHTML = "<p>No se encontraron resultados.</p>";
-        }
-        nextPageContext = results?.nextpage || null; // Guardar contexto incluso si no hay items
-        isLoadingMore = false;
-        hideLoadMoreSpinner();
-        return;
-    }
-
-    // Guardar el contexto para la siguiente página
-    nextPageContext = results.nextpage || null;
-    console.log("Next page context:", nextPageContext);
-
-    results.items.forEach(video => {
-        const authorName = video.uploaderName || 'Autor Desconocido';
-        const videoId = video.videoId || video.url?.split('v=')[1];
-
-        if (!videoId) {
-            console.warn("Resultado omitido, no se pudo obtener videoId:", video);
-            return;
-        }
-        // Evitar duplicados al añadir MÁS resultados
-        if (append && resultsDiv.querySelector(`.video-result[data-video-id="${videoId}"]`)) {
-            // console.log(`Video duplicado omitido al añadir: ${video.title}`);
-            return;
-        }
-
-        const videoDiv = document.createElement('div');
-        videoDiv.classList.add('video-result');
-        videoDiv.dataset.videoId = videoId;
-
-        const thumbnailContainer = document.createElement('div');
-        thumbnailContainer.classList.add('thumbnail-container');
-        const thumbnail = document.createElement('img');
-        thumbnail.src = video.thumbnail;
-        thumbnail.alt = video.title;
-        thumbnail.classList.add('thumbnail');
-        thumbnail.loading = "lazy";
-        thumbnailContainer.appendChild(thumbnail);
-        if (video.duration && video.duration > 0) {
-            const durationSpan = document.createElement('span');
-            durationSpan.textContent = formatDuration(video.duration);
-            durationSpan.classList.add('duration');
-            thumbnailContainer.appendChild(durationSpan);
-        }
-        videoDiv.appendChild(thumbnailContainer);
-
-        const detailsDiv = document.createElement('div');
-        detailsDiv.classList.add('video-details');
-        const title = document.createElement('h3');
-        title.textContent = video.title;
-        title.classList.add('video-title');
-        title.title = video.title;
-        detailsDiv.appendChild(title);
-        const author = document.createElement('p');
-        author.textContent = authorName;
-        author.classList.add('video-author');
-        detailsDiv.appendChild(author);
-                // --- Botón Añadir ---
-        const addToPlaylistButton = document.createElement('button');
-        // Estilos base del botón (pueden estar en CSS)
-        addToPlaylistButton.innerHTML = '<i class="fa-solid fa-plus"></i><span class="add-text"> Añadir</span>';
-        addToPlaylistButton.classList.add('add-to-playlist', 'search-result-add-button'); // Añadir clase específica
-        // Guardar datos del video en el botón
-        addToPlaylistButton.dataset.videoId = videoId;
-        addToPlaylistButton.dataset.videoTitle = video.title;
-        addToPlaylistButton.dataset.videoThumbnail = video.thumbnail;
-        const durationSeconds = typeof video.duration === 'number' ? video.duration : parseDuration(video.duration);
-        addToPlaylistButton.dataset.videoDuration = durationSeconds;
-        
-        addToPlaylistButton.addEventListener('click', (event) => {
-            // Extraer datos del botón presionado
-            const button = event.currentTarget;
-            const videoData = {
-                videoId: button.dataset.videoId,
-                title: button.dataset.videoTitle,
-                thumbnail: button.dataset.videoThumbnail,
-                duration: parseInt(button.dataset.videoDuration, 10),
-            };
-            // Llamar a la nueva función manejadora
-            handleSearchResultAddClick(event, videoData);
-        });
-      
-        detailsDiv.appendChild(addToPlaylistButton);
-        videoDiv.appendChild(detailsDiv);
-        resultsDiv.appendChild(videoDiv);
-    }); // Fin del forEach de resultados
-
-    if (append) {
-        hideLoadMoreSpinner();
-    }
-    isLoadingMore = false;
-};
-function handleSearchResultAddClick(event, videoData) {
-    event.preventDefault(); // Evitar comportamiento por defecto
-    event.stopPropagation(); // Detener propagación
-
-    const addButton = event.currentTarget; // El botón que fue clickeado
-// Determine if there are any playlists loaded that are not the empty manual playlist
- const userLoadedPlaylists = playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
-
-if (userLoadedPlaylists.length === 0) {
-    // Case: No playlists loaded (or only manual is present and empty). Add directly to the manual playlist.
-    console.log("No loaded playlists or only empty manual, adding direct to manual playlist.");
-    addVideoToManualPlaylist(videoData); // Call the function to add to the manual playlist
-} else {
-    // Case: There are other playlists available. Show the menu to let the user choose.
-    console.log("Showing menu to select destination playlist (Add action).");
-    // Call the new generic popup function with the action type 'add'
-    // No sourcePlaylistId is needed for 'add' from search results.
-    showPlaylistSelectionPopup(addButton, videoData, 'add'); // <-- NEW CALL HERE
-  }
-}
-// --- NUEVA: Función específica para añadir a "Mis Vídeos Añadidos" ---
-function addVideoToManualPlaylist(videoData) {
-    const manualPlaylistId = 'manual';
-    let manualPlaylist = playlistsData.find(p => p.id === manualPlaylistId);
-
-    // Crear playlist manual si no existe
-    if (!manualPlaylist) {
-        manualPlaylist = {
-            id: manualPlaylistId,
-            name: 'Mis Vídeos Añadidos',
-            thumbnailUrl: 'https://via.placeholder.com/50?text=+',
-            videos: [],
-            isExpanded: true
-        };
-        // Asegurar que la manual siempre quede al principio si se crea ahora
-        playlistsData.unshift(manualPlaylist);
-        console.log("Playlist 'manual' creada y añadida al inicio.");
-    }
-
-    // Verificar duplicados DENTRO de la playlist manual
-    const isDuplicate = manualPlaylist.videos.some(video => video.videoId === videoData.videoId);
-    if (isDuplicate) {
-        mostrarMensajeFlotante(`"${videoData.title}" ya está en "${manualPlaylist.name}".`);
-        return;
-    }
-
-    // Crear el objeto de video
-    const videoObject = {
-        videoId: videoData.videoId,
-        title: videoData.title || "Título no disponible",
-        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-        duration: videoData.duration || 0, // Ya debería ser número
-    };
-
-    // Añadir al final de la playlist manual
-    manualPlaylist.videos.push(videoObject);
-    mostrarMensajeFlotante(`Video añadido a "${manualPlaylist.name}": ${videoObject.title}`);
-    console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
-
-    updatePlaylistsUI(); // Actualizar la UI
-    checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
-}
-// --- NUEVA: Función para añadir a una Playlist ESPECÍFICA ---
-function addVideoToSpecificPlaylist(videoData, targetPlaylistId) {
-    const targetPlaylist = playlistsData.find(p => p.id === targetPlaylistId);
-    if (!targetPlaylist) {
-        console.error(`Error: Playlist destino ${targetPlaylistId} no encontrada.`);
-        mostrarMensajeFlotante("Error: No se encontró la playlist destino.");
-        return;
-    }
-
-    // Verificar duplicados en la playlist destino
-    const isDuplicate = targetPlaylist.videos.some(video => video.videoId === videoData.videoId);
-    if (isDuplicate) {
-        mostrarMensajeFlotante(`"${videoData.title}" ya está en "${targetPlaylist.name}".`);
-        return;
-    }
-
-    const videoObject = {
-        videoId: videoData.videoId,
-        title: videoData.title || "Título no disponible",
-        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-        duration: videoData.duration || 0,
-    };
-
-    // --- Lógica de Inserción: "Debajo del video que se está reproduciendo" ---
-    let targetIndex = targetPlaylist.videos.length; // Por defecto, añadir al final
-
-    if (currentPlayingInfo.playlistId === targetPlaylistId && currentPlayingInfo.flattenedIndex >= 0) {
-        // Si el video actual está en la playlist destino
-        const currentVideoLocalIndex = targetPlaylist.videos.findIndex(v => v.videoId === currentPlayingInfo.videoId);
-        if (currentVideoLocalIndex !== -1) {
-            targetIndex = currentVideoLocalIndex + 1; // Insertar justo después
-            console.log(`Insertando después del video actual (índice local ${currentVideoLocalIndex}) en ${targetPlaylistId}. Nuevo índice: ${targetIndex}`);
-        } else {
-             console.log(`Video actual (${currentPlayingInfo.videoId}) no encontrado localmente en ${targetPlaylistId}, añadiendo al final.`);
-        }
-    } else {
-        // Si no hay nada sonando, o está en otra playlist, añadir al final
-        console.log(`Video actual no está en ${targetPlaylistId} (o nada suena), añadiendo al final.`);
-         targetIndex = targetPlaylist.videos.length;
-    }
-
-    // Insertar el video en el array
-    targetPlaylist.videos.splice(targetIndex, 0, videoObject);
-    mostrarMensajeFlotante(`Video añadido a "${targetPlaylist.name}": ${videoObject.title}`);
-    console.log(`Video ${videoObject.videoId} añadido a playlist '${targetPlaylistId}' en índice ${targetIndex}.`);
-
-    updatePlaylistsUI(); // Actualizar UI
-    updateCurrentPlayingIndex(); // Recalcular índice aplanado
-    checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
-}
-// --- NUEVA: Función auxiliar para habilitar botón Play ---
-function checkAndEnablePlayButton() {
-     const flatList = getFlattenedPlaylist();
-     if (flatList.length > 0 && playersInitialized) {
-         botonPlay.disabled = false;
-     }
-}
-// --- Scroll Infinito ---
-const handleScroll = () => {
-    if (isLoadingMore || !nextPageContext || !currentSearchQuery) {
-        return;
-    }
-    const scrollThreshold = 300; // Píxeles antes del final para empezar a cargar
-    const bottomReached = resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - scrollThreshold;
-    if (bottomReached) {
-        console.log("Scroll cerca del final, intentando cargar más...");
-        performSearch(currentSearchQuery, nextPageContext);
-    }
-};
-resultsContainer.addEventListener('scroll', handleScroll);
-
-// --- Funciones Spinner "Cargar Más" ---
-function showLoadMoreSpinner() {
-    let spinner = document.getElementById('loadMoreSpinner');
-    if (!spinner) {
-        spinner = document.createElement('div');
-        spinner.id = 'loadMoreSpinner';
-        spinner.className = 'loading-spinner-small';
-        resultsContainer.appendChild(spinner); // Añadir al contenedor scrollable
-    }
-    spinner.style.display = 'flex';
-}
-function hideLoadMoreSpinner() {
-    const spinner = document.getElementById('loadMoreSpinner');
-    if (spinner) {
-        spinner.style.display = 'none';
+        console.error("Error durante el crossfade:", error);
+        isTransitioning = false;
+        isAudioFading = false;
+        // En caso de error, intenta detener ambos y limpiar
+        currentActivePlayer.stopVideo();
+        nextPlayer.stopVideo();
+        document.getElementById('player1').classList.add('hidden');
+        document.getElementById('player2').classList.add('hidden');
+        // Manejar el error, quizás pasar al siguiente video o mostrar mensaje
     }
 }
 
-// Módulo: Manejo de Playlists (Nueva Lógica con Pestañas)
+// Función auxiliar para animar el volumen
+function animateVolume(player, startVolume, endVolume, duration) {
+    const startTime = performance.now();
+    const range = endVolume - startVolume;
 
-// --- Función para obtener la lista aplanada para reproducción ---
-function getFlattenedPlaylist() {
-    let flatList = [];
-    playlistsData.forEach(playlist => {
-        // ¡IMPORTANTE! Aplanar todos los videos, independientemente de si la pestaña está expandida o no,
-        // para mantener un orden de reproducción consistente.
-        playlist.videos.forEach(video => {
-            flatList.push({ ...video, sourcePlaylistId: playlist.id });
-        });
-    });
-    return flatList;
-}
+    function frame() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1); // Clamp between 0 and 1
+        const currentVolume = startVolume + range * progress;
+        player.setVolume(Math.round(currentVolume));
 
-// --- Actualizar índice basado en video actual ---
-function updateCurrentPlayingIndex() {
-    const flatList = getFlattenedPlaylist();
-    let playingVideoId = null;
-    let activePlayerNum = null;
-
-    // Determinar qué player está sonando
-    try {
-        if (player1 && player1.getPlayerState() === YT.PlayerState.PLAYING) {
-            playingVideoId = player1.getVideoData()?.video_id;
-            activePlayerNum = 1;
-        } else if (player2 && player2.getPlayerState() === YT.PlayerState.PLAYING) {
-            playingVideoId = player2.getVideoData()?.video_id;
-            activePlayerNum = 2;
-        }
-    } catch (e) {
-        console.error("Error getting playing video data:", e);
-        // Mantener índice previo si hay error?
-    }
-
-    if (playingVideoId) {
-        // Solo actualizar si el video que suena ha cambiado o el índice es inválido
-        if (currentPlayingInfo.videoId !== playingVideoId || currentPlayingInfo.flattenedIndex < 0) {
-            const newFlatIndex = flatList.findIndex(v => v.videoId === playingVideoId);
-            if (newFlatIndex !== -1) {
-                const currentVideoObject = flatList[newFlatIndex];
-                currentPlayingInfo.videoId = playingVideoId;
-                currentPlayingInfo.playlistId = currentVideoObject.sourcePlaylistId;
-                currentPlayingInfo.flattenedIndex = newFlatIndex;
-                console.log(`Índice aplanado actualizado a: ${newFlatIndex} (Video: ${playingVideoId})`);
-                // Actualizar UI para reflejar el cambio de resaltado
-                updatePlaylistsUI();
-            } else {
-                console.warn(`Video ${playingVideoId} sonando, pero no encontrado en la lista aplanada actualizada.`);
-                // Podríamos buscar por playlistId también si el ID no coincide? O resetear?
-                currentPlayingInfo.flattenedIndex = -1; // Marcar como desconocido
-            }
-        }
-        // Asegurarse que currentPlayer esté sincronizado con el player que realmente suena
-        if (activePlayerNum && currentPlayer !== activePlayerNum) {
-            console.log(`Sincronizando currentPlayer a ${activePlayerNum}`);
-            currentPlayer = activePlayerNum;
-        }
-    } else {
-        // Si nada suena, el índice es -1 (o el último conocido si se pausó?)
-        // Por simplicidad, si nada suena activamente, consideramos índice -1
-        if (currentPlayingInfo.flattenedIndex !== -1) {
-            console.log("Reproducción detenida o sin iniciar, reseteando índice aplanado.");
-            currentPlayingInfo.videoId = null;
-            currentPlayingInfo.playlistId = null;
-            currentPlayingInfo.flattenedIndex = -1;
-            // Actualizar UI para quitar resaltado
-            updatePlaylistsUI();
+        if (progress < 1) {
+            requestAnimationFrame(frame);
         }
     }
+    requestAnimationFrame(frame);
 }
 
+// Obtiene el siguiente video en la playlist o null si es el final
+function getNextVideoInPlaylist() {
+    if (!currentPlayingInfo.playlistId) return null;
 
-// --- Manejar carga de Playlist desde URL ---
-async function handlePlaylistLoaded(playlistInfo) { // Marcar como async si usa await interno
-    console.log('Datos de playlist recibidos:', playlistInfo);
+    const currentPlaylist = playlistsData.find(p => p.id === currentPlayingInfo.playlistId);
+    if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) return null;
 
-    // --- VALIDACIÓN INICIAL ---
-    if (!playlistInfo || !playlistInfo.relatedStreams || !Array.isArray(playlistInfo.relatedStreams)) {
-        // Intenta obtener ID incluso si falla para mensaje de error
-        const failedPlaylistId = playlistInfo?.id || playlistInfo?.url?.split('list=')[1] || 'desconocida';
-        mostrarMensajeFlotante(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`);
-        console.error("Respuesta inválida de getPlaylistInfo:", playlistInfo);
-        return;
+    const nextIndex = currentPlayingInfo.flattenedIndex + 1;
+    if (nextIndex < currentPlaylist.videos.length) {
+        return currentPlaylist.videos[nextIndex];
     }
-
-    const playlistId = playlistInfo.id || playlistInfo.url?.split('list=')[1] || `playlist_${Date.now()}`;
-    if (playlistsData.some(p => p.id === playlistId)) {
-        mostrarMensajeFlotante(`La playlist "${playlistInfo.name || playlistId}" ya está cargada.`);
-        return;
-    }
-
-    const loadedVideos = playlistInfo.relatedStreams.map(video => ({
-        videoId: video.url?.split('v=')[1],
-        title: video.title || "Título Desconocido",
-        thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-        duration: parseDuration(video.duration) || 0,
-    })).filter(video => video.videoId); // Asegurarse de que tengamos un videoId
-
-    if (loadedVideos.length === 0) {
-        mostrarMensajeFlotante(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`);
-        return;
-    }
-
-    const newPlaylist = {
-        id: playlistId,
-        name: playlistInfo.name || `Playlist ${playlistsData.length + 1}`,
-        thumbnailUrl: playlistInfo.thumbnailUrl || 'https://via.placeholder.com/50?text=Playlist',
-        videos: loadedVideos,
-        isExpanded: false // Por defecto, las nuevas playlists están contraídas
-    };
-
-    playlistsData.push(newPlaylist);
-    console.log(`Playlist añadida: ${newPlaylist.name} con ${newPlaylist.videos.length} videos.`);
-    mostrarMensajeFlotante(`Playlist "${newPlaylist.name}" cargada con éxito.`);
-    updatePlaylistsUI(); // Actualizar la UI
-    checkAndEnablePlayButton(); // Habilitar botón Play si corresponde
+    return null; // No hay más videos en esta playlist
 }
 
-// --- Función para renderizar y actualizar la interfaz de playlists ---
-function updatePlaylistsUI() {
-    const playlistsContainer = document.getElementById('playlists-container');
-    if (!playlistsContainer) {
-        console.error("El contenedor de playlists no se encontró en el DOM.");
-        return;
+// Obtiene el video anterior en la playlist
+function getPrevVideoInPlaylist() {
+    if (!currentPlayingInfo.playlistId || currentPlayingInfo.flattenedIndex <= 0) return null;
+
+    const currentPlaylist = playlistsData.find(p => p.id === currentPlayingInfo.playlistId);
+    if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) return null;
+
+    const prevIndex = currentPlayingInfo.flattenedIndex - 1;
+    if (prevIndex >= 0) {
+        return currentPlaylist.videos[prevIndex];
     }
-
-    playlistsContainer.innerHTML = ''; // Limpiar el contenedor actual
-
-    if (playlistsData.length === 0) {
-        playlistsContainer.innerHTML = '<p>No hay playlists cargadas aún. ¡Añade una!</p>';
-        document.getElementById('botonPlay').disabled = true; // Deshabilitar si no hay nada
-        return;
-    }
-
-    playlistsData.forEach(playlist => {
-        const playlistDiv = document.createElement('div');
-        playlistDiv.classList.add('playlist-item');
-        playlistDiv.dataset.playlistId = playlist.id;
-
-        const playlistHeader = document.createElement('div');
-        playlistHeader.classList.add('playlist-header');
-
-        const playlistThumbnail = document.createElement('img');
-        playlistThumbnail.src = playlist.thumbnailUrl;
-        playlistThumbnail.alt = playlist.name;
-        playlistThumbnail.classList.add('playlist-thumbnail');
-        playlistHeader.appendChild(playlistThumbnail);
-
-        const playlistTitle = document.createElement('h3');
-        playlistTitle.textContent = playlist.name;
-        playlistTitle.classList.add('playlist-title');
-        playlistHeader.appendChild(playlistTitle);
-
-        const toggleButton = document.createElement('button');
-        toggleButton.classList.add('playlist-toggle-button');
-        toggleButton.innerHTML = playlist.isExpanded ? '<i class="fas fa-chevron-up"></i>' : '<i class="fas fa-chevron-down"></i>';
-        toggleButton.addEventListener('click', () => togglePlaylistExpand(playlist.id));
-        playlistHeader.appendChild(toggleButton);
-
-        // --- Menú de Opciones (3 puntos) para cada playlist ---
-        const optionsMenuDiv = document.createElement('div');
-        optionsMenuDiv.classList.add('delete-menu'); // Reutiliza clases del botón de eliminar de video
-        optionsMenuDiv.innerHTML = `
-            <button class="delete-menu-button playlist-options-button" aria-label="Opciones de Playlist">
-                <i class="fas fa-ellipsis-v"></i>
-            </button>
-            <div class="delete-menu-content playlist-options-content hidden">
-                <button class="menu-option move-playlist-up" data-playlist-id="${playlist.id}"><i class="fas fa-arrow-up"></i> Mover Arriba</button>
-                <button class="menu-option move-playlist-down" data-playlist-id="${playlist.id}"><i class="fas fa-arrow-down"></i> Mover Abajo</button>
-                <button class="menu-option remove-playlist" data-playlist-id="${playlist.id}"><i class="fas fa-times"></i> Eliminar Playlist</button>
-            </div>
-        `;
-        playlistHeader.appendChild(optionsMenuDiv);
-
-        // Event listener para el botón de opciones de playlist
-        const playlistOptionsButton = optionsMenuDiv.querySelector('.playlist-options-button');
-        playlistOptionsButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Evitar que el clic se propague al documento y cierre el menú inmediatamente
-            closeAllContextMenus(); // Cerrar otros menús abiertos
-            const menuContent = playlistOptionsButton.nextElementSibling;
-            menuContent.classList.toggle('hidden');
-        });
-
-        // Event listeners para las opciones del menú de playlist
-        optionsMenuDiv.querySelector('.move-playlist-up').addEventListener('click', (event) => {
-            event.stopPropagation();
-            movePlaylist(playlist.id, -1);
-            closeAllContextMenus();
-        });
-        optionsMenuDiv.querySelector('.move-playlist-down').addEventListener('click', (event) => {
-            event.stopPropagation();
-            movePlaylist(playlist.id, 1);
-            closeAllContextMenus();
-        });
-        optionsMenuDiv.querySelector('.remove-playlist').addEventListener('click', (event) => {
-            event.stopPropagation();
-            removePlaylist(playlist.id);
-            closeAllContextMenus();
-        });
-
-
-        playlistDiv.appendChild(playlistHeader);
-
-        const videoListDiv = document.createElement('div');
-        videoListDiv.classList.add('playlist-video-list');
-        if (!playlist.isExpanded) {
-            videoListDiv.classList.add('hidden');
-        }
-
-        playlist.videos.forEach(video => {
-            const videoItemDiv = document.createElement('div');
-            videoItemDiv.classList.add('video-item');
-            videoItemDiv.dataset.videoId = video.videoId;
-            videoItemDiv.dataset.sourcePlaylistId = playlist.id; // Añadir ID de playlist de origen
-
-            // Resaltar si es el video que se está reproduciendo
-            if (currentPlayingInfo.videoId === video.videoId && currentPlayingInfo.playlistId === playlist.id) {
-                videoItemDiv.classList.add('playing');
-                // Asegurarse de que el video actualmente reproduciéndose esté visible
-                if (!playlist.isExpanded) {
-                    playlist.isExpanded = true;
-                    toggleButton.innerHTML = '<i class="fas fa-chevron-up"></i>';
-                    videoListDiv.classList.remove('hidden');
-                }
-            }
-
-            const thumbnailImg = document.createElement('img');
-            thumbnailImg.src = video.thumbnail;
-            thumbnailImg.alt = video.title;
-            thumbnailImg.classList.add('video-item-thumbnail');
-            videoItemDiv.appendChild(thumbnailImg);
-
-            const videoInfoDiv = document.createElement('div');
-            videoInfoDiv.classList.add('video-item-info');
-
-            const videoTitleP = document.createElement('p');
-            videoTitleP.textContent = video.title;
-            videoTitleP.classList.add('video-item-title');
-            videoTitleP.title = video.title; // Título completo en tooltip
-            videoInfoDiv.appendChild(videoTitleP);
-
-            const videoDurationSpan = document.createElement('span');
-            videoDurationSpan.textContent = formatDuration(video.duration);
-            videoDurationSpan.classList.add('video-item-duration');
-            videoInfoDiv.appendChild(videoDurationSpan);
-
-            videoItemDiv.appendChild(videoInfoDiv);
-
-            // Botón de eliminar vídeo
-            const deleteVideoMenuDiv = document.createElement('div');
-            deleteVideoMenuDiv.classList.add('delete-menu');
-            deleteVideoMenuDiv.innerHTML = `
-                <button class="delete-menu-button" aria-label="Opciones de video">
-                    <i class="fas fa-ellipsis-h"></i>
-                </button>
-                <div class="delete-menu-content hidden">
-                    <button class="menu-option move-video-up" data-video-id="${video.videoId}" data-playlist-id="${playlist.id}"><i class="fas fa-arrow-up"></i> Mover Arriba</button>
-                    <button class="menu-option move-video-down" data-video-id="${video.videoId}" data-playlist-id="${playlist.id}"><i class="fas fa-arrow-down"></i> Mover Abajo</button>
-                    <button class="menu-option delete-video" data-video-id="${video.videoId}" data-playlist-id="${playlist.id}"><i class="fas fa-trash-alt"></i> Eliminar</button>
-                    <button class="menu-option add-to-another-playlist" data-video-id="${video.videoId}" data-video-title="${video.title}" data-video-thumbnail="${video.thumbnail}" data-video-duration="${video.duration}" data-source-playlist-id="${playlist.id}"><i class="fas fa-plus"></i> Añadir a otra playlist</button>
-                </div>
-            `;
-            videoItemDiv.appendChild(deleteVideoMenuDiv);
-
-            // Event listeners para los botones de eliminar/mover
-            const deleteButton = deleteVideoMenuDiv.querySelector('.delete-menu-button');
-            deleteButton.addEventListener('click', (event) => {
-                event.stopPropagation(); // Evitar que el clic se propague al documento
-                closeAllContextMenus(); // Cerrar otros menús abiertos
-                const menuContent = deleteButton.nextElementSibling;
-                menuContent.classList.toggle('hidden');
-            });
-
-            deleteVideoMenuDiv.querySelector('.delete-video').addEventListener('click', (event) => {
-                event.stopPropagation();
-                removeVideoFromPlaylist(event.currentTarget.dataset.playlistId, event.currentTarget.dataset.videoId);
-                closeAllContextMenus();
-            });
-            deleteVideoMenuDiv.querySelector('.move-video-up').addEventListener('click', (event) => {
-                event.stopPropagation();
-                moveVideoInPlaylist(event.currentTarget.dataset.playlistId, event.currentTarget.dataset.videoId, -1);
-                closeAllContextMenus();
-            });
-            deleteVideoMenuDiv.querySelector('.move-video-down').addEventListener('click', (event) => {
-                event.stopPropagation();
-                moveVideoInPlaylist(event.currentTarget.dataset.playlistId, event.currentTarget.dataset.videoId, 1);
-                closeAllContextMenus();
-            });
-
-            // Event listener para "Añadir a otra playlist"
-            const addToAnotherPlaylistButton = deleteVideoMenuDiv.querySelector('.add-to-another-playlist');
-            addToAnotherPlaylistButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const button = event.currentTarget;
-                const videoData = {
-                    videoId: button.dataset.videoId,
-                    title: button.dataset.videoTitle,
-                    thumbnail: button.dataset.videoThumbnail,
-                    duration: parseInt(button.dataset.videoDuration, 10),
-                };
-                const sourcePlaylistId = button.dataset.sourcePlaylistId;
-                showPlaylistSelectionPopup(button, videoData, 'transfer', sourcePlaylistId);
-                closeAllContextMenus();
-            });
-
-
-            // Añadir listener para reproducción al hacer clic en el item
-            videoItemDiv.addEventListener('click', () => {
-                if (!event.target.closest('.delete-menu')) { // Evitar activar si click en menú
-                    playVideoFromPlaylist(playlist.id, video.videoId);
-                }
-            });
-
-            videoListDiv.appendChild(videoItemDiv);
-        });
-        playlistDiv.appendChild(videoListDiv);
-        playlistsContainer.appendChild(playlistDiv);
-    });
+    return null;
 }
 
-// --- NUEVA Función: Cerrar todos los menús contextuales de 3 puntos ---
-function closeAllContextMenus() {
-    document.querySelectorAll('.delete-menu-content:not(.hidden)').forEach(menu => {
-        menu.classList.add('hidden');
-    });
-}
-// --- NUEVA Función: Cerrar todos los popups de selección de playlist ---
-function closePlaylistSelectionPopups() {
-    document.querySelectorAll('.playlist-selection-popup-menu:not(.hidden)').forEach(popup => {
-        popup.remove(); // Eliminar el popup del DOM
-    });
+// --- Funciones de Control de Reproducción ---
+
+function getCurrentPlayer() {
+    return (currentPlayer === 1) ? player1 : player2;
 }
 
-// --- Nueva: Función para mostrar el popup de selección de playlist ---
-function showPlaylistSelectionPopup(triggerElement, videoData, actionType, sourcePlaylistId = null) {
-    // Eliminar cualquier popup existente para evitar múltiples abiertos
-    closePlaylistSelectionPopups();
-
-    const popupDiv = document.createElement('div');
-    popupDiv.classList.add('playlist-selection-popup-menu'); // Clase CSS
-    popupDiv.innerHTML = '<p>Mover/Copiar a playlist:</p>';
-
-    // Añadir una opción para cada playlist
-    playlistsData.forEach(playlist => {
-        // No mostrar la playlist de origen como opción para transferir
-        if (actionType === 'transfer' && playlist.id === sourcePlaylistId) {
-            return;
-        }
-
-        const optionButton = document.createElement('button');
-        optionButton.textContent = playlist.name;
-        optionButton.classList.add('menu-option'); // Reutiliza clase
-        optionButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            if (actionType === 'add') {
-                addVideoToSpecificPlaylist(videoData, playlist.id);
-            } else if (actionType === 'transfer') {
-                // Si es 'transfer', primero eliminar de la original y luego añadir a la nueva
-                removeVideoFromPlaylist(sourcePlaylistId, videoData.videoId, false); // No mostrar mensaje aquí
-                addVideoToSpecificPlaylist(videoData, playlist.id);
-            }
-            popupDiv.remove(); // Cerrar popup después de seleccionar
-        });
-        popupDiv.appendChild(optionButton);
-    });
-
-    // Posicionar el popup debajo del elemento que lo disparó
-    const rect = triggerElement.getBoundingClientRect();
-    popupDiv.style.position = 'absolute';
-    popupDiv.style.top = `${rect.bottom + window.scrollY + 5}px`;
-    popupDiv.style.left = `${rect.left + window.scrollX}px`;
-    popupDiv.style.zIndex = '1000'; // Asegurar que esté por encima de otros elementos
-
-    document.body.appendChild(popupDiv); // Añadir al body
-
-    // Asegurarse de que el popup se cierre al hacer clic fuera
-    setTimeout(() => { // Pequeño retraso para evitar que el clic actual lo cierre
-        document.addEventListener('click', closePlaylistSelectionPopups, { once: true });
-    }, 100);
+function getOtherPlayer() {
+    return (currentPlayer === 1) ? player2 : player1;
 }
 
-
-// --- Manejo de la expansión/contracción de playlists ---
-function togglePlaylistExpand(playlistId) {
-    const playlist = playlistsData.find(p => p.id === playlistId);
-    if (playlist) {
-        playlist.isExpanded = !playlist.isExpanded;
-        updatePlaylistsUI(); // Redibujar para reflejar el cambio
+function playVideo(videoObj) {
+    // Detener y ocultar el reproductor inactivo
+    const otherPlayer = getOtherPlayer();
+    const otherPlayerElement = document.getElementById(otherPlayer.getIframe().id);
+    if (otherPlayerElement) {
+        otherPlayer.stopVideo();
+        otherPlayerElement.classList.add('hidden');
     }
+
+    const activePlayer = getCurrentPlayer();
+    const activePlayerElement = document.getElementById(activePlayer.getIframe().id);
+
+    currentPlayingInfo.videoId = videoObj.id;
+    currentPlayingInfo.playlistId = videoObj.playlistId; // Asegúrate de que el video tenga una playlistId asociada
+    currentPlayingInfo.flattenedIndex = videoObj.flattenedIndex;
+
+    activePlayerElement.classList.remove('hidden'); // Asegurarse de que esté visible
+    activePlayer.loadVideoById(videoObj.id);
+    activePlayer.setVolume(100);
+    activePlayer.playVideo();
+
+    startMonitor(); // Iniciar monitoreo del progreso
+
+    // Actualizar el botón de play a pausa
+    document.getElementById('botonPlay').innerHTML = '<i class="fas fa-pause"></i>';
+
+    // Actualizar el estilo de 'currently-playing-video' en la UI
+    updateCurrentlyPlayingVideoUI();
+
+    // Cargar segmentos de SponsorBlock para el nuevo video
+    fetchAndApplySponsorBlockSegments(videoObj.id);
 }
 
-// --- Manejo de eliminar playlist ---
-function removePlaylist(playlistId) {
-    // Confirmación visual
-    if (!confirm("¿Estás seguro de que quieres eliminar esta playlist?")) {
-        return;
+// Asigna event listeners a los botones de control de audio/video
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('botonPlay').addEventListener('click', togglePlayPause);
+    document.getElementById('botonNext').addEventListener('click', playNextVideo);
+    document.getElementById('botonPrev').addEventListener('click', playPrevVideo);
+    document.getElementById('botonStop').addEventListener('click', stopVideoPlayback);
+
+    // Event listener para la barra de progreso
+    const progressSeekBar = document.querySelector('.progress-seek-bar');
+    if (progressSeekBar) {
+        progressSeekBar.addEventListener('click', seekVideo);
     }
-    const index = playlistsData.findIndex(p => p.id === playlistId);
-    if (index !== -1) {
-        const removedPlaylist = playlistsData.splice(index, 1);
-        mostrarMensajeFlotante(`Playlist "${removedPlaylist[0].name}" eliminada.`);
-        console.log(`Playlist ${playlistId} eliminada.`);
-        // Si la playlist actual estaba reproduciendo, detener y reiniciar
-        if (currentPlayingInfo.playlistId === playlistId) {
-            stopVideo(); // Detener reproducción
-            currentPlayingInfo = { playlistId: null, videoId: null, flattenedIndex: -1 };
-            console.log("Reproducción detenida, playlist actual eliminada.");
-        }
-        updatePlaylistsUI(); // Actualizar la UI
-        updateCurrentPlayingIndex(); // Recalcular índice aplanado
-        checkAndEnablePlayButton(); // Actualizar estado del botón Play
-    }
-}
-
-// --- Manejo de eliminar video de playlist ---
-function removeVideoFromPlaylist(playlistId, videoId, showMessage = true) {
-    const playlist = playlistsData.find(p => p.id === playlistId);
-    if (playlist) {
-        const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
-        if (videoIndex !== -1) {
-            const removedVideo = playlist.videos.splice(videoIndex, 1);
-            if (showMessage) {
-                mostrarMensajeFlotante(`"${removedVideo[0].title}" eliminado de "${playlist.name}".`);
-            }
-            console.log(`Video ${videoId} eliminado de playlist ${playlistId}.`);
-
-            // Si el video eliminado era el que se estaba reproduciendo actualmente
-            if (currentPlayingInfo.videoId === videoId && currentPlayingInfo.playlistId === playlistId) {
-                console.log("El video actualmente reproduciéndose ha sido eliminado. Saltando al siguiente...");
-                playNextVideo(); // Intentar reproducir el siguiente video
-            } else {
-                updateCurrentPlayingIndex(); // Recalcular índice aplanado
-            }
-            updatePlaylistsUI(); // Actualizar la UI
-            checkAndEnablePlayButton(); // Actualizar estado del botón Play
-        }
-    }
-}
-
-// --- Manejo de mover video dentro de playlist ---
-function moveVideoInPlaylist(playlistId, videoId, direction) {
-    const playlist = playlistsData.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    const index = playlist.videos.findIndex(v => v.videoId === videoId);
-    if (index === -1) return;
-
-    const newIndex = index + direction;
-    if (newIndex >= 0 && newIndex < playlist.videos.length) {
-        const [movedVideo] = playlist.videos.splice(index, 1);
-        playlist.videos.splice(newIndex, 0, movedVideo);
-        mostrarMensajeFlotante(`"${movedVideo.title}" movido.`);
-        console.log(`Video ${videoId} movido en playlist ${playlistId} de ${index} a ${newIndex}.`);
-        updatePlaylistsUI();
-        updateCurrentPlayingIndex(); // Recalcular índice aplanado
-    }
-}
-
-// --- Manejo de mover playlist ---
-function movePlaylist(playlistId, direction) {
-    const index = playlistsData.findIndex(p => p.id === playlistId);
-    if (index === -1) return;
-
-    const newIndex = index + direction;
-    if (newIndex >= 0 && newIndex < playlistsData.length) {
-        const [movedPlaylist] = playlistsData.splice(index, 1);
-        playlistsData.splice(newIndex, 0, movedPlaylist);
-        mostrarMensajeFlotante(`Playlist "${movedPlaylist.name}" movida.`);
-        console.log(`Playlist ${playlistId} movida de ${index} a ${newIndex}.`);
-        updatePlaylistsUI();
-        updateCurrentPlayingIndex(); // Recalcular índice aplanado
-    }
-}
-
-// Módulo: Funcionalidad de Reproducción
-
-let reproduccionIniciada = false; // Flag para controlar el estado de reproducción
-
-// Función para reproducir un video específico (por videoId y opcionalmente playlistId)
-function playVideo(videoId, playlistId = null) {
-    if (!playersInitialized) {
-        console.warn("Reproductores no inicializados aún.");
-        mostrarMensajeFlotante("Los reproductores aún no están listos. Inténtalo de nuevo en unos segundos.");
-        return;
-    }
-
-    const flatList = getFlattenedPlaylist();
-    let targetIndex = -1;
-
-    if (playlistId) {
-        targetIndex = flatList.findIndex(v => v.videoId === videoId && v.sourcePlaylistId === playlistId);
-    } else {
-        // Si no se da playlistId, buscar la primera ocurrencia del video
-        targetIndex = flatList.findIndex(v => v.videoId === videoId);
-    }
-
-    if (targetIndex === -1) {
-        console.error(`Video ${videoId} (en playlist ${playlistId || 'cualquiera'}) no encontrado en la lista aplanada.`);
-        mostrarMensajeFlotante("El video solicitado no se encontró en tus playlists cargadas.");
-        return;
-    }
-
-    const videoToPlay = flatList[targetIndex];
-
-    // Verificar si ya está sonando el mismo video en el mismo player
-    const activePlayer = (currentPlayer === 1 ? player1 : player2);
-    try {
-        if (activePlayer && activePlayer.getPlayerState() !== -1 && activePlayer.getVideoData()?.video_id === videoId) {
-            if (activePlayer.getPlayerState() === YT.PlayerState.PLAYING) {
-                console.log(`Video ${videoId} ya está reproduciéndose. No se hace nada.`);
-                return;
-            } else {
-                console.log(`Video ${videoId} ya está en el reproductor pero no reproduciendo. Reanudando.`);
-                activePlayer.playVideo();
-                reproduccionIniciada = true;
-                updatePlayButtonIcon(true);
-                return;
-            }
-        }
-    } catch (e) {
-        console.warn("Error al verificar estado del reproductor actual:", e);
-    }
-
-    console.log(`Intentando reproducir video: ${videoToPlay.title} (${videoToPlay.videoId}) desde flattenedIndex: ${targetIndex}`);
-
-    // Si ya estamos en una transición, intentar abortarla o manejarla
-    if (isTransitioning) {
-        console.log("Ya hay una transición en curso, intentando abortar/interrumpir.");
-        // Podríamos decidir qué hacer: detener el fade actual, forzar el nuevo video, etc.
-        // Por ahora, simplemente cargaremos el nuevo video en el 'otro' reproductor.
-    }
-
-    // Determinar el player "siguiente" (el que no está activo, o el 1 si no hay activo)
-    const nextPlayerNum = (currentPlayer === 1 ? 2 : 1);
-    const nextPlayer = (nextPlayerNum === 1 ? player1 : player2);
-    const activePlayerElement = document.getElementById(`player${currentPlayer}`);
-    const nextPlayerElement = document.getElementById(`player${nextPlayerNum}`);
-
-    // Pre-cargar el video en el siguiente reproductor
-    nextPlayer.loadVideoById(videoToPlay.videoId);
-    isTransitioning = true; // Establecer flag de transición
-    reproduccionIniciada = true; // Marcar reproducción como iniciada
-    updatePlayButtonIcon(true); // Actualizar icono a pausa
-
-    // Actualizar currentPlayingInfo *inmediatamente* con el video que se INTENTA reproducir
-    currentPlayingInfo.playlistId = videoToPlay.sourcePlaylistId;
-    currentPlayingInfo.videoId = videoToPlay.videoId;
-    currentPlayingInfo.flattenedIndex = targetIndex;
-    updatePlaylistsUI(); // Actualizar UI para reflejar el resaltado
-
-    // Iniciar crossfade y cambiar z-index
-    setTimeout(() => { // Pequeño delay para asegurar que loadVideoById empiece a cargar
-        // Ocultar el player activo actual y mostrar el siguiente
-        activePlayerElement.classList.add('fade-out');
-        activePlayerElement.classList.remove('fade-in');
-        activePlayerElement.style.zIndex = '1'; // El player que se va a ocultar
-
-        nextPlayerElement.classList.add('fade-in');
-        nextPlayerElement.classList.remove('fade-out');
-        nextPlayerElement.style.zIndex = '2'; // El player que se va a mostrar
-
-        // Iniciar la reproducción del siguiente reproductor (si no se inició ya automáticamente)
-        if (nextPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-            console.log(`Intentando playVideo() en player ${nextPlayerNum} después de load.`);
-            nextPlayer.playVideo();
-        }
-
-        // Manejar el final del crossfade visual y de audio
-        // El crossfade de audio se maneja en monitorPlayers ahora.
-        // Aquí solo la lógica visual:
-        setTimeout(() => {
-            // El player que estaba activo puede ser pausado y enviado al fondo
-            if (activePlayer && typeof activePlayer.pauseVideo === 'function') {
-                try { activePlayer.pauseVideo(); } catch (e) { console.warn("Error al pausar el player viejo:", e); }
-            }
-            if (activePlayerElement) {
-                 activePlayerElement.classList.add('hidden'); // Ocultar completamente al final del crossfade
-                 activePlayerElement.classList.remove('fade-out'); // Limpiar clase
-            }
-            // currentPlayer se actualizará en onPlayerStateChange cuando el nuevo reproductor entre en PLAYING
-            isTransitioning = false; // Transición visual terminada
-            console.log("Transición visual completada.");
-        }, CROSSFADE_DURATION * 1000); // Esperar la duración completa del crossfade
-
-    }, 100); // Un pequeño retraso para permitir la preparación del iframe
-}
+});
 
 
-// Función para reproducir un video desde la lista de reproducción
-function playVideoFromPlaylist(playlistId, videoId) {
-    console.log(`Reproducir videoId: ${videoId} desde playlistId: ${playlistId}`);
-    playVideo(videoId, playlistId);
-}
-
-// Funciones de control de reproducción
 function togglePlayPause() {
-    if (!playersInitialized) {
-        mostrarMensajeFlotante("Los reproductores no están listos aún.");
-        return;
-    }
-    const flatList = getFlattenedPlaylist();
-    if (flatList.length === 0) {
-        mostrarMensajeFlotante("No hay videos en la playlist para reproducir.");
-        return;
-    }
+    const player = getCurrentPlayer();
+    if (!player || !player.getPlayerState) return;
 
-    const activePlayer = (currentPlayer === 1 ? player1 : player2);
-    if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') {
-         console.warn("No hay reproductor activo o no está listo.");
-         // Si no hay player activo, intentar reproducir el primer video de la lista aplanada
-         if (flatList.length > 0) {
-              console.log("No hay player activo, intentando reproducir el primer video.");
-              playVideo(flatList[0].videoId, flatList[0].sourcePlaylistId);
-         }
-         return;
-    }
-
-    const playerState = activePlayer.getPlayerState();
-
+    const playerState = player.getPlayerState();
     if (playerState === YT.PlayerState.PLAYING) {
-        activePlayer.pauseVideo();
-        reproduccionIniciada = false;
-        updatePlayButtonIcon(false); // Pausa
-    } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
-        // Si está pausado o en cola, intentar reproducir
-        // Asegúrate de que currentPlayingInfo esté actualizado si se pausó y luego reanuda
-        if (currentPlayingInfo.videoId && currentPlayingInfo.flattenedIndex !== -1) {
-            activePlayer.playVideo();
-            reproduccionIniciada = true;
-            updatePlayButtonIcon(true); // Reproduciendo
-        } else {
-             // Si no hay info de reproducción, intentar reproducir el primer video
-            console.log("Player en pausa/cola pero sin currentPlayingInfo, intentando reproducir el primer video.");
-            playVideo(flatList[0].videoId, flatList[0].sourcePlaylistId);
-        }
-    } else if (playerState === YT.PlayerState.ENDED || playerState === -1 /* unstarted */) {
-         // Si terminó o no ha iniciado, reproducir el primer video o el siguiente
-         if (currentPlayingInfo.flattenedIndex !== -1) {
-             playNextVideo(); // Si ya había algo reproduciendo, pasar al siguiente
-         } else {
-            playVideo(flatList[0].videoId, flatList[0].sourcePlaylistId); // Reproducir el primero
-         }
+        player.pauseVideo();
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+        stopMonitor();
+    } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.ENDED || playerState === YT.PlayerState.CUED) {
+        player.playVideo();
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-pause"></i>';
+        startMonitor();
     }
 }
 
 function playNextVideo() {
-    const flatList = getFlattenedPlaylist();
-    if (flatList.length === 0) {
-        console.log("No hay videos para reproducir.");
-        stopVideo();
-        return;
-    }
-
-    // Determinar el índice del siguiente video
-    let nextIndex;
-    if (currentPlayingInfo.flattenedIndex === -1) {
-        nextIndex = 0; // Si no hay nada sonando, empezar desde el principio
+    const nextVideoInfo = getNextVideoInPlaylist();
+    if (nextVideoInfo) {
+        playVideo(nextVideoInfo);
     } else {
-        nextIndex = currentPlayingInfo.flattenedIndex + 1;
-        if (nextIndex >= flatList.length) {
-            nextIndex = 0; // Volver al principio si se llegó al final de la playlist
-        }
+        mostrarMensajeFlotante("No hay más videos en la playlist.");
     }
-
-    const nextVideo = flatList[nextIndex];
-    console.log(`Reproduciendo siguiente video: ${nextVideo.title} (Índice: ${nextIndex})`);
-    playVideo(nextVideo.videoId, nextVideo.sourcePlaylistId);
 }
 
 function playPrevVideo() {
-    const flatList = getFlattenedPlaylist();
-    if (flatList.length === 0) {
-        console.log("No hay videos para reproducir.");
-        stopVideo();
-        return;
-    }
-
-    // Determinar el índice del video anterior
-    let prevIndex;
-    if (currentPlayingInfo.flattenedIndex === -1) {
-        prevIndex = flatList.length - 1; // Si no hay nada sonando, ir al último
+    const prevVideoInfo = getPrevVideoInPlaylist();
+    if (prevVideoInfo) {
+        playVideo(prevVideoInfo);
     } else {
-        prevIndex = currentPlayingInfo.flattenedIndex - 1;
-        if (prevIndex < 0) {
-            prevIndex = flatList.length - 1; // Volver al final si se llegó al principio
-        }
+        mostrarMensajeFlotante("Estás en el primer video de la playlist.");
     }
-
-    const prevVideo = flatList[prevIndex];
-    console.log(`Reproduciendo video anterior: ${prevVideo.title} (Índice: ${prevIndex})`);
-    playVideo(prevVideo.videoId, prevVideo.sourcePlaylistId);
 }
 
-function stopVideo() {
-    if (player1 && typeof player1.stopVideo === 'function') {
-        try { player1.stopVideo(); } catch (e) { console.warn("Error al detener player1:", e); }
-    }
-    if (player2 && typeof player2.stopVideo === 'function') {
-        try { player2.stopVideo(); } catch (e) { console.warn("Error al detener player2:", e); }
-    }
-    reproduccionIniciada = false;
-    currentPlayingInfo = { playlistId: null, videoId: null, flattenedIndex: -1 };
-    updatePlayButtonIcon(false); // Pausa
-    updatePlaylistsUI(); // Quitar resaltado de video actual
-    resetVisualPlayers(); // Restablecer visibilidad y z-index
-    console.log("Reproducción detenida y reproductores reseteados visualmente.");
-}
-
-function resetVisualPlayers() {
-    const player1Element = document.getElementById('player1');
-    const player2Element = document.getElementById('player2');
-
-    if (player1Element) {
-        player1Element.classList.add('hidden'); // Ocultar por defecto
-        player1Element.classList.remove('fade-in', 'fade-out'); // Limpiar clases de transición
-        player1Element.style.zIndex = '1';
-    }
-    if (player2Element) {
-        player2Element.classList.add('hidden'); // Ocultar por defecto
-        player2Element.classList.remove('fade-in', 'fade-out'); // Limpiar clases de transición
-        player2Element.style.zIndex = '1';
-    }
-    // Asegurar que solo uno (o ninguno) sea visible si no hay reproducción activa
-    // Si no hay reproducción activa, ambos deben estar hidden
-    if (!reproduccionIniciada && player1Element && player2Element) {
-        player1Element.classList.add('hidden');
-        player2Element.classList.add('hidden');
+function stopVideoPlayback() {
+    const player = getCurrentPlayer();
+    if (player && player.stopVideo) {
+        player.stopVideo();
+        stopMonitor(); // Detener el monitoreo de tiempo
+        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+        updateProgressBar(0, 0); // Resetear barra de progreso
+        // Ocultar el reproductor activo
+        const activePlayerElement = document.getElementById(player.getIframe().id);
+        activePlayerElement.classList.add('hidden');
+        currentPlayingInfo = { playlistId: null, videoId: null, flattenedIndex: -1 }; // Resetear info
+        updateCurrentlyPlayingVideoUI(); // Limpiar el marcado de "playing" en la UI
     }
 }
 
 
-// --- Actualizar icono del botón Play ---
-const botonPlay = document.getElementById('botonPlay');
-function updatePlayButtonIcon(isPlaying) {
-    if (!botonPlay) return;
-    botonPlay.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+// --- Funciones de Monitoreo de Progreso ---
+
+function startMonitor() {
+    if (monitorInterval) clearInterval(monitorInterval); // Limpiar cualquier intervalo previo
+    monitorInterval = setInterval(updateProgress, 1000); // Actualizar cada segundo
 }
 
-
-// Módulo: Barra de Progreso y Monitor de Reproducción
-
-const timeElapsedSpan = document.getElementById('timeElapsed');
-const timeRemainingSpan = document.getElementById('timeRemaining');
-const progressBarDiv = document.getElementById('progressBar');
-const progressSeekBar = document.getElementById('progressSeek-bar'); // El contenedor clickeable
-
-function monitorPlayers() {
-    if (!reproduccionIniciada) {
-        timeElapsedSpan.textContent = "0:00";
-        timeRemainingSpan.textContent = "0:00";
-        if (progressBarDiv) progressBarDiv.style.width = '0%';
-        return;
-    }
-
-    const activePlayer = (currentPlayer === 1 ? player1 : player2);
-    if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function' || typeof activePlayer.getDuration !== 'function') {
-        return;
-    }
-
-    const currentTime = activePlayer.getCurrentTime();
-    const duration = activePlayer.getDuration();
-
-    if (duration > 0) {
-        const elapsedPercentage = (currentTime / duration) * 100;
-        if (progressBarDiv) progressBarDiv.style.width = `${elapsedPercentage}%`;
-        timeElapsedSpan.textContent = formatDuration(currentTime);
-        timeRemainingSpan.textContent = formatDuration(duration - currentTime);
-
-        // --- Lógica de Crossfade de Audio (Volumen) ---
-        const flatList = getFlattenedPlaylist();
-        const currentVideo = flatList[currentPlayingInfo.flattenedIndex];
-
-        if (currentVideo && !isTransitioning && !isAudioFading) {
-            // Verificar si el video está cerca del final para iniciar el crossfade de salida
-            if (duration - currentTime <= CROSSFADE_DURATION && currentPlayingInfo.flattenedIndex < flatList.length - 1) {
-                console.log("Iniciando crossfade de salida...");
-                isAudioFading = true; // Prevenir múltiples llamadas
-                startAudioFade(activePlayer, 'out', () => {
-                    console.log("Crossfade de salida completado. Iniciando siguiente video.");
-                    playNextVideo();
-                });
-            }
-        }
-        // --- Lógica de SponsorBlock ---
-        checkAndSkipSegment(activePlayer);
+function stopMonitor() {
+    if (monitorInterval) {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
     }
 }
 
-// Función para el crossfade de audio
-function startAudioFade(player, direction, callback) {
-    const startVolume = direction === 'out' ? 100 : 0;
-    const endVolume = direction === 'out' ? 0 : 100;
-    const volumeStep = (endVolume - startVolume) / (CROSSFADE_DURATION * 10); // 10 pasos por segundo
+function updateProgress() {
+    const player = getCurrentPlayer();
+    if (!player || !player.getCurrentTime || !player.getDuration || isAudioFading) return;
 
-    let currentVolume = startVolume;
-    isAudioFading = true; // Set the flag
-
-    const fadeInterval = setInterval(() => {
-        currentVolume += volumeStep;
-        if ((direction === 'out' && currentVolume <= endVolume) || (direction === 'in' && currentVolume >= endVolume)) {
-            currentVolume = endVolume;
-            player.setVolume(currentVolume);
-            clearInterval(fadeInterval);
-            isAudioFading = false; // Reset the flag
-            if (callback) callback();
-            console.log(`Crossfade de audio '${direction}' terminado.`);
-        } else {
-            player.setVolume(currentVolume);
-        }
-    }, 100); // Actualizar cada 100ms
-}
-
-// Seek a través de la barra de progreso
-if (progressSeekBar) {
-    progressSeekBar.addEventListener('click', (event) => {
-        const activePlayer = (currentPlayer === 1 ? player1 : player2);
-        if (!activePlayer || typeof activePlayer.getDuration !== 'function') return;
-
-        const rect = progressSeekBar.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const width = rect.width;
-        const newTime = (clickX / width) * activePlayer.getDuration();
-
-        activePlayer.seekTo(newTime, true);
-        console.log(`Buscando a: ${formatDuration(newTime)}`);
-    });
-}
-
-
-// Módulo: Funciones Utilitarias (Formato, etc.)
-
-// Formatear duración de segundos a MM:SS
-function formatDuration(seconds) {
-    if (isNaN(seconds) || seconds < 0) return "0:00";
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    const formattedSeconds = remainingSeconds < 10 ? '0' + remainingSeconds : remainingSeconds;
-    return `${minutes}:${formattedSeconds}`;
-}
-
-// Parsear duración de formato ISO 8601 (PT#M#S) a segundos o directamente si ya es número
-function parseDuration(duration) {
-    if (typeof duration === 'number') return duration; // Ya es segundos
-    
-    const p = duration.indexOf('P');
-    if (p === -1) return 0; // No es formato ISO 8601
-    
-    let totalSeconds = 0;
-    const timePart = duration.substring(p + 1); // Remove 'P'
-    
-    const matches = timePart.match(/(\d+H)?(\d+M)?(\d+S)?/);
-    if (!matches) return 0;
-
-    const hours = parseInt(matches[1] || '0');
-    const minutes = parseInt(matches[2] || '0');
-    const seconds = parseInt(matches[3] || '0');
-
-    totalSeconds += hours * 3600;
-    totalSeconds += minutes * 60;
-    totalSeconds += seconds;
-
-    return totalSeconds;
-}
-
-
-// Módulo: SponsorBlock Integration (Simplified Piped API)
-
-async function fetchSponsorSegments(videoId) {
-    if (segmentosCache[videoId]) {
-        return segmentosCache[videoId];
-    }
-    try {
-        const response = await fetch(`/.netlify/functions/sponsorblock?video_id=${videoId}`);
-        if (!response.ok) {
-            const errorBody = await response.json();
-            console.error("Error fetching SponsorBlock segments:", errorBody.error || response.statusText);
-            return []; // Retornar array vacío en caso de error
-        }
-        const data = await response.json();
-        const segments = data || []; // Asegurarse de que sea un array
-        segmentosCache[videoId] = segments;
-        console.log(`Segmentos de SponsorBlock para ${videoId}:`, segments);
-        return segments;
-    } catch (error) {
-        console.error("Error en fetchSponsorSegments:", error);
-        return [];
-    }
-}
-
-async function checkAndSkipSegment(player, forceCheck = false) {
-    if (!player || typeof player.getPlayerState !== 'function' || !player.getVideoData) {
-        return;
-    }
-
-    const videoId = player.getVideoData()?.video_id;
-    if (!videoId) return;
-
-    const playerState = player.getPlayerState();
     const currentTime = player.getCurrentTime();
     const duration = player.getDuration();
 
-    // Solo actuar si está reproduciendo o si se fuerza la comprobación (ej. al inicio de un video)
-    if (playerState !== YT.PlayerState.PLAYING && !forceCheck) {
+    if (duration > 0) {
+        const progress = (currentTime / duration) * 100;
+        updateProgressBar(currentTime, duration);
+        checkSponsorBlock(currentTime); // Verifica SponsorBlock
+    }
+}
+
+function updateProgressBar(currentTime, duration) {
+    const progressBarFill = document.getElementById('progressBar');
+    const timeElapsedSpan = document.getElementById('timeElapsed');
+    const timeRemainingSpan = document.getElementById('timeRemaining');
+
+    if (duration > 0) {
+        const progressPercent = (currentTime / duration) * 100;
+        progressBarFill.style.width = `${progressPercent}%`;
+
+        timeElapsedSpan.textContent = formatTime(currentTime);
+        timeRemainingSpan.textContent = formatTime(duration - currentTime);
+    } else {
+        progressBarFill.style.width = '0%';
+        timeElapsedSpan.textContent = '0:00';
+        timeRemainingSpan.textContent = '0:00';
+    }
+}
+
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+}
+
+function seekVideo(event) {
+    const progressBar = event.currentTarget;
+    const clickX = event.offsetX;
+    const width = progressBar.clientWidth;
+    const seekTime = (clickX / width) * getCurrentPlayer().getDuration();
+    getCurrentPlayer().seekTo(seekTime, true);
+}
+
+// --- Funciones de Interfaz de Usuario (UI) ---
+
+// Renderiza o actualiza la lista de playlists en la sidebar
+function updatePlaylistsUI() {
+    const playlistContainer = document.getElementById('playlistContainer');
+    if (!playlistContainer) return;
+
+    playlistContainer.innerHTML = ''; // Limpiar el contenedor actual
+
+    if (playlistsData.length === 0) {
+        playlistContainer.innerHTML = '<p class="text-light">No hay playlists para mostrar. Inicia sesión en Google y asegúrate de tener playlists públicas o sin listar.</p>';
         return;
     }
 
-    // Evitar re-saltos inmediatos después de un skip
-    if (videoId === lastSeekVideoId && Math.abs(currentTime - lastSeekEndTime) < 0.5) {
-        // console.log("Evitando re-salto inmediato.");
-        return;
+    playlistsData.forEach(playlist => {
+        const playlistItem = document.createElement('div');
+        playlistItem.className = 'playlist-item';
+        playlistItem.dataset.playlistId = playlist.id;
+
+        // Añadir clase 'expanded' si la playlist está expandida
+        if (playlist.isExpanded) {
+            playlistItem.classList.add('expanded');
+        }
+
+        // Añadir clase 'currently-playing' si es la playlist activa
+        if (currentPlayingInfo.playlistId === playlist.id) {
+            playlistItem.classList.add('currently-playing');
+        }
+
+        playlistItem.innerHTML = `
+            <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="playlist-thumbnail">
+            <div class="playlist-info">
+                <span class="playlist-name">${playlist.name}</span>
+                <span class="playlist-video-count">${playlist.videoCount} videos</span>
+            </div>
+            <div class="playlist-item-actions">
+                <button class="expand-playlist-button" title="Expandir/Contraer">
+                    <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
+                </button>
+                <button class="delete-playlist-button" title="Eliminar Playlist (Solo UI)">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        playlistContainer.appendChild(playlistItem);
+
+        // Añadir listener para expandir/contraer
+        playlistItem.querySelector('.expand-playlist-button').addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que el clic en el botón afecte al elemento padre
+            togglePlaylistExpansion(playlist.id);
+        });
+
+        // Listener para eliminar playlist (solo de la UI)
+        playlistItem.querySelector('.delete-playlist-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deletePlaylistFromUI(playlist.id);
+        });
+
+        // Listener para reproducir la playlist
+        playlistItem.addEventListener('click', () => {
+            playPlaylist(playlist.id);
+        });
+
+
+        // Si la playlist está expandida, renderizar sus videos
+        if (playlist.isExpanded && playlist.videos) {
+            renderPlaylistVideos(playlist.id, playlist.videos, playlistContainer);
+        }
+    });
+}
+
+// Renderiza los videos de una playlist específica
+function renderPlaylistVideos(playlistId, videos, parentContainer) {
+    const playlistVideosList = document.createElement('ul');
+    playlistVideosList.className = 'playlist-videos-list';
+    playlistVideosList.dataset.playlistId = playlistId; // Para identificar a qué playlist pertenece
+
+    videos.forEach((video, index) => {
+        const videoItem = document.createElement('li');
+        videoItem.className = 'playlist-video-item';
+        videoItem.dataset.videoId = video.id;
+        videoItem.dataset.flattenedIndex = index; // Guardar el índice plano para la navegación
+        videoItem.dataset.playlistId = playlistId;
+
+        // Añadir clase si es el video actualmente en reproducción
+        if (currentPlayingInfo.playlistId === playlistId && currentPlayingInfo.videoId === video.id) {
+            videoItem.classList.add('currently-playing-video');
+        }
+
+        videoItem.innerHTML = `
+            <i class="fas fa-grip-lines playlist-video-drag-handle"></i>
+            <img src="${video.thumbnailUrl}" alt="${video.title}" class="playlist-video-thumbnail">
+            <div class="playlist-video-info">
+                <span class="playlist-video-title">${video.title}</span>
+                <span class="playlist-video-channel">${video.channelTitle}</span>
+            </div>
+            <div class="playlist-item-actions">
+                <button class="add-to-queue-button" title="Añadir a la cola"><i class="fas fa-plus"></i></button>
+                <button class="delete-video-button" title="Eliminar Video (Solo UI)"><i class="fas fa-times"></i></button>
+            </div>
+        `;
+        playlistVideosList.appendChild(videoItem);
+
+        videoItem.addEventListener('click', (e) => {
+            // Asegurarse de que el clic no sea en un botón de acción
+            if (!e.target.closest('.add-to-queue-button') && !e.target.closest('.delete-video-button') && !e.target.closest('.playlist-video-drag-handle')) {
+                playVideo({
+                    id: video.id,
+                    playlistId: playlistId,
+                    flattenedIndex: index
+                });
+            }
+        });
+
+        // Listeners para los botones de acción del video
+        videoItem.querySelector('.add-to-queue-button').addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que se reproduzca el video
+            mostrarMensajeFlotante(`Video "${video.title}" añadido a la cola.`);
+            // Lógica para añadir a la cola
+        });
+        videoItem.querySelector('.delete-video-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteVideoFromPlaylistUI(playlistId, video.id);
+        });
+    });
+
+    // Encontrar el lugar correcto para insertar la lista de videos
+    const playlistItemElement = parentContainer.querySelector(`.playlist-item[data-playlist-id="${playlistId}"]`);
+    if (playlistItemElement) {
+        playlistItemElement.insertAdjacentElement('afterend', playlistVideosList);
     }
+}
 
-    const segments = await fetchSponsorSegments(videoId);
-    if (segments.length === 0) return;
+// Alterna la expansión de una playlist
+async function togglePlaylistExpansion(playlistId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    if (!playlist) return;
 
-    for (const segment of segments) {
-        const [segmentStart, segmentEnd] = segment.segment;
-        const category = segment.category;
+    playlist.isExpanded = !playlist.isExpanded;
 
-        // Comprobar si el tiempo actual está dentro de un segmento a saltar
-        if (currentTime >= segmentStart && currentTime < segmentEnd) {
-            // Asegurarse de que sea una categoría a saltar (puedes expandir esto)
-            if (['sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'filler'].includes(category)) {
-                let skipToTime = segmentEnd + 0.1; // Saltar un poco más allá del final del segmento
-                // Si el segmento 'outro' lleva al final del video y hay siguiente video en la playlist,
-                // activar un crossfade especial a ese siguiente video.
-                if (category === 'outro' && (duration - segmentEnd) < 5) { // Si el 'outro' es cerca del final del video
-                     const flatList = getFlattenedPlaylist();
-                     const currentIndex = flatList.findIndex(v => v.videoId === videoId);
-                     if (currentIndex !== -1 && currentIndex < flatList.length - 1) { // Si no es el último video
-                         console.log(`Detectado segmento 'outro' cerca del final. Iniciando crossfade a siguiente video.`);
-                         hasOutroCrossfadeStarted = true; // Activar el flag
-                         // No hacer seek, dejar que el crossfade de audio se active y luego playNextVideo
-                         return; // Salir sin hacer seekTo
-                     }
-                }
+    if (playlist.isExpanded && (!playlist.videos || playlist.videos.length === 0)) {
+        // Cargar videos solo si se expande y aún no se han cargado
+        await getVideosForPlaylist(playlist.id);
+    }
+    updatePlaylistsUI(); // Volver a renderizar para reflejar los cambios
+}
 
-                console.log(`Saltando segmento de ${category}: ${formatDuration(segmentStart)} - ${formatDuration(segmentEnd)}. Salto a ${formatDuration(skipToTime)}`);
-                player.seekTo(skipToTime, true);
-                lastSeekEndTime = skipToTime;
-                lastSeekVideoId = videoId;
-                // Mostrar mensaje flotante al usuario
-                mostrarMensajeFlotante(`Saltando: ${category.charAt(0).toUpperCase() + category.slice(1)}`);
-                return; // Solo salta un segmento a la vez
+// Función para eliminar una playlist de la UI (sin afectar YouTube)
+function deletePlaylistFromUI(playlistId) {
+    playlistsData = playlistsData.filter(p => p.id !== playlistId);
+    mostrarMensajeFlotante("Playlist eliminada de la interfaz (no de YouTube).");
+    updatePlaylistsUI();
+    // Si la playlist eliminada era la que se estaba reproduciendo, detener la reproducción
+    if (currentPlayingInfo.playlistId === playlistId) {
+        stopVideoPlayback();
+    }
+}
+
+// Función para eliminar un video de una playlist en la UI
+function deleteVideoFromPlaylistUI(playlistId, videoId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    if (playlist && playlist.videos) {
+        const initialVideoCount = playlist.videos.length;
+        playlist.videos = playlist.videos.filter(v => v.id !== videoId);
+        // Re-indexar los videos aplanados después de eliminar
+        playlist.videos.forEach((v, idx) => v.flattenedIndex = idx);
+        playlist.videoCount = playlist.videos.length; // Actualizar el conteo
+
+        if (playlist.videos.length < initialVideoCount) {
+            mostrarMensajeFlotante("Video eliminado de la playlist (no de YouTube).");
+            updatePlaylistsUI();
+            // Si el video eliminado era el que se estaba reproduciendo, manejar la reproducción
+            if (currentPlayingInfo.playlistId === playlistId && currentPlayingInfo.videoId === videoId) {
+                // Intenta reproducir el siguiente o el anterior
+                playNextVideo(); // O puedes decidir stopVideoPlayback()
             }
         }
     }
 }
 
-// Módulo: Listeners de Eventos y Carga Inicial
+// Lógica de reproducción de una playlist completa
+async function playPlaylist(playlistId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    if (!playlist) return;
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Cargar la API de YouTube una vez que el DOM esté listo
-    loadYouTubeAPI();
+    showLoadingSpinner();
+    try {
+        // Asegurarse de que los videos de la playlist estén cargados
+        if (!playlist.videos || playlist.videos.length === 0) {
+            await getVideosForPlaylist(playlist.id);
+        }
 
-    // Asignar listeners a los botones de control de reproducción
-    document.getElementById('botonPlay').addEventListener('click', togglePlayPause);
-    document.getElementById('botonStop').addEventListener('click', stopVideo);
-    document.getElementById('botonNext').addEventListener('click', playNextVideo);
-    document.getElementById('botonPrev').addEventListener('click', playPrevVideo);
-
-    // Asignar listeners a los botones de Google SignIn/SignOut AHORA DENTRO de DOMContentLoaded
-    // Estos estaban fuera y causaban el error 'null'
-    const signInButton = document.getElementById('googleSignInButton');
-    const signOutButton = document.getElementById('googleSignOutButton');
-
-    if (signInButton) { // Añadir una comprobación de existencia por si acaso, aunque con DOMContentLoaded no debería ser null
-        signInButton.addEventListener('click', handleAuthClick);
-    } else {
-        console.warn("Elemento #googleSignInButton no encontrado al cargar el DOM.");
-    }
-
-    if (signOutButton) { // Igual para el botón de cerrar sesión
-        signOutButton.addEventListener('click', handleSignOutClick);
-    } else {
-        console.warn("Elemento #googleSignOutButton no encontrado al cargar el DOM.");
-    }
-
-
-    // Listener para la barra de búsqueda
-    const searchInput = document.getElementById('searchInput');
-    const searchButton = document.getElementById('searchButton');
-
-    searchButton.addEventListener('click', () => {
-        const query = searchInput.value.trim();
-        if (query) {
-            performSearch(query);
-            // Limpiar resultados anteriores y mostrar spinner si es necesario
-            resultsDiv.innerHTML = '';
-            showLoadingSpinner(); // Mostrar spinner de página completa si la búsqueda es lenta
+        if (playlist.videos && playlist.videos.length > 0) {
+            // Establecer la playlist activa y el primer video
+            currentPlayingInfo.playlistId = playlist.id;
+            currentPlayingInfo.flattenedIndex = 0; // Siempre empezar por el primer video
+            playVideo(playlist.videos[0]);
+            mostrarMensajeFlotante(`Iniciando playlist: ${playlist.name}`);
         } else {
-            mostrarMensajeFlotante("Por favor, introduce un término de búsqueda.");
+            mostrarMensajeFlotante("La playlist no tiene videos o no se pudieron cargar.");
+        }
+    } catch (error) {
+        console.error("Error al reproducir playlist:", error);
+        mostrarMensajeFlotante("Error al reproducir playlist.");
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+
+// Función para obtener videos de una playlist específica (llamada por app.js)
+async function getVideosForPlaylist(playlistId) {
+    showLoadingSpinner();
+    try {
+        let videos = [];
+        let nextPageToken = null;
+        do {
+            const response = await gapi.client.youtube.playlistItems.list({
+                'part': ['snippet'],
+                'playlistId': playlistId,
+                'maxResults': 50,
+                'pageToken': nextPageToken
+            });
+            if (response.result.items) {
+                // Mapear los resultados a un formato más simple
+                const mappedVideos = response.result.items.map((item, index) => ({
+                    id: item.snippet.resourceId.videoId,
+                    title: item.snippet.title,
+                    thumbnailUrl: item.snippet.thumbnails.default ? item.snippet.thumbnails.default.url : 'placeholder.jpg',
+                    channelTitle: item.snippet.channelTitle,
+                    playlistId: playlistId, // Añadir la playlistId al video
+                    flattenedIndex: index // Añadir un índice para la navegación interna
+                }));
+                videos = videos.concat(mappedVideos);
+            }
+            nextPageToken = response.result.nextPageToken;
+        } while (nextPageToken);
+
+        // Actualizar el objeto playlistData con los videos cargados
+        const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
+        if (playlistIndex !== -1) {
+            playlistsData[playlistIndex].videos = videos;
+            playlistsData[playlistIndex].videoCount = videos.length; // Actualizar conteo si es necesario
+        }
+
+    } catch (err) {
+        console.error("Error al obtener videos de la playlist de YouTube:", err);
+        // Manejar el error, quizás mostrar un mensaje al usuario
+        mostrarMensajeFlotante("Error al cargar videos de la playlist.");
+    } finally {
+        hideLoadingSpinner();
+    }
+}
+
+// Actualiza el marcado del video "currently playing" en la UI de playlists
+function updateCurrentlyPlayingVideoUI() {
+    // Quitar la clase de todos los videos primero
+    document.querySelectorAll('.playlist-video-item.currently-playing-video').forEach(item => {
+        item.classList.remove('currently-playing-video');
+    });
+    // Quitar la clase de todas las playlists
+    document.querySelectorAll('.playlist-item.currently-playing').forEach(item => {
+        item.classList.remove('currently-playing');
+    });
+
+    if (currentPlayingInfo.playlistId && currentPlayingInfo.videoId) {
+        // Marcar la playlist
+        const currentPlaylistElement = document.querySelector(`.playlist-item[data-playlist-id="${currentPlayingInfo.playlistId}"]`);
+        if (currentPlaylistElement) {
+            currentPlaylistElement.classList.add('currently-playing');
+        }
+
+        // Marcar el video
+        const currentVideoElement = document.querySelector(`.playlist-video-item[data-playlist-id="${currentPlayingInfo.playlistId}"][data-video-id="${currentPlayingInfo.videoId}"]`);
+        if (currentVideoElement) {
+            currentVideoElement.classList.add('currently-playing-video');
+            // Opcional: hacer scroll para que el video actual sea visible
+            currentVideoElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+}
+
+
+// --- Funciones de Búsqueda ---
+
+async function searchYouTube() {
+    currentSearchQuery = document.getElementById('searchInput').value;
+    if (!currentSearchQuery.trim()) {
+        mostrarMensajeFlotante("Por favor, introduce un término de búsqueda.");
+        return;
+    }
+
+    showLoadingSpinner(); // Mostrar spinner de carga global
+
+    try {
+        const response = await gapi.client.Youtube.list({
+            'part': 'snippet',
+            'q': currentSearchQuery,
+            'type': 'video',
+            'maxResults': 25, // Número inicial de resultados
+            'videoEmbeddable': 'true' // Asegurarse de que los videos puedan ser incrustados
+        });
+
+        const searchResults = response.result.items;
+        nextPageContext = response.result.nextPageToken; // Guardar token para la paginación
+
+        renderSearchResults(searchResults, true); // Pasar true para indicar que es una nueva búsqueda
+
+    } catch (err) {
+        console.error('Error en la búsqueda de YouTube:', err);
+        mostrarMensajeFlotante("Error en la búsqueda de YouTube. Inténtalo de nuevo más tarde.");
+    } finally {
+        hideLoadingSpinner(); // Ocultar spinner
+    }
+}
+
+function renderSearchResults(results, newSearch = false) {
+    const resultsDiv = document.getElementById('results');
+    if (!resultsDiv) return;
+
+    if (newSearch) {
+        resultsDiv.innerHTML = ''; // Limpiar resultados anteriores si es una nueva búsqueda
+    }
+
+    if (results.length === 0 && newSearch) {
+        resultsDiv.innerHTML = '<p class="text-light">No se encontraron resultados para su búsqueda.</p>';
+        return;
+    }
+
+    results.forEach(item => {
+        const videoCard = document.createElement('div');
+        videoCard.className = 'video-card';
+        videoCard.dataset.videoId = item.id.videoId; // Guardar el ID del video
+
+        const thumbnailUrl = item.snippet.thumbnails.medium ? item.snippet.thumbnails.medium.url : 'placeholder.jpg';
+
+        videoCard.innerHTML = `
+            <img src="${thumbnailUrl}" alt="${item.snippet.title}">
+            <div class="video-card-info">
+                <h4 class="video-card-title">${item.snippet.title}</h4>
+                <p class="video-card-channel">${item.snippet.channelTitle}</p>
+                <div class="video-card-actions">
+                    <button class="add-to-playlist add-to-playlist-search-button" title="Añadir a playlist">
+                        <i class="fas fa-plus"></i> <span class="add-text">Añadir</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        resultsDiv.appendChild(videoCard);
+
+        // Listener para reproducir el video al hacer clic en la tarjeta (no en el botón)
+        videoCard.addEventListener('click', (e) => {
+            if (!e.target.closest('.add-to-playlist-search-button')) { // Asegurarse de no hacer clic en el botón
+                playVideo({ id: item.id.videoId, playlistId: null, flattenedIndex: -1 }); // No es parte de una playlist
+                mostrarMensajeFlotante(`Reproduciendo: ${item.snippet.title}`);
+            }
+        });
+
+        // Listener para el botón "Añadir a playlist"
+        videoCard.querySelector('.add-to-playlist-search-button').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevenir que el clic en el botón active el reproductor
+            // Aquí llamarías a una función para abrir un selector de playlist o similar
+            // Por ahora, solo un mensaje flotante
+            mostrarMensajeFlotante(`Video "${item.snippet.title}" listo para añadir a playlist.`);
+            // Implementa aquí la lógica para añadir el video a una playlist existente
+            // showPlaylistSelectionPopup(item.id.videoId, item.snippet.title);
+        });
+    });
+}
+
+async function loadMoreSearchResults() {
+    if (isLoadingMore || !nextPageContext) {
+        return;
+    }
+    isLoadingMore = true;
+    showLoadMoreSpinner(); // Mostrar spinner pequeño para carga adicional
+
+    try {
+        const response = await gapi.client.Youtube.list({
+            'part': 'snippet',
+            'q': currentSearchQuery,
+            'type': 'video',
+            'maxResults': 25,
+            'pageToken': nextPageContext,
+            'videoEmbeddable': 'true'
+        });
+
+        const newResults = response.result.items;
+        nextPageContext = response.result.nextPageToken;
+
+        renderSearchResults(newResults, false); // No limpiar resultados existentes
+
+    } catch (err) {
+        console.error('Error al cargar más resultados de YouTube:', err);
+        mostrarMensajeFlotante("Error al cargar más resultados.");
+    } finally {
+        hideLoadMoreSpinner();
+        isLoadingMore = false;
+    }
+}
+
+// --- Funciones de SponsorBlock ---
+
+async function fetchAndApplySponsorBlockSegments(videoId) {
+    if (!isSponsorBlockActive) {
+        currentSegments = [];
+        return;
+    }
+
+    if (segmentosCache[videoId]) {
+        currentSegments = segmentosCache[videoId];
+        console.log(`Segmentos de SponsorBlock cargados desde caché para ${videoId}.`);
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&category=sponsor&category=selfpromo&category=interaction&category=intro&category=outro&category=highlight`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        currentSegments = data && data.length > 0 ? data[0].segments : [];
+        segmentosCache[videoId] = currentSegments;
+        console.log(`Segmentos de SponsorBlock cargados para ${videoId}:`, currentSegments);
+    } catch (error) {
+        console.error("Error al obtener segmentos de SponsorBlock:", error);
+        currentSegments = [];
+    }
+}
+
+function checkSponsorBlock(currentTime) {
+    if (!isSponsorBlockActive || currentSegments.length === 0 || isAudioFading || isTransitioning) {
+        return;
+    }
+
+    const player = getCurrentPlayer();
+    if (!player || !player.getCurrentTime || !player.getDuration) return;
+
+    for (const segment of currentSegments) {
+        const [segmentStart, segmentEnd] = segment.segment;
+        const segmentCategory = segment.category;
+
+        // Si el tiempo actual está dentro de un segmento
+        if (currentTime >= segmentStart && currentTime < segmentEnd) {
+            // console.log(`Saltando segmento: ${segmentCategory} de ${formatTime(segmentStart)} a ${formatTime(segmentEnd)}`);
+            // Manejar 'outro' para iniciar crossfade antes de que termine el video
+            if (segmentCategory === 'outro' && !hasOutroCrossfadeStarted) {
+                console.log("Segmento 'outro' detectado. Iniciando crossfade anticipado.");
+                hasOutroCrossfadeStarted = true; // Prevenir múltiples disparos
+                startCrossfade(player.getIframe().id);
+                return; // No intentar seekTo si ya estamos haciendo crossfade
+            } else if (segmentCategory !== 'outro') { // Saltar otros segmentos
+                player.seekTo(segmentEnd, true); // Saltar al final del segmento
+                console.log(`Saltado segmento '${segmentCategory}' a ${formatTime(segmentEnd)}`);
+                mostrarMensajeFlotante(`Saltando ${segmentCategory}...`);
+                break; // Saltar solo un segmento a la vez
+            }
+        }
+    }
+}
+
+
+// --- Funciones Utilitarias / Mensajes Flotantes ---
+
+// Función para mostrar mensajes flotantes
+function mostrarMensajeFlotante(mensaje) {
+    const container = document.getElementById('floatingMessageContainer');
+    if (!container) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'floating-message';
+    messageDiv.textContent = mensaje;
+    container.appendChild(messageDiv);
+
+    // Mostrar el mensaje con una pequeña animación
+    setTimeout(() => {
+        messageDiv.classList.add('show');
+    }, 10); // Pequeño retardo para que la transición funcione
+
+    // Ocultar y eliminar el mensaje después de un tiempo
+    setTimeout(() => {
+        messageDiv.classList.remove('show');
+        // Esperar a que la transición de ocultar termine antes de eliminar
+        messageDiv.addEventListener('transitionend', () => {
+            messageDiv.remove();
+        }, { once: true });
+    }, 3000); // Mensaje visible por 3 segundos
+}
+
+
+// --- Inicialización y Event Listeners ---
+
+// Es importante que las funciones onYouTubeIframeAPIReady, gapiInitialize y gisInitalize
+// se llamen desde el HTML en la carga de sus respectivos scripts.
+// Este listener asegura que el código de app.js se ejecute cuando el DOM esté cargado.
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM Content Loaded in app.js");
+
+    // Asociar eventos a los botones de búsqueda
+    document.getElementById('searchButton').addEventListener('click', searchYouTube);
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchYouTube();
         }
     });
 
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-            searchButton.click();
-        }
-    });
+    // Lógica para el scroll infinito en los resultados de búsqueda
+    const resultsContainerElement = document.querySelector('.search-results-section');
+    if (resultsContainerElement) {
+        resultsContainerElement.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = resultsContainerElement;
+            if (scrollHeight - scrollTop <= clientHeight + 100 && !isLoadingMore && nextPageContext) {
+                loadMoreSearchResults();
+            }
+        });
+    }
 
-    // Iniciar la actualización de la UI de playlists
-    updatePlaylistsUI();
+    // Inicializar los reproductores de YouTube cuando la API esté lista.
+    // Esto se hará cuando onYouTubeIframeAPIReady sea llamado por el script de YouTube.
+    // updatePlaylistsUI() se llamará desde auth.js después de la autenticación exitosa.
+    // Los listeners de drag and drop se añadirán después de que la UI de playlist inicial sea renderizada.
 
-    // Comentar la llamada inicial a mostrarMensajeFlotante si no la necesitas
-    // mostrarMensajeFlotante("¡Bienvenido a YT CrossMix!");
-
-    // Inicialmente, deshabilitar botón Play si no hay videos cargados
-    document.getElementById('botonPlay').disabled = true;
-
-    // Asegurarse de que el spinner de carga de página completa esté oculto al inicio
+    // Cierre inicial de spinners por si se quedaron pegados de una carga previa
     hideLoadingSpinner();
-    hideLoadMoreSpinner();
+    // hideLoadMoreSpinner() ya se maneja en el CSS con .hidden para .loading-spinner-small
+    document.getElementById('loadMoreSpinner').classList.add('hidden'); // Asegurarse que el spinner de carga de más esté oculto
 });
 
+
 // Función para mostrar el spinner de carga de página completa
+// (Mantengo aquí ya que se usa en app.js para búsquedas/playlists)
+// Idealmente, estas funciones podrían estar en un archivo de utilidades compartido.
+// Si las has movido a auth.js, elimina estas duplicadas.
+// En este caso las mantengo, pero ten cuidado con duplicados.
+/*
 function showLoadingSpinner() {
     const loadingSpinner = document.getElementById('loadingSpinner');
     if (loadingSpinner) {
         loadingSpinner.classList.remove('hidden');
     }
 }
-// Function to hide the loading spinner
 function hideLoadingSpinner() {
     const loadingSpinner = document.getElementById('loadingSpinner');
     if (loadingSpinner) {
         loadingSpinner.classList.add('hidden');
     }
 }
+*/
 
 // Event listener for global clicks to close popups - ensure it captures during the capture phase
 document.addEventListener('click', (event) => {
     // Close contextual menus (the 3 dots menu) if the click target is not inside a .delete-menu
     if (!event.target.closest('.delete-menu')) {
-        closeAllContextMenus();
+        // closeAllContextMenus(); // Asume que esta función existe
     }
     // Close the generic playlist selection popups if the click target is not inside a .playlist-selection-popup-menu
     if (!event.target.closest('.playlist-selection-popup-menu')) {
-        closePlaylistSelectionPopups(); // NEW CALL HERE
+        // closePlaylistSelectionPopups(); // Asume que esta función existe
     }
 }, true); // Keep using the capture phase for better reliability
