@@ -11,9 +11,7 @@
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
 
-    <script src="./auth.js"></script>
-    <script src="./app.js"></script>
-
+    <script async defer src="https://www.youtube.com/iframe_api"></script>
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
 </head>
@@ -24,34 +22,47 @@
         <div id="player2" class="video-player"></div>
     </div>
 
-    <div class="main-content-wrapper">
-        <header class="main-header">
-            <div class="logo">
-                <img src="./electronic.ico" alt="Logo" class="logo-icon">
-                <h1>YT CrossMix</h1>
-            </div>
-            <div class="header-actions">
-                <button id="googleSignInButton" class="auth-button">Iniciar Sesión con Google</button>
-                <button id="googleSignOutButton" class="auth-button hidden">Cerrar Sesión</button>
-            </div>
-        </header>
+    <header class="main-header">
+        <a href="#" class="logo">
+            <img src="https://www.youtube.com/s/desktop/4f80e556/img/favicon.ico" alt="Logo">
+            YT CrossMix
+        </a>
+        <nav>
+            <ul>
+                <li><a href="#">Inicio</a></li>
+                <li><a href="#">Explorar</a></li>
+            </ul>
+        </nav>
+        <div class="auth-buttons">
+            <button id="googleSignInButton" class="auth-button">Iniciar Sesión con Google</button>
+            <button id="googleSignOutButton" class="auth-button hidden">Cerrar Sesión</button>
+        </div>
+    </header>
 
-        <main class="main-layout">
-            <section class="playlists-section">
-                <h2>Mis Playlists</h2>
-                <div id="playlists-container" class="playlists-grid">
-                    </div>
+    <div class="main-content-wrapper hidden"> <aside class="sidebar hidden"> <div class="section-title">
+                <i class="fas fa-list-music"></i>
+                <h3>Mis Playlists</h3>
+            </div>
+            <div id="playlistContainer">
+                </div>
+        </aside>
+        <main class="content-area hidden"> <section class="search-section">
+                <div class="section-title">
+                    <i class="fas fa-search"></i>
+                    <h3>Buscar Video</h3>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Buscar en YouTube...">
+                    <button id="searchButton"><i class="fas fa-search"></i></button>
+                </div>
             </section>
-
-            <section class="search-section">
-                <div class="search-bar-container">
-                    <input type="text" id="searchInput" placeholder="Buscar videos de YouTube..." class="search-input">
-                    <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
+            <section class="search-results-section">
+                <div class="section-title">
+                    <i class="fas fa-video"></i>
+                    <h3>Resultados de Búsqueda</h3>
                 </div>
-                <div id="resultsContainer" class="search-results-container">
-                    <div id="results" class="search-results-grid">
-                        </div>
-                </div>
+                <div id="results" class="search-results-grid">
+                    </div>
                 <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
             </section>
         </main>
@@ -76,9 +87,11 @@
     <div id="loadingSpinner" class="loading-spinner hidden"><div class="spinner"></div></div>
     <div id="floatingMessageContainer"></div>
 
-    <footer class="page-footer">
-      <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>.</p>
-    </footer>
+    <script src="./auth.js"></script>
+    <script src="./app.js"></script>
 
+    <footer class="page-footer">
+      <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a></p>
+    </footer>
 </body>
 </html>
