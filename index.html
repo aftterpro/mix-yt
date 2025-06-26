@@ -70,9 +70,26 @@
       </main>
     </div>
     
-    <div class="player-bar">...</div>
+     <div class="player-bar">
+        <div class="player-controls">
+            <button id="botonPrev" class="control-button" disabled><i class="fas fa-backward"></i></button>
+            <button id="botonPlay" class="control-button main-play-button"><i class="fas fa-play"></i></button>
+            <button id="botonNext" class="control-button" disabled><i class="fas fa-forward"></i></button>
+            <button id="botonStop" class="control-button" disabled><i class="fas fa-stop"></i></button>
+        </div>
+        <div class="progress-bar-container">
+            <span id="timeElapsed" class="time-display">0:00</span>
+            <div class="progress-seek-bar">
+                <div id="progressBar" class="progress-fill"></div>
+            </div>
+            <span id="timeRemaining" class="time-display">0:00</span>
+        </div>
+    </div>
 
     <script src="./auth.js"></script> <script src="./app.js"></script>
+        <div id="loadingSpinner" class="loading-spinner hidden"><div class="spinner"></div></div>
+    <div id="floatingMessageContainer"></div>
+        <script src="./app.js"></script> 
      <footer class="page-footer">
       <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>. Creado por <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.</p>
       <p>Utilizamos la API de <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.</p>
