@@ -34,7 +34,7 @@ const SPONSORBLOCK_API_URL = '/.netlify/functions/sponsorblock'; // Endpoint de 
 
 // --- CONFIGURACIÓN DE GOOGLE IDENTITY SERVICES (GIS) Y GAPI ---
 // REEMPLAZA ESTO CON TU PROPIO CLIENT ID DE GOOGLE CLOUD
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE'; 
+const GOOGLE_CLIENT_ID = '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com'; 
 const GOOGLE_YOUTUBE_API_SCOPES = 'https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/userinfo.profile';
 
 let googleAccessToken = null; // Almacena el token de acceso de Google para las llamadas a la API de YouTube
