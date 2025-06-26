@@ -1521,6 +1521,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('botonNext').addEventListener('click', playNextVideo);
     document.getElementById('botonPrev').addEventListener('click', playPrevVideo);
 
+    // Asignar listeners a los botones de Google SignIn/SignOut AHORA DENTRO de DOMContentLoaded
+    // Estos estaban fuera y causaban el error 'null'
+    const signInButton = document.getElementById('googleSignInButton');
+    const signOutButton = document.getElementById('googleSignOutButton');
+
+    if (signInButton) { // Añadir una comprobación de existencia por si acaso, aunque con DOMContentLoaded no debería ser null
+        signInButton.addEventListener('click', handleAuthClick);
+    } else {
+        console.warn("Elemento #googleSignInButton no encontrado al cargar el DOM.");
+    }
+
+    if (signOutButton) { // Igual para el botón de cerrar sesión
+        signOutButton.addEventListener('click', handleSignOutClick);
+    } else {
+        console.warn("Elemento #googleSignOutButton no encontrado al cargar el DOM.");
+    }
+
+
     // Listener para la barra de búsqueda
     const searchInput = document.getElementById('searchInput');
     const searchButton = document.getElementById('searchButton');
