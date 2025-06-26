@@ -1462,10 +1462,6 @@ document.addEventListener('DOMContentLoaded', () => {
         addPlaylistFromUrl(searchInput2.value.trim());
     });
 
-    // Event listener para el botón de extraer playlist de usuario
-    extractUserPlaylistButton.addEventListener('click', handleGoogleSignIn);
-
-
     // Event listener para scroll infinito en resultados de búsqueda
     resultsContainer.addEventListener('scroll', () => {
         if (resultsContainer.scrollTop + resultsContainer.clientHeight >= resultsContainer.scrollHeight - 100 && !isLoadingMore && nextPageContext) { // Usar nextPageContext global
