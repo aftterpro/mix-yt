@@ -2,26 +2,17 @@
 <html lang="es"> 
 <head>
     <meta charset="UTF-8">
+
     <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
+    
     <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
+
     <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
     
-    <!-- Content Security Policy (CSP) para permitir recursos de Google y otros -->
-    <!-- ADVERTENCIA: Esta es una CSP básica. Para producción, se recomienda una CSP más estricta y específica. -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self' https:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
-        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com;
-        font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;
-        img-src 'self' https: data:;
-        connect-src 'self' https: wss:;
-        frame-src https://www.youtube.com https://accounts.google.com;
-    ">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="./styles.css">
     <link rel="stylesheet" type="text/css" href="./efecto.css">
     <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
@@ -31,167 +22,116 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
+      "@type": "WebApplication",
       "name": "YT CrossMix",
-      "url": "https://mix-yt.netlify.app", 
-      "description": "Mezclador de playlists de YouTube con efecto crossfade automático para transiciones suaves.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://mix-yt.netlify.app",  
-        "query-input": "required name=search_term_string"
+      "applicationCategory": "Multimedia",
+      "operatingSystem": "All",
+      "description": "Crea mezclas perfectas de tus playlists de YouTube con transiciones suaves.",
+      "url": "https://mix-yt.netlify.app/",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
       }
     }
     </script>
-    <!-- Cargar la biblioteca de Google Identity Services (GIS) -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Cargar la biblioteca de Google Platform (para gapi.client.youtube) -->
-    <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
-<body class="vibe-theme">
-    <header class="main-header">
-        <div class="header-content">
-            <h1 class="app-title">YT CrossMix</h1>
-            <div class="search-input-header">
-                <input type="text" 
-                       id="searchInput" 
-                       placeholder="Buscar en Piped.video"
-                       aria-label="Buscar videos">
-                <!-- Botón de Google Sign-In renderizado por GIS -->
-                <div id="g_id_onload"
-                     data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
-                     data-context="signin"
-                     data-ux_mode="popup"
-                     data-callback="handleAuthResponse"
-                     data-auto_prompt="false">
-                </div>
-                <div class="g_id_signin"
-                     data-type="standard"
-                     data-shape="rectangular"
-                     data-theme="outline"
-                     data-text="signin_with"
-                     data-size="large"
-                     data-logo_alignment="left"
-                     id="googleSignInButton"> <!-- ID añadido para referencia -->
-                </div>
-                <button id="googleSignOutButton" class="header-button hidden" title="Cerrar sesión">
-                    <i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span>
-                </button>
-            </div>
+<body>
+    <header class="header-container">
+        <h1>YT CrossMix</h1>
+        <div class="search-section">
+            <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube...">
+            <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
         </div>
     </header>
 
-    <div class="container">
+    <main>
+        <div class="video-player-container">
+            <div id="player1" class="video-player"></div>
+            <div id="player2" class="video-player hidden"></div>
+        </div>
+
         <aside class="sidebar">
-            <div class="playlist-header">
-                <h3>Mi Biblioteca (Playlists de YouTube)</h3>
-            </div>
-            
-            <div id="user-playlists-section" class="user-playlists-section">
-                <!-- Contenedor para playlists del usuario logueado -->
-                <p>Inicia sesión con Google para ver tus playlists de YouTube.</p>
-                <div id="user-playlists-container" class="playlists-grid">
-                    <!-- Aquí se cargarán las playlists del usuario -->
+            <section class="section-container">
+                <h2>Mis Playlists</h2>
+                <div class="add-playlist-container">
+                    <input type="text" id="playlistIdInput" placeholder="Introduce ID o URL de Playlist">
+                    <button id="addPlaylistButton" class="add-button">
+                        <i class="fas fa-plus"></i> Añadir Playlist
+                    </button>
                 </div>
-            </div>
+                <div id="playlistsContainer" class="playlists-container">
+                    </div>
+            </section>
+
+            <section class="section-container">
+                <h2>Siguiente en la Cola</h2>
+                <div id="nextInQueueContainer" class="next-in-queue-container">
+                    <p id="nextInQueueMessage" class="no-next-message">No hay videos en la cola.</p>
+                </div>
+            </section>
         </aside>
 
-        <main class="main-content">
-            <section id="search-panel" class="vibe-panel">
-                <div id="resultsContainer" class="results-wrapper">
-                    <div id="results" class="search-results"></div>
-                    <!-- Spinner para "Cargar Más" resultados -->
-                    <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
+        <section class="main-content">
+            <div id="searchResultsSection" class="search-results-section hidden">
+                <h2>Resultados de Búsqueda</h2>
+                <div id="resultsContainer" class="results-container">
+                    <div id="results" class="results-grid">
+                        </div>
                 </div>
-            </section>
-            <section id="upNextSection" class="up-next-section">
-                <h3>Siguiente en la cola</h3>
-                <div id="upNextList" class="up-next-list">
-                    <p class="no-videos-message">No hay videos en la cola.</p>
-                </div>
-            </section>
-        </main>
-    </div>
+            </div>
+        </section>
+    </main>
 
-    <div class="main-player-container">
-        <div id="contenedor-player" class="player-wrapper">
-            <div id="videoContainer" class="video-container">
-                <div id="player1" class="video-player"></div>
-                <div id="player2" class="video-player hidden"></div>
-            </div>
-            <div class="player-controls">
-                <button id="botonPrev" class="control-button">
-                    <i class="fas fa-backward"></i>
+    <template id="playlist-template">
+        <div class="playlist-item">
+            <div class="playlist-header">
+                <img src="" alt="Playlist Thumbnail" class="playlist-thumbnail">
+                <h3 class="playlist-title"></h3>
+                <button class="expand-playlist-button">
+                    <i class="fas fa-chevron-down"></i>
                 </button>
-                <button id="botonPlay" class="control-button">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button id="botonNext" class="control-button">
-                    <i class="fas fa-forward"></i>
-                </button>
-                <button id="muteButton" class="control-button">
-                    <i class="fas fa-volume-up"></i>
-                </button>
-                <button id="shuffleButton" class="control-button">
-                    <i class="fas fa-shuffle"></i>
-                </button>
-                <button id="loopButton" class="control-button" data-loop-mode="none">
-                    <i class="fas fa-repeat"></i>
-                </button>
-                <button id="skipIntroButton" class="control-button">
-                    <i class="fas fa-forward-step"></i> Intro
-                </button>
-            </div>
-            <div class="progress-bar-container">
-                <span id="currentTimeDisplay" class="time-display">0:00</span>
-                <div id="progressBar" class="progress-bar">
-                    <div id="progressFill" class="progress-fill"></div>
-                    <div id="progressHandle" class="progress-handle"></div>
+                <div class="playlist-actions">
+                    <div class="delete-menu">
+                        <button class="delete-menu-button">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="delete-menu-content">
+                            <button class="delete-playlist-button">Eliminar</button>
+                        </div>
+                    </div>
                 </div>
-                <span id="totalDurationDisplay" class="time-display">0:00</span>
             </div>
-            <div class="volume-control-container">
-                <i class="fas fa-volume-up"></i>
-                <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider">
-                <i class="fas fa-volume-down"></i>
-            </div>
+            <div class="playlist-videos">
+                </div>
         </div>
-    </div>
+    </template>
 
-    <div id="loadingSpinner" class="loading-spinner hidden">
-        <div class="spinner"></div>
-    </div>
-
-    <div id="errorContainer" class="error-container hidden"></div>
-    <div id="floatingMessageContainer"></div>
-    
-    <div id="userIdDisplay" class="user-id-display hidden"></div> <!-- Hidden, as Firebase ID is not used now -->
-
-    <!-- TEMPLATES PARA CONTENIDO DINÁMICO -->
-    <!-- Template para videos de playlist (general, se usará para videos de playlists de usuario) -->
     <template id="playlist-video-template">
         <div class="playlist-video-item">
-            <div class="image-container">
-                <img src="" alt="" class="video-thumbnail">
-                <span class="playing-icon hidden"><i class="fas fa-play"></i></span>
+            <div class="video-info-and-thumbnail">
+                <div class="thumbnail-container">
+                    <img src="" alt="" class="video-thumbnail">
+                    <span class="duration"></span>
+                </div>
+                <h4 class="video-title"></h4>
             </div>
-            <div class="text-container">
-                <p class="video-title"></p>
-                <p class="video-duration"></p>
-            </div>
-            <div class="playlist-options-menu delete-menu">
-                <button class="delete-menu-button"><i class="fas fa-ellipsis-v"></i></button>
-                <div class="delete-menu-content">
-                    <button class="play-video-button"><i class="fas fa-play"></i> Reproducir ahora</button>
-                    <!-- Funciones de añadir/mover/eliminar video no implementadas sin Firebase. Son solo visuales. -->
-                    <button class="add-to-other-playlist-button" disabled><i class="fas fa-plus"></i> Añadir a otra (desh.)</button>
-                    <button class="move-video-button" disabled><i class="fas fa-arrows-alt"></i> Mover (desh.)</button>
-                    <button class="remove-video-button" disabled><i class="fas fa-trash"></i> Quitar (desh.)</button>
+            <div class="video-actions">
+                <div class="delete-menu">
+                    <button class="delete-menu-button">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="delete-menu-content">
+                        <button class="delete-video-button">Eliminar</button>
+                        <button class="move-up-button">Mover arriba</button>
+                        <button class="move-down-button">Mover abajo</button>
+                        <button class="add-to-other-playlist-button">Añadir a otra playlist</button>
+                    </div>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- Template para resultados de búsqueda -->
     <template id="search-result-template">
         <div class="search-result-item">
             <div class="thumbnail-container">
@@ -200,30 +140,18 @@
             </div>
             <div class="result-details">
                 <h3 class="result-title video-title"></h3>
-                <button class="add-to-playlist" disabled>
-                    <i class="fa-solid fa-plus"></i>
-                    <span class="add-text">Añadir a la playlist (desh.)</span>
-                </button>
-                <p class="text-xs text-gray-500 mt-1">
-                    Solo puedes añadir a playlists de Google al iniciar sesión.
-                </p>
-            </div>
+                </div>
         </div>
     </template>
 
-    <!-- Template para tarjetas de playlist del usuario (simplificada) -->
-    <template id="user-playlist-card-template">
-        <div class="playlist-card">
-            <img src="" alt="" class="playlist-thumbnail">
-            <div class="playlist-info">
-                <h3 class="playlist-name"></h3>
-                <p class="playlist-video-count"></p>
-                <button class="load-user-playlist-button">Cargar</button>
-            </div>
-        </div>
-    </template>
+    <div id="loadingSpinner" class="loading-spinner hidden">
+        <div class="spinner"></div>
+    </div>
 
-    <script type="module" src="./app.js"></script>
+    <div id="errorContainer" class="error-container hidden"></div>
+    <div id="floatingMessageContainer"></div>
+
+    <script src="./app.js"></script>
     <footer class="page-footer">
         <p>
             Con la tecnología de SponsorBlock. Created by 
