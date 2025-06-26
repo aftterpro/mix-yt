@@ -37,6 +37,11 @@ exports.handler = async function (event, context) {
   let targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(
     query
   )}&filter=videos`; // Añadir el parámetro filter
+  
+  if (nextPageToken) {
+    targetUrl += `&nextpage=${encodeURIComponent(nextPageToken)}`; // Añadir nextPageToken si existe
+  }
+
   console.log("Netlify Function: Target URL:", targetUrl); // Log URL
   
 
@@ -60,9 +65,8 @@ exports.handler = async function (event, context) {
       statusCode: 502,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
-          error: "Error al contactar el servicio de búsqueda externo (Piped).", 
-          details: error.message, // Incluir mensaje de error real
-          failedUrl: targetUrl // Informar qué URL falló
+          error: "Error al obtener datos de Piped API. Intenta de nuevo más tarde.", 
+          details: error.message 
       }),
     };
   }
