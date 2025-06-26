@@ -8,6 +8,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
     
+    <!-- Content Security Policy (CSP) para permitir recursos de Google y otros -->
+    <!-- ADVERTENCIA: Esta es una CSP básica. Para producción, se recomienda una CSP más estricta y específica. -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self' https:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
+        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com;
+        font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;
+        img-src 'self' https: data:;
+        connect-src 'self' https: wss:;
+        frame-src https://www.youtube.com https://accounts.google.com;
+    ">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="./styles.css">
@@ -15,8 +27,6 @@
     <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script type="application/ld+json">
     {
@@ -32,7 +42,10 @@
       }
     }
     </script>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <!-- Cargar la biblioteca de Google Identity Services (GIS) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Cargar la biblioteca de Google Platform (para gapi.client.youtube) -->
+    <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
 <body class="vibe-theme">
     <header class="main-header">
@@ -43,14 +56,26 @@
                        id="searchInput" 
                        placeholder="Buscar en Piped.video"
                        aria-label="Buscar videos">
-<button id="authorize-button" style="display: none;">Iniciar sesión con Google</button>
-<button id="signout-button" style="display: none;">Cerrar sesión</button>
-
-<section id="user-playlists-section">
-    <h2>Mis Playlists de YouTube</h2>
-    <div id="user-playlists-container" class="playlists-grid">
-        </div>
-</section>
+                <!-- Botón de Google Sign-In renderizado por GIS -->
+                <div id="g_id_onload"
+                     data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
+                     data-context="signin"
+                     data-ux_mode="popup"
+                     data-callback="handleAuthResponse"
+                     data-auto_prompt="false">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-shape="rectangular"
+                     data-theme="outline"
+                     data-text="signin_with"
+                     data-size="large"
+                     data-logo_alignment="left"
+                     id="googleSignInButton"> <!-- ID añadido para referencia -->
+                </div>
+                <button id="googleSignOutButton" class="header-button hidden" title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span>
+                </button>
             </div>
         </div>
     </header>
@@ -58,50 +83,43 @@
     <div class="container">
         <aside class="sidebar">
             <div class="playlist-header">
-                <h3>Mi Biblioteca</h3>
-                <div class="playlist-info">
-                    <span class="playlist-count"></span>
-                </div>
+                <h3>Mi Biblioteca (Playlists de YouTube)</h3>
             </div>
             
-            <div class="search-container">
+            <div id="user-playlists-section" class="user-playlists-section">
+                <!-- Contenedor para playlists del usuario logueado -->
+                <p>Inicia sesión con Google para ver tus playlists de YouTube.</p>
+                <div id="user-playlists-container" class="playlists-grid">
+                    <!-- Aquí se cargarán las playlists del usuario -->
+                </div>
+            </div>
+
+            <!-- Sección de "Añadir Link Playlist" (sin funcionalidad de guardado local sin Firebase) -->
+            <div class="search-container mt-4">
                 <div class="playlist-url-input">
                     <input type="text" 
                            id="searchInput2" 
                            placeholder="Añadir Link Playlist :)"
                            aria-label="URL de la playlist">
                 </div>
-                <button id="añadirUrlButton" class="add-to-playlist">
+                <button id="añadirUrlButton" class="add-to-playlist" disabled>
                     <i class="fa-solid fa-plus"></i>
-                    <span class="add-text">Añadir a la playlist</span>
+                    <span class="add-text">Añadir a la playlist (función deshabilitada)</span>
                 </button>
+                <p class="text-xs text-gray-500 mt-1">
+                    Esta función no guarda playlists. Para gestión de playlists, usa la integración de Google.
+                </p>
             </div>
-
-            <div id="playlistContainer" class="playlist-wrapper">
-                </div>
         </aside>
 
         <main class="main-content">
             <section id="search-panel" class="vibe-panel">
                 <div id="resultsContainer" class="results-wrapper">
                     <div id="results" class="search-results"></div>
+                    <!-- Spinner para "Cargar Más" resultados -->
+                    <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
                 </div>
             </section>
-            <template id="search-result-template">
-    <div class="search-result-item">
-        <div class="thumbnail-container">
-            <img src="" alt="" class="result-thumbnail">
-            <span class="duration"></span>
-        </div>
-        <div class="result-details">
-            <h3 class="result-title video-title"></h3>
-            <button class="add-to-playlist">
-                <i class="fa-solid fa-plus"></i>
-                <span class="add-text">Añadir a la playlist</span>
-            </button>
-        </div>
-    </div>
-</template>
             <section id="upNextSection" class="up-next-section">
                 <h3>Siguiente en la cola</h3>
                 <div id="upNextList" class="up-next-list">
@@ -127,6 +145,18 @@
                 <button id="botonNext" class="control-button">
                     <i class="fas fa-forward"></i>
                 </button>
+                <button id="muteButton" class="control-button">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+                <button id="shuffleButton" class="control-button">
+                    <i class="fas fa-shuffle"></i>
+                </button>
+                <button id="loopButton" class="control-button" data-loop-mode="none">
+                    <i class="fas fa-repeat"></i>
+                </button>
+                <button id="skipIntroButton" class="control-button">
+                    <i class="fas fa-forward-step"></i> Intro
+                </button>
             </div>
             <div class="progress-bar-container">
                 <span id="currentTimeDisplay" class="time-display">0:00</span>
@@ -151,9 +181,65 @@
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer"></div>
     
-    <div id="userIdDisplay" class="user-id-display">Loading User ID...</div>
+    <div id="userIdDisplay" class="user-id-display hidden"></div> <!-- Hidden, as Firebase ID is not used now -->
 
-    <script type="module" src="./firebase-init.js"></script>
+    <!-- TEMPLATES PARA CONTENIDO DINÁMICO -->
+    <!-- Template para videos de playlist (general, se usará para videos de playlists de usuario) -->
+    <template id="playlist-video-template">
+        <div class="playlist-video-item">
+            <div class="image-container">
+                <img src="" alt="" class="video-thumbnail">
+                <span class="playing-icon hidden"><i class="fas fa-play"></i></span>
+            </div>
+            <div class="text-container">
+                <p class="video-title"></p>
+                <p class="video-duration"></p>
+            </div>
+            <div class="playlist-options-menu delete-menu">
+                <button class="delete-menu-button"><i class="fas fa-ellipsis-v"></i></button>
+                <div class="delete-menu-content">
+                    <button class="play-video-button"><i class="fas fa-play"></i> Reproducir ahora</button>
+                    <!-- Funciones de añadir/mover/eliminar video no implementadas sin Firebase. Son solo visuales. -->
+                    <button class="add-to-other-playlist-button" disabled><i class="fas fa-plus"></i> Añadir a otra (desh.)</button>
+                    <button class="move-video-button" disabled><i class="fas fa-arrows-alt"></i> Mover (desh.)</button>
+                    <button class="remove-video-button" disabled><i class="fas fa-trash"></i> Quitar (desh.)</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template para resultados de búsqueda -->
+    <template id="search-result-template">
+        <div class="search-result-item">
+            <div class="thumbnail-container">
+                <img src="" alt="" class="result-thumbnail">
+                <span class="duration"></span>
+            </div>
+            <div class="result-details">
+                <h3 class="result-title video-title"></h3>
+                <button class="add-to-playlist" disabled>
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="add-text">Añadir a la playlist (desh.)</span>
+                </button>
+                <p class="text-xs text-gray-500 mt-1">
+                    Solo puedes añadir a playlists de Google al iniciar sesión.
+                </p>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template para tarjetas de playlist del usuario (simplificada) -->
+    <template id="user-playlist-card-template">
+        <div class="playlist-card">
+            <img src="" alt="" class="playlist-thumbnail">
+            <div class="playlist-info">
+                <h3 class="playlist-name"></h3>
+                <p class="playlist-video-count"></p>
+                <button class="load-user-playlist-button">Cargar</button>
+            </div>
+        </div>
+    </template>
+
     <script type="module" src="./app.js"></script>
     <footer class="page-footer">
         <p>
