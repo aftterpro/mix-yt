@@ -1,3 +1,10 @@
+// Function to show the loading spinner
+function showLoadingSpinner() {
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    if (loadingSpinner) {
+        loadingSpinner.classList.remove('hidden');
+    }
+}
 
 // Function to hide the loading spinner
 function hideLoadingSpinner() {
@@ -7,14 +14,23 @@ function hideLoadingSpinner() {
     }
 }
 
-// Show the loading spinner when the page loads
+// You would typically call showLoadingSpinner() when an async operation starts
+// and hideLoadingSpinner() when it finishes.
+// Example:
+// document.getElementById('myButton').addEventListener('click', async () => {
+//     showLoadingSpinner();
+//     try {
+//         await someAsyncTask();
+//     } finally {
+//         hideLoadingSpinner();
+//     }
+// });
+
+// If you have a specific initial loading state, you can manage it here or in app.js
+// For instance, hide it after the main content is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    // The loading spinner is already in the HTML with the 'hidden' class.
-    // We don't need to do anything to show it initially with this setup.
-
-    // You would typically call hideLoadingSpinner() when your main content has loaded
-    // or your application is ready. For example, after fetching initial data.
-
-    // For demonstration purposes, let's hide it after a short delay (replace this with your actual logic)
-    setTimeout(hideLoadingSpinner, 2000); // Hide after 2 seconds
+    // This script is meant to provide the functions.
+    // The initial state of the spinner should be managed by the main app.js or directly in HTML (e.g., initially hidden)
+    // For many applications, the spinner is initially visible in HTML and hidden by JS once content is ready.
+    // Example: setTimeout(hideLoadingSpinner, 2000); // Hide after 2 seconds for demonstration
 });
