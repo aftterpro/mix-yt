@@ -1,66 +1,144 @@
-/* === ESTILOS PARA LA NUEVA ESTRUCTURA TIPO YOUTUBE MUSIC === */
+/* styles.css - CORREGIDO COMPLETAMENTE */
 
-/* Ajuste del Body para dejar espacio para la barra del reproductor */
-body {
-    /* Agrega un padding en la parte inferior igual a la altura de la barra del reproductor */
-    padding-bottom: 90px; /* Ajusta este valor a la altura de tu .player-bar */
+:root {
+    --primary-bg: #121212;
+    --secondary-bg: #1a1a1a;
+    --tertiary-bg: #282828;
+    --text-color: #ffffff;
+    --text-light: #aaaaaa;
+    --accent-color: #007bff; /* Cambiado a azul para consistencia */
+    --border-color: #333333;
+    --border-radius: 8px;
+    --spacing-unit: 10px;
+
+    --header-height: 60px;
+    --player-bar-height: 80px;
 }
 
-/* Contenedor principal del contenido */
+/* === ESTRUCTURA Y LAYOUT PRINCIPAL === */
+
+body, html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+    overflow: hidden; /* Evita el scroll en el body, lo controlará el main-layout */
+}
+
+/* CONTENEDOR DE VIDEO DE FONDO */
+.video-player-wrapper {
+    position: fixed; /* Clave: lo saca del flujo normal */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1; /* Detrás de todo el contenido */
+    pointer-events: none; /* No debe interferir con los clicks */
+}
+
+/* ENCABEZADO FIJO */
+.main-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--header-height);
+    background-color: rgba(20, 20, 20, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border-color);
+}
+.header-content { display: flex; width: 100%; justify-content: space-between; align-items: center; }
+.app-title { font-size: 1.5em; }
+.search-bar-container { display: flex; }
+#searchInput { background-color: #222; border: 1px solid #333; color: white; padding: 8px 12px; border-radius: 20px 0 0 20px; outline: none;}
+#searchButton { background-color: var(--accent-color); border: none; color: white; padding: 8px 12px; cursor: pointer; border-radius: 0 20px 20px 0;}
+
+/* CONTENEDOR PRINCIPAL (SCROLLABLE) */
 .main-layout-container {
-    position: relative; /* Necesario para que el contenido se muestre sobre el video de fondo */
-    z-index: 5;
-    background-color: transparent; /* El fondo ahora es el video */
+    position: relative;
+    z-index: 10; /* Encima del video de fondo */
+    height: 100vh; /* Ocupa toda la altura de la ventana */
+    padding-top: var(--header-height); /* Espacio para el header fijo */
+    padding-bottom: var(--player-bar-height); /* Espacio para el reproductor fijo */
+    box-sizing: border-box;
+    display: flex;
+    gap: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    overflow-y: auto; /* CLAVE: Esta es el área que se desplaza */
 }
 
-/* El contenedor del video de fondo ya es posicionado de forma absoluta por efecto.css,
-   por lo que no necesita más estilos aquí. Solo asegúrate de que su z-index sea bajo.
-   Tu .video-player ya tiene `position: absolute` y `z-index` manejado por JS, lo cual es correcto. */
+/* BARRA LATERAL (SIDEBAR) */
+.sidebar {
+    width: 350px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
 
-/* Estilos para la nueva barra de reproductor fija */
+/* CONTENIDO PRINCIPAL (RESULTADOS) */
+.content-area {
+    flex-grow: 1;
+    min-width: 0; /* Evita que el flex item se desborde */
+}
+
+/* ESTILOS DE SECCIONES Y CONTENIDO (Reutilizados) */
+.section-card {
+    background-color: rgba(26, 26, 26, 0.8);
+    backdrop-filter: blur(5px);
+    padding: 15px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+.section-title { margin-top: 0; color: var(--accent-color); }
+.add-playlist-input-container { display: flex; margin-bottom: 10px;}
+#playlistIdInput { flex-grow: 1; }
+.playlists-container { max-height: 40vh; overflow-y: auto; }
+.next-in-queue-content { max-height: 25vh; overflow-y: auto; }
+.search-results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+.results-wrapper { max-height: 70vh; overflow-y: auto; }
+.search-result-item { background-color: var(--tertiary-bg); border-radius: 5px; overflow: hidden; }
+.search-result-item .thumbnail-container { position: relative; padding-top: 56.25%; } /* 16:9 */
+.search-result-item .result-thumbnail { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.search-result-item .duration { position: absolute; bottom: 5px; right: 5px; background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; font-size: 0.8em; }
+.search-result-item .result-details { padding: 10px; }
+.search-result-item .result-title { font-size: 0.9em; margin: 0; }
+
+/* BARRA DE REPRODUCTOR FIJA */
 .player-bar {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 90px; /* Altura de la barra */
-    background-color: rgba(20, 20, 20, 0.95); /* Fondo oscuro semi-transparente */
-    backdrop-filter: blur(10px); /* Efecto de desenfoque para un look moderno */
-    -webkit-backdrop-filter: blur(10px);
-    border-top: 1px solid #333;
-    z-index: 1000; /* Asegura que esté por encima de todo */
+    height: var(--player-bar-height);
+    background-color: rgba(20, 20, 20, 0.8);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    padding: 0 20px;
+    padding: 5px 20px;
     box-sizing: border-box;
+    border-top: 1px solid var(--border-color);
 }
+.player-controls { display: flex; gap: 15px; margin-bottom: 8px; }
+.control-button { background: none; border: none; color: white; font-size: 1.2em; cursor: pointer; }
+.control-button:disabled { color: #555; cursor: not-allowed; }
+.main-play-button { font-size: 1.8em; }
+.progress-bar-container { width: 100%; max-width: 600px; display: flex; align-items: center; gap: 10px; }
+.time-display { font-size: 0.8em; color: var(--text-light); }
+.progress-seek-bar { flex-grow: 1; height: 4px; background-color: #444; border-radius: 2px; cursor: pointer; }
+.progress-fill { height: 100%; width: 0%; background-color: var(--accent-color); border-radius: 2px; }
 
-/* Ajustes a los controles y barra de progreso dentro de la nueva barra */
-.player-bar .player-controls {
-    width: 100%;
-    max-width: 700px; /* Limita el ancho de los controles */
-    justify-content: center;
-    gap: 15px;
-    margin-bottom: 5px; /* Espacio entre controles y barra de progreso */
-}
-
-.player-bar .progress-bar-container {
-    width: 100%;
-    max-width: 800px; /* Limita el ancho de la barra de progreso */
-}
-
-/* Asegúrate de que los elementos dentro del sidebar y main content tengan un fondo
-   para que el texto sea legible sobre el video de fondo. Tu clase .section-card ya lo hace. */
-.section-card {
-    background-color: rgba(42, 42, 42, 0.9); /* Ligeramente transparente */
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Oculta la sección original del reproductor que ya no usamos */
-.video-player-section {
-    display: none !important;
-}
+/* FOOTER */
+.page-footer { text-align: center; font-size: 0.8em; color: var(--text-light); padding: 5px; background-color: var(--primary-bg); }
+.page-footer a { color: var(--accent-color); text-decoration: none; }
