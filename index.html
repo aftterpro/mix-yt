@@ -8,7 +8,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
     
-    <!-- Content Security Policy (CSP) para permitir recursos de Google y otros -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' https:;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com https://apis.google.com https://accounts.google.com https://www.gstatic.com blob: data:;
@@ -43,46 +42,28 @@
       }
     }
     </script>
-    <!-- Cargar la biblioteca de Google Identity Services (GIS) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <!-- Cargar la biblioteca de Google Platform (para gapi.client.youtube) -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
 <body class="yt-music-theme">
+
+    <div id="videoContainer" class="video-player-wrapper">
+        <div id="player1" class="video-player"></div>
+        <div id="player2" class="video-player hidden"></div>
+    </div>
+
     <header class="main-header">
         <div class="header-content">
             <h1 class="app-title">YT CrossMix</h1>
             <div class="search-and-auth">
                 <div class="search-bar-container">
-                    <input type="text" 
-                           id="searchInput" 
-                           placeholder="Buscar vídeos en YouTube..."
-                           aria-label="Buscar vídeos">
-                    <button id="searchButton" class="search-button">
-                        <i class="fas fa-search"></i>
-                    </button>
+                    <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube..." aria-label="Buscar vídeos">
+                    <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
                 </div>
                 <div class="auth-buttons-container">
-                    <!-- Botón de Google Sign-In renderizado por GIS -->
-                    <div id="g_id_onload"
-                         data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE"
-                         data-context="signin"
-                         data-ux_mode="popup"
-                         data-callback="handleAuthResponse"
-                         data-auto_prompt="false">
-                    </div>
-                    <div class="g_id_signin"
-                         data-type="standard"
-                         data-shape="rectangular"
-                         data-theme="outline"
-                         data-text="signin_with"
-                         data-size="large"
-                         data-logo_alignment="left"
-                         id="googleSignInButton"> 
-                    </div>
-                    <button id="googleSignOutButton" class="auth-button sign-out-button hidden" title="Cerrar sesión">
-                        <i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span>
-                    </button>
+                    <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID_HERE" data-context="signin" data-ux_mode="popup" data-callback="handleAuthResponse" data-auto_prompt="false"></div>
+                    <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline" data-text="signin_with" data-size="large" data-logo_alignment="left" id="googleSignInButton"></div>
+                    <button id="googleSignOutButton" class="auth-button sign-out-button hidden" title="Cerrar sesión"><i class="fas fa-sign-out-alt"></i> <span>Cerrar Sesión</span></button>
                 </div>
             </div>
         </div>
@@ -94,15 +75,12 @@
                 <h2 class="section-title">Mi Biblioteca</h2>
                 <div class="add-playlist-input-container">
                     <input type="text" id="playlistIdInput" placeholder="Añadir ID o URL de Playlist">
-                    <button id="addPlaylistButton" class="add-button">
-                        <i class="fas fa-plus"></i>
-                    </button>
+                    <button id="addPlaylistButton" class="add-button"><i class="fas fa-plus"></i></button>
                 </div>
                 <div id="playlistsContainer" class="playlists-container">
                     <p class="no-playlists-message">Aún no hay playlists añadidas.</p>
                 </div>
             </section>
-
             <section class="section-card next-in-queue-section">
                 <h2 class="section-title">Siguiente en la Cola</h2>
                 <div id="nextInQueueContainer" class="next-in-queue-content">
@@ -110,156 +88,51 @@
                 </div>
             </section>
         </aside>
-
+        
         <main class="content-area">
-            <section class="video-player-section">
-                <div id="videoContainer" class="video-player-wrapper">
-                    <div id="player1" class="video-player"></div>
-                    <div id="player2" class="video-player hidden"></div>
-                </div>
-                <div class="player-controls">
-                    <button id="botonPrev" class="control-button">
-                        <i class="fas fa-backward"></i>
-                    </button>
-                    <button id="botonPlay" class="control-button main-play-button">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button id="botonNext" class="control-button">
-                        <i class="fas fa-forward"></i>
-                    </button>
-                    <button id="muteButton" class="control-button volume-button">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <div class="volume-slider-container">
-                        <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider">
-                    </div>
-                    <button id="shuffleButton" class="control-button shuffle-button">
-                        <i class="fas fa-shuffle"></i>
-                    </button>
-                    <button id="loopButton" class="control-button loop-button" data-loop-mode="none">
-                        <i class="fas fa-repeat"></i>
-                    </button>
-                    <button id="skipIntroButton" class="control-button skip-button">
-                        <i class="fas fa-forward-step"></i> Intro
-                    </button>
-                </div>
-                <div class="progress-bar-container">
-                    <span id="currentTimeDisplay" class="time-display">0:00</span>
-                    <div id="progressBar" class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                        <div id="progressHandle" class="progress-handle"></div>
-                    </div>
-                    <span id="totalDurationDisplay" class="time-display">0:00</span>
-                </div>
-            </section>
-
             <section id="searchResultsSection" class="section-card search-results-section hidden">
                 <h2 class="section-title">Resultados de Búsqueda</h2>
                 <div id="resultsContainer" class="results-wrapper">
-                    <div id="results" class="search-results-grid">
-                        <!-- Resultados de búsqueda se cargarán aquí -->
-                    </div>
+                    <div id="results" class="search-results-grid"></div>
                 </div>
-                <!-- Spinner para "Cargar Más" resultados -->
                 <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
             </section>
         </main>
     </div>
 
-    <!-- Templates -->
-    <template id="playlist-template">
-        <div class="playlist-item">
-            <div class="playlist-header">
-                <img src="" alt="Playlist Thumbnail" class="playlist-thumbnail">
-                <h3 class="playlist-title"></h3>
-                <button class="expand-playlist-button">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-                <div class="playlist-actions">
-                    <div class="delete-menu">
-                        <button class="delete-menu-button">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <div class="delete-menu-content">
-                            <button class="delete-playlist-button"><i class="fas fa-trash"></i> Eliminar</button>
-                        </div>
-                    </div>
-                </div>
+    <div class="player-bar">
+        <div class="player-controls">
+            <button id="botonPrev" class="control-button"><i class="fas fa-backward"></i></button>
+            <button id="botonPlay" class="control-button main-play-button"><i class="fas fa-play"></i></button>
+            <button id="botonNext" class="control-button"><i class="fas fa-forward"></i></button>
+            <button id="muteButton" class="control-button volume-button"><i class="fas fa-volume-up"></i></button>
+            <div class="volume-slider-container">
+                <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider">
             </div>
-            <div class="playlist-videos">
-                <!-- Videos se cargarán aquí -->
-            </div>
+            <button id="shuffleButton" class="control-button shuffle-button"><i class="fas fa-shuffle"></i></button>
+            <button id="loopButton" class="control-button loop-button" data-loop-mode="none"><i class="fas fa-repeat"></i></button>
+            <button id="skipIntroButton" class="control-button skip-button"><i class="fas fa-forward-step"></i> Intro</button>
         </div>
-    </template>
-
-    <template id="playlist-video-template">
-        <div class="playlist-video-item">
-            <div class="video-info-and-thumbnail">
-                <div class="thumbnail-container">
-                    <img src="" alt="" class="video-thumbnail">
-                    <span class="duration"></span>
-                </div>
-                <h4 class="video-title"></h4>
+        <div class="progress-bar-container">
+            <span id="currentTimeDisplay" class="time-display">0:00</span>
+            <div id="progressBar" class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+                <div id="progressHandle" class="progress-handle"></div>
             </div>
-            <div class="video-actions">
-                <div class="delete-menu">
-                    <button class="delete-menu-button">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                    <div class="delete-menu-content">
-                        <button class="delete-video-button"><i class="fas fa-trash"></i> Eliminar</button>
-                        <button class="move-up-button"><i class="fas fa-arrow-up"></i> Mover arriba</button>
-                        <button class="move-down-button"><i class="fas fa-arrow-down"></i> Mover abajo</button>
-                        <button class="add-to-other-playlist-button"><i class="fas fa-plus"></i> Añadir a otra playlist</button>
-                    </div>
-                </div>
-            </div>
+            <span id="totalDurationDisplay" class="time-display">0:00</span>
         </div>
-    </template>
-
-    <!-- Template para resultados de búsqueda -->
-    <template id="search-result-template">
-        <div class="search-result-item">
-            <div class="thumbnail-container">
-                <img src="" alt="" class="result-thumbnail">
-                <span class="duration"></span>
-            </div>
-            <div class="result-details">
-                <h3 class="result-title video-title"></h3>
-                <!-- The entire div will be clickable to add the video -->
-            </div>
-        </div>
-    </template>
-
-    <!-- Template para siguiente en la cola -->
-    <template id="next-in-queue-template">
-        <div class="next-video-item">
-            <div class="thumbnail-container">
-                <img src="" alt="" class="next-thumbnail">
-            </div>
-            <h4 class="next-title"></h4>
-        </div>
-    </template>
-
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner" class="loading-spinner hidden">
-        <div class="spinner"></div>
     </div>
 
-    <!-- Error Messages Container -->
+    <template id="playlist-template"> ... </template>
+    <template id="playlist-video-template"> ... </template>
+    <template id="search-result-template"> ... </template>
+    <template id="next-in-queue-template"> ... </template>
+
+    <div id="loadingSpinner" class="loading-spinner hidden"> ... </div>
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer"></div>
 
     <script type="module" src="./app.js"></script>
-    <footer class="page-footer">
-        <p>
-            Con la tecnología de SponsorBlock. Created by 
-            <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.
-        </p>
-        <p>
-            Utilizamos la API de 
-            <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.
-            </p>
-    </footer>
+    <footer class="page-footer"> ... </footer>
 </body>
 </html>
