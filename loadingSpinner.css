@@ -1,29 +1,29 @@
 /* loadingSpinner.css */
 .loading-spinner {
-    position: fixed; /* Stay in place during scrolling */
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Fondo semi-transparente más oscuro para mayor contraste */
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000; /* Ensure it's on top of everything */
-    backdrop-filter: blur(5px); /* Efecto de desenfoque en el fondo */
-    transition: opacity 0.3s ease; /* Transición para ocultar/mostrar */
+    z-index: 2000; /* Muy alto para estar sobre todo */
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
 }
 
 .loading-spinner.hidden {
     opacity: 0;
-    pointer-events: none; /* Deshabilita interacciones cuando está oculto */
+    pointer-events: none;
 }
 
 .spinner {
-    border: 6px solid rgba(255, 255, 255, 0.3); /* Grosor del borde */
-    border-top: 6px solid #007bff; /* Color principal del spinner (azul) */
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-top: 6px solid #007bff;
     border-radius: 50%;
-    width: 60px; /* Tamaño un poco más grande */
+    width: 60px;
     height: 60px;
     animation: spin 1s linear infinite;
 }
@@ -33,22 +33,12 @@
     100% { transform: rotate(360deg); }
 }
 
-/* Estilos para un spinner de carga más pequeño (para "cargar más" en resultados de búsqueda) */
 .loading-spinner-small {
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 20px;
 }
-
-.loading-spinner-small .spinner {
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top: 3px solid #007bff;
-    width: 30px;
-    height: 30px;
-    animation: spin 1s linear infinite;
-}
-
 .loading-spinner-small.hidden {
     display: none;
 }
