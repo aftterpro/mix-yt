@@ -728,7 +728,7 @@ function updateCurrentlyPlayingVideoUI() {
 
 
 // --- Funciones de Búsqueda ---
-async   const searchYouTube = async (query, nextPage = null) => {
+const searchYouTube = async (query, nextPage = null) => {
     if (!resultsDiv) return;
 
     // Limpiar y mostrar estado si es búsqueda NUEVA
