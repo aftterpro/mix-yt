@@ -437,7 +437,48 @@ body, html {
 .playlist-video-drag-handle:hover {
     color: var(--text-color);
 }
+.search-bar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 40px;
+}
 
+.search-bar-header input {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--tertiary-bg);
+  color: var(--text-color);
+  width: 250px;
+}
+
+.search-bar-header button {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.sidebar {
+  display: block;
+  background-color: var(--secondary-bg);
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border-color);
+  width: 280px;
+  min-width: 280px;
+}
+
+.main-content-wrapper {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - var(--header-height) - var(--player-bar-height));
+  margin-top: var(--header-height);
+  padding-bottom: var(--player-bar-height);
+}
 /* === BARRA DEL REPRODUCTOR (PIE DE PÁGINA) === */
 
 .player-bar {
