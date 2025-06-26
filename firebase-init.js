@@ -38,8 +38,8 @@ function initGoogleAuth() {
     // Usaremos la API gapi.auth2 para obtener el token de acceso necesario para la YouTube Data API
     gapi.load('client:auth2', () => {
         gapi.client.init({
-            apiKey: 'TU_API_KEY_DE_YOUTUBE_DATA_API', // Tu API Key si la usas para acceso público (no necesaria para datos de usuario logueado)
-            clientId: 'TU_CLIENT_ID_DE_GOOGLE', // ¡Este es tu CLIENT ID de OAuth 2.0!
+            apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4', // Tu API Key si la usas para acceso público (no necesaria para datos de usuario logueado)
+            clientId: '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com', // ¡Este es tu CLIENT ID de OAuth 2.0!
             scope: 'https://www.googleapis.com/auth/youtube.readonly', // Scope para leer playlists y videos
             discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest"]
         }).then(() => {
