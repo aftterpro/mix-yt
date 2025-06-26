@@ -16,11 +16,6 @@
     background-color: #0056b3; /* Color de fondo al pasar el mouse */
 }
 
-.add-to-playlist:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-}
-
 .add-text{
     margin-left: 5px; /* Espacio entre el icono y el texto */
 }
@@ -37,30 +32,18 @@
     cursor: pointer;
     font-size: 1.2em;
     padding: 0;
-    color: inherit; /* Hereda el color del texto del padre */
 }
 
 .delete-menu-content {
     display: none;
     position: absolute;
-    background-color: rgba(0, 0, 0, 0.8); /* Fondo semi-transparente oscuro */
-    min-width: 120px; /* Ancho mínimo para los botones */
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4); /* Sombra más pronunciada */
-    z-index: 10; /* Asegura que esté por encima de otros elementos */
-    border-radius: 8px; /* Bordes más redondeados */
-    padding: 8px; /* Más padding */
+    background-color: rgba(0, 0, 0, 0.7); /* Fondo semi-transparente */
+    min-width: 100px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 5px;
+    padding: 5px;
     right: 0; /* Para que aparezca a la derecha del botón */
-    top: 100%; /* Para que aparezca justo debajo del botón */
-    transform: translateY(5px); /* Pequeño espacio entre botón y menú */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-}
-
-.delete-menu-content.show {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
 }
 
 .delete-menu-content button {
@@ -68,96 +51,26 @@
     border: none;
     color: white;
     cursor: pointer;
-    display: flex; /* Para alinear icono y texto */
-    align-items: center;
+    display: block; /* Para que los botones se apilen verticalmente */
     width: 100%;
     text-align: left;
-    padding: 8px 10px; /* Más padding para los ítems del menú */
-    border-radius: 5px; /* Bordes redondeados para los botones internos */
-    transition: background-color 0.2s ease;
+    padding: 5px 0;
 }
 
-.delete-menu-content button:hover {
-    background-color: rgba(255, 255, 255, 0.1); /* Fondo claro al pasar el mouse */
+.delete-menu:hover .delete-menu-content {
+    display: block;
 }
-
-.delete-menu-content button i {
-    margin-right: 8px; /* Espacio entre icono y texto */
-}
-
-/* Estilos para el botón de mover arriba/abajo */
-.move-up-button, .move-down-button {
+.move-up-button{
     background: none;
     border: none;
-    color: #fff; /* Color blanco para los iconos */
-    cursor: pointer;
-    font-size: 1em;
-    padding: 5px;
-    opacity: 0.7; /* Ligeramente transparente */
-    transition: opacity 0.2s ease;
-}
-
-.move-up-button:hover, .move-down-button:hover {
-    opacity: 1; /* Opacidad completa al pasar el mouse */
-}
-
-
-/* Estilos para botones de control del reproductor (ej. play, pause, next, prev) */
-.control-button {
-    background-color: rgba(255, 255, 255, 0.1); /* Fondo sutil */
-    border: none;
-    border-radius: 50%; /* Botones circulares */
     color: white;
-    font-size: 1.5em; /* Tamaño del icono */
-    width: 45px; /* Tamaño fijo */
-    height: 45px; /* Tamaño fijo */
-    display: flex;
-    justify-content: center;
-    align-items: center;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.2s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); /* Sombra suave */
+    display: block; /* Para que los botones se apilen verticalmente */
+    width: 100%;
+    text-align: left;
+    padding: 5px 0;
 }
-
-.control-button:hover {
-    background-color: rgba(255, 255, 255, 0.2); /* Más claro al pasar el mouse */
-    transform: translateY(-2px); /* Pequeño efecto de elevación */
-}
-
-.control-button:active {
-    transform: translateY(0); /* Vuelve a la posición normal al hacer clic */
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* Sombra más pequeña */
-}
-
-/* Estilos específicos para botones de toggle (shuffle, loop, mute) */
-.control-button.active {
-    background-color: #007bff; /* Color de acento cuando está activo */
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.5); /* Brillo azul */
-}
-
-/* Estilos para el botón de "Extraer Playlists" */
-.header-button {
-    background-color: #4285F4; /* Color de Google Blue */
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 8px 15px;
-    font-size: 0.9em;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-}
-
-.header-button:hover {
-    background-color: #357ae8; /* Un poco más oscuro al pasar el mouse */
-    transform: translateY(-1px);
-}
-
-.header-button i {
-    margin-right: 8px; /* Espacio para el icono */
-}
-
-.header-button.hidden {
-    display: none;
+.thumbnail-container {
+    position: relative;
+    display: inline-block;
 }
