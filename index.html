@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="es"> 
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
-    <!-- Metas y links como antes -->
+    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="./styles.css">
@@ -12,7 +11,9 @@
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
 
-    <!-- Carga de las bibliotecas de Google -->
+    <script src="./auth.js"></script>
+    <script src="./app.js"></script>
+
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
 </head>
@@ -20,57 +21,42 @@
 
     <div id="videoContainer" class="video-player-wrapper">
         <div id="player1" class="video-player"></div>
-        <div id="player2" class="video-player hidden"></div>
+        <div id="player2" class="video-player"></div>
     </div>
 
-    <header class="main-header">
-        <div class="header-content">
-            <h1 class="app-title">YT CrossMix</h1>
-            <div class="search-bar-container">
-                <input type="text" id="searchInput" placeholder="Buscar vídeos en YouTube..." aria-label="Buscar vídeos">
-                <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
+    <div class="main-content-wrapper">
+        <header class="main-header">
+            <div class="logo">
+                <img src="./electronic.ico" alt="Logo" class="logo-icon">
+                <h1>YT CrossMix</h1>
             </div>
-            <div class="auth-buttons-container">
-                <button id="googleSignInButton" class="auth-button" disabled>
-                    <i class="fab fa-google"></i> Iniciar sesión
-                </button>
-                <button id="googleSignOutButton" class="auth-button sign-out-button hidden">
-                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
-                </button>
+            <div class="header-actions">
+                <button id="googleSignInButton" class="auth-button">Iniciar Sesión con Google</button>
+                <button id="googleSignOutButton" class="auth-button hidden">Cerrar Sesión</button>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <div class="main-layout-container">
-      <aside class="sidebar">
-          <section class="section-card user-playlists-section">
-              <h2 class="section-title">Mi Biblioteca</h2>
-              <!-- SE ELIMINÓ EL INPUT PARA AÑADIR POR URL -->
-              <div id="playlistsContainer" class="playlists-container">
-                  <p class="no-playlists-message">Inicia sesión para ver tus playlists.</p>
-              </div>
-          </section>
-          <section class="section-card next-in-queue-section">
-              <h2 class="section-title">Siguiente en la Cola</h2>
-              <div id="nextInQueueContainer" class="next-in-queue-content">
-                  <p class="no-next-message">No hay videos en la cola.</p>
-              </div>
-          </section>
-      </aside>
-      
-      <main class="content-area">
-          <section id="searchResultsSection" class="section-card search-results-section hidden">
-              <h2 class="section-title">Resultados de Búsqueda</h2>
-              <div id="resultsContainer" class="results-wrapper">
-                  <div id="results" class="search-results-grid">
-                      <!-- Los resultados aparecen aquí -->
-                  </div>
-              </div>
-              <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
-          </section>
-      </main>
+        <main class="main-layout">
+            <section class="playlists-section">
+                <h2>Mis Playlists</h2>
+                <div id="playlists-container" class="playlists-grid">
+                    </div>
+            </section>
+
+            <section class="search-section">
+                <div class="search-bar-container">
+                    <input type="text" id="searchInput" placeholder="Buscar videos de YouTube..." class="search-input">
+                    <button id="searchButton" class="search-button"><i class="fas fa-search"></i></button>
+                </div>
+                <div id="resultsContainer" class="search-results-container">
+                    <div id="results" class="search-results-grid">
+                        </div>
+                </div>
+                <div id="loadMoreSpinner" class="loading-spinner-small hidden"></div>
+            </section>
+        </main>
     </div>
-    
+
     <div class="player-bar">
         <div class="player-controls">
             <button id="botonPrev" class="control-button"><i class="fas fa-backward"></i></button>
@@ -89,8 +75,7 @@
 
     <div id="loadingSpinner" class="loading-spinner hidden"><div class="spinner"></div></div>
     <div id="floatingMessageContainer"></div>
-    <script src="./auth.js"></script>
-    <script src="./app.js"></script>
+
     <footer class="page-footer">
       <p>Con la tecnología de <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer">SponsorBlock</a>.</p>
     </footer>
