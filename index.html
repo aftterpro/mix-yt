@@ -19,10 +19,6 @@
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
     
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
-
-
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -148,9 +144,6 @@
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer"></div>
     
-    <script src="./auth.js"></script>
-    <script src="./app.js"></script>
-    
     <footer class="page-footer">
         <p>
             Con la tecnología de SponsorBlock. Created by 
@@ -161,5 +154,11 @@
             <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.
             </p>
     </footer>
+        <script src="./auth.js"></script>
+
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
+    
+    <script src="./app.js"></script>
 </body>
 </html>
