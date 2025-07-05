@@ -10,7 +10,6 @@ let isTransitioning = false; // Flag para estado de transición
 let isAudioFading = false; // NUEVO: Flag específico para la duración del fundido de audio
 let hasOutroCrossfadeStarted = false; // NUEVO: Flag para indicar si el crossfade fue disparado por un segmento "outro" de SB
 
-let playlistsData = []; // Array principal para almacenar todas las playlists
 const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library'; // ID para identificar estas playlists
 
 
