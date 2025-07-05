@@ -10,6 +10,10 @@ let isTransitioning = false; // Flag para estado de transición
 let isAudioFading = false; // NUEVO: Flag específico para la duración del fundido de audio
 let hasOutroCrossfadeStarted = false; // NUEVO: Flag para indicar si el crossfade fue disparado por un segmento "outro" de SB
 
+let playlistsData = []; // Array principal para almacenar todas las playlists
+const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library'; // ID para identificar estas playlists
+
+
 let playlistsData = []; // Array principal para almacenar todas las playlists [{id, name, thumbnailUrl, videos:[], isExpanded}, ...]
 let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
     playlistId: null,
@@ -233,6 +237,70 @@ function onPlayerStateChange(event) {
          }
     }
 }
+// Módulo: Integración con la Biblioteca de YouTube (Escucha de eventos de auth.js)
+
+/**
+ * Procesa las playlists obtenidas de la API de YouTube y las añade a la aplicación.
+ * @param {Array} youtubePlaylists - El array de playlists de la API de Google.
+ */
+function addYouTubeLibraryPlaylists(youtubePlaylists) {
+    if (!youtubePlaylists || youtubePlaylists.length === 0) {
+        mostrarMensajeFlotante("No se encontraron playlists en tu biblioteca de YouTube.");
+        return;
+    }
+
+    // Transforma los datos de la API al formato que usa nuestra app
+    const formattedPlaylists = youtubePlaylists.map(playlist => {
+        // Ignorar playlists que no tienen título o items
+        if (!playlist.snippet.title || playlist.contentDetails.itemCount === 0) {
+            return null;
+        }
+        return {
+            id: playlist.id,
+            name: playlist.snippet.title,
+            // Usar thumbnail de alta calidad si está disponible, si no, el por defecto
+            thumbnailUrl: playlist.snippet.thumbnails.high?.url || playlist.snippet.thumbnails.default.url,
+            videos: [], // Los videos se cargarán desde Piped al hacer clic en la playlist
+            isExpanded: false,
+            source: YOUTUBE_LIBRARY_SOURCE_ID, // Marcar como playlist de la biblioteca de YT
+            isLoaded: false, // Marcar que los videos aún no se han cargado
+        };
+    }).filter(p => p !== null); // Filtrar las playlists nulas
+
+    // Añadir las nuevas playlists al principio de la lista de datos
+    playlistsData.unshift(...formattedPlaylists);
+    
+    mostrarMensajeFlotante(`${formattedPlaylists.length} playlists de tu biblioteca han sido añadidas.`);
+    updatePlaylistsUI(); // Refrescar la interfaz
+}
+
+
+/**
+ * Elimina todas las playlists que fueron cargadas desde la biblioteca de YouTube.
+ */
+function clearYouTubeLibraryPlaylists() {
+    const initialCount = playlistsData.length;
+    playlistsData = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
+    const removedCount = initialCount - playlistsData.length;
+    
+    if (removedCount > 0) {
+        console.log(`Se eliminaron ${removedCount} playlists de la biblioteca de YouTube.`);
+        updatePlaylistsUI(); // Actualizar la interfaz para que desaparezcan
+    }
+}
+
+// --- Listener para cuando se obtienen las playlists ---
+document.addEventListener('playlistsFetched', (event) => {
+    console.log("Evento 'playlistsFetched' recibido en app.js");
+    const libraryPlaylists = event.detail;
+    addYouTubeLibraryPlaylists(libraryPlaylists);
+});
+
+// --- Listener para cuando el usuario cierra sesión ---
+document.addEventListener('userLoggedOut', () => {
+    console.log("Evento 'userLoggedOut' recibido en app.js");
+    clearYouTubeLibraryPlaylists();
+});
 // Módulo: Interacción con API de Búsqueda (Piped)
 const performSearch = async (query, nextPage = null) => {
     if (!resultsDiv) return;
@@ -1129,7 +1197,42 @@ function togglePlaylistExpansion(playlistId) {
     const playlist = playlistsData.find(p => p.id === playlistId);
     if (!playlist) return;
 
-    // Alternar el estado
+    // --- LÓGICA AÑADIDA PARA CARGA BAJO DEMANDA ---
+    // Si es una playlist de la biblioteca de YouTube y sus videos no han sido cargados aún
+    if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+        console.log(`Cargando videos para la playlist de biblioteca: ${playlist.name}`);
+        mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
+        
+        // Usamos nuestra función existente getPlaylistInfo que usa Piped
+        getPlaylistInfo(playlistId)
+            .then(playlistInfo => {
+                if (playlistInfo && playlistInfo.relatedStreams) {
+                    const loadedVideos = playlistInfo.relatedStreams.map(video => ({
+                        videoId: video.url?.split('v=')[1],
+                        title: video.title || "Título Desconocido",
+                        thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
+                        duration: parseDuration(video.duration) || 0,
+                    })).filter(v => v.videoId);
+
+                    playlist.videos = loadedVideos;
+                    playlist.isLoaded = true; // Marcar como cargada
+                    playlist.isExpanded = true; // Expandir después de cargar
+                    updatePlaylistsUI(); // Actualizar la UI para mostrar los videos y el estado expandido
+                    checkAndEnablePlayButton();
+                } else {
+                    mostrarMensajeFlotante(`No se pudieron cargar los videos para "${playlist.name}".`);
+                }
+            })
+            .catch(error => {
+                console.error("Error al cargar videos de la playlist:", error);
+                mostrarMensajeFlotante(`Error al cargar: ${error.message}`);
+            });
+        
+        return; // Detenemos la ejecución aquí, la UI se actualizará cuando los datos lleguen.
+    }
+    // --- FIN DE LA LÓGICA AÑADIDA ---
+
+    // Alternar el estado (lógica original)
     playlist.isExpanded = !playlist.isExpanded;
 
     const groupDiv = document.querySelector(`.playlist-group[data-playlist-id="${playlistId}"]`);
@@ -1137,51 +1240,31 @@ function togglePlaylistExpansion(playlistId) {
     const icon = groupDiv?.querySelector('.expand-icon');
 
     if (groupDiv && videosDiv && icon) {
-        // Actualizar clases para icono y estado general
         groupDiv.classList.toggle('expanded', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-up', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-down', !playlist.isExpanded);
 
-        // Detener transiciones pendientes en este elemento para evitar conflictos
-        videosDiv.removeEventListener('transitionend', handleTransitionEnd); // Quitar listener anterior si existe
+        videosDiv.removeEventListener('transitionend', handleTransitionEnd);
 
         if (playlist.isExpanded) {
-            // 1. (CSS ya NO debería tener display: none) Asegurar que sea visible para medir
-            videosDiv.style.display = 'block'; // O 'flex', 'grid' si usas eso internamente
-            videosDiv.style.maxHeight = '0px'; // Asegurar que parte de 0
-
-            // 2. Calcular altura necesaria
-            const scrollHeight = videosDiv.scrollHeight;
-
-            // 3. Aplicar altura para iniciar animación
-            requestAnimationFrame(() => { // Esperar al siguiente frame
-                videosDiv.style.maxHeight = scrollHeight + 'px';
-            });
-
-            // 4. Opcional: Remover max-height explícito después de la animación para altura natural
-            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
-
-        } else {
-            // --- COLAPSAR ---
-            // 1. Establecer max-height a su altura actual ANTES de animar a 0
-            videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-
-            // 2. Forzar reflow para que la transición se aplique desde la altura actual
+            videosDiv.style.display = 'block';
+            videosDiv.style.maxHeight = '0px'; 
             requestAnimationFrame(() => {
-                 // 3. Animar a max-height 0
+                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            });
+            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
+        } else {
+            videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            requestAnimationFrame(() => {
                  videosDiv.style.maxHeight = '0px';
             });
-
-            // 4. Opcional: Poner display: none DESPUÉS de que termine la animación
-             videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
+            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
         }
     } else {
-        // Fallback si no se encuentran los elementos: re-renderizar todo
         console.warn("Elementos no encontrados para toggle, re-renderizando UI completa.");
         updatePlaylistsUI();
     }
 }
-
 // --- Función manejadora para el final de la transición ---
 function handleTransitionEnd(event) {
     // Asegurarse que la transición completada sea de 'max-height'
