@@ -18,6 +18,10 @@
     <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="icon" href="./electronic.ico">
+    
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiInitialize()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisInitalize()"></script>
+
 
     <script type="application/ld+json">
     {
@@ -35,7 +39,6 @@
     </script>
     </head>
 <body class="vibe-theme">
-    <!-- Player Container con nueva estructura -->
     <div class="main-player-container">
         <div id="contenedor-player" class="player-wrapper">
             <div id="videoContainer" class="video-container">
@@ -53,9 +56,7 @@
         </div>
     </div>
 
-    <!-- Contenedor principal con estructura mejorada -->
     <div class="container">
-        <!-- Sidebar con nueva estructura -->
         <aside class="sidebar">
             <div class="playlist-header">
                 <h3>Playlist</h3>
@@ -64,7 +65,15 @@
                 </div>
             </div>
             
-            <div class="search-container">
+            <div class="sidebar-actions-container">
+                <div class="auth-buttons">
+                    <button id="googleSignInButton" class="google-button hidden">
+                        <i class="fab fa-google"></i> Cargar mi Biblioteca
+                    </button>
+                    <button id="googleSignOutButton" class="google-button hidden">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
+                </div>
                 <div class="playlist-url-input">
                     <input type="text" 
                            id="searchInput2" 
@@ -82,7 +91,6 @@
             </div>
         </aside>
 
-        <!-- Contenido principal mejorado -->
         <main class="main-content">
             <section id="search-panel" class="vibe-panel">
                 <div class="search-container">
@@ -98,7 +106,6 @@
         </main>
     </div>
 
-    <!-- Template para items de la playlist -->
     <template id="playlist-item-template">
         <div class="playlist-item" draggable="true">
             <div class="thumbnail-container">
@@ -119,8 +126,7 @@
         </div>
     </template>
 
-    <!-- Template para resultados de búsqueda -->
-<template id="search-result-template">
+    <template id="search-result-template">
     <div class="search-result-item">
         <div class="thumbnail-container">
             <img src="" alt="" class="result-thumbnail">
@@ -135,16 +141,16 @@
         </div>
     </div>
 </template>
-    <!-- Loading Spinner -->
     <div id="loadingSpinner" class="loading-spinner hidden">
         <div class="spinner"></div>
     </div>
 
-    <!-- Error Messages Container -->
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer"></div>
-
+    
+    <script src="./auth.js"></script>
     <script src="./app.js"></script>
+    
     <footer class="page-footer">
         <p>
             Con la tecnología de SponsorBlock. Created by 
