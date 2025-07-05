@@ -1,13 +1,17 @@
-// auth.js - Módulo de Autenticación de Google y API de YouTube
+// auth.js - Módulo de Autenticación de Google y API de YouTube (Versión Corregida)
 
 const CLIENT_ID = "228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com";
 const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
 
 let tokenClient;
-let authReady = false; // Flag para saber si GAPI y GIS están listos para la autenticación
 
-// --- Helper para el spinner (Definidas aquí para que auth.js las pueda usar) ---
-// Idealmente, estas podrían estar en un archivo de utilidades compartido.
+// --- CORRECCIÓN 1: Flags para controlar la carga de las APIs ---
+// Usaremos estos flags para asegurarnos de que ambas librerías están listas
+// antes de intentar usarlas. Esto soluciona la "condición de carrera".
+let gapiReady = false;
+let gisReady = false;
+
+// --- Helper para el spinner (sin cambios) ---
 function showLoadingSpinner() {
     const loadingSpinner = document.getElementById('loadingSpinner');
     if (loadingSpinner) {
@@ -22,11 +26,11 @@ function hideLoadingSpinner() {
     }
 }
 
+
 // --- FUNCIONES PRINCIPALES ---
 
-// Función para obtener las playlists del usuario
 async function getPlaylists() {
-    showLoadingSpinner(); // Muestra el spinner al iniciar la carga
+    showLoadingSpinner();
     try {
         let allPlaylists = [];
         let nextPageToken = null;
@@ -43,160 +47,141 @@ async function getPlaylists() {
             nextPageToken = response.result.nextPageToken;
         } while (nextPageToken);
 
-        // Dispara un evento personalizado para que app.js actualice la UI
         document.dispatchEvent(new CustomEvent('playlistsFetched', { detail: allPlaylists }));
 
     } catch (err) {
         console.error("Error al obtener playlists de YouTube:", err);
-        // Si hay un error, actualiza la UI para reflejar el estado no autenticado
         updateUI(false);
-        // Aquí podrías añadir una función para mostrar un mensaje flotante de error
-        // por ejemplo: mostrarMensajeFlotante("Error al cargar playlists. Es posible que necesites iniciar sesión de nuevo.");
     } finally {
-        hideLoadingSpinner(); // Oculta el spinner al finalizar
+        hideLoadingSpinner();
     }
 }
 
-// Actualiza la visibilidad de los botones de autenticación y el contenido principal
+// --- CORRECCIÓN 2: Modificar updateUI para no ocultar toda la sidebar ---
+// Ahora solo ocultará/mostrará los botones y el contenedor de la playlist,
+// pero la sidebar y el botón de login siempre estarán visibles cuando no estás logueado.
 function updateUI(isLoggedIn) {
     const signInButton = document.getElementById('googleSignInButton');
     const signOutButton = document.getElementById('googleSignOutButton');
-    const mainContentWrapper = document.querySelector('.main-content-wrapper');
-    const sidebar = document.querySelector('.sidebar');
-    const contentArea = document.querySelector('.content-area');
+    const playlistContainer = document.getElementById('playlistContainer'); // El contenedor de las listas
 
     if (isLoggedIn) {
         if (signInButton) signInButton.classList.add('hidden');
         if (signOutButton) signOutButton.classList.remove('hidden');
-        // Muestra los elementos principales de la interfaz
-        if (mainContentWrapper) mainContentWrapper.classList.remove('hidden');
-        if (sidebar) sidebar.classList.remove('hidden');
-        if (contentArea) contentArea.classList.remove('hidden');
+        if (playlistContainer) playlistContainer.classList.remove('hidden'); // Muestra las playlists
     } else {
         if (signInButton) signInButton.classList.remove('hidden');
         if (signOutButton) signOutButton.classList.add('hidden');
-        // Oculta los elementos principales de la interfaz si no estás logueado
-        if (mainContentWrapper) mainContentWrapper.classList.add('hidden');
-        if (sidebar) sidebar.classList.add('hidden');
-        if (contentArea) contentArea.classList.add('hidden');
+        // No ocultamos toda la sidebar, solo limpiamos el contenedor de playlists si es necesario.
+        // La limpieza se hará desde app.js al recibir el evento de logout.
     }
 }
 
 
-// Callback que se ejecuta cuando se obtiene o se intenta obtener un token
+// Callback que se ejecuta cuando se obtiene un token (sin cambios)
 async function tokenResponseCallback(tokenResponse) {
     if (tokenResponse && tokenResponse.access_token) {
         gapi.client.setToken(tokenResponse);
         console.log("Acceso concedido. Token:", tokenResponse.access_token);
-        updateUI(true); // Actualiza la UI a "logueado"
-        await getPlaylists(); // Carga las playlists
+        updateUI(true);
+        await getPlaylists();
     } else {
         console.error("No se obtuvo el token de acceso o la autenticación fue denegada.");
-        updateUI(false); // Actualiza la UI a "no logueado"
+        updateUI(false);
     }
 }
 
-
-// Función para inicializar Google Identity Services (GIS)
+// Función de inicialización de GIS (Google Identity Services)
 function gisInitalize() {
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
         scope: SCOPES,
-        callback: tokenResponseCallback, // Usa el callback definido arriba
+        callback: tokenResponseCallback,
     });
     console.log("GIS client initialized.");
-    authReady = true; // Marca GIS como listo
-    checkAuthStatus(); // Intenta verificar el estado de autenticación
+    gisReady = true; // Marcar GIS como listo
+    tryStartApp(); // Intentar arrancar la app
 }
 
-// Función para inicializar Google API Client Library (GAPI)
+// Función de inicialización de GAPI (Google API Client)
 function gapiInitialize() {
     gapi.load('client', () => {
         gapi.client.init({}).then(() => {
-            gapi.client.load('https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest')
-                .then(() => {
-                    document.getElementById('googleSignInButton').disabled = false;
-                    console.log("GAPI client for YouTube loaded.");
-                    authReady = true; // Marca GAPI como listo
-                    checkAuthStatus(); // Intenta verificar el estado de autenticación
-                });
+            return gapi.client.load('https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest');
+        }).then(() => {
+            console.log("GAPI client for YouTube loaded.");
+            gapiReady = true; // Marcar GAPI como listo
+            tryStartApp(); // Intentar arrancar la app
+        }).catch(err => {
+            console.error("Error inicializando GAPI client", err);
         });
     });
 }
 
-// Nueva función central para verificar el estado de autenticación al cargar la página
-async function checkAuthStatus() {
-    // Solo proceder si ambas APIs están completamente cargadas y listas
-    if (!authReady) {
-        // console.log("Esperando que ambas APIs de Google estén listas...");
-        return;
+// --- CORRECCIÓN 3: Nueva función para arrancar la app de forma segura ---
+// Esta función solo se ejecutará cuando AMBAS librerías (GAPI y GIS) estén listas.
+function tryStartApp() {
+    if (gapiReady && gisReady) {
+        console.log("Ambas APIs de Google están listas. Comprobando estado de autenticación.");
+        // Ahora que sabemos que todo está listo, podemos llamar a checkAuthStatus
+        checkAuthStatus();
     }
+}
 
+
+// --- CORRECCIÓN 4: Modificar checkAuthStatus para NO iniciar login automático ---
+// Esta función ahora solo comprobará si ya existe un token. No intentará loguear al usuario.
+function checkAuthStatus() {
+    // gapi.client.getToken() ya no dará error porque esta función solo se llama
+    // desde tryStartApp(), que garantiza que gapi.client está inicializado.
     const token = gapi.client.getToken();
     if (token && token.access_token) {
-        // Ya tenemos un token válido (probablemente de una sesión anterior)
+        // Si ya tenemos un token, actualizamos la UI y cargamos las playlists
         console.log("Autenticación verificada: token existente y válido.");
-        updateUI(true); // Actualiza la UI a "logueado"
-        await getPlaylists(); // Carga las playlists
+        updateUI(true);
+        getPlaylists();
     } else {
-        // No hay token o ha expirado. Intentar obtener uno silenciosamente.
-        console.log("No hay token activo, intentando re-autenticación silenciosa...");
-        tokenClient.requestAccessToken({prompt: 'none'}); // El callback lo maneja tokenResponseCallback
+        // Si NO hay token, simplemente actualizamos la UI al estado "no logueado".
+        // Ya NO intentamos la re-autenticación silenciosa.
+        console.log("No hay token activo. Mostrando botón de inicio de sesión.");
+        updateUI(false);
     }
 }
 
-// Manejador del clic en el botón de inicio de sesión
+// Manejador del clic en el botón de inicio de sesión (sin cambios)
+// Este es ahora el ÚNICO lugar que inicia el popup de login.
 function handleAuthClick() {
-    // Cuando el usuario hace clic en Iniciar Sesión, siempre pedimos consentimiento explícito
-    tokenClient.requestAccessToken({prompt: 'consent'});
+    if (tokenClient) {
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
 }
 
-// Manejador del clic en el botón de cerrar sesión
+// Manejador del clic en el botón de cerrar sesión (sin cambios)
 function handleSignOutClick() {
     const token = gapi.client.getToken();
     if (token !== null) {
         google.accounts.oauth2.revoke(token.access_token, () => {
-            gapi.client.setToken(''); // Limpiar el token en gapi
+            gapi.client.setToken('');
             console.log('Token revocado y sesión cerrada.');
-            updateUI(false); // Actualiza la UI a "no logueado"
-            // También limpia la UI de playlists
-            document.getElementById('playlistContainer').innerHTML = '';
-            // Limpiar los datos de playlists si es necesario
-            // playlistsData = []; // Esto está en app.js, app.js limpiará sus datos al recibir el evento
-            // Si el estado de currentPlayingInfo es importante, límpialo en app.js
+            updateUI(false);
+            document.dispatchEvent(new CustomEvent('userLoggedOut'));
         });
     }
 }
 
-// Añadir listeners a los botones solo cuando el DOM esté listo
+// Añadir listeners a los botones (sin cambios)
 document.addEventListener('DOMContentLoaded', () => {
     const signInButton = document.getElementById('googleSignInButton');
     const signOutButton = document.getElementById('googleSignOutButton');
 
     if (signInButton) {
         signInButton.addEventListener('click', handleAuthClick);
-        signInButton.disabled = true; // Deshabilitar hasta que GAPI esté listo
     }
     if (signOutButton) {
         signOutButton.addEventListener('click', handleSignOutClick);
     }
-
-    // Al cargar la página, inicializar la UI en estado no logueado por defecto
-    // hasta que checkAuthStatus determine lo contrario.
+    
+    // Al inicio, la UI se muestra en estado "no logueado" por defecto.
+    // checkAuthStatus() se encargará de cambiarla si encuentra un token.
     updateUI(false);
 });
-// Manejador del clic en el botón de cerrar sesión
-function handleSignOutClick() {
-    const token = gapi.client.getToken();
-    if (token !== null) {
-        google.accounts.oauth2.revoke(token.access_token, () => {
-            gapi.client.setToken(''); // Limpiar el token en gapi
-            console.log('Token revocado y sesión cerrada.');
-            updateUI(false); // Actualiza la UI a "no logueado"
-            
-            // *** AÑADIR ESTA LÍNEA ***
-            // Dispara un evento para que app.js sepa que debe limpiar las playlists de YT.
-            document.dispatchEvent(new CustomEvent('userLoggedOut'));
-        });
-    }
-}
