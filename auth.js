@@ -185,3 +185,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // hasta que checkAuthStatus determine lo contrario.
     updateUI(false);
 });
+// Manejador del clic en el botón de cerrar sesión
+function handleSignOutClick() {
+    const token = gapi.client.getToken();
+    if (token !== null) {
+        google.accounts.oauth2.revoke(token.access_token, () => {
+            gapi.client.setToken(''); // Limpiar el token en gapi
+            console.log('Token revocado y sesión cerrada.');
+            updateUI(false); // Actualiza la UI a "no logueado"
+            
+            // *** AÑADIR ESTA LÍNEA ***
+            // Dispara un evento para que app.js sepa que debe limpiar las playlists de YT.
+            document.dispatchEvent(new CustomEvent('userLoggedOut'));
+        });
+    }
+}
