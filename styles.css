@@ -922,3 +922,61 @@ p[style*="color: #999"] { /* Duración en Playlist (ajustado color) */
     }
     .playlist-item .delete-menu-button { min-height: auto; padding: 8px;} /* Botón menú táctil */
 }
+/* ---- ESTILOS PARA ACCIONES DEL SIDEBAR Y AUTENTICACIÓN ---- */
+.sidebar-actions-container {
+    margin-bottom: var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.auth-buttons {
+    margin-bottom: var(--spacing-sm);
+    text-align: center;
+}
+
+.google-button {
+    background-color: #4285F4; /* Color de Google */
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.9em;
+    transition: background-color 0.3s ease;
+}
+
+.google-button:hover {
+    background-color: #357ae8;
+}
+
+.google-button i {
+    margin-right: 8px;
+}
+
+#googleSignOutButton {
+    background-color: #c53929; /* Un rojo para cerrar sesión */
+}
+#googleSignOutButton:hover {
+    background-color: #b03426;
+}
+
+/* El .hidden ya está definido, pero nos aseguramos */
+.hidden {
+    display: none !important;
+}
+
+/* Reemplazar la clase de búsqueda anterior por la nueva estructura */
+.sidebar-actions-container .playlist-url-input {
+    margin-bottom: var(--spacing-md);
+}
+
+.sidebar-actions-container .add-to-playlist {
+     width: 100%;
+     max-width: 100%;
+     justify-content: center;
+     margin-bottom: 0; /* Quitar margen si está dentro del contenedor */
+}
