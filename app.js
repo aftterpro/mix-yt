@@ -2507,7 +2507,6 @@ function checkGoogleTokenOnLoad() {
         // Token disponible, puedes continuar autenticado
         console.log('Token encontrado en localStorage:', token);
         // Llama aquí a tu función de inicialización autenticada
-        onGoogleSignInSuccess(token);
     } else {
         // No hay token, muestra el botón de login
    //     showGoogleLoginButton();
