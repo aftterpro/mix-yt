@@ -138,6 +138,22 @@ function onPlayerError(event) {
     }
 }
 function onPlayerStateChange(event) {
+    const player = event.target;
+    const state = event.data;
+
+    // Estado: PLAYING
+    if (state === YT.PlayerState.PLAYING) {
+        // Solo marca isTransitioning=false si era el reproductor entrante
+        isTransitioning = false;
+        // Si venías de un crossfade, asegúrate de que isAudioFading=false (por si acaso)
+        isAudioFading = false;
+        // Opcional: actualizar UI aquí
+    }
+
+    // Estado: PAUSED (si quieres hacer algo extra)
+    if (state === YT.PlayerState.PAUSED) {
+        // Ejemplo: mostrar un ícono de pausa o similar
+    }
 }
 // Módulo: Integración con la Biblioteca de YouTube (Escucha de eventos de auth.js)
 
