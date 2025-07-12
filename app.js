@@ -1316,36 +1316,37 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
         let allVideos = [];
         let nextPageToken = null;
 
-        // Bucle para obtener todas las páginas de resultados
         do {
             const response = await gapi.client.youtube.playlistItems.list({
-                'part': ['snippet', 'contentDetails'], // Pedimos 'snippet' para info básica y 'contentDetails' para el videoId
+                'part': ['snippet', 'contentDetails'],
                 'playlistId': playlistId,
-                'maxResults': 50, // Máximo permitido por página
+                'maxResults': 50,
                 'pageToken': nextPageToken
             });
 
             const result = response.result;
             if (result.items) {
-                // Transformamos la respuesta de la API de Google al formato que usa nuestra app
                 const formattedVideos = result.items
                     .map(item => {
-                        // A veces los videos eliminados permanecen en las playlists. Los filtramos.
-                        if (!item.snippet || !item.snippet.thumbnails) {
+                        // Comprobamos existencia de los campos y miniaturas
+                        const thumbnails = item?.snippet?.thumbnails;
+                        const videoId = item?.contentDetails?.videoId;
+                        const title = item?.snippet?.title;
+                        const highThumb = thumbnails?.high?.url;
+                        const defaultThumb = thumbnails?.default?.url;
+                        // Si no hay videoId o miniatura, lo omitimos
+                        if (!videoId || (!highThumb && !defaultThumb)) {
                             console.warn('Item de playlist omitido por falta de datos:', item);
                             return null;
                         }
                         return {
-                            videoId: item.contentDetails.videoId,
-                            title: item.snippet.title,
-                            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url,
-                            // NOTA: La API `playlistItems.list` no devuelve la duración.
-                            // Obtenerla requeriría una llamada a la API por cada video, lo cual es muy lento e ineficiente.
-                            // Por ahora, la dejaremos en 0.
+                            videoId,
+                            title: title || 'Sin título',
+                            thumbnail: highThumb || defaultThumb,
                             duration: 0,
                         };
                     })
-                    .filter(v => v !== null && v.videoId); // Filtrar nulos y videos sin ID
+                    .filter(v => v !== null && v.videoId);
 
                 allVideos = allVideos.concat(formattedVideos);
             }
@@ -1356,7 +1357,6 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 
     } catch (err) {
         console.error("Error al obtener videos de la playlist de YouTube:", err);
-        // Propagar el error para que el `.catch` en `togglePlaylistExpansion` lo maneje
         throw new Error(err.result?.error?.message || "No se pudieron obtener los videos.");
     }
 }
