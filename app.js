@@ -811,7 +811,61 @@ function updatePlaylistsUI() {
     // Volver a habilitar Drag and Drop (Fase 1 - dentro de la misma lista)
     enableDragAndDrop();
 }
+/**
+ * Actualiza de forma inteligente solo la UI de una playlist específica,
+ * evitando un redibujado completo de todo el contenedor.
+ * @param {string} playlistId - El ID de la playlist a actualizar.
+ */
+function updateSinglePlaylistUI(playlistId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    const groupDiv = document.querySelector(`.playlist-group[data-playlist-id="${playlistId}"]`);
 
+    if (!groupDiv) {
+        console.warn(`updateSinglePlaylistUI: No se encontró el grupo en el DOM para la playlist ${playlistId}.`);
+        // Si no se encuentra, como fallback, redibujar todo para evitar inconsistencias.
+        updatePlaylistsUI();
+        return;
+    }
+
+    // Caso especial: si la playlist se quedó vacía y no es la manual, la eliminamos del DOM.
+    if (playlist && playlist.videos.length === 0 && playlist.id !== 'manual') {
+        // Opcional: mostrar mensaje antes de eliminar la playlist de la lista de datos.
+        mostrarMensajeFlotante(`Playlist "${playlist.name}" eliminada (vacía).`);
+        playlistsData = playlistsData.filter(p => p.id !== playlistId);
+        groupDiv.style.transition = 'opacity 0.3s ease';
+        groupDiv.style.opacity = '0';
+        setTimeout(() => groupDiv.remove(), 300); // Eliminar del DOM tras la animación
+        return;
+    }
+    
+    // Si la playlist todavía existe, actualizamos su contenido.
+    if (playlist) {
+        // 1. Actualizar el contador en el header
+        const headerName = groupDiv.querySelector('.playlist-group-name');
+        if (headerName) {
+            headerName.textContent = `${playlist.name} (${playlist.videos.length})`;
+        }
+
+        // 2. Redibujar solo la lista de videos de esta playlist
+        const videosDiv = groupDiv.querySelector('.playlist-group-videos');
+        if (videosDiv) {
+            const playingVideoId = currentPlayingInfo.videoId;
+            videosDiv.innerHTML = ''; // Limpiar solo esta lista de videos
+            playlist.videos.forEach(video => {
+                const item = createPlaylistItemElement(video, playlist.id, playingVideoId);
+                videosDiv.appendChild(item);
+            });
+            
+            // Re-habilitar drag & drop solo para los nuevos elementos de esta playlist
+            enableDragAndDrop(videosDiv);
+
+            // Ajustar la altura para mantener la animación de expandir/colapsar
+            if (playlist.isExpanded) {
+                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            }
+        }
+    }
+}
 // --- Helper para crear elemento de Video en Playlist ---
 function createPlaylistItemElement(video, playlistId, playingVideoId) {
     // Crear el contenedor principal para el item de la playlist
@@ -1347,28 +1401,29 @@ function deleteVideo(playlistId, videoId) {
 
     // Opcional: Eliminar playlist si queda vacía (excepto la manual)
     if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
-         mostrarMensajeFlotante(`Playlist "${playlistsData[playlistIndex].name}" eliminada (vacía).`);
          playlistsData.splice(playlistIndex, 1);
     }
 
-    updatePlaylistsUI(); // Actualizar UI
+    updateSinglePlaylistUI(playlistId); // <-- Nueva línea eficiente
     updateCurrentPlayingIndex(); // Recalcular índice por si acaso
 }
 
 // --- REESCRIBIR COMPLETAMENTE enableDragAndDrop ---
-function enableDragAndDrop() {
-    const playlistContainer = document.getElementById('playlistContainer');
+function enableDragAndDrop(scopeElement = document) {
+    const playlistContainer = scopeElement === document 
+        ? document.getElementById('playlistContainer') 
+        : scopeElement.closest('.playlist-group');
+
     if (!playlistContainer) return;
 
-    let draggedItemElement = null; // Elemento DOM que se arrastra
-    let draggedVideoData = null;   // Objeto { videoId, sourcePlaylistId }
-    let placeholder = null;        // Elemento visual temporal
+    let draggedItemElement = null;
+    let draggedVideoData = null;
+    let placeholder = null;
 
-    // Crear placeholder una vez
     function createPlaceholder() {
         const ph = document.createElement('div');
         ph.className = 'playlist-item placeholder';
-        ph.style.height = '40px'; // Altura aprox de un item
+        ph.style.height = '40px';
         ph.style.backgroundColor = 'rgba(0, 123, 255, 0.2)';
         ph.style.border = '1px dashed #007bff';
         ph.style.margin = '4px 0';
@@ -1376,9 +1431,11 @@ function enableDragAndDrop() {
     }
     placeholder = createPlaceholder();
 
-    // --- Event Listeners en los ITEMS (.playlist-item) ---
-    playlistContainer.querySelectorAll('.playlist-item').forEach(item => {
-        // DRAG START: Inicia el arrastre
+    const itemsToMakeDraggable = (scopeElement === document) 
+        ? playlistContainer.querySelectorAll('.playlist-item') 
+        : scopeElement.querySelectorAll('.playlist-item');
+
+    itemsToMakeDraggable.forEach(item => {
         item.addEventListener('dragstart', (event) => {
             const targetItem = event.target.closest('.playlist-item');
             if (!targetItem) return;
@@ -1390,45 +1447,39 @@ function enableDragAndDrop() {
             };
 
             event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', draggedVideoData.videoId); // Guardar ID
+            event.dataTransfer.setData('text/plain', draggedVideoData.videoId);
 
-            // Añadir clase con delay
             setTimeout(() => targetItem.classList.add('dragging'), 0);
             console.log(`Drag Start: Video ${draggedVideoData.videoId} from Playlist ${draggedVideoData.sourcePlaylistId}`);
         });
 
-        // DRAG END: Termina el arrastre (se suelte o se cancele)
         item.addEventListener('dragend', (event) => {
             if (draggedItemElement) {
                 draggedItemElement.classList.remove('dragging');
             }
             if(placeholder && placeholder.parentNode) {
-                 placeholder.remove(); // Limpiar placeholder
+                 placeholder.remove();
             }
-             // Limpiar clases visuales de drop target
             document.querySelectorAll('.drag-over-area').forEach(el => el.classList.remove('drag-over-area'));
             draggedItemElement = null;
             draggedVideoData = null;
         });
 
-         // DRAG OVER: Cuando se arrastra SOBRE otro item
          item.addEventListener('dragover', (event) => {
-             event.preventDefault(); // Necesario
+             event.preventDefault();
              event.dataTransfer.dropEffect = 'move';
              const targetItem = event.target.closest('.playlist-item');
-             if (!targetItem || targetItem === draggedItemElement) return; // No sobre sí mismo
+             if (!targetItem || targetItem === draggedItemElement) return;
 
-             // Insertar placeholder ANTES del item sobre el que estamos
               const targetRect = targetItem.getBoundingClientRect();
               const offsetY = event.clientY - targetRect.top;
-              // Decidir si insertar antes o después basado en la mitad del item
               if (offsetY < targetRect.height / 2) {
                    targetItem.parentNode.insertBefore(placeholder, targetItem);
               } else {
                    targetItem.parentNode.insertBefore(placeholder, targetItem.nextSibling);
               }
         });
-        // DROP: Cuando se SUELTA sobre otro item
+
         item.addEventListener('drop', (event) => {
             event.preventDefault();
              if (placeholder && placeholder.parentNode) {
@@ -1441,59 +1492,49 @@ function enableDragAndDrop() {
             }
 
             const targetPlaylistId = targetItem.dataset.playlistId;
-            const droppedVideoId = event.dataTransfer.getData('text/plain'); // Debería coincidir con draggedVideoData.videoId
+            const droppedVideoId = event.dataTransfer.getData('text/plain');
 
-             // Calcular índice destino basado en la posición donde estaba el placeholder
-             const videoElements = Array.from(targetItem.parentNode.children).filter(el => el !== placeholder && !el.classList.contains('dragging'));
-             // El índice será la posición del targetItem en la lista filtrada
-             let targetIndex = videoElements.indexOf(targetItem);
+             let targetIndex = Array.from(targetItem.parentNode.children)
+                .filter(el => el.classList.contains('playlist-item') && !el.classList.contains('placeholder') && !el.classList.contains('dragging'))
+                .indexOf(targetItem);
 
-            // Si el placeholder estaba DESPUÉS del targetItem, el índice es +1
-             // (Esto es más complejo, usar la posición del placeholder es mejor)
-             // O más simple: obtener el índice del targetItem real y decidir antes/después
               const targetRect = targetItem.getBoundingClientRect();
               const offsetY = event.clientY - targetRect.top;
               if (offsetY >= targetRect.height / 2) {
-                   targetIndex++; // Insertar después
+                   targetIndex++;
               }
 
             console.log(`Drop: Video ${droppedVideoId} (from ${draggedVideoData.sourcePlaylistId}) sobre item ${targetItem.dataset.videoId} (Playlist ${targetPlaylistId}, índice ${targetIndex})`);
 
-            // Llamar a la función unificada para mover
             moveVideo(droppedVideoId, draggedVideoData.sourcePlaylistId, targetPlaylistId, targetIndex);
         });
     });
 
-    // --- Event Listeners en los CONTENEDORES de Videos (.playlist-group-videos) ---
-    playlistContainer.querySelectorAll('.playlist-group-videos').forEach(container => {
+    const containersToListen = (scopeElement === document)
+        ? playlistContainer.querySelectorAll('.playlist-group-videos')
+        : playlistContainer.querySelectorAll('.playlist-group-videos');
 
-        // DRAG OVER: Arrastrando sobre el área del contenedor (para añadir al final)
+    containersToListen.forEach(container => {
         container.addEventListener('dragover', (event) => {
              event.preventDefault();
              event.dataTransfer.dropEffect = 'move';
-             // Añadir indicador visual solo si no hay items hijos (o si estamos al final?)
              if (container.children.length === 0 || event.offsetY > container.scrollHeight - 20) {
                  container.classList.add('drag-over-area');
-                  // Añadir placeholder al final si no está ya ahí
                   if (!placeholder.parentNode || placeholder.nextSibling) {
                      container.appendChild(placeholder);
                   }
              } else {
                  container.classList.remove('drag-over-area');
-                 // El dragover sobre un item manejará el placeholder
              }
         });
 
-         // DRAG LEAVE: Saliendo del área del contenedor
          container.addEventListener('dragleave', (event) => {
-              // Quitar indicador si salimos del área Y no entramos en un hijo
              if (!container.contains(event.relatedTarget)) {
                   container.classList.remove('drag-over-area');
                    if(placeholder.parentNode === container) placeholder.remove();
              }
          });
 
-        // DROP: Soltando sobre el área del contenedor (generalmente para añadir al final)
         container.addEventListener('drop', (event) => {
             event.preventDefault();
              if (placeholder && placeholder.parentNode) {
@@ -1506,9 +1547,8 @@ function enableDragAndDrop() {
             const targetPlaylistId = groupDiv.dataset.playlistId;
             const droppedVideoId = event.dataTransfer.getData('text/plain');
 
-            // Mover al final de esta playlist
              const targetPlaylist = playlistsData.find(p => p.id === targetPlaylistId);
-             const targetIndex = targetPlaylist ? targetPlaylist.videos.length : 0; // Índice final
+             const targetIndex = targetPlaylist ? targetPlaylist.videos.length : 0;
 
             console.log(`Drop: Video ${droppedVideoId} (from ${draggedVideoData.sourcePlaylistId}) al final de Playlist ${targetPlaylistId}`);
             moveVideo(droppedVideoId, draggedVideoData.sourcePlaylistId, targetPlaylistId, targetIndex);
@@ -1557,8 +1597,15 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 
     console.log(`Video ${videoId} movido de ${sourcePlaylistId} a ${targetPlaylistId} en índice ${targetIndex}.`);
 
-    // 4. Actualizar la UI completa
-    updatePlaylistsUI();
+    // 4. Actualizar la UI 
+     if (sourcePlaylistId === targetPlaylistId) {
+        // Si el video se movió dentro de la misma playlist, solo actualizamos esa.
+        updateSinglePlaylistUI(sourcePlaylistId);
+    } else {
+        // Si se movió a otra playlist, actualizamos ambas.
+        updateSinglePlaylistUI(sourcePlaylistId);
+        updateSinglePlaylistUI(targetPlaylistId);
+    }
 
     // 5. Recalcular el índice de reproducción aplanado
     // Es crucial llamar a esto DESPUÉS de actualizar playlistsData
