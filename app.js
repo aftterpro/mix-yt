@@ -1,4 +1,3 @@
-
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
@@ -524,7 +523,7 @@ function addVideoToManualPlaylist(videoData) {
 
     // Añadir al final de la playlist manual
     manualPlaylist.videos.push(videoObject);
-    mostrarMensajeFlotante(`Video añadido a "${manualPlaylist.name}": ${videoObject.title}`);
+
     console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
 
     updatePlaylistsUI(); // Actualizar la UI
@@ -1395,10 +1394,6 @@ function deleteVideo(playlistId, videoId) {
 
     const deletedVideoTitle = playlistsData[playlistIndex].videos[videoIndex].title;
     playlistsData[playlistIndex].videos.splice(videoIndex, 1); // Eliminar del array
-
-    mostrarMensajeFlotante(`Video "${deletedVideoTitle}" eliminado.`);
-    console.log(`Eliminando video: ${deletedVideoTitle} de playlist ${playlistId}`);
-
     // Opcional: Eliminar playlist si queda vacía (excepto la manual)
     if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
          playlistsData.splice(playlistIndex, 1);
@@ -2029,7 +2024,6 @@ function askToRepeatPlaylist() {
 function playFirstVideo() {
     if (!playersInitialized) {
         console.error('Los reproductores no están inicializados.');
-        mostrarMensajeFlotante("Los reproductores aún no están listos.");
         return;
     }
     stopMonitoring();
@@ -2062,7 +2056,6 @@ function playFirstVideo() {
             updatePlaylistsUI();
         } catch (e) {
              console.error("Error al iniciar el primer video:", e);
-             mostrarMensajeFlotante("Error al intentar reproducir el primer video.");
              reproduccionIniciada = false; // Falló el inicio
               document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
         }
@@ -2464,7 +2457,6 @@ añadirUrlButton.addEventListener('click', async () => {
         alert('URL de la playlist no válida.');
         return;
     }
-    mostrarMensajeFlotante("Buscando información de la playlist...");
     searchInput2.value = ''; // Limpiar input inmediatamente
 
     try {
