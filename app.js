@@ -1197,39 +1197,32 @@ function togglePlaylistExpansion(playlistId) {
     if (!playlist) return;
 
     // --- LÓGICA AÑADIDA PARA CARGA BAJO DEMANDA ---
-    // Si es una playlist de la biblioteca de YouTube y sus videos no han sido cargados aún
-    if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
-        console.log(`Cargando videos para la playlist de biblioteca: ${playlist.name}`);
-        mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
-        
-        // Usamos nuestra función existente getPlaylistInfo que usa Piped
-        getPlaylistInfo(playlistId)
-            .then(playlistInfo => {
-                if (playlistInfo && playlistInfo.relatedStreams) {
-                    const loadedVideos = playlistInfo.relatedStreams.map(video => ({
-                        videoId: video.url?.split('v=')[1],
-                        title: video.title || "Título Desconocido",
-                        thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-                        duration: parseDuration(video.duration) || 0,
-                    })).filter(v => v.videoId);
-
-                    playlist.videos = loadedVideos;
-                    playlist.isLoaded = true; // Marcar como cargada
-                    playlist.isExpanded = true; // Expandir después de cargar
-                    updatePlaylistsUI(); // Actualizar la UI para mostrar los videos y el estado expandido
-                    checkAndEnablePlayButton();
-                } else {
-                    mostrarMensajeFlotante(`No se pudieron cargar los videos para "${playlist.name}".`);
-                }
-            })
-            .catch(error => {
-                console.error("Error al cargar videos de la playlist:", error);
-                mostrarMensajeFlotante(`Error al cargar: ${error.message}`);
-            });
-        
-        return; // Detenemos la ejecución aquí, la UI se actualizará cuando los datos lleguen.
-    }
-    // --- FIN DE LA LÓGICA AÑADIDA ---
+// Si es una playlist de la biblioteca de YouTube y sus videos no han sido cargados aún
+if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+    console.log(`Cargando videos de la biblioteca para: ${playlist.name} usando la API de Google.`);
+    mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
+    
+    // ▼▼▼ CAMBIO PRINCIPAL: LLAMAR A LA NUEVA FUNCIÓN AUTENTICADA ▼▼▼
+    getYouTubeLibraryPlaylistItems(playlist.id)
+        .then(loadedVideos => {
+            // El resto de la lógica puede permanecer igual, ya que `getYouTubeLibraryPlaylistItems`
+            // devolverá los videos en el formato que tu aplicación ya espera.
+            playlist.videos = loadedVideos;
+            playlist.isLoaded = true; // Marcar como cargada
+            playlist.isExpanded = true; // Expandir después de cargar
+            updatePlaylistsUI(); // Actualizar la UI
+            checkAndEnablePlayButton();
+        })
+        .catch(error => {
+            console.error("Error al cargar videos de la playlist de la biblioteca:", error);
+            mostrarMensajeFlotante(`Error al cargar: ${error.message || 'La playlist podría ser inválida.'}`);
+            // Opcional: desmarcar para reintentar
+            playlist.isLoaded = false;
+        });
+    
+    return; // Detenemos la ejecución aquí, la UI se actualizará cuando los datos lleguen.
+}
+// --- FIN DE LA LÓGICA AÑADIDA ---
 
     // Alternar el estado (lógica original)
     playlist.isExpanded = !playlist.isExpanded;
@@ -1262,6 +1255,55 @@ function togglePlaylistExpansion(playlistId) {
     } else {
         console.warn("Elementos no encontrados para toggle, re-renderizando UI completa.");
         updatePlaylistsUI();
+    }
+}
+async function getYouTubeLibraryPlaylistItems(playlistId) {
+    try {
+        let allVideos = [];
+        let nextPageToken = null;
+
+        // Bucle para obtener todas las páginas de resultados
+        do {
+            const response = await gapi.client.youtube.playlistItems.list({
+                'part': ['snippet', 'contentDetails'], // Pedimos 'snippet' para info básica y 'contentDetails' para el videoId
+                'playlistId': playlistId,
+                'maxResults': 50, // Máximo permitido por página
+                'pageToken': nextPageToken
+            });
+
+            const result = response.result;
+            if (result.items) {
+                // Transformamos la respuesta de la API de Google al formato que usa nuestra app
+                const formattedVideos = result.items
+                    .map(item => {
+                        // A veces los videos eliminados permanecen en las playlists. Los filtramos.
+                        if (!item.snippet || !item.snippet.thumbnails) {
+                            console.warn('Item de playlist omitido por falta de datos:', item);
+                            return null;
+                        }
+                        return {
+                            videoId: item.contentDetails.videoId,
+                            title: item.snippet.title,
+                            thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url,
+                            // NOTA: La API `playlistItems.list` no devuelve la duración.
+                            // Obtenerla requeriría una llamada a la API por cada video, lo cual es muy lento e ineficiente.
+                            // Por ahora, la dejaremos en 0.
+                            duration: 0,
+                        };
+                    })
+                    .filter(v => v !== null && v.videoId); // Filtrar nulos y videos sin ID
+
+                allVideos = allVideos.concat(formattedVideos);
+            }
+            nextPageToken = result.nextPageToken;
+        } while (nextPageToken);
+
+        return allVideos;
+
+    } catch (err) {
+        console.error("Error al obtener videos de la playlist de YouTube:", err);
+        // Propagar el error para que el `.catch` en `togglePlaylistExpansion` lo maneje
+        throw new Error(err.result?.error?.message || "No se pudieron obtener los videos.");
     }
 }
 // --- Función manejadora para el final de la transición ---
