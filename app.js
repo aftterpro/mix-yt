@@ -138,21 +138,101 @@ function onPlayerError(event) {
     }
 }
 function onPlayerStateChange(event) {
-    const player = event.target;
-    const state = event.data;
+    const playerState = event.data;
+    const changedPlayerNum = event.target === player1 ? 1 : 2;
+    const videoId = event.target.getVideoData()?.video_id;
+    const playerInstance = event.target;
 
-    // Estado: PLAYING
-    if (state === YT.PlayerState.PLAYING) {
-        // Solo marca isTransitioning=false si era el reproductor entrante
-        isTransitioning = false;
-        // Si venías de un crossfade, asegúrate de que isAudioFading=false (por si acaso)
-        isAudioFading = false;
-        // Opcional: actualizar UI aquí
-    }
+     if (playerState === YT.PlayerState.PLAYING) {
+         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO. Video: ${videoId || 'Unknown ID'}`);
 
-    // Estado: PAUSED (si quieres hacer algo extra)
-    if (state === YT.PlayerState.PAUSED) {
-        // Ejemplo: mostrar un ícono de pausa o similar
+         const flatList = getFlattenedPlaylist();
+         const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
+
+         if (videoId && playingVideoIndex !== -1) {
+              const playingVideoObject = flatList[playingVideoIndex];
+              currentPlayingInfo.videoId = videoId;
+              currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
+              currentPlayingInfo.flattenedIndex = playingVideoIndex;
+              console.log(`onPlayerStateChange: Información de reproducción actual actualizada vía cambio de estado: ${playingVideoIndex} (Video: ${videoId})`);
+              updatePlaylistsUI();
+
+             if (currentPlayer !== changedPlayerNum) {
+                  console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum}.`);
+                  currentPlayer = changedPlayerNum;
+             }
+
+             if (isTransitioning) {
+                 console.log(`onPlayerStateChange: Video conocido (${videoId}) comenzó a reproducir. Reseteando flag isTransitioning.`);
+                 isTransitioning = false;
+             }
+
+              // --- CORRECCIÓN: Resetear hasOutroCrossfadeStarted cuando un NUEVO video comienza a reproducir ---
+             console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted.`);
+             hasOutroCrossfadeStarted = false; // Resetear el flag
+
+         } else if (videoId && playingVideoIndex === -1) {
+             console.warn(`onPlayerStateChange: Video desconocido (${videoId}) comenzó a reproducir en Player ${changedPlayerNum}.`);
+              currentPlayingInfo.videoId = videoId;
+              currentPlayingInfo.playlistId = null;
+              currentPlayingInfo.flattenedIndex = -1;
+               updatePlaylistsUI();
+               if (currentPlayer !== changedPlayerNum) {
+                   console.log(`onPlayerStateChange: Estableciendo currentPlayer a ${changedPlayerNum} basándose en video desconocido.`);
+                    currentPlayer = changedPlayerNum;
+               }
+                console.log(`onPlayerStateChange: Reseteando flag hasOutroCrossfadeStarted para video desconocido.`);
+                hasOutroCrossfadeStarted = false;
+
+         } else {
+               console.log(`onPlayerStateChange: Player ${changedPlayerNum} está REPRODUCIENDO, pero el videoId aún no está disponible.`);
+         }
+
+          // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING
+          if (videoId) {
+             checkAndSkipSegment(event.target, true);
+          }
+
+     } else if (playerState === YT.PlayerState.PAUSED) {
+        console.log('onPlayerStateChange: Video pausado en Player', changedPlayerNum);
+         if (changedPlayerNum === currentPlayer && reproduccionIniciada) {
+             // Handled by button
+         }
+     } else if (playerState === YT.PlayerState.BUFFERING) {
+         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está BUFFERING. Video: ${videoId || 'Unknown ID'}`);
+
+     } else if (playerState === YT.PlayerState.CUED) {
+         console.log(`onPlayerStateChange: Player ${changedPlayerNum} está CUED. Video: ${videoId || 'Unknown ID'}`);
+
+         const intendedNextPlayerNum = currentPlayer === 1 ? 2 : 1;
+         const intendedNextVideoId = currentPlayingInfo.flattenedIndex !== -1 ? getFlattenedPlaylist()[currentPlayingInfo.flattenedIndex]?.videoId : null;
+
+         if (changedPlayerNum === intendedNextPlayerNum && videoId === intendedNextVideoId && isTransitioning) {
+             console.warn(`onPlayerStateChange: Reproductor siguiente previsto (${changedPlayerNum}) entró en estado CUED inesperadamente después de la llamada a playVideo() durante la transición. Video: ${videoId}. Intentando playVideo() de nuevo.`);
+             setTimeout(() => {
+                 try {
+                     if (playerInstance && typeof playerInstance.playVideo === 'function' && playerInstance.getPlayerState() === YT.PlayerState.CUED) {
+                          console.log(`onPlayerStateChange: Reintentando playVideo() en Player ${changedPlayerNum} desde estado CUED.`);
+                         playerInstance.playVideo();
+                     } else {
+                          console.log(`onPlayerStateChange: No se reintenta playVideo() - Player ${changedPlayerNum} ya no está en estado CUED o es inválido.`);
+                     }
+                 } catch(e) { console.error("onPlayerStateChange: Error reintentando playVideo desde estado CUED:", e); }
+             }, 500);
+         } else if (playerState === YT.PlayerState.CUED) {
+               console.log(`onPlayerStateChange: Player ${changedPlayerNum} entró en estado CUED normalmente. Video: ${videoId || 'Unknown ID'}.`);
+         }
+
+     } else if (playerState === YT.PlayerState.ENDED) {
+         console.log(`onPlayerStateChange: Player ${changedPlayerNum} estado ENDED. Video: ${videoId || 'Unknown ID'}`);
+         const endedVideoMatchesCurrent = (videoId && currentPlayingInfo.videoId === videoId);
+
+         if (endedVideoMatchesCurrent && !isTransitioning && !isAudioFading) {
+             console.log(`onPlayerStateChange: Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
+             playNextVideo();
+         } else if (changedPlayerNum !== currentPlayer) {
+             console.log(`onPlayerStateChange: Otro player ${changedPlayerNum} estado ENDED. Video: ${videoId}. (No es el reproductor activo actual)`);
+         }
     }
 }
 // Módulo: Integración con la Biblioteca de YouTube (Escucha de eventos de auth.js)
@@ -1528,6 +1608,36 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 }
 
 // Módulo: Reproducción y Crossfade (Adaptado Parcialmente)
+// Utilidad: Esperar a que un player esté listo antes de usarlo.
+function waitForPlayerReady(player) {
+    return new Promise((resolve) => {
+        if (player && typeof player.getPlayerState === 'function') {
+            resolve();
+        } else {
+            // Si tu inicialización incluye un onReady custom, adapta aquí:
+            player.addEventListener('onReady', resolve);
+        }
+    });
+}
+
+// Utilidad: Esperar a que el player entre en cierto estado (opcional, para más robustez).
+function waitForPlayerState(player, wantedState, timeoutMs = 3000) {
+    return new Promise((resolve, reject) => {
+        let elapsed = 0;
+        const interval = setInterval(() => {
+            if (player.getPlayerState() === wantedState) {
+                clearInterval(interval);
+                resolve();
+            }
+            elapsed += 100;
+            if (elapsed >= timeoutMs) {
+                clearInterval(interval);
+                reject(new Error("Timeout esperando estado del player"));
+            }
+        }, 100);
+    });
+}
+
 async function playNextVideo() {
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
     const flatList = getFlattenedPlaylist();
