@@ -2604,6 +2604,19 @@ function extractPlaylistId(url) {
         return null;
     }
 }
+// Al iniciar la app, revisa si ya hay un token guardado
+function checkGoogleTokenOnLoad() {
+    const token = localStorage.getItem('google_token');
+    if (token) {
+        // Token disponible, puedes continuar autenticado
+        console.log('Token encontrado en localStorage:', token);
+        // Llama aquí a tu función de inicialización autenticada
+        onGoogleSignInSuccess(token);
+    } else {
+        // No hay token, muestra el botón de login
+        showGoogleLoginButton();
+    }
+}
 // --- Inicialización ---
 document.addEventListener('DOMContentLoaded', () => {
      // Asegurarse que la playlist manual exista al inicio (si no hay datos guardados)
@@ -2613,7 +2626,10 @@ document.addEventListener('DOMContentLoaded', () => {
      updatePlaylistsUI(); // Render inicial de la UI de playlists
      loadYouTubeAPI(); // Iniciar carga de la API de YouTube
 });
-
+// Llama a token si hay
+window.onload = () => {
+    checkGoogleTokenOnLoad();
+};
 // Cerrar menús contextuales si se hace click fuera
 document.addEventListener('click', (event) => {
     // Close contextual menus (the 3 dots menu) if the click target is not inside a .delete-menu
