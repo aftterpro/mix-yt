@@ -2614,7 +2614,7 @@ function checkGoogleTokenOnLoad() {
         onGoogleSignInSuccess(token);
     } else {
         // No hay token, muestra el botón de login
-        showGoogleLoginButton();
+   //     showGoogleLoginButton();
     }
 }
 // --- Inicialización ---
