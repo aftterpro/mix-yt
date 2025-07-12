@@ -1698,98 +1698,48 @@ function handleCriticalError(error, flatList, currentFlatIndex) {
     document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
     reproduccionIniciada = false;
 }
-function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
-    const fadeStartTime = Date.now();
+function crossfadeAudio(prevPlayer, nextPlayer) {
+    const DURATION_MS = (typeof CROSSFADE_DURATION === 'number' && CROSSFADE_DURATION > 0)
+        ? Math.floor(CROSSFADE_DURATION * 1000)
+        : 2000; // Por defecto 2s si no está definida
+    const FPS = 30;
+    const STEP_MS = 1000 / FPS;
+    const STEPS = Math.ceil(DURATION_MS / STEP_MS);
 
-    // Protección contra iniciar un nuevo fundido si ya hay uno en curso
-    if (isAudioFading) {
-         console.log("Crossfade Audio: Ya desvaneciendo, saltando nueva solicitud.");
-         // Si se solicita un nuevo fundido mientras uno está activo, ¿debería detenerse el existente?
-         // Por ahora, simplemente saltamos la nueva solicitud. Si el comportamiento es extraño, considerar detener el anterior.
-         return;
+    let step = 0;
+    isAudioFading = true;
+
+    let prevStartVol = (prevPlayer && typeof prevPlayer.getVolume === 'function') ? prevPlayer.getVolume() : 100;
+    let nextStartVol = (nextPlayer && typeof nextPlayer.getVolume === 'function') ? nextPlayer.getVolume() : 0;
+    if (isNaN(prevStartVol) || prevStartVol < 0) prevStartVol = 100;
+    if (isNaN(nextStartVol) || nextStartVol < 0) nextStartVol = 0;
+
+    if (DURATION_MS === 0 || prevStartVol === 0) {
+        try { if (prevPlayer && typeof prevPlayer.setVolume === 'function') prevPlayer.setVolume(0); } catch {}
+        try { if (nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(100); } catch {}
+        try { if (prevPlayer && typeof prevPlayer.stopVideo === 'function') prevPlayer.stopVideo(); } catch {}
+        isAudioFading = false;
+        return;
     }
 
-    // Usar los reproductores pasados como argumentos para determinar quién se desvanece y quién entra
-    const previousPlayer = playerToFadeOut; // El reproductor cuyo volumen disminuirá
-    const nextPlayer = playerToFadeIn;     // El reproductor cuyo volumen aumentará
+    const fadeInterval = setInterval(() => {
+        step++;
 
-    // Validar las instancias de reproductores y los métodos requeridos
-    if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-        console.error("Crossfade Audio: Reproductores inválidos pasados como argumentos.");
-        isAudioFading = false; // Asegurarse de que el flag se resetee si la entrada es inválida
-        return; // Salir de la ejecución de la función
-    }
+        const prevVol = Math.max(0, Math.round(prevStartVol * (1 - step / STEPS)));
+        const nextVol = Math.min(100, Math.round(nextStartVol + ((100 - nextStartVol) * (step / STEPS))));
 
-    // Loguear qué reproductores se están desvaneciendo basándose en su referencia interna (player1/player2) para depuración
-    console.log(`Crossfade START @ ${new Date(fadeStartTime).toLocaleTimeString()}: Desvaneciendo Player ${previousPlayer === player1 ? 1:2}, Fundiendo Player ${nextPlayer === player1 ? 1:2}`);
-    isAudioFading = true; // <<<--- MARCAR EL INICIO DEL PROCESO DE FUNDIDO DE AUDIO
+        try { if (prevPlayer && typeof prevPlayer.setVolume === 'function') prevPlayer.setVolume(prevVol); } catch {}
+        try { if (nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(nextVol); } catch {}
 
-    // Los volúmenes iniciales se espera que se establezcan en playNextVideo (por ejemplo, previousPlayer en 100, nextPlayer en 0)
-    // El intervalo ahora gestionará el fundido desde esos volúmenes iniciales hacia los volúmenes objetivo (0 y 100).
-
-    let currentVolume = previousPlayer.getVolume(); // Iniciar desvanecimiento desde su volumen actual
-    let nextVolume = nextPlayer.getVolume();      // Iniciar fundido de entrada desde su volumen actual (debería ser 0 desde playNextVideo)
-
-    // Asegurar que los volúmenes iniciales estén dentro del rango válido [0, 100]
-    currentVolume = Math.max(0, Math.min(100, currentVolume));
-    nextVolume = Math.max(0, Math.min(100, nextVolume));
-
-    // Calcular el número de pasos y el tiempo de intervalo para el fundido
-    const crossfadeSteps = Math.max(1, Math.floor(CROSSFADE_DURATION * 10)); // Apuntar a 10 pasos por segundo para suavidad
-    const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100; // Cuánto cambia el volumen por paso
-    const intervalTime = crossfadeSteps > 0 ? Math.max(10, Math.floor(CROSSFADE_DURATION * 1000 / crossfadeSteps)) : 100; // Tiempo entre pasos (mínimo 10ms)
-
-    // Limpiar cualquier intervalo de crossfade anterior por si acaso
-    if (window.crossfadeIntervalId) {
-        clearInterval(window.crossfadeIntervalId);
-        window.crossfadeIntervalId = null;
-        console.log("Crossfade: Intervalo previo limpiado.");
-    }
-
-    // Iniciar el intervalo para ajustar volúmenes gradualmente
-    const intervalId = setInterval(() => {
-         // Volver a validar reproductores dentro del intervalo. Las instancias de reproductor podrían volverse inválidas.
-         if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Reproductores inválidos en intervalo, deteniendo fundido.`);
-             clearInterval(intervalId);
-             window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-             isAudioFading = false; // <<<--- RESETEAR FLAG EN ERROR
-             return; // Detener la ejecución del intervalo
+        if (step >= STEPS) {
+            clearInterval(fadeInterval);
+            try { if (prevPlayer && typeof prevPlayer.setVolume === 'function') prevPlayer.setVolume(0); } catch {}
+            try { if (nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(100); } catch {}
+            // Detener el reproductor anterior tras el crossfade
+            try { if (prevPlayer && typeof prevPlayer.stopVideo === 'function') prevPlayer.stopVideo(); } catch {}
+            isAudioFading = false;
         }
-
-        // Calcular los nuevos volúmenes para este paso
-        currentVolume = Math.max(0, currentVolume - volumeStep); // Disminuir volumen del reproductor de salida, no bajar de 0
-        nextVolume = Math.min(100, nextVolume + volumeStep);      // Aumentar volumen del reproductor de entrada, no subir de 100
-
-        try {
-            // Aplicar los nuevos volúmenes a las instancias de reproductores
-            if(previousPlayer) previousPlayer.setVolume(currentVolume);
-            if(nextPlayer) nextPlayer.setVolume(nextVolume);
-        } catch (e) {
-             // Loguear cualquier error durante el establecimiento de volumen y detener el fundido
-             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Error estableciendo volumen:`, e);
-             clearInterval(intervalId);
-             window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-             isAudioFading = false; // <<<--- RESETEAR FLAG EN ERROR
-             return; // Detener la ejecución del intervalo
-        }
-
-        // --- Verificar si el crossfade está completo ---
-        // El fundido está completo cuando el reproductor de salida está en o por debajo de 0 volumen Y
-        // el reproductor de entrada está en o por encima de 100 volumen.
-        if (currentVolume <= 0 && nextVolume >= 100) {
-            // Limpiar el intervalo cuando el fundido haya terminado
-            clearInterval(intervalId);
-            window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-            const fadeEndTime = Date.now();
-            console.log(`Crossfade audio FINALIZADO @ ${new Date(fadeEndTime).toLocaleTimeString()} (Duración: ${(fadeEndTime - fadeStartTime)/1000}s).`);
-            isAudioFading = false; // <<<--- MARCAR EL FIN DEL PROCESO DE FUNDIDO DE AUDIO
-
-             // Opcional: Agregar una callback o un evento aquí si algo necesita suceder exactamente cuando termina el fundido de audio
-             // (como detener el video anterior si no se hizo en el manejador transitionend)
-        }
-    }, intervalTime); // Ejecutar la función del intervalo cada 'intervalTime' milisegundos
-    window.crossfadeIntervalId = intervalId; // Almacenar el ID del intervalo
+    }, STEP_MS);
 }
 // --- Preguntar para repetir ---
 function askToRepeatPlaylist() {
