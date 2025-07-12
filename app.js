@@ -1823,15 +1823,15 @@ function playFirstVideo() {
           reproduccionIniciada = false;
     }
 }
-// Módulo: Monitoreo de Reproductores (Adaptado Parcialmente)
-
+// Módulo: Monitoreo de Reproductores
 function startMonitoring() {
     if (!monitorInterval) {
-        // Usar intervalo más corto para precisión en saltos y crossfade
+        // Usar intervalo corto para precisión en saltos y crossfade
         monitorInterval = setInterval(monitorPlayers, 300); // 300ms
         console.log('Monitoreo iniciado (intervalo: 300ms).');
     }
 }
+
 function stopMonitoring() {
     if (monitorInterval) {
         clearInterval(monitorInterval);
@@ -1839,82 +1839,76 @@ function stopMonitoring() {
         console.log('Monitoreo detenido.');
     }
 }
-function monitorPlayers() {
-    // Log opcional para depuración:
-    // console.log(`Monitor: Corriendo (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, hasOutroCrossfadeStarted: ${hasOutroCrossfadeStarted}, Initialized: ${playersInitialized}, reproduccionIniciada: ${reproduccionIniciada})`);
 
-    if (!playersInitialized || !reproduccionIniciada) {
-        return; // No ejecutar la lógica de monitoreo si no está listo
-    }
+function monitorPlayers() {
+    // --- Chequeos de estado global ---
+    if (!playersInitialized || !reproduccionIniciada) return;
 
     const activePlayer = (currentPlayer === 1) ? player1 : player2;
 
-    if (!activePlayer || typeof activePlayer.getPlayerState !== 'function' || typeof activePlayer.getCurrentTime !== 'function' || typeof activePlayer.getDuration !== 'function' || typeof activePlayer.getVideoData !== 'function') {
+    // --- Validación del reproductor activo ---
+    if (!activePlayer ||
+        typeof activePlayer.getPlayerState !== 'function' ||
+        typeof activePlayer.getCurrentTime !== 'function' ||
+        typeof activePlayer.getDuration !== 'function' ||
+        typeof activePlayer.getVideoData !== 'function') {
         console.warn("Monitor: El reproductor activo es inválido.");
-        stopMonitoring(); // Detener el monitoreo si el reproductor activo es inválido
+        stopMonitoring();
         return;
     }
 
     const playerState = activePlayer.getPlayerState();
     const currentTime = activePlayer.getCurrentTime();
     const videoDuration = activePlayer.getDuration();
-    const videoId = activePlayer.getVideoData()?.video_id; // Obtener videoId de forma segura
+    const videoId = activePlayer.getVideoData()?.video_id;
 
+    // --- Validación de video y duración ---
     if (!videoId || isNaN(videoDuration) || videoDuration <= 0) {
-        checkAndSkipSegment(activePlayer); // Aún así, verificar SponsorBlock incluso si la duración es extraña
-        return; // No se pueden realizar comprobaciones basadas en tiempo
+        checkAndSkipSegment(activePlayer);
+        return;
     }
 
-     // Asegurarse de que los segmentos de SponsorBlock se obtengan y almacenen en caché si no lo están ya
-     // La lógica para evitar bucles de fetch está en checkAndSkipSegment y obtenerSegmentosSponsorBlock
+    // --- SponsorBlock: asegurar que los segmentos estén gestionados ---
     if (!segmentosCache[videoId]) {
-        // Llamar a checkAndSkipSegment para iniciar la obtención si es necesario
-         checkAndSkipSegment(activePlayer);
-         // No es necesario retornar, checkAndSkipSegment maneja la lógica si los segmentos aún no están listos
+        checkAndSkipSegment(activePlayer);
     } else if (segmentosCache[videoId] === 'fetching') {
-         // Si está obteniendo, simplemente esperar al próximo tick.
-          checkAndSkipSegment(activePlayer); // Aún llamamos para que checkAndSkipSegment maneje el estado 'fetching'
+        checkAndSkipSegment(activePlayer);
     } else {
-        // Si los segmentos están en caché ([] o [segmentos...]), verificar y saltar
-         checkAndSkipSegment(activePlayer);
+        checkAndSkipSegment(activePlayer);
     }
 
-
-    // --- Verificar Tiempo Restante para Disparar Crossfade (Disparo basado en tiempo) ---
-    // Disparar playNextVideo si el tiempo restante está dentro de la ventana de CROSSFADE_DURATION,
-    // Y NO estamos ya en un proceso de transición,
-    // Y el crossfade AÚN NO ha sido disparado por la lógica de detección de "outro".
+    // --- Crossfade basado en tiempo restante ---
     const timeRemaining = videoDuration - currentTime;
-    // console.log(`Monitor: Tiempo restante: ${timeRemaining.toFixed(1)}s`);
 
-    // Disparar el crossfade basado en el tiempo restante SOLAMENTE si:
-    // 1. El reproductor está realmente en estado PLAYING
-    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer
-    // 3. El tiempo restante es mayor que 0
-    // 4. NO estamos ya en un proceso de transición (`isTransitioning` es false)
-    // 5. El crossfade AÚN NO ha sido disparado por la lógica de detección de "outro" (`hasOutroCrossfadeStarted` es false)
-    if (playerState === YT.PlayerState.PLAYING &&
-        timeRemaining <= CROSSFADE_DURATION + 0.5 && // La ventana comienza CROSSFADE_DURATION + buffer antes del final
-        timeRemaining > 0 && // Asegurarse de que el tiempo restante sea positivo
-        !isTransitioning && // Evitar disparar si ya estamos en transición
-        !hasOutroCrossfadeStarted) // Crucial: No disparar si un "outro" ya lo hizo
-         {
-        console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en tiempo.`);
+    // Dispara playNextVideo basado en el tiempo, SIEMPRE, aunque haya transición/crossfade en curso.
+    // Esto permite múltiples triggers (por monitoreo, outro o evento ENDED)
+    if (
+        playerState === YT.PlayerState.PLAYING &&
+        timeRemaining <= CROSSFADE_DURATION + 0.5 &&
+        timeRemaining > 0 &&
+        !hasOutroCrossfadeStarted // Solo bloquea si un outro ya disparó el crossfade
+    ) {
+        // Si playNextVideo ya fue llamado por otro trigger, él mismo gestiona isTransitioning y repetidos llamados
+        console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade. Disparando playNextVideo basado en tiempo.`);
         playNextVideo();
     }
 
-    // --- Salvaguarda: Considerar detener el reproductor inactivo si sigue sonando inesperadamente ---
-    const inactivePlayer = (currentPlayer === 1) ? player2 : player1; // El reproductor que NO es el lógico actual
-     if (inactivePlayer && typeof inactivePlayer.getPlayerState === 'function' && typeof inactivePlayer.stopVideo === 'function') {
+    // --- Salvaguarda: detener reproductor inactivo si sigue sonando ---
+    const inactivePlayer = (currentPlayer === 1) ? player2 : player1;
+    if (
+        inactivePlayer &&
+        typeof inactivePlayer.getPlayerState === 'function' &&
+        typeof inactivePlayer.stopVideo === 'function'
+    ) {
         const inactiveState = inactivePlayer.getPlayerState();
-        if (inactiveState === YT.PlayerState.PLAYING &&
-            !isTransitioning && !isAudioFading &&
-             inactivePlayer !== activePlayer)
-            {
-            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO fuera de transición/fundido. Deteniéndolo.");
-            try {
-                inactivePlayer.stopVideo();
-            } catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
+        // Permite que el inactivo se detenga aunque haya transición/crossfade (para máxima seguridad)
+        if (
+            inactiveState === YT.PlayerState.PLAYING &&
+            inactivePlayer !== activePlayer
+        ) {
+            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO. Deteniéndolo.");
+            try { inactivePlayer.stopVideo(); }
+            catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
         }
     }
 }
