@@ -1639,68 +1639,6 @@ function waitForPlayerState(player, wantedState, timeoutMs = 3000) {
         }, 100);
     });
 }
-
-async function playNextVideo() {
-    const currentFlatIndex = currentPlayingInfo.flattenedIndex;
-    const flatList = getFlattenedPlaylist();
-
-    logTransition(`Llamada. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}`);
-    isTransitioning = true;
-
-    if (flatList.length === 0) {
-        handleEmptyPlaylist();
-        return;
-    }
-
-    let nextIndex = currentFlatIndex + 1;
-    if (nextIndex >= flatList.length) {
-        handleEndOfPlaylist();
-        return;
-    }
-
-    const previousVideoIdForCleanup = currentPlayingInfo.videoId;
-    let currentPlayerLogicalNum = currentPlayer;
-    let previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2;
-    let nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;
-    let currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
-    let nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
-
-    try {
-        // Paso 1: Validaciones previas
-        const nextVideo = flatList[nextIndex];
-        if (!nextVideo || !nextVideo.videoId) {
-            throw new Error(`Video siguiente inválido en el índice aplanado ${nextIndex}.`);
-        }
-        validatePlayerInstances(previousPlayerInstance, nextPlayerInstance);
-
-        // Paso 2: Preparar video siguiente y estado lógico
-        await prepareNextPlayer(nextPlayerInstance, nextVideo.videoId, nextPlayerElement);
-        setInitialVolumes(previousPlayerInstance, nextPlayerInstance);
-
-        currentPlayingInfo = {
-            flattenedIndex: nextIndex,
-            videoId: nextVideo.videoId,
-            playlistId: nextVideo.sourcePlaylistId
-        };
-        updatePlaylistsUI();
-
-        // Paso 3: Transiciones visuales y reproducción
-        applyTransitionClasses(currentPlayerElement, nextPlayerElement);
-
-        await playNextPlayer(nextPlayerInstance, currentPlayerLogicalNum);
-
-        // Paso 4: Crossfade de audio
-        setTimeout(() => crossfadeAudio(previousPlayerInstance, nextPlayerInstance), 50);
-
-        // Paso 5: Manejo de limpieza post-transición
-        setupTransitionEndHandlers(currentPlayerElement, previousPlayerInstance, nextPlayerElement,
-            currentPlayerLogicalNum, previousVideoIdForCleanup);
-
-    } catch (error) {
-        handleCriticalError(error, flatList, currentFlatIndex);
-    }
-}
-
 // --- Funciones auxiliares ---
 
 function logTransition(msg) {
