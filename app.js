@@ -1640,7 +1640,19 @@ function waitForPlayerState(player, wantedState, timeoutMs = 3000) {
     });
 }
 // --- Funciones auxiliares ---
-
+async function playNextPlayer(player, logicalNum) {
+    try {
+        logTransition(`Estado de Player ${logicalNum === 1 ? 2 : 1} ANTES de playVideo(): ${player.getPlayerState()}`);
+        if (player && typeof player.playVideo === 'function') {
+            player.playVideo();
+        } else {
+            throw new Error("Fallo al iniciar reproducción en reproductor siguiente.");
+        }
+        logTransition(`Estado de Player ${logicalNum === 1 ? 2 : 1} DESPUÉS de playVideo(): ${player.getPlayerState()}`);
+    } catch (e) {
+        throw e;
+    }
+}
 function logTransition(msg) {
     console.log(`playNextVideo [Data]: ${msg}`);
 }
