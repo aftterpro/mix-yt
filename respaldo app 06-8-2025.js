@@ -1,4 +1,3 @@
-
 // Módulo: Configuración y Variables Globales
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
@@ -9,6 +8,11 @@ let youtubeAPIReady = false;
 let isTransitioning = false; // Flag para estado de transición
 let isAudioFading = false; // NUEVO: Flag específico para la duración del fundido de audio
 let hasOutroCrossfadeStarted = false; // NUEVO: Flag para indicar si el crossfade fue disparado por un segmento "outro" de SB
+let crossfadeInterval = null;
+let crossfadeInProgress = false;
+
+const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library'; // ID para identificar estas playlists
+
 
 let playlistsData = []; // Array principal para almacenar todas las playlists [{id, name, thumbnailUrl, videos:[], isExpanded}, ...]
 let currentPlayingInfo = { // Para rastrear qué video/playlist está sonando
@@ -233,6 +237,70 @@ function onPlayerStateChange(event) {
          }
     }
 }
+// Módulo: Integración con la Biblioteca de YouTube (Escucha de eventos de auth.js)
+
+/**
+ * Procesa las playlists obtenidas de la API de YouTube y las añade a la aplicación.
+ * @param {Array} youtubePlaylists - El array de playlists de la API de Google.
+ */
+function addYouTubeLibraryPlaylists(youtubePlaylists) {
+    if (!youtubePlaylists || youtubePlaylists.length === 0) {
+        mostrarMensajeFlotante("No se encontraron playlists en tu biblioteca de YouTube.");
+        return;
+    }
+
+    // Transforma los datos de la API al formato que usa nuestra app
+    const formattedPlaylists = youtubePlaylists.map(playlist => {
+        // Ignorar playlists que no tienen título o items
+        if (!playlist.snippet.title || playlist.contentDetails.itemCount === 0) {
+            return null;
+        }
+        return {
+            id: playlist.id,
+            name: playlist.snippet.title,
+            // Usar thumbnail de alta calidad si está disponible, si no, el por defecto
+            thumbnailUrl: playlist.snippet.thumbnails.high?.url || playlist.snippet.thumbnails.default.url,
+            videos: [], // Los videos se cargarán desde Piped al hacer clic en la playlist
+            isExpanded: false,
+            source: YOUTUBE_LIBRARY_SOURCE_ID, // Marcar como playlist de la biblioteca de YT
+            isLoaded: false, // Marcar que los videos aún no se han cargado
+        };
+    }).filter(p => p !== null); // Filtrar las playlists nulas
+
+    // Añadir las nuevas playlists al principio de la lista de datos
+    playlistsData.unshift(...formattedPlaylists);
+    
+    mostrarMensajeFlotante(`${formattedPlaylists.length} playlists de tu biblioteca han sido añadidas.`);
+    updatePlaylistsUI(); // Refrescar la interfaz
+}
+
+
+/**
+ * Elimina todas las playlists que fueron cargadas desde la biblioteca de YouTube.
+ */
+function clearYouTubeLibraryPlaylists() {
+    const initialCount = playlistsData.length;
+    playlistsData = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
+    const removedCount = initialCount - playlistsData.length;
+    
+    if (removedCount > 0) {
+        console.log(`Se eliminaron ${removedCount} playlists de la biblioteca de YouTube.`);
+        updatePlaylistsUI(); // Actualizar la interfaz para que desaparezcan
+    }
+}
+
+// --- Listener para cuando se obtienen las playlists ---
+document.addEventListener('playlistsFetched', (event) => {
+    console.log("Evento 'playlistsFetched' recibido en app.js");
+    const libraryPlaylists = event.detail;
+    addYouTubeLibraryPlaylists(libraryPlaylists);
+});
+
+// --- Listener para cuando el usuario cierra sesión ---
+document.addEventListener('userLoggedOut', () => {
+    console.log("Evento 'userLoggedOut' recibido en app.js");
+    clearYouTubeLibraryPlaylists();
+});
 // Módulo: Interacción con API de Búsqueda (Piped)
 const performSearch = async (query, nextPage = null) => {
     if (!resultsDiv) return;
@@ -457,7 +525,7 @@ function addVideoToManualPlaylist(videoData) {
 
     // Añadir al final de la playlist manual
     manualPlaylist.videos.push(videoObject);
-    mostrarMensajeFlotante(`Video añadido a "${manualPlaylist.name}": ${videoObject.title}`);
+
     console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
 
     updatePlaylistsUI(); // Actualizar la UI
@@ -744,7 +812,61 @@ function updatePlaylistsUI() {
     // Volver a habilitar Drag and Drop (Fase 1 - dentro de la misma lista)
     enableDragAndDrop();
 }
+/**
+ * Actualiza de forma inteligente solo la UI de una playlist específica,
+ * evitando un redibujado completo de todo el contenedor.
+ * @param {string} playlistId - El ID de la playlist a actualizar.
+ */
+function updateSinglePlaylistUI(playlistId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    const groupDiv = document.querySelector(`.playlist-group[data-playlist-id="${playlistId}"]`);
 
+    if (!groupDiv) {
+        console.warn(`updateSinglePlaylistUI: No se encontró el grupo en el DOM para la playlist ${playlistId}.`);
+        // Si no se encuentra, como fallback, redibujar todo para evitar inconsistencias.
+        updatePlaylistsUI();
+        return;
+    }
+
+    // Caso especial: si la playlist se quedó vacía y no es la manual, la eliminamos del DOM.
+    if (playlist && playlist.videos.length === 0 && playlist.id !== 'manual') {
+        // Opcional: mostrar mensaje antes de eliminar la playlist de la lista de datos.
+        mostrarMensajeFlotante(`Playlist "${playlist.name}" eliminada (vacía).`);
+        playlistsData = playlistsData.filter(p => p.id !== playlistId);
+        groupDiv.style.transition = 'opacity 0.3s ease';
+        groupDiv.style.opacity = '0';
+        setTimeout(() => groupDiv.remove(), 300); // Eliminar del DOM tras la animación
+        return;
+    }
+    
+    // Si la playlist todavía existe, actualizamos su contenido.
+    if (playlist) {
+        // 1. Actualizar el contador en el header
+        const headerName = groupDiv.querySelector('.playlist-group-name');
+        if (headerName) {
+            headerName.textContent = `${playlist.name} (${playlist.videos.length})`;
+        }
+
+        // 2. Redibujar solo la lista de videos de esta playlist
+        const videosDiv = groupDiv.querySelector('.playlist-group-videos');
+        if (videosDiv) {
+            const playingVideoId = currentPlayingInfo.videoId;
+            videosDiv.innerHTML = ''; // Limpiar solo esta lista de videos
+            playlist.videos.forEach(video => {
+                const item = createPlaylistItemElement(video, playlist.id, playingVideoId);
+                videosDiv.appendChild(item);
+            });
+            
+            // Re-habilitar drag & drop solo para los nuevos elementos de esta playlist
+            enableDragAndDrop(videosDiv);
+
+            // Ajustar la altura para mantener la animación de expandir/colapsar
+            if (playlist.isExpanded) {
+                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            }
+        }
+    }
+}
 // --- Helper para crear elemento de Video en Playlist ---
 function createPlaylistItemElement(video, playlistId, playingVideoId) {
     // Crear el contenedor principal para el item de la playlist
@@ -1129,7 +1251,35 @@ function togglePlaylistExpansion(playlistId) {
     const playlist = playlistsData.find(p => p.id === playlistId);
     if (!playlist) return;
 
-    // Alternar el estado
+    // --- LÓGICA AÑADIDA PARA CARGA BAJO DEMANDA ---
+// Si es una playlist de la biblioteca de YouTube y sus videos no han sido cargados aún
+if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+    console.log(`Cargando videos de la biblioteca para: ${playlist.name} usando la API de Google.`);
+    mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
+    
+    // ▼▼▼ CAMBIO PRINCIPAL: LLAMAR A LA NUEVA FUNCIÓN AUTENTICADA ▼▼▼
+    getYouTubeLibraryPlaylistItems(playlist.id)
+        .then(loadedVideos => {
+            // El resto de la lógica puede permanecer igual, ya que `getYouTubeLibraryPlaylistItems`
+            // devolverá los videos en el formato que tu aplicación ya espera.
+            playlist.videos = loadedVideos;
+            playlist.isLoaded = true; // Marcar como cargada
+            playlist.isExpanded = true; // Expandir después de cargar
+            updatePlaylistsUI(); // Actualizar la UI
+            checkAndEnablePlayButton();
+        })
+        .catch(error => {
+            console.error("Error al cargar videos de la playlist de la biblioteca:", error);
+            mostrarMensajeFlotante(`Error al cargar: ${error.message || 'La playlist podría ser inválida.'}`);
+            // Opcional: desmarcar para reintentar
+            playlist.isLoaded = false;
+        });
+    
+    return; // Detenemos la ejecución aquí, la UI se actualizará cuando los datos lleguen.
+}
+// --- FIN DE LA LÓGICA AÑADIDA ---
+
+    // Alternar el estado (lógica original)
     playlist.isExpanded = !playlist.isExpanded;
 
     const groupDiv = document.querySelector(`.playlist-group[data-playlist-id="${playlistId}"]`);
@@ -1137,51 +1287,80 @@ function togglePlaylistExpansion(playlistId) {
     const icon = groupDiv?.querySelector('.expand-icon');
 
     if (groupDiv && videosDiv && icon) {
-        // Actualizar clases para icono y estado general
         groupDiv.classList.toggle('expanded', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-up', playlist.isExpanded);
         icon.classList.toggle('fa-chevron-down', !playlist.isExpanded);
 
-        // Detener transiciones pendientes en este elemento para evitar conflictos
-        videosDiv.removeEventListener('transitionend', handleTransitionEnd); // Quitar listener anterior si existe
+        videosDiv.removeEventListener('transitionend', handleTransitionEnd);
 
         if (playlist.isExpanded) {
-            // 1. (CSS ya NO debería tener display: none) Asegurar que sea visible para medir
-            videosDiv.style.display = 'block'; // O 'flex', 'grid' si usas eso internamente
-            videosDiv.style.maxHeight = '0px'; // Asegurar que parte de 0
-
-            // 2. Calcular altura necesaria
-            const scrollHeight = videosDiv.scrollHeight;
-
-            // 3. Aplicar altura para iniciar animación
-            requestAnimationFrame(() => { // Esperar al siguiente frame
-                videosDiv.style.maxHeight = scrollHeight + 'px';
-            });
-
-            // 4. Opcional: Remover max-height explícito después de la animación para altura natural
-            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
-
-        } else {
-            // --- COLAPSAR ---
-            // 1. Establecer max-height a su altura actual ANTES de animar a 0
-            videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-
-            // 2. Forzar reflow para que la transición se aplique desde la altura actual
+            videosDiv.style.display = 'block';
+            videosDiv.style.maxHeight = '0px'; 
             requestAnimationFrame(() => {
-                 // 3. Animar a max-height 0
+                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            });
+            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
+        } else {
+            videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
+            requestAnimationFrame(() => {
                  videosDiv.style.maxHeight = '0px';
             });
-
-            // 4. Opcional: Poner display: none DESPUÉS de que termine la animación
-             videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
+            videosDiv.addEventListener('transitionend', handleTransitionEnd, { once: true });
         }
     } else {
-        // Fallback si no se encuentran los elementos: re-renderizar todo
         console.warn("Elementos no encontrados para toggle, re-renderizando UI completa.");
         updatePlaylistsUI();
     }
 }
+async function getYouTubeLibraryPlaylistItems(playlistId) {
+    try {
+        let allVideos = [];
+        let nextPageToken = null;
 
+        do {
+            const response = await gapi.client.youtube.playlistItems.list({
+                'part': ['snippet', 'contentDetails'],
+                'playlistId': playlistId,
+                'maxResults': 50,
+                'pageToken': nextPageToken
+            });
+
+            const result = response.result;
+            if (result.items) {
+                const formattedVideos = result.items
+                    .map(item => {
+                        // Comprobamos existencia de los campos y miniaturas
+                        const thumbnails = item?.snippet?.thumbnails;
+                        const videoId = item?.contentDetails?.videoId;
+                        const title = item?.snippet?.title;
+                        const highThumb = thumbnails?.high?.url;
+                        const defaultThumb = thumbnails?.default?.url;
+                        // Si no hay videoId o miniatura, lo omitimos
+                        if (!videoId || (!highThumb && !defaultThumb)) {
+                            console.warn('Item de playlist omitido por falta de datos:', item);
+                            return null;
+                        }
+                        return {
+                            videoId,
+                            title: title || 'Sin título',
+                            thumbnail: highThumb || defaultThumb,
+                            duration: 0,
+                        };
+                    })
+                    .filter(v => v !== null && v.videoId);
+
+                allVideos = allVideos.concat(formattedVideos);
+            }
+            nextPageToken = result.nextPageToken;
+        } while (nextPageToken);
+
+        return allVideos;
+
+    } catch (err) {
+        console.error("Error al obtener videos de la playlist de YouTube:", err);
+        throw new Error(err.result?.error?.message || "No se pudieron obtener los videos.");
+    }
+}
 // --- Función manejadora para el final de la transición ---
 function handleTransitionEnd(event) {
     // Asegurarse que la transición completada sea de 'max-height'
@@ -1217,34 +1396,31 @@ function deleteVideo(playlistId, videoId) {
 
     const deletedVideoTitle = playlistsData[playlistIndex].videos[videoIndex].title;
     playlistsData[playlistIndex].videos.splice(videoIndex, 1); // Eliminar del array
-
-    mostrarMensajeFlotante(`Video "${deletedVideoTitle}" eliminado.`);
-    console.log(`Eliminando video: ${deletedVideoTitle} de playlist ${playlistId}`);
-
     // Opcional: Eliminar playlist si queda vacía (excepto la manual)
     if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
-         mostrarMensajeFlotante(`Playlist "${playlistsData[playlistIndex].name}" eliminada (vacía).`);
          playlistsData.splice(playlistIndex, 1);
     }
 
-    updatePlaylistsUI(); // Actualizar UI
+    updateSinglePlaylistUI(playlistId); // <-- Nueva línea eficiente
     updateCurrentPlayingIndex(); // Recalcular índice por si acaso
 }
 
 // --- REESCRIBIR COMPLETAMENTE enableDragAndDrop ---
-function enableDragAndDrop() {
-    const playlistContainer = document.getElementById('playlistContainer');
+function enableDragAndDrop(scopeElement = document) {
+    const playlistContainer = scopeElement === document 
+        ? document.getElementById('playlistContainer') 
+        : scopeElement.closest('.playlist-group');
+
     if (!playlistContainer) return;
 
-    let draggedItemElement = null; // Elemento DOM que se arrastra
-    let draggedVideoData = null;   // Objeto { videoId, sourcePlaylistId }
-    let placeholder = null;        // Elemento visual temporal
+    let draggedItemElement = null;
+    let draggedVideoData = null;
+    let placeholder = null;
 
-    // Crear placeholder una vez
     function createPlaceholder() {
         const ph = document.createElement('div');
         ph.className = 'playlist-item placeholder';
-        ph.style.height = '40px'; // Altura aprox de un item
+        ph.style.height = '40px';
         ph.style.backgroundColor = 'rgba(0, 123, 255, 0.2)';
         ph.style.border = '1px dashed #007bff';
         ph.style.margin = '4px 0';
@@ -1252,9 +1428,11 @@ function enableDragAndDrop() {
     }
     placeholder = createPlaceholder();
 
-    // --- Event Listeners en los ITEMS (.playlist-item) ---
-    playlistContainer.querySelectorAll('.playlist-item').forEach(item => {
-        // DRAG START: Inicia el arrastre
+    const itemsToMakeDraggable = (scopeElement === document) 
+        ? playlistContainer.querySelectorAll('.playlist-item') 
+        : scopeElement.querySelectorAll('.playlist-item');
+
+    itemsToMakeDraggable.forEach(item => {
         item.addEventListener('dragstart', (event) => {
             const targetItem = event.target.closest('.playlist-item');
             if (!targetItem) return;
@@ -1266,45 +1444,39 @@ function enableDragAndDrop() {
             };
 
             event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', draggedVideoData.videoId); // Guardar ID
+            event.dataTransfer.setData('text/plain', draggedVideoData.videoId);
 
-            // Añadir clase con delay
             setTimeout(() => targetItem.classList.add('dragging'), 0);
             console.log(`Drag Start: Video ${draggedVideoData.videoId} from Playlist ${draggedVideoData.sourcePlaylistId}`);
         });
 
-        // DRAG END: Termina el arrastre (se suelte o se cancele)
         item.addEventListener('dragend', (event) => {
             if (draggedItemElement) {
                 draggedItemElement.classList.remove('dragging');
             }
             if(placeholder && placeholder.parentNode) {
-                 placeholder.remove(); // Limpiar placeholder
+                 placeholder.remove();
             }
-             // Limpiar clases visuales de drop target
             document.querySelectorAll('.drag-over-area').forEach(el => el.classList.remove('drag-over-area'));
             draggedItemElement = null;
             draggedVideoData = null;
         });
 
-         // DRAG OVER: Cuando se arrastra SOBRE otro item
          item.addEventListener('dragover', (event) => {
-             event.preventDefault(); // Necesario
+             event.preventDefault();
              event.dataTransfer.dropEffect = 'move';
              const targetItem = event.target.closest('.playlist-item');
-             if (!targetItem || targetItem === draggedItemElement) return; // No sobre sí mismo
+             if (!targetItem || targetItem === draggedItemElement) return;
 
-             // Insertar placeholder ANTES del item sobre el que estamos
               const targetRect = targetItem.getBoundingClientRect();
               const offsetY = event.clientY - targetRect.top;
-              // Decidir si insertar antes o después basado en la mitad del item
               if (offsetY < targetRect.height / 2) {
                    targetItem.parentNode.insertBefore(placeholder, targetItem);
               } else {
                    targetItem.parentNode.insertBefore(placeholder, targetItem.nextSibling);
               }
         });
-        // DROP: Cuando se SUELTA sobre otro item
+
         item.addEventListener('drop', (event) => {
             event.preventDefault();
              if (placeholder && placeholder.parentNode) {
@@ -1317,59 +1489,49 @@ function enableDragAndDrop() {
             }
 
             const targetPlaylistId = targetItem.dataset.playlistId;
-            const droppedVideoId = event.dataTransfer.getData('text/plain'); // Debería coincidir con draggedVideoData.videoId
+            const droppedVideoId = event.dataTransfer.getData('text/plain');
 
-             // Calcular índice destino basado en la posición donde estaba el placeholder
-             const videoElements = Array.from(targetItem.parentNode.children).filter(el => el !== placeholder && !el.classList.contains('dragging'));
-             // El índice será la posición del targetItem en la lista filtrada
-             let targetIndex = videoElements.indexOf(targetItem);
+             let targetIndex = Array.from(targetItem.parentNode.children)
+                .filter(el => el.classList.contains('playlist-item') && !el.classList.contains('placeholder') && !el.classList.contains('dragging'))
+                .indexOf(targetItem);
 
-            // Si el placeholder estaba DESPUÉS del targetItem, el índice es +1
-             // (Esto es más complejo, usar la posición del placeholder es mejor)
-             // O más simple: obtener el índice del targetItem real y decidir antes/después
               const targetRect = targetItem.getBoundingClientRect();
               const offsetY = event.clientY - targetRect.top;
               if (offsetY >= targetRect.height / 2) {
-                   targetIndex++; // Insertar después
+                   targetIndex++;
               }
 
             console.log(`Drop: Video ${droppedVideoId} (from ${draggedVideoData.sourcePlaylistId}) sobre item ${targetItem.dataset.videoId} (Playlist ${targetPlaylistId}, índice ${targetIndex})`);
 
-            // Llamar a la función unificada para mover
             moveVideo(droppedVideoId, draggedVideoData.sourcePlaylistId, targetPlaylistId, targetIndex);
         });
     });
 
-    // --- Event Listeners en los CONTENEDORES de Videos (.playlist-group-videos) ---
-    playlistContainer.querySelectorAll('.playlist-group-videos').forEach(container => {
+    const containersToListen = (scopeElement === document)
+        ? playlistContainer.querySelectorAll('.playlist-group-videos')
+        : playlistContainer.querySelectorAll('.playlist-group-videos');
 
-        // DRAG OVER: Arrastrando sobre el área del contenedor (para añadir al final)
+    containersToListen.forEach(container => {
         container.addEventListener('dragover', (event) => {
              event.preventDefault();
              event.dataTransfer.dropEffect = 'move';
-             // Añadir indicador visual solo si no hay items hijos (o si estamos al final?)
              if (container.children.length === 0 || event.offsetY > container.scrollHeight - 20) {
                  container.classList.add('drag-over-area');
-                  // Añadir placeholder al final si no está ya ahí
                   if (!placeholder.parentNode || placeholder.nextSibling) {
                      container.appendChild(placeholder);
                   }
              } else {
                  container.classList.remove('drag-over-area');
-                 // El dragover sobre un item manejará el placeholder
              }
         });
 
-         // DRAG LEAVE: Saliendo del área del contenedor
          container.addEventListener('dragleave', (event) => {
-              // Quitar indicador si salimos del área Y no entramos en un hijo
              if (!container.contains(event.relatedTarget)) {
                   container.classList.remove('drag-over-area');
                    if(placeholder.parentNode === container) placeholder.remove();
              }
          });
 
-        // DROP: Soltando sobre el área del contenedor (generalmente para añadir al final)
         container.addEventListener('drop', (event) => {
             event.preventDefault();
              if (placeholder && placeholder.parentNode) {
@@ -1382,9 +1544,8 @@ function enableDragAndDrop() {
             const targetPlaylistId = groupDiv.dataset.playlistId;
             const droppedVideoId = event.dataTransfer.getData('text/plain');
 
-            // Mover al final de esta playlist
              const targetPlaylist = playlistsData.find(p => p.id === targetPlaylistId);
-             const targetIndex = targetPlaylist ? targetPlaylist.videos.length : 0; // Índice final
+             const targetIndex = targetPlaylist ? targetPlaylist.videos.length : 0;
 
             console.log(`Drop: Video ${droppedVideoId} (from ${draggedVideoData.sourcePlaylistId}) al final de Playlist ${targetPlaylistId}`);
             moveVideo(droppedVideoId, draggedVideoData.sourcePlaylistId, targetPlaylistId, targetIndex);
@@ -1433,8 +1594,15 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 
     console.log(`Video ${videoId} movido de ${sourcePlaylistId} a ${targetPlaylistId} en índice ${targetIndex}.`);
 
-    // 4. Actualizar la UI completa
-    updatePlaylistsUI();
+    // 4. Actualizar la UI 
+     if (sourcePlaylistId === targetPlaylistId) {
+        // Si el video se movió dentro de la misma playlist, solo actualizamos esa.
+        updateSinglePlaylistUI(sourcePlaylistId);
+    } else {
+        // Si se movió a otra playlist, actualizamos ambas.
+        updateSinglePlaylistUI(sourcePlaylistId);
+        updateSinglePlaylistUI(targetPlaylistId);
+    }
 
     // 5. Recalcular el índice de reproducción aplanado
     // Es crucial llamar a esto DESPUÉS de actualizar playlistsData
@@ -1442,397 +1610,404 @@ function moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
 }
 
 // Módulo: Reproducción y Crossfade (Adaptado Parcialmente)
+// Utilidad: Esperar a que un player esté listo antes de usarlo.
+function waitForPlayerReady(player) {
+    return new Promise((resolve) => {
+        if (player && typeof player.getPlayerState === 'function') {
+            resolve();
+        } else {
+            // Si tu inicialización incluye un onReady custom, adapta aquí:
+            player.addEventListener('onReady', resolve);
+        }
+    });
+}
+
+// Utilidad: Esperar a que el player entre en cierto estado (opcional, para más robustez).
+function waitForPlayerState(player, wantedState, timeoutMs = 3000) {
+    return new Promise((resolve, reject) => {
+        let elapsed = 0;
+        const interval = setInterval(() => {
+            if (player.getPlayerState() === wantedState) {
+                clearInterval(interval);
+                resolve();
+            }
+            elapsed += 100;
+            if (elapsed >= timeoutMs) {
+                clearInterval(interval);
+                reject(new Error("Timeout esperando estado del player"));
+            }
+        }, 100);
+    });
+}
+// --- Funciones auxiliares ---
+async function playNextPlayer(player, logicalNum) {
+    try {
+        logTransition(`Estado de Player ${logicalNum === 1 ? 2 : 1} ANTES de playVideo(): ${player.getPlayerState()}`);
+        if (player && typeof player.playVideo === 'function') {
+            player.playVideo();
+        } else {
+            throw new Error("Fallo al iniciar reproducción en reproductor siguiente.");
+        }
+        logTransition(`Estado de Player ${logicalNum === 1 ? 2 : 1} DESPUÉS de playVideo(): ${player.getPlayerState()}`);
+    } catch (e) {
+        throw e;
+    }
+}
+function logTransition(msg) {
+    console.log(`playNextVideo [Data]: ${msg}`);
+}
+function handleEmptyPlaylist() {
+    logTransition("No hay videos en la lista aplanada.");
+    
+    // MODIFICACIÓN: Cancelar crossfade
+    cancelCrossfade();
+    stopMonitoring();
+    reproduccionIniciada = false;
+    document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('botonPlay').disabled = true;
+    currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null };
+    updatePlaylistsUI();
+    isTransitioning = false;
+    logTransition("*** Transición ABORTADA (Sin videos). Flag isTransitioning=false. ***");
+}
+
+function handleEndOfPlaylist() {
+    logTransition('Fin de la lista aplanada detectado.');
+    askToRepeatPlaylist();
+    isTransitioning = false;
+    logTransition("*** Transición FINALIZADA (Fin de lista). Flag isTransitioning=false. ***");
+}
+
+function validatePlayerInstances(prev, next) {
+    if (!prev || typeof prev.setVolume !== 'function' || typeof prev.getVolume !== 'function' ||
+        !next || typeof next.cueVideoById !== 'function' || typeof next.playVideo !== 'function' ||
+        typeof next.setVolume !== 'function' || typeof next.getPlayerState !== 'function') {
+        throw new Error("Instancias de reproductores o funciones de API requeridas faltan para el crossfade.");
+    }
+}
+
+async function prepareNextPlayer(nextPlayer, videoId, nextPlayerElement) {
+    logTransition(`Llamando a cueVideoById('${videoId}')`);
+    nextPlayer.cueVideoById(videoId);
+    if (nextPlayerElement) {
+        nextPlayerElement.classList.remove('hidden', 'fade-out');
+    }
+}
+
+function setInitialVolumes(prev, next) {
+    try { prev.setVolume(prev.getVolume() || 100); } catch (e) { prev.setVolume(100); }
+    try { next.setVolume(0); } catch (e) { }
+}
+
+function applyTransitionClasses(currentEl, nextEl) {
+    if (currentEl) currentEl.classList.add('fade-out');
+    if (nextEl) {
+        nextEl.classList.remove('fade-in');
+        nextEl.classList.add('fade-in');
+    }
+}
+
+// ===== MODIFICACIONES A PLAYNEXTVIDEO =====
 async function playNextVideo() {
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
-    console.log(`playNextVideo [Data]: Llamada. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}`);
+    const flatList = getFlattenedPlaylist();
 
-    // Protección para evitar iniciar una nueva transición si ya hay una activa
-    if (isTransitioning) {
-        console.warn("playNextVideo [Data]: Transición principal ya en curso, cancelando.");
+    logTransition(`Llamada. Índice aplanado actual: ${currentFlatIndex}, isTransitioning=${isTransitioning}, isAudioFading=${isAudioFading}`);
+    
+    // Prevenir múltiples llamadas durante transición PERO permitir si ya terminó el crossfade
+    if (isTransitioning && crossfadeInProgress) {
+        console.log("playNextVideo: Transición y crossfade en progreso, ignorando llamada duplicada.");
         return;
     }
+    
+    isTransitioning = true;
 
-    isTransitioning = true; // Marcar el inicio del proceso de transición
-    console.log(`playNextVideo [Data]: *** Transición PRINCIPAL INICIADA desde índice aplanado ${currentFlatIndex}. Flag isTransitioning=true. ***`);
-
-    const flatList = getFlattenedPlaylist();
     if (flatList.length === 0) {
-        console.log("playNextVideo [Data]: No hay videos en la lista aplanada.");
-        stopMonitoring();
-        reproduccionIniciada = false;
-        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
-        document.getElementById('botonPlay').disabled = true;
-        currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null };
-        updatePlaylistsUI();
-        isTransitioning = false; // Resetear flag al salir temprano
-        console.log(`playNextVideo [Data]: *** Transición ABORTADA (Sin videos). Flag isTransitioning=false. ***`);
+        handleEmptyPlaylist();
         return;
     }
 
     let nextIndex = currentFlatIndex + 1;
-
     if (nextIndex >= flatList.length) {
-        console.log('playNextVideo [Data]: Fin de la lista aplanada detectado.');
-        askToRepeatPlaylist();
-        isTransitioning = false; // Resetear flag al llegar al final
-        console.log(`playNextVideo [Data]: *** Transición FINALIZADA (Fin de lista). Flag isTransitioning=false. ***`);
+        handleEndOfPlaylist();
         return;
     }
 
-    const previousVideoIdForCleanup = currentPlayingInfo.videoId; // Guardar ID del video saliente para limpieza
+    const previousVideoIdForCleanup = currentPlayingInfo.videoId;
+    let currentPlayerLogicalNum = currentPlayer;
+    let previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2;
+    let nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;
+    let currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
+    let nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
 
     try {
+        // Paso 1: Validaciones previas
         const nextVideo = flatList[nextIndex];
         if (!nextVideo || !nextVideo.videoId) {
-             throw new Error(`Video siguiente inválido en el índice aplanado ${nextIndex}.`);
+            throw new Error(`Video siguiente inválido en el índice aplanado ${nextIndex}.`);
         }
-        const nextVideoId = nextVideo.videoId;
+        validatePlayerInstances(previousPlayerInstance, nextPlayerInstance);
 
-        // Identificar reproductores basándose en el reproductor lógico actual (el que va a desvanecerse)
-        const currentPlayerLogicalNum = currentPlayer; // Número del reproductor que está sonando (debería desvanecerse)
-        const previousPlayerInstance = (currentPlayerLogicalNum === 1) ? player1 : player2; // La instancia del reproductor actual
-        const nextPlayerInstance = (currentPlayerLogicalNum === 1) ? player2 : player1;     // La instancia del reproductor que sonará después
+        // Paso 2: Preparar video siguiente y estado lógico
+        await prepareNextPlayer(nextPlayerInstance, nextVideo.videoId, nextPlayerElement);
+        setInitialVolumes(previousPlayerInstance, nextPlayerInstance);
 
-        // Obtener los elementos DOM correspondientes para aplicar clases CSS
-        const currentPlayerElement = document.getElementById(`player${currentPlayerLogicalNum}`);
-        const nextPlayerElement = document.getElementById(`player${currentPlayerLogicalNum === 1 ? 2 : 1}`);
-
-        // Validar instancias de reproductores y métodos requeridos
-        if (!previousPlayerInstance || typeof previousPlayerInstance.setVolume !== 'function' || typeof previousPlayerInstance.getVolume !== 'function' ||
-            !nextPlayerInstance || typeof nextPlayerInstance.cueVideoById !== 'function' || typeof nextPlayerInstance.playVideo !== 'function' || typeof nextPlayerInstance.setVolume !== 'function' || typeof nextPlayerInstance.getPlayerState !== 'function') {
-             throw new Error("Instancias de reproductores o funciones de API requeridas faltan para el crossfade.");
-        }
-
-        // --- Paso 1: Preparar el siguiente video (cargarlo sin reproducir) ---
-        console.log(`playNextVideo [Data]: Llamando a cueVideoById('${nextVideoId}') en Player ${currentPlayerLogicalNum === 1 ? 2 : 1}.`);
-        nextPlayerInstance.cueVideoById(nextVideoId);
-
-        // Asegurarse de que el contenedor del siguiente reproductor esté listo y en la capa correcta para la superposición visual
-        // Debe estar visible y no en estado de desvanecimiento antes de que comience la transición.
-        if (nextPlayerElement) {
-            nextPlayerElement.classList.remove('hidden', 'fade-out'); // Asegurarse de que esté visible y no desvaneciéndose
-            // El CSS debería manejar el z-index para la superposición: el reproductor entrante (nextPlayerElement) necesita un z-index más alto
-        } else { console.warn("playNextVideo [Data]: Elemento DOM para nextPlayerElement no encontrado."); }
-
-
-        // --- Paso 2: Establecer volúmenes iniciales ANTES de iniciar la reproducción/desvanecimiento ---
-        // Asegurarse de que el reproductor anterior esté a volumen completo (o al que tenía) al inicio del desvanecimiento.
-        // Asegurarse de que el reproductor siguiente esté silenciado (volumen 0) antes de que comience su reproducción para el fundido de entrada.
-        try { previousPlayerInstance.setVolume(previousPlayerInstance.getVolume() || 100); console.log(`playNextVideo [Data]: Volumen inicial reproductor previo: ${previousPlayerInstance.getVolume()}`); } catch(e) { console.warn("playNextVideo [Data]: Error obteniendo/estableciendo volumen de reproductor previo, por defecto 100:", e); previousPlayerInstance.setVolume(100); }
-        try { nextPlayerInstance.setVolume(0); console.log(`playNextVideo [Data]: Volumen inicial reproductor siguiente: 0`);} catch(e) { console.warn("playNextVideo [Data]: Error estableciendo volumen de reproductor siguiente a 0:", e); }
-
-        // Actualizar el estado lógico inmediatamente para el resaltado en la UI.
-        // Esto actualiza currentPlayingInfo a los detalles del *siguiente* video.
         currentPlayingInfo = {
-             flattenedIndex: nextIndex,
-             videoId: nextVideo.videoId,
-             playlistId: nextVideo.sourcePlaylistId
+            flattenedIndex: nextIndex,
+            videoId: nextVideo.videoId,
+            playlistId: nextVideo.sourcePlaylistId
         };
-        console.log(`playNextVideo [Data]: Estado lógico actualizado a índice ${nextIndex} (Video: ${nextVideoId}).`);
-        updatePlaylistsUI(); // Actualizar el resaltado en la UI basado en el nuevo estado lógico
+        updatePlaylistsUI();
 
+        // Paso 3: Transiciones visuales y reproducción
+        applyTransitionClasses(currentPlayerElement, nextPlayerElement);
 
-        // --- Paso 3: Iniciar las Transiciones Visual y de Audio SIMULTÁNEAMENTE ---
+        await playNextPlayer(nextPlayerInstance, currentPlayerLogicalNum);
 
-        // Aplicar clases CSS para iniciar el desvanecimiento visual en el reproductor actual y el fundido de entrada en el siguiente.
-        // Esto debería activar las transiciones CSS definidas en tu hoja de estilos.
-        if (currentPlayerElement) {
-            currentPlayerElement.classList.add('fade-out');
-        } else { console.warn("playNextVideo [Data]: Elemento DOM para currentPlayerElement no encontrado."); }
-        if (nextPlayerElement) {
-             nextPlayerElement.classList.remove('fade-in'); // Eliminar por si estaba de un intento previo
-            nextPlayerElement.classList.add('fade-in');
-        }
-
-        // Iniciar la reproducción del video cargado en el siguiente reproductor.
-        // Esto es necesario ahora para que su flujo de audio esté disponible (a volumen 0).
-         try {
-            console.log(`playNextVideo [Data]: Estado de Player ${currentPlayerLogicalNum === 1 ? 2 : 1} ANTES de playVideo(): ${nextPlayerInstance.getPlayerState()}`); // Log estado antes
-            if (nextPlayerInstance && typeof nextPlayerInstance.playVideo === 'function') {
-                 console.log(`playNextVideo [Data]: Llamando a playVideo() en Player ${currentPlayerLogicalNum === 1 ? 2 : 1} para iniciar reproducción para fundido de entrada.`);
-                 nextPlayerInstance.playVideo();
-                 // El audio comenzará a cargar/reproducir, pero su volumen es 0 debido a setVolume(0) anterior.
-                 // El manejador onPlayerStateChange debería eventualmente capturar BUFFERING y luego PLAYING.
-            } else {
-                 console.warn(`playNextVideo [Data]: Instancia de reproductor siguiente inválida o playVideo falta, no se puede iniciar reproducción para fundido.`);
-                  throw new Error("Fallo al iniciar reproducción en reproductor siguiente."); // Propagar error al bloque catch
-            }
-             console.log(`playNextVideo [Data]: Estado de Player ${currentPlayerLogicalNum === 1 ? 2 : 1} DESPUÉS de playVideo(): ${nextPlayerInstance.getPlayerState()}`); // Log estado después
-         } catch(e) {
-             console.error("playNextVideo [Data]: Error llamando a playVideo en reproductor siguiente:", e);
-              // Si playVideo falla, abortar la transición limpiamente
-              isTransitioning = false; // Resetear el flag principal de transición
-               // Eliminar clases visuales que pudieran haberse aplicado
-               if (currentPlayerElement) currentPlayerElement.classList.remove('fade-out');
-               if (nextPlayerElement) nextPlayerElement.classList.remove('fade-in');
-               // Revertir estado lógico? Tal vez quedarse en el video actual?
-                currentPlayingInfo.flattenedIndex = currentFlatIndex; // Revertir índice
-                currentPlayingInfo.videoId = previousVideoIdForCleanup;
-                currentPlayingInfo.playlistId = flatList[currentFlatIndex]?.sourcePlaylistId || null;
-                updatePlaylistsUI(); // Actualizar UI de vuelta
-               throw e; // Volver a lanzar el error para que sea capturado por el try/catch principal
-         }
-
-        // Iniciar el Fundido de Audio después de un pequeño retraso.
-        // Este retraso da al reproductor de YouTube un momento para comenzar a cargar/preparar el flujo de audio
-        // después de la llamada a playVideo(), antes de que comencemos a ajustar su volumen.
-        const audioFadeStartDelay = 50; // Milisegundos de retraso antes de iniciar el fundido de audio (ajustar si es necesario)
-        console.log(`playNextVideo [Data]: Programando crossfadeAudio en ${audioFadeStartDelay}ms.`);
+        // MODIFICACIÓN: Esperar un poco más antes del crossfade para asegurar que el nuevo video inicie
         setTimeout(() => {
-            console.log(`playNextVideo [Data]: Iniciando crossfadeAudio.`);
-            // Llamar a la función crossfadeAudio, pasando las instancias específicas de reproductores involucradas.
-            // crossfadeAudio gestionará el desvanecimiento de volúmenes durante el CROSSFADE_DURATION definido.
-             crossfadeAudio(previousPlayerInstance, nextPlayerInstance); // Usar la función crossfadeAudio modificada
-        }, audioFadeStartDelay); // Retraso antes de iniciar el fundido de audio
-
-
-        // --- Paso 4: Manejar la Limpieza después de las Transiciones (Al completar el Desvanecimiento Visual) ---
-        // Esta parte se activa por el final de la transición de desvanecimiento visual en el reproductor saliente.
-        // Maneja tareas como detener el video antiguo, ocultar su contenedor y limpiar datos.
-
-        let transitionEndHandler = (event) => {
-            // Asegurarse de que este listener solo se dispare para la transición de 'opacity' en el elemento correcto (el reproductor saliente)
-            // Esto evita que se dispare en otras posibles transiciones (como z-index) o elementos.
-            if (event.propertyName !== 'opacity' || event.target !== currentPlayerElement) {
-                return; // Ignorar si no es la transición de opacity o no es el elemento que estamos desvaneciendo
-            }
-
-            console.log(`playNextVideo [Data]: Evento transitionend disparado en ${event.target.id} por propiedad ${event.propertyName}. Realizando limpieza.`);
-
-            // Eliminar el event listener para evitar que se dispare múltiples veces
-            event.target.removeEventListener('transitionend', transitionEndHandler);
-            // Limpiar el timeout de respaldo, ya que el evento transitionend se disparó exitosamente
-            clearTimeout(transitionEndHandler.fallbackTimeoutId);
-
-
-            // --- Lógica de Limpieza (Esto se ejecuta después de que el desvanecimiento visual se completa) ---
+            // Verificar que el nuevo reproductor esté efectivamente reproduciendo antes del crossfade
             try {
-                console.log(`playNextVideo [Data]: Limpieza de transición iniciada.`);
-
-                // Detener explícitamente el video anterior.
-                // Esto es más seguro ahora que su audio se ha desvanecido.
-                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function' && previousPlayerInstance.getPlayerState() !== YT.PlayerState.ENDED) {
-                      console.log(`playNextVideo [Data]: Limpieza - Llamando a stopVideo() en Player previo ${currentPlayerLogicalNum}.`);
-                      previousPlayerInstance.stopVideo();
-                 }
-
-                // Ocultar completamente el contenedor del reproductor antiguo después del desvanecimiento
-                if (currentPlayerElement) {
-                    currentPlayerElement.classList.remove('fade-out', 'fade-in'); // Eliminar cualquier clase de desvanecimiento
-                    currentPlayerElement.classList.add('hidden'); // Ocultar completamente el contenedor
+                const nextPlayerState = nextPlayerInstance.getPlayerState();
+                if (nextPlayerState === YT.PlayerState.PLAYING) {
+                    crossfadeAudio(previousPlayerInstance, nextPlayerInstance);
+                } else {
+                    console.warn(`El reproductor siguiente no está reproduciendo (Estado: ${nextPlayerState}), retrasando crossfade...`);
+                    // Reintentar en 200ms más
+                    setTimeout(() => crossfadeAudio(previousPlayerInstance, nextPlayerInstance), 200);
                 }
-                // Eliminar la clase fade-in del contenedor del nuevo reproductor (ya debería estar completamente visible)
-                if (nextPlayerElement) {
-                    nextPlayerElement.classList.remove('fade-in');
-                     // Asegurarse de que el siguiente reproductor esté en z-index o capa predeterminada si se ajustó con CSS
-                }
-
-                // Limpieza de datos (como caché de SponsorBlock) relacionada con el video ANTERIOR
-                if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
-                    console.log(`playNextVideo [Data]: Limpieza - Limpiando caché SB para video ANTERIOR: ${previousVideoIdForCleanup}`);
-                    delete segmentosCache[previousVideoIdForCleanup];
-                }
-                // Restablecer el seguimiento del último salto si fue para el video que acaba de terminar
-                if (lastSeekVideoId === previousVideoIdForCleanup) {
-                     lastSeekEndTime = -1;
-                     lastSeekVideoId = null;
-                }
-
-            } catch (cleanupError) {
-                 console.error("playNextVideo [Data]: Error durante la limpieza de transitionend:", cleanupError);
-                 // Si la limpieza falla, intentar asegurar que los flags se reseteen como salvaguarda.
-                 // isTransitioning se resetea principalmente en onPlayerStateChange cuando el NUEVO video comienza a reproducir.
-                 isAudioFading = false; // El fundido de audio también debería haber terminado o detenerse a estas alturas
-                 console.log(`playNextVideo [Data]: *** Limpieza de Transición INTERRUMPIDA (Error). isAudioFading reseteado. ***`);
-            } finally {
-                 // Este bloque se ejecuta después del try/catch en el manejador transitionend.
-                 // El reseteo del flag principal isTransitioning ocurre en onPlayerStateChange cuando el NUEVO reproductor entra en estado PLAYING.
-                 console.log(`playNextVideo [Data]: Limpieza de transitionend FINALIZADA.`);
-                 // El cambio lógico de currentPlayer se maneja en onPlayerStateChange cuando el nuevo reproductor confirma el estado PLAYING.
+            } catch(e) {
+                console.error("Error verificando estado del reproductor para crossfade:", e);
+                // Hacer crossfade de todos modos
+                crossfadeAudio(previousPlayerInstance, nextPlayerInstance);
             }
-        };
+        }, 150); // Aumentar delay inicial
 
-        // Agregar el event listener para el evento transitionend en el elemento que se está desvaneciendo (currentPlayerElement)
-        if (currentPlayerElement) {
-            console.log(`playNextVideo [Data]: Agregando listener de transitionend a ${currentPlayerElement.id}`);
-            currentPlayerElement.addEventListener('transitionend', transitionEndHandler);
-
-            // --- Agregar un setTimeout de respaldo por si transitionend no se dispara ---
-            // Esta es una medida de seguridad para navegadores o escenarios donde el evento transitionend podría no dispararse de forma fiable.
-            // La duración de respaldo debe ser ligeramente mayor que la duración de la transición CSS.
-            const fallbackTimeoutMs = CROSSFADE_DURATION * 1000 + 200; // CROSSFADE_DURATION en ms + pequeño buffer
-            console.log(`playNextVideo [Data]: Estableciendo setTimeout de respaldo (${fallbackTimeoutMs}ms).`);
-            const fallbackTimeoutId = setTimeout(() => {
-                console.warn(`playNextVideo [Data]: setTimeout de respaldo disparado después de ${fallbackTimeoutMs}ms. Asumiendo que la transición falló o no se disparó.`);
-                // Si el timeout se dispara, eliminar el listener de transitionend (si se había agregado)
-                if (currentPlayerElement) {
-                     currentPlayerElement.removeEventListener('transitionend', transitionEndHandler);
-                }
-                // Ejecutar la lógica de limpieza directamente, omitiendo el evento transitionend.
-                // Pasar un objeto de evento simulado que parezca un transitionend para opacity en el elemento correcto
-                // El flag isFallback puede usarse dentro del manejador si es necesario.
-                transitionEndHandler({ propertyName: 'opacity', target: currentPlayerElement, isFallback: true });
-            }, fallbackTimeoutMs);
-
-             // Almacenar el ID del timeout en la propia función manejadora para que pueda ser limpiado desde dentro del manejador
-             transitionEndHandler.fallbackTimeoutId = fallbackTimeoutId;
-
-        } else {
-            // Si el elemento del reproductor saliente no se encuentra por alguna razón, ejecutar la lógica de limpieza inmediatamente como respaldo.
-            console.warn("playNextVideo [Data]: currentPlayerElement no encontrado para transición, ejecutando limpieza inmediatamente como respaldo.");
-            try {
-                 console.log(`playNextVideo [Data]: Ejecutando lógica post-transición inmediatamente.`);
-
-                 // Detener el video anterior inmediatamente
-                 if (previousPlayerInstance && typeof previousPlayerInstance.stopVideo === 'function') {
-                      console.log(`playNextVideo [Data]: Llamando a stopVideo() en Player previo ${currentPlayerLogicalNum} inmediatamente.`);
-                      previousPlayerInstance.stopVideo();
-                 }
-
-                 // Ocultar el elemento del reproductor anterior previsto si se encuentra en el DOM
-                 const intendedPreviousElement = document.getElementById(`player${currentPlayerLogicalNum}`);
-                 if (intendedPreviousElement) {
-                      intendedPreviousElement.classList.remove('fade-out', 'fade-in');
-                      intendedPreviousElement.classList.add('hidden');
-                 }
-                  // Eliminar fade-in del elemento del reproductor siguiente si se encuentra
-                  if (nextPlayerElement) {
-                      nextPlayerElement.classList.remove('fade-in');
-                  }
-
-                 // Limpieza de datos (ya manejada arriba en el bloque try principal, pero bueno ser seguro)
-                 if (previousVideoIdForCleanup && segmentosCache[previousVideoIdForCleanup]) {
-                      delete segmentosCache[previousVideoIdForCleanup];
-                 }
-                 if (lastSeekVideoId === previousVideoIdForCleanup) {
-                       lastSeekEndTime = -1;
-                       lastSeekVideoId = null;
-                 }
-                 // Los flags ya se resetearon en error crítico antes de esta ruta inmediata
-
-            } catch (immediateError) {
-                 console.error("playNextVideo [Data]: Error durante la lógica post-transición inmediata:", immediateError);
-            } finally {
-                 isAudioFading = false; // Asumir que el fundido de audio no comenzaría o completaría limpiamente aquí
-                 // isTransitioning ya se reseteó en error crítico al inicio de playNextVideo si ocurrió un error crítico temprano.
-                 console.log(`playNextVideo [Data]: Flags reseteados después de ejecución de lógica inmediata.`);
-                 // El cambio lógico de currentPlayer se maneja en onPlayerStateChange cuando el siguiente reproductor confirma el estado PLAYING.
-            }
-        }
-
+        // Paso 5: Manejo de limpieza post-transición (SIN cambios)
+        setupTransitionEndHandlers(currentPlayerElement, previousPlayerInstance, nextPlayerElement,
+            currentPlayerLogicalNum, previousVideoIdForCleanup);
 
     } catch (error) {
-        console.error("playNextVideo [Data]: Error CRÍTICO durante playNextVideo:", error);
-        // Asegurarse de que los flags se reseteen y el estado se revierta en caso de error crítico *antes* de que comience la transición
-        // Este bloque catch maneja errores que ocurren *antes* de que se configure el manejador transitionend.
-        isTransitioning = false; // Resetear flag principal de transición
-        isAudioFading = false; // Asegurarse de que el flag de fundido de audio también se resetee
-        // Revertir el estado lógico a la información del video que se suponía que estaba reproduciendo antes de este intento de transición fallido
-        const previousVideo = flatList[currentFlatIndex]; // Usar el índice *antes* del intento de incremento
-         currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
-         currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
-         currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
-        console.log(`playNextVideo [Data]: *** Transición INTERRUMPIDA (Error Crítico). Flag=false. Estado REVERTIDO a índice ${currentFlatIndex} ***`);
-        mostrarMensajeFlotante(`Error cambiando video: ${error.message}`);
-        updatePlaylistsUI(); // Actualizar la UI para reflejar el estado revertido
-        stopMonitoring(); // Detener el monitoreo en caso de error crítico
-         // Asegurarse de que el estado del botón sea correcto - ¿tal vez volver al botón de Play?
-         document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
-         reproduccionIniciada = false; // Permitir intentar reiniciar con Play
+        handleCriticalError(error, flatList, currentFlatIndex);
     }
 }
-function crossfadeAudio(playerToFadeOut, playerToFadeIn) {
-    const fadeStartTime = Date.now();
 
-    // Protección contra iniciar un nuevo fundido si ya hay uno en curso
-    if (isAudioFading) {
-         console.log("Crossfade Audio: Ya desvaneciendo, saltando nueva solicitud.");
-         // Si se solicita un nuevo fundido mientras uno está activo, ¿debería detenerse el existente?
-         // Por ahora, simplemente saltamos la nueva solicitud. Si el comportamiento es extraño, considerar detener el anterior.
-         return;
+function setupTransitionEndHandlers(currentEl, prevPlayer, nextEl, logicalNum, prevVideoId) {
+    let transitionEndHandler = (event) => {
+        if (event.propertyName !== 'opacity' || event.target !== currentEl) return;
+        event.target.removeEventListener('transitionend', transitionEndHandler);
+        clearTimeout(transitionEndHandler.fallbackTimeoutId);
+        cleanupAfterTransition(prevPlayer, currentEl, nextEl, logicalNum, prevVideoId);
+    };
+
+    if (currentEl) {
+        currentEl.addEventListener('transitionend', transitionEndHandler);
+        const fallbackTimeoutMs = CROSSFADE_DURATION * 1000 + 200;
+        const fallbackTimeoutId = setTimeout(() => {
+            if (currentEl) currentEl.removeEventListener('transitionend', transitionEndHandler);
+            transitionEndHandler({ propertyName: 'opacity', target: currentEl, isFallback: true });
+        }, fallbackTimeoutMs);
+        transitionEndHandler.fallbackTimeoutId = fallbackTimeoutId;
+    } else {
+        cleanupAfterTransition(prevPlayer, currentEl, nextEl, logicalNum, prevVideoId);
     }
+}
 
-    // Usar los reproductores pasados como argumentos para determinar quién se desvanece y quién entra
-    const previousPlayer = playerToFadeOut; // El reproductor cuyo volumen disminuirá
-    const nextPlayer = playerToFadeIn;     // El reproductor cuyo volumen aumentará
-
-    // Validar las instancias de reproductores y los métodos requeridos
-    if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-        console.error("Crossfade Audio: Reproductores inválidos pasados como argumentos.");
-        isAudioFading = false; // Asegurarse de que el flag se resetee si la entrada es inválida
-        return; // Salir de la ejecución de la función
-    }
-
-    // Loguear qué reproductores se están desvaneciendo basándose en su referencia interna (player1/player2) para depuración
-    console.log(`Crossfade START @ ${new Date(fadeStartTime).toLocaleTimeString()}: Desvaneciendo Player ${previousPlayer === player1 ? 1:2}, Fundiendo Player ${nextPlayer === player1 ? 1:2}`);
-    isAudioFading = true; // <<<--- MARCAR EL INICIO DEL PROCESO DE FUNDIDO DE AUDIO
-
-    // Los volúmenes iniciales se espera que se establezcan en playNextVideo (por ejemplo, previousPlayer en 100, nextPlayer en 0)
-    // El intervalo ahora gestionará el fundido desde esos volúmenes iniciales hacia los volúmenes objetivo (0 y 100).
-
-    let currentVolume = previousPlayer.getVolume(); // Iniciar desvanecimiento desde su volumen actual
-    let nextVolume = nextPlayer.getVolume();      // Iniciar fundido de entrada desde su volumen actual (debería ser 0 desde playNextVideo)
-
-    // Asegurar que los volúmenes iniciales estén dentro del rango válido [0, 100]
-    currentVolume = Math.max(0, Math.min(100, currentVolume));
-    nextVolume = Math.max(0, Math.min(100, nextVolume));
-
-    // Calcular el número de pasos y el tiempo de intervalo para el fundido
-    const crossfadeSteps = Math.max(1, Math.floor(CROSSFADE_DURATION * 10)); // Apuntar a 10 pasos por segundo para suavidad
-    const volumeStep = crossfadeSteps > 0 ? 100 / crossfadeSteps : 100; // Cuánto cambia el volumen por paso
-    const intervalTime = crossfadeSteps > 0 ? Math.max(10, Math.floor(CROSSFADE_DURATION * 1000 / crossfadeSteps)) : 100; // Tiempo entre pasos (mínimo 10ms)
-
-    // Limpiar cualquier intervalo de crossfade anterior por si acaso
-    if (window.crossfadeIntervalId) {
-        clearInterval(window.crossfadeIntervalId);
-        window.crossfadeIntervalId = null;
-        console.log("Crossfade: Intervalo previo limpiado.");
-    }
-
-    // Iniciar el intervalo para ajustar volúmenes gradualmente
-    const intervalId = setInterval(() => {
-         // Volver a validar reproductores dentro del intervalo. Las instancias de reproductor podrían volverse inválidas.
-         if (!previousPlayer || !nextPlayer || typeof previousPlayer.setVolume !== 'function' || typeof nextPlayer.setVolume !== 'function') {
-             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Reproductores inválidos en intervalo, deteniendo fundido.`);
-             clearInterval(intervalId);
-             window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-             isAudioFading = false; // <<<--- RESETEAR FLAG EN ERROR
-             return; // Detener la ejecución del intervalo
+function cleanupAfterTransition(prevPlayer, currentEl, nextEl, logicalNum, prevVideoId) {
+    try {
+        if (prevPlayer && typeof prevPlayer.stopVideo === 'function' && prevPlayer.getPlayerState() !== YT.PlayerState.ENDED) {
+            prevPlayer.stopVideo();
         }
+        if (currentEl) {
+            currentEl.classList.remove('fade-out', 'fade-in');
+            currentEl.classList.add('hidden');
+        }
+        if (nextEl) nextEl.classList.remove('fade-in');
+        if (prevVideoId && segmentosCache[prevVideoId]) delete segmentosCache[prevVideoId];
+        if (lastSeekVideoId === prevVideoId) {
+            lastSeekEndTime = -1;
+            lastSeekVideoId = null;
+        }
+    } catch (cleanupError) {
+        console.error("playNextVideo [Data]: Error durante la limpieza de transitionend:", cleanupError);
+        isAudioFading = false;
+    }
+}
+// ===== LIMPIEZA EN FUNCIONES DE MANEJO DE ERRORES =====
 
-        // Calcular los nuevos volúmenes para este paso
-        currentVolume = Math.max(0, currentVolume - volumeStep); // Disminuir volumen del reproductor de salida, no bajar de 0
-        nextVolume = Math.min(100, nextVolume + volumeStep);      // Aumentar volumen del reproductor de entrada, no subir de 100
+function handleCriticalError(error, flatList, currentFlatIndex) {
+    console.error("playNextVideo [Data]: Error CRÍTICO durante playNextVideo:", error);
+    
+    // MODIFICACIÓN: Cancelar crossfade si hay error crítico
+    cancelCrossfade();
+    
+    isTransitioning = false;
+    isAudioFading = false;
+    const previousVideo = flatList[currentFlatIndex];
+    currentPlayingInfo.flattenedIndex = currentFlatIndex >= 0 ? currentFlatIndex : -1;
+    currentPlayingInfo.videoId = previousVideo ? previousVideo.videoId : null;
+    currentPlayingInfo.playlistId = previousVideo ? previousVideo.sourcePlaylistId : null;
+    logTransition(`*** Transición INTERRUMPIDA (Error Crítico). Flag=false. Estado REVERTIDO a índice ${currentFlatIndex} ***`);
+    mostrarMensajeFlotante(`Error cambiando video: ${error.message}`);
+    updatePlaylistsUI();
+    stopMonitoring();
+    document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
+    reproduccionIniciada = false;
+}
+// Función crossfadeAudio optimizada
+function crossfadeAudio(prevPlayer, nextPlayer) {
+    // Prevenir múltiples crossfades simultáneos
+    if (crossfadeInProgress) {
+        console.log("Crossfade ya en progreso, ignorando nueva llamada.");
+        return;
+    }
+    
+    crossfadeInProgress = true;
+    const DURATION_MS = (typeof CROSSFADE_DURATION === 'number' && CROSSFADE_DURATION > 0)
+        ? Math.floor(CROSSFADE_DURATION * 1000)
+        : 15000; // 15 segundos por defecto (coherente con tu configuración)
+    
+    const FPS = 60; // Aumentar a 60 FPS para transición más suave
+    const STEP_MS = 1000 / FPS;
+    const STEPS = Math.ceil(DURATION_MS / STEP_MS);
 
+    let step = 0;
+    isAudioFading = true;
+
+    // Obtener volúmenes iniciales de forma más robusta
+    let prevStartVol = 100;
+    let nextStartVol = 0;
+    
+    try {
+        if (prevPlayer && typeof prevPlayer.getVolume === 'function') {
+            const vol = prevPlayer.getVolume();
+            prevStartVol = (vol !== null && !isNaN(vol) && vol >= 0) ? vol : 100;
+        }
+    } catch(e) { 
+        console.warn("Error obteniendo volumen del reproductor anterior:", e);
+        prevStartVol = 100; 
+    }
+    
+    try {
+        if (nextPlayer && typeof nextPlayer.getVolume === 'function') {
+            const vol = nextPlayer.getVolume();
+            nextStartVol = (vol !== null && !isNaN(vol) && vol >= 0) ? vol : 0;
+        }
+    } catch(e) { 
+        console.warn("Error obteniendo volumen del reproductor siguiente:", e);
+        nextStartVol = 0; 
+    }
+
+    console.log(`Iniciando crossfade: ${prevStartVol}% → 0% | 0% → 100% durante ${DURATION_MS}ms`);
+
+    // Caso especial: crossfade instantáneo
+    if (DURATION_MS === 0 || prevStartVol === 0) {
         try {
-            // Aplicar los nuevos volúmenes a las instancias de reproductores
-            if(previousPlayer) previousPlayer.setVolume(currentVolume);
-            if(nextPlayer) nextPlayer.setVolume(nextVolume);
-        } catch (e) {
-             // Loguear cualquier error durante el establecimiento de volumen y detener el fundido
-             console.error(`Crossfade Interval @ ${Date.now() - fadeStartTime}ms: Error estableciendo volumen:`, e);
-             clearInterval(intervalId);
-             window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-             isAudioFading = false; // <<<--- RESETEAR FLAG EN ERROR
-             return; // Detener la ejecución del intervalo
+            if (prevPlayer && typeof prevPlayer.setVolume === 'function') prevPlayer.setVolume(0);
+            if (nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(100);
+            if (prevPlayer && typeof prevPlayer.stopVideo === 'function') prevPlayer.stopVideo();
+        } catch(e) { console.error("Error en crossfade instantáneo:", e); }
+        
+        isAudioFading = false;
+        crossfadeInProgress = false;
+        return;
+    }
+
+    // Limpiar cualquier crossfade anterior
+    if (crossfadeInterval) {
+        clearInterval(crossfadeInterval);
+        crossfadeInterval = null;
+    }
+
+    // Iniciar crossfade gradual
+    crossfadeInterval = setInterval(() => {
+        step++;
+        
+        // Curvas de volumen suavizadas (ease-in-out)
+        const progress = step / STEPS;
+        const easedProgress = easeInOutCubic(progress);
+        
+        // Calcular volúmenes con curva suavizada
+        const prevVol = Math.max(0, Math.round(prevStartVol * (1 - easedProgress)));
+        const nextVol = Math.min(100, Math.round(nextStartVol + ((100 - nextStartVol) * easedProgress)));
+
+        // Aplicar volúmenes de forma segura
+        try {
+            if (prevPlayer && typeof prevPlayer.setVolume === 'function') {
+                // Verificar que el player anterior aún esté activo antes de cambiar volumen
+                const prevState = prevPlayer.getPlayerState();
+                if (prevState === YT.PlayerState.PLAYING || prevState === YT.PlayerState.BUFFERING) {
+                    prevPlayer.setVolume(prevVol);
+                }
+            }
+        } catch(e) {
+            console.warn("Error configurando volumen del reproductor anterior:", e);
+        }
+        
+        try {
+            if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
+                nextPlayer.setVolume(nextVol);
+            }
+        } catch(e) {
+            console.warn("Error configurando volumen del reproductor siguiente:", e);
         }
 
-        // --- Verificar si el crossfade está completo ---
-        // El fundido está completo cuando el reproductor de salida está en o por debajo de 0 volumen Y
-        // el reproductor de entrada está en o por encima de 100 volumen.
-        if (currentVolume <= 0 && nextVolume >= 100) {
-            // Limpiar el intervalo cuando el fundido haya terminado
-            clearInterval(intervalId);
-            window.crossfadeIntervalId = null; // Limpiar el ID del intervalo
-            const fadeEndTime = Date.now();
-            console.log(`Crossfade audio FINALIZADO @ ${new Date(fadeEndTime).toLocaleTimeString()} (Duración: ${(fadeEndTime - fadeStartTime)/1000}s).`);
-            isAudioFading = false; // <<<--- MARCAR EL FIN DEL PROCESO DE FUNDIDO DE AUDIO
-
-             // Opcional: Agregar una callback o un evento aquí si algo necesita suceder exactamente cuando termina el fundido de audio
-             // (como detener el video anterior si no se hizo en el manejador transitionend)
+        // Debug cada 10% del progreso
+        if (step % Math.floor(STEPS / 10) === 0 || step === STEPS) {
+            console.log(`Crossfade ${Math.round(progress * 100)}%: Prev=${prevVol}%, Next=${nextVol}%`);
         }
-    }, intervalTime); // Ejecutar la función del intervalo cada 'intervalTime' milisegundos
-    window.crossfadeIntervalId = intervalId; // Almacenar el ID del intervalo
+
+        // Finalizar crossfade
+        if (step >= STEPS) {
+            clearInterval(crossfadeInterval);
+            crossfadeInterval = null;
+            
+            // Volúmenes finales garantizados
+            try {
+                if (prevPlayer && typeof prevPlayer.setVolume === 'function') prevPlayer.setVolume(0);
+                if (nextPlayer && typeof nextPlayer.setVolume === 'function') nextPlayer.setVolume(100);
+                
+                // Detener el reproductor anterior SOLO después del crossfade completo
+                setTimeout(() => {
+                    try {
+                        if (prevPlayer && typeof prevPlayer.stopVideo === 'function') {
+                            const prevState = prevPlayer.getPlayerState();
+                            // Solo detener si no está ya terminado o detenido
+                            if (prevState !== YT.PlayerState.ENDED && prevState !== YT.PlayerState.UNSTARTED) {
+                                prevPlayer.stopVideo();
+                                console.log("Reproductor anterior detenido después del crossfade.");
+                            }
+                        }
+                    } catch(e) {
+                        console.error("Error deteniendo reproductor anterior:", e);
+                    }
+                }, 100); // Pequeño delay para asegurar que el crossfade visual termine
+                
+            } catch(e) {
+                console.error("Error en finalización del crossfade:", e);
+            }
+            
+            isAudioFading = false;
+            crossfadeInProgress = false;
+            console.log("Crossfade completado.");
+        }
+    }, STEP_MS);
+}
+
+// Función de easing para crossfade más suave
+function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+}
+
+// Función para cancelar crossfade en caso de emergencia
+function cancelCrossfade() {
+    if (crossfadeInterval) {
+        clearInterval(crossfadeInterval);
+        crossfadeInterval = null;
+        crossfadeInProgress = false;
+        isAudioFading = false;
+        console.log("Crossfade cancelado.");
+    }
 }
 // --- Preguntar para repetir ---
 function askToRepeatPlaylist() {
@@ -1858,7 +2033,6 @@ function askToRepeatPlaylist() {
 function playFirstVideo() {
     if (!playersInitialized) {
         console.error('Los reproductores no están inicializados.');
-        mostrarMensajeFlotante("Los reproductores aún no están listos.");
         return;
     }
     stopMonitoring();
@@ -1891,7 +2065,6 @@ function playFirstVideo() {
             updatePlaylistsUI();
         } catch (e) {
              console.error("Error al iniciar el primer video:", e);
-             mostrarMensajeFlotante("Error al intentar reproducir el primer video.");
              reproduccionIniciada = false; // Falló el inicio
               document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
         }
@@ -1902,15 +2075,15 @@ function playFirstVideo() {
           reproduccionIniciada = false;
     }
 }
-// Módulo: Monitoreo de Reproductores (Adaptado Parcialmente)
-
+// Módulo: Monitoreo de Reproductores
 function startMonitoring() {
     if (!monitorInterval) {
-        // Usar intervalo más corto para precisión en saltos y crossfade
+        // Usar intervalo corto para precisión en saltos y crossfade
         monitorInterval = setInterval(monitorPlayers, 300); // 300ms
         console.log('Monitoreo iniciado (intervalo: 300ms).');
     }
 }
+
 function stopMonitoring() {
     if (monitorInterval) {
         clearInterval(monitorInterval);
@@ -1919,81 +2092,72 @@ function stopMonitoring() {
     }
 }
 function monitorPlayers() {
-    // Log opcional para depuración:
-    // console.log(`Monitor: Corriendo (Transitioning: ${isTransitioning}, AudioFading: ${isAudioFading}, hasOutroCrossfadeStarted: ${hasOutroCrossfadeStarted}, Initialized: ${playersInitialized}, reproduccionIniciada: ${reproduccionIniciada})`);
-
-    if (!playersInitialized || !reproduccionIniciada) {
-        return; // No ejecutar la lógica de monitoreo si no está listo
-    }
+    // --- Chequeos de estado global ---
+    if (!playersInitialized || !reproduccionIniciada) return;
 
     const activePlayer = (currentPlayer === 1) ? player1 : player2;
 
-    if (!activePlayer || typeof activePlayer.getPlayerState !== 'function' || typeof activePlayer.getCurrentTime !== 'function' || typeof activePlayer.getDuration !== 'function' || typeof activePlayer.getVideoData !== 'function') {
+    // --- Validación del reproductor activo ---
+    if (!activePlayer ||
+        typeof activePlayer.getPlayerState !== 'function' ||
+        typeof activePlayer.getCurrentTime !== 'function' ||
+        typeof activePlayer.getDuration !== 'function' ||
+        typeof activePlayer.getVideoData !== 'function') {
         console.warn("Monitor: El reproductor activo es inválido.");
-        stopMonitoring(); // Detener el monitoreo si el reproductor activo es inválido
+        stopMonitoring();
         return;
     }
 
     const playerState = activePlayer.getPlayerState();
     const currentTime = activePlayer.getCurrentTime();
     const videoDuration = activePlayer.getDuration();
-    const videoId = activePlayer.getVideoData()?.video_id; // Obtener videoId de forma segura
+    const videoId = activePlayer.getVideoData()?.video_id;
 
+    // --- Validación de video y duración ---
     if (!videoId || isNaN(videoDuration) || videoDuration <= 0) {
-        checkAndSkipSegment(activePlayer); // Aún así, verificar SponsorBlock incluso si la duración es extraña
-        return; // No se pueden realizar comprobaciones basadas en tiempo
+        checkAndSkipSegment(activePlayer);
+        return;
     }
 
-     // Asegurarse de que los segmentos de SponsorBlock se obtengan y almacenen en caché si no lo están ya
-     // La lógica para evitar bucles de fetch está en checkAndSkipSegment y obtenerSegmentosSponsorBlock
+    // --- SponsorBlock: asegurar que los segmentos estén gestionados ---
     if (!segmentosCache[videoId]) {
-        // Llamar a checkAndSkipSegment para iniciar la obtención si es necesario
-         checkAndSkipSegment(activePlayer);
-         // No es necesario retornar, checkAndSkipSegment maneja la lógica si los segmentos aún no están listos
+        checkAndSkipSegment(activePlayer);
     } else if (segmentosCache[videoId] === 'fetching') {
-         // Si está obteniendo, simplemente esperar al próximo tick.
-          checkAndSkipSegment(activePlayer); // Aún llamamos para que checkAndSkipSegment maneje el estado 'fetching'
+        checkAndSkipSegment(activePlayer);
     } else {
-        // Si los segmentos están en caché ([] o [segmentos...]), verificar y saltar
-         checkAndSkipSegment(activePlayer);
+        checkAndSkipSegment(activePlayer);
     }
-
-
-    // --- Verificar Tiempo Restante para Disparar Crossfade (Disparo basado en tiempo) ---
-    // Disparar playNextVideo si el tiempo restante está dentro de la ventana de CROSSFADE_DURATION,
-    // Y NO estamos ya en un proceso de transición,
-    // Y el crossfade AÚN NO ha sido disparado por la lógica de detección de "outro".
+    // --- Crossfade basado en tiempo restante (MODIFICADO) ---
     const timeRemaining = videoDuration - currentTime;
-    // console.log(`Monitor: Tiempo restante: ${timeRemaining.toFixed(1)}s`);
 
-    // Disparar el crossfade basado en el tiempo restante SOLAMENTE si:
-    // 1. El reproductor está realmente en estado PLAYING
-    // 2. El tiempo restante es menor o igual que la duración del crossfade MÁS un pequeño buffer
-    // 3. El tiempo restante es mayor que 0
-    // 4. NO estamos ya en un proceso de transición (`isTransitioning` es false)
-    // 5. El crossfade AÚN NO ha sido disparado por la lógica de detección de "outro" (`hasOutroCrossfadeStarted` es false)
-    if (playerState === YT.PlayerState.PLAYING &&
-        timeRemaining <= CROSSFADE_DURATION + 0.5 && // La ventana comienza CROSSFADE_DURATION + buffer antes del final
-        timeRemaining > 0 && // Asegurarse de que el tiempo restante sea positivo
-        !isTransitioning && // Evitar disparar si ya estamos en transición
-        !hasOutroCrossfadeStarted) // Crucial: No disparar si un "outro" ya lo hizo
-         {
-        console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade (${CROSSFADE_DURATION}s + buffer). Disparando playNextVideo basado en tiempo.`);
+    // MODIFICACIÓN: Solo disparar si NO hay crossfade en progreso
+    if (
+        playerState === YT.PlayerState.PLAYING &&
+        timeRemaining <= CROSSFADE_DURATION + 0.5 &&
+        timeRemaining > 0 &&
+        !hasOutroCrossfadeStarted &&
+        !crossfadeInProgress // NUEVA CONDICIÓN
+    ) {
+        console.log(`Monitor: Tiempo restante (${timeRemaining.toFixed(1)}s) dentro de la ventana de crossfade. Disparando playNextVideo basado en tiempo.`);
         playNextVideo();
     }
 
-    // --- Salvaguarda: Considerar detener el reproductor inactivo si sigue sonando inesperadamente ---
-    const inactivePlayer = (currentPlayer === 1) ? player2 : player1; // El reproductor que NO es el lógico actual
-     if (inactivePlayer && typeof inactivePlayer.getPlayerState === 'function' && typeof inactivePlayer.stopVideo === 'function') {
+    // --- Salvaguarda: detener reproductor inactivo si sigue sonando (MODIFICADO) ---
+    const inactivePlayer = (currentPlayer === 1) ? player2 : player1;
+    if (
+        inactivePlayer &&
+        typeof inactivePlayer.getPlayerState === 'function' &&
+        typeof inactivePlayer.stopVideo === 'function' &&
+        !crossfadeInProgress // NO detener durante crossfade
+    ) {
         const inactiveState = inactivePlayer.getPlayerState();
-        if (inactiveState === YT.PlayerState.PLAYING &&
-            !isTransitioning && !isAudioFading &&
-             inactivePlayer !== activePlayer)
-            {
-            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO fuera de transición/fundido. Deteniéndolo.");
-            try {
-                inactivePlayer.stopVideo();
-            } catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
+        if (
+            inactiveState === YT.PlayerState.PLAYING &&
+            inactivePlayer !== activePlayer
+        ) {
+            console.warn("Monitor: Reproductor inactivo detectado aún REPRODUCIENDO. Deteniéndolo.");
+            try { inactivePlayer.stopVideo(); }
+            catch(e) { console.error("Monitor: Error deteniendo reproductor inactivo:", e); }
         }
     }
 }
@@ -2293,7 +2457,6 @@ añadirUrlButton.addEventListener('click', async () => {
         alert('URL de la playlist no válida.');
         return;
     }
-    mostrarMensajeFlotante("Buscando información de la playlist...");
     searchInput2.value = ''; // Limpiar input inmediatamente
 
     try {
@@ -2433,6 +2596,18 @@ function extractPlaylistId(url) {
         return null;
     }
 }
+// Al iniciar la app, revisa si ya hay un token guardado
+function checkGoogleTokenOnLoad() {
+    const token = localStorage.getItem('google_token');
+    if (token) {
+        // Token disponible, puedes continuar autenticado
+        console.log('Token encontrado en localStorage:', token);
+        // Llama aquí a tu función de inicialización autenticada
+    } else {
+        // No hay token, muestra el botón de login
+   //     showGoogleLoginButton();
+    }
+}
 // --- Inicialización ---
 document.addEventListener('DOMContentLoaded', () => {
      // Asegurarse que la playlist manual exista al inicio (si no hay datos guardados)
@@ -2442,7 +2617,10 @@ document.addEventListener('DOMContentLoaded', () => {
      updatePlaylistsUI(); // Render inicial de la UI de playlists
      loadYouTubeAPI(); // Iniciar carga de la API de YouTube
 });
-
+// Llama a token si hay
+window.onload = () => {
+    checkGoogleTokenOnLoad();
+};
 // Cerrar menús contextuales si se hace click fuera
 document.addEventListener('click', (event) => {
     // Close contextual menus (the 3 dots menu) if the click target is not inside a .delete-menu
