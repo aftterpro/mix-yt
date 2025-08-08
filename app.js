@@ -56,6 +56,7 @@ export const botonPlay = document.getElementById('botonPlay');
 // --- Funciones de Inicialización ---
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded.");
+    mostrarMensajeFlotante("Cardo totalmente")
   loadYouTubeAPI();
   setupEventListeners(); // Mover todos los event listeners aquí
 });
