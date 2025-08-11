@@ -390,7 +390,7 @@ class GoogleAuthManager {
     updateUI(isLoggedIn) {
         const signInButton = document.getElementById('googleSignInButton');
         const signOutButton = document.getElementById('googleSignOutButton');
-        const playlistContainer = document.getElementById('playlistContainer');
+        const playlistContainer = document.getElementById('sidebar-actions-container');
         
         if (isLoggedIn) {
             if (signInButton) signInButton.classList.add('hidden');
