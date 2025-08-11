@@ -3,7 +3,6 @@ import { PlaylistState, CONFIG } from './config.js';
 import { mostrarMensajeFlotante } from './ui.js';
 import { UIManager } from './ui.js';
 import { Utils } from './utils.js';
-import { authManager } from './auth.js';
 
 export class PlaylistManager {
     // Obtener la lista aplanada para reproducción
@@ -261,6 +260,7 @@ export class PlaylistManager {
 
         PlaylistManager.updateCurrentPlayingIndex();
     }
+    
     // Habilitar botón Play si hay videos
     static checkAndEnablePlayButton() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
@@ -277,21 +277,31 @@ export class PlaylistManager {
         }
 
         const formattedPlaylists = youtubePlaylists.map(playlist => {
-            if (!playlist.snippet.title || playlist.contentDetails.itemCount === 0) {
+            if (!playlist.snippet?.title || playlist.contentDetails?.itemCount === 0) {
                 return null;
             }
             return {
                 id: playlist.id,
                 name: playlist.snippet.title,
-                thumbnailUrl: playlist.snippet.thumbnails.high?.url || playlist.snippet.thumbnails.default.url,
+                thumbnailUrl: playlist.snippet.thumbnails?.high?.url || 
+                             playlist.snippet.thumbnails?.medium?.url ||
+                             playlist.snippet.thumbnails?.default?.url ||
+                             'https://via.placeholder.com/120x90?text=Playlist',
                 videos: [],
                 isExpanded: false,
                 source: CONFIG.YOUTUBE_LIBRARY_SOURCE_ID,
                 isLoaded: false,
+                videoCount: playlist.contentDetails?.itemCount || 0
             };
         }).filter(p => p !== null);
 
-        PlaylistState.playlistsData.unshift(...formattedPlaylists);
+        // Insertar después de la playlist manual
+        const manualPlaylistIndex = PlaylistState.playlistsData.findIndex(p => p.id === 'manual');
+        if (manualPlaylistIndex !== -1) {
+            PlaylistState.playlistsData.splice(manualPlaylistIndex + 1, 0, ...formattedPlaylists);
+        } else {
+            PlaylistState.playlistsData.unshift(...formattedPlaylists);
+        }
         
         mostrarMensajeFlotante(`${formattedPlaylists.length} playlists de tu biblioteca han sido añadidas.`);
         UIManager.updatePlaylistsUI();
@@ -306,33 +316,122 @@ export class PlaylistManager {
         if (removedCount > 0) {
             console.log(`Se eliminaron ${removedCount} playlists de la biblioteca de YouTube.`);
             UIManager.updatePlaylistsUI();
+            mostrarMensajeFlotante(`Se eliminaron ${removedCount} playlists de la biblioteca.`);
         }
     }
 
     // Alternar expansión de playlist
-    static togglePlaylistExpansion(playlistId) {
+    static async togglePlaylistExpansion(playlistId) {
         const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
         if (!playlist) return;
 
         // Lógica para carga bajo demanda de playlists de YouTube
-        if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+        if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded && !playlist.isExpanded) {
             console.log(`Cargando videos de la biblioteca para: ${playlist.name}`);
             mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
             
-            // Aquí llamarías a la función de carga de videos desde la biblioteca
-            // Por ahora solo simularemos el comportamiento
-            setTimeout(() => {
-                playlist.isLoaded = true;
-                playlist.isExpanded = true;
-                UIManager.updatePlaylistsUI();
-                PlaylistManager.checkAndEnablePlayButton();
-            }, 1000);
+            try {
+                // Importar authManager dinámicamente para evitar dependencias circulares
+                const { authManager } = await import('./auth.js');
+                
+                if (!authManager.isUserAuthenticated()) {
+                    mostrarMensajeFlotante("Error: No hay sesión de Google activa.");
+                    return;
+                }
+
+                const videos = await authManager.getPlaylistVideos(playlist.id);
+                
+                if (videos && videos.length > 0) {
+                    playlist.videos = videos;
+                    playlist.isLoaded = true;
+                    playlist.isExpanded = true;
+                    
+                    console.log(`Cargados ${videos.length} videos para "${playlist.name}"`);
+                    mostrarMensajeFlotante(`"${playlist.name}" cargada (${videos.length} videos).`);
+                    
+                    UIManager.updatePlaylistsUI();
+                    PlaylistManager.checkAndEnablePlayButton();
+                } else {
+                    mostrarMensajeFlotante(`No se pudieron cargar los videos de "${playlist.name}".`);
+                }
+                
+            } catch (error) {
+                console.error(`Error cargando playlist ${playlist.name}:`, error);
+                mostrarMensajeFlotante(`Error cargando "${playlist.name}". Intenta de nuevo.`);
+            }
             
             return;
         }
 
+        // Toggle normal de expansión
         playlist.isExpanded = !playlist.isExpanded;
         UIManager.updatePlaylistsUI();
     }
-}
 
+    // Refrescar una playlist específica de YouTube
+    static async refreshYouTubePlaylist(playlistId) {
+        const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
+        if (!playlist || playlist.source !== CONFIG.YOUTUBE_LIBRARY_SOURCE_ID) {
+            console.error(`Playlist ${playlistId} no encontrada o no es de YouTube.`);
+            return;
+        }
+
+        try {
+            const { authManager } = await import('./auth.js');
+            
+            if (!authManager.isUserAuthenticated()) {
+                mostrarMensajeFlotante("Error: No hay sesión de Google activa.");
+                return;
+            }
+
+            mostrarMensajeFlotante(`Actualizando "${playlist.name}"...`);
+
+            const videos = await authManager.getPlaylistVideos(playlist.id);
+            
+            if (videos) {
+                const oldCount = playlist.videos.length;
+                playlist.videos = videos;
+                playlist.isLoaded = true;
+                
+                console.log(`Playlist "${playlist.name}" actualizada: ${oldCount} -> ${videos.length} videos`);
+                mostrarMensajeFlotante(`"${playlist.name}" actualizada (${videos.length} videos).`);
+                
+                UIManager.updatePlaylistsUI();
+                PlaylistManager.updateCurrentPlayingIndex();
+                PlaylistManager.checkAndEnablePlayButton();
+            } else {
+                mostrarMensajeFlotante(`Error actualizando "${playlist.name}".`);
+            }
+            
+        } catch (error) {
+            console.error(`Error refrescando playlist ${playlist.name}:`, error);
+            mostrarMensajeFlotante(`Error actualizando "${playlist.name}".`);
+        }
+    }
+
+    // Obtener estadísticas de playlists
+    static getPlaylistStats() {
+        const stats = {
+            totalPlaylists: PlaylistState.playlistsData.length,
+            totalVideos: 0,
+            youtubeLibraryPlaylists: 0,
+            manualPlaylists: 0,
+            loadedPlaylists: 0
+        };
+
+        PlaylistState.playlistsData.forEach(playlist => {
+            stats.totalVideos += playlist.videos.length;
+            
+            if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID) {
+                stats.youtubeLibraryPlaylists++;
+                if (playlist.isLoaded) {
+                    stats.loadedPlaylists++;
+                }
+            } else {
+                stats.manualPlaylists++;
+            }
+        });
+
+        return stats;
+    }
+}
