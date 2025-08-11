@@ -338,7 +338,7 @@ class App {
         if (token) {
             console.log('Token encontrado en localStorage:', token);
             // Aquí podrías inicializar funciones autenticadas
-             googleSignInButton.disabled = true;
+             googleSignInButton.disabled = false;
         } else {
             console.log('No hay token de Google disponible');
         }
