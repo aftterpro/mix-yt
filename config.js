@@ -4,8 +4,8 @@ export const CONFIG = {
     YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library',
     PIPED_INSTANCES: [
         //"https://pipedapi.reallyaweso.me",
-        "https://pipedapi.ducks.party",
-        "https://piapi.ggtyler.dev"
+        "https://pipedapi.ducks.party"
+      //  "https://piapi.ggtyler.dev"
     ]
 };
 
