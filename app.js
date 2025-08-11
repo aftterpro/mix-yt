@@ -256,7 +256,7 @@ class App {
             searchInput2.value = '';
 
             try {
-                mostrarMensajeFlotante('Cargando playlist...');
+               console.log('Cargando playlist...');
                 const playlistInfo = await Utils.getPlaylistInfo(playlistIdFromUrl);
                 if (playlistInfo) {
                     playlistInfo.id = playlistIdFromUrl;
@@ -264,7 +264,6 @@ class App {
                 }
             } catch (error) {
                 console.error("Error en proceso de añadir URL:", error);
-                mostrarMensajeFlotante(`Error al cargar playlist: ${error.message}`);
             }
         });
 
@@ -339,6 +338,7 @@ class App {
         if (token) {
             console.log('Token encontrado en localStorage:', token);
             // Aquí podrías inicializar funciones autenticadas
+             googleSignInButton.disabled = true;
         } else {
             console.log('No hay token de Google disponible');
         }
