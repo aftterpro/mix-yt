@@ -8,7 +8,7 @@ export function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'floating-messages';
-    const playlistContainer = document.getElementById('playlistContainer');
+    const playlistContainer = document.getElementById('floatingMessageContainer');
     playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
 
     setTimeout(() => {
@@ -566,4 +566,5 @@ export class UIManager {
         });
     }
 }
+
 
