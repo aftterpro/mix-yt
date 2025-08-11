@@ -7,7 +7,7 @@ import { Utils } from './utils.js';
 export function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
-    mensajeDiv.className = 'mensaje-flotante';
+    mensajeDiv.className = 'floating-messages';
     const playlistContainer = document.getElementById('playlistContainer');
     playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
 
@@ -566,3 +566,4 @@ export class UIManager {
         });
     }
 }
+
