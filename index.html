@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es"> 
 <head>
@@ -49,12 +48,12 @@
                 <button id="botonNext" class="control-button">
                     <i class="fas fa-forward"></i>
                 </button>
-                    <button onclick="window.YTCrossMixApp.debug()">
-            <i class="fas fa-bug"></i> Debug
-        </button>
-        <button onclick="window.YTCrossMixApp.reset()">
-            <i class="fas fa-refresh"></i> Reset
-        </button>
+                <button onclick="window.YTCrossMixApp?.debug()">
+                    <i class="fas fa-bug"></i> Debug
+                </button>
+                <button onclick="window.YTCrossMixApp?.reset()">
+                    <i class="fas fa-refresh"></i> Reset
+                </button>
             </div>
         </div>
     </div>
@@ -130,20 +129,21 @@
     </template>
 
     <template id="search-result-template">
-    <div class="search-result-item">
-        <div class="thumbnail-container">
-            <img src="" alt="" class="result-thumbnail">
-            <span class="duration"></span>
+        <div class="search-result-item">
+            <div class="thumbnail-container">
+                <img src="" alt="" class="result-thumbnail">
+                <span class="duration"></span>
+            </div>
+            <div class="result-details">
+                <h3 class="result-title video-title"></h3>
+                <button class="add-to-playlist">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="add-text">Añadir a la playlist</span>
+                </button>
+            </div>
         </div>
-        <div class="result-details">
-            <h3 class="result-title video-title"></h3>
-            <button class="add-to-playlist">
-                <i class="fa-solid fa-plus"></i>
-                <span class="add-text">Añadir a la playlist</span>
-            </button>
-        </div>
-    </div>
-</template>
+    </template>
+    
     <div id="loadingSpinner" class="loading-spinner hidden">
         <div class="spinner"></div>
     </div>
@@ -159,31 +159,49 @@
         <p>
             Utilizamos la API de 
             <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.
-            </p>
+        </p>
     </footer>
-     <!-- Scripts -->
-   <script  type="module src="./auth.js"></script>
-   <script type="module">
+    
+    <!-- Scripts -->
+    <script type="module">
         // Importar y usar los módulos
         import './app.js';
+        import { authManager } from './auth.js';
         
-        // La aplicación se inicializará automáticamente cuando el DOM esté listo
         console.log('Módulos cargados, la aplicación se está inicializando...');
+        
+        // Inicializar autenticación cuando la app esté lista
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('DOM cargado, inicializando autenticación...');
+                await authManager.initialize();
+                console.log('Autenticación inicializada correctamente');
+            } catch (error) {
+                console.error('Error inicializando autenticación:', error);
+            }
+        });
         
         // Ejemplo de uso de la API modular
         window.addEventListener('load', () => {
             // Acceder a la instancia de la aplicación
             const app = window.YTCrossMixApp;
             
-            // Ejemplo: obtener estadísticas cada 10 segundos
-            setInterval(() => {
-                const stats = app.getStats();
-                console.log('Stats:', stats);
-            }, 10000);
+            if (app) {
+                // Ejemplo: obtener estadísticas cada 30 segundos
+                setInterval(() => {
+                    const stats = app.getStats();
+                    console.log('App Stats:', stats);
+                }, 30000);
+                
+                // Hacer el authManager disponible globalmente para debugging
+                window.authManager = authManager;
+            }
         });
     </script>
-<!-- Contador de visitas -->
-<center><a href="https://websmultimedia.com/contador-de-visitas-gratis" title="Contador De Visitas Gratis">
-<img style="border: 0px solid; display: inline;" alt="contador de visitas" src="https://websmultimedia.com/contador-de-visitas.php?id=22075"></a><br><a href='https://websmultimedia.com/contador-de-visitas-gratis'>Contador de visitas</a><br></center>
-<!-- Fin Contador de visitas -->
+
+    <!-- Contador de visitas -->
+    <center><a href="https://websmultimedia.com/contador-de-visitas-gratis" title="Contador De Visitas Gratis">
+    <img style="border: 0px solid; display: inline;" alt="contador de visitas" src="https://websmultimedia.com/contador-de-visitas.php?id=22075"></a><br><a href='https://websmultimedia.com/contador-de-visitas-gratis'>Contador de visitas</a><br></center>
+    <!-- Fin Contador de visitas -->
+</body>
 </html>
