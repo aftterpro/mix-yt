@@ -5,8 +5,10 @@ import { PlaylistManager } from './playlistManager.js';
 import { SearchManager } from './searchManager.js';
 import { PlaybackController } from './playbackController.js';
 import { SponsorBlockManager } from './sponsorblock.js';
-import { UIManager, mostrarMensajeFlotante } from './ui.js';
+import { mostrarMensajeFlotante } from './ui.js';
 import { Utils } from './utils.js';
+
+import { UIManager } from './ui.js';
 
 class App {
     constructor() {
