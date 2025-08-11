@@ -146,12 +146,8 @@ class App {
     async initializeModules() {
         try {
             // Inicializar búsqueda
-            if (window.SearchManager) {
-                SearchManager.initialize();
-                console.log('SearchManager inicializado');
-            } else {
-                console.warn('SearchManager no disponible');
-            }
+            SearchManager.initialize();
+            console.log('SearchManager inicializado');
 
             // Renderizar UI inicial de playlists
             UIManager.updatePlaylistsUI();
