@@ -1,8 +1,9 @@
-// playlistManager.js - Manejo de Playlists
+// Manejo de Playlists (Actualizado con YouTube Library)
 import { PlaylistState, CONFIG } from './config.js';
 import { mostrarMensajeFlotante } from './ui.js';
 import { UIManager } from './ui.js';
 import { Utils } from './utils.js';
+import { authManager } from './auth.js';
 
 export class PlaylistManager {
     // Obtener la lista aplanada para reproducción
@@ -126,7 +127,7 @@ export class PlaylistManager {
             manualPlaylist = {
                 id: manualPlaylistId,
                 name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: 'https://via.placeholder.com/50?text=+',
+                thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico',
                 videos: [],
                 isExpanded: true
             };
@@ -260,7 +261,6 @@ export class PlaylistManager {
 
         PlaylistManager.updateCurrentPlayingIndex();
     }
-
     // Habilitar botón Play si hay videos
     static checkAndEnablePlayButton() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
@@ -335,3 +335,4 @@ export class PlaylistManager {
         UIManager.updatePlaylistsUI();
     }
 }
+
