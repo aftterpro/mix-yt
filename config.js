@@ -3,8 +3,9 @@ export const CONFIG = {
     CROSSFADE_DURATION: 15, // Duración del crossfade en segundos
     YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library',
     PIPED_INSTANCES: [
-        "https://pipedapi.reallyaweso.me",
-        "https://pipedapi.ducks.party"
+        //"https://pipedapi.reallyaweso.me",
+        "https://pipedapi.ducks.party",
+        "https://piapi.ggtyler.dev"
     ]
 };
 
