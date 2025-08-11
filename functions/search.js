@@ -1,7 +1,7 @@
 //Instancias api
 const pipedInstances = [
   "https://api.piped.private.coffee",
-    "https://pipedapi.reallyaweso.me",
+  //  "https://pipedapi.reallyaweso.me",
     "https://pipedapi.ducks.party"
    // "https://piapi.ggtyler.dev" carga lenta imagenes
 ];
@@ -71,3 +71,4 @@ exports.handler = async function (event, context) {
     };
   }
 };
+
