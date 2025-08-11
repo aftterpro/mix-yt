@@ -238,12 +238,12 @@ async function initializeYTCrossMix() {
             { name: 'utils', path: './utils.js' },
             { name: 'ui', path: './ui.js' },
             { name: 'auth', path: './auth.js' },
+            { name: 'SearchManager', path: './searchManager.js},
             { name: 'playlistManager', path: './playlistManager.js' }
         ];
 
         // Cargar módulos opcionales (que pueden no existir)
         const optionalModules = [
-            { name: 'searchManager', path: './searchManager.js' },
             { name: 'playbackController', path: './playbackController.js' },
             { name: 'sponsorBlockManager', path: './sponsorblock.js' },
             { name: 'youtubeAPI', path: './youtubeAPI.js' }
