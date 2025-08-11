@@ -1,6 +1,4 @@
 // Módulo de Autenticación de Google y API de YouTube (Versión Modular Mejorada)
-
-import { mostrarMensajeFlotante } from './ui.js';
 import { PlaylistManager } from './playlistManager.js';
 import { Utils } from './utils.js';
 
@@ -85,7 +83,6 @@ class GoogleAuthManager {
                 this.tryStartApp();
             }).catch(err => {
                 console.error("Error inicializando GAPI client", err);
-                mostrarMensajeFlotante('Error al inicializar cliente de YouTube');
             });
         });
     }
@@ -269,12 +266,9 @@ class GoogleAuthManager {
             document.dispatchEvent(new CustomEvent('playlistsFetched', { 
                 detail: allPlaylists 
             }));
-            
-            mostrarMensajeFlotante(`${allPlaylists.length} playlists cargadas de tu biblioteca`);
-            
+                        
         } catch (err) {
             console.error("Error al obtener playlists de YouTube:", err);
-            mostrarMensajeFlotante('Error al cargar playlists de YouTube');
             this.updateUI(false);
         } finally {
             this.hideLoadingSpinner();
@@ -326,7 +320,6 @@ class GoogleAuthManager {
             
         } catch (error) {
             console.error('Error al obtener videos de playlist:', error);
-            mostrarMensajeFlotante('Error al cargar videos de la playlist');
             return null;
         }
     }
@@ -369,7 +362,6 @@ class GoogleAuthManager {
             this.tokenClient.requestAccessToken({ prompt: 'consent' });
         } else {
             console.error('Cliente de autenticación no inicializado');
-            mostrarMensajeFlotante('Error: Sistema de autenticación no listo');
         }
     }
 
@@ -390,8 +382,6 @@ class GoogleAuthManager {
                 
                 // Disparar evento de cierre de sesión
                 document.dispatchEvent(new CustomEvent('userLoggedOut'));
-                
-                mostrarMensajeFlotante('Sesión cerrada correctamente');
             });
         }
     }
