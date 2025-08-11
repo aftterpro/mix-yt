@@ -2,8 +2,8 @@
 const pipedInstances = [
   "https://api.piped.private.coffee",
   //  "https://pipedapi.reallyaweso.me",
-    "https://pipedapi.ducks.party"
-   // "https://piapi.ggtyler.dev" carga lenta imagenes
+    "https://pipedapi.ducks.party",
+    "https://piapi.ggtyler.dev"// carga lenta imagenes
 ];
 function getRandomPipedInstance() {
   const randomIndex = Math.floor(Math.random() * pipedInstances.length);
@@ -71,4 +71,5 @@ exports.handler = async function (event, context) {
     };
   }
 };
+
 
