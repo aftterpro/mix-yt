@@ -11,6 +11,7 @@ import { Utils } from './utils.js';
 class App {
     constructor() {
         this.initialized = false;
+        this.authInitialized = false;
         this.setupGlobalReferences();
     }
 
@@ -81,19 +82,23 @@ class App {
     setupGlobalEventListeners() {
         // Event listeners para YouTube Library
         document.addEventListener('playlistsFetched', (event) => {
-            console.log("Evento 'playlistsFetched' recibido");
+            console.log("Evento 'playlistsFetched' recibido con", event.detail.length, "playlists");
             PlaylistManager.addYouTubeLibraryPlaylists(event.detail);
         });
 
         document.addEventListener('userLoggedOut', () => {
             console.log("Evento 'userLoggedOut' recibido");
             PlaylistManager.clearYouTubeLibraryPlaylists();
+            mostrarMensajeFlotante("Sesión cerrada. Se eliminaron las playlists de YouTube.");
         });
 
         // Event listeners para estados de reproductores
         window.addEventListener('playersReady', () => {
             const flatList = PlaylistManager.getFlattenedPlaylist();
-            document.getElementById('botonPlay').disabled = flatList.length === 0;
+            const playButton = document.getElementById('botonPlay');
+            if (playButton) {
+                playButton.disabled = flatList.length === 0;
+            }
             console.log('Reproductores listos, botón Play configurado');
         });
 
@@ -115,9 +120,25 @@ class App {
             }
         }, true);
 
-        // Listener para token de Google si está disponible
+        // Listener para cuando la página esté completamente cargada
         window.addEventListener('load', () => {
             this.checkGoogleTokenOnLoad();
+        });
+
+        // Listener personalizado para errores de autenticación
+        document.addEventListener('authError', (event) => {
+            console.error('Error de autenticación:', event.detail);
+            mostrarMensajeFlotante('Error de autenticación: ' + event.detail.message);
+        });
+
+        // Listener para cambios en el estado de autenticación
+        document.addEventListener('authStatusChanged', (event) => {
+            const isAuthenticated = event.detail.isAuthenticated;
+            console.log('Estado de autenticación cambió:', isAuthenticated);
+            
+            if (isAuthenticated) {
+                mostrarMensajeFlotante('Autenticación exitosa');
+            }
         });
     }
 
@@ -125,8 +146,12 @@ class App {
     async initializeModules() {
         try {
             // Inicializar búsqueda
-            SearchManager.initialize();
-            console.log('SearchManager inicializado');
+            if (window.SearchManager) {
+                SearchManager.initialize();
+                console.log('SearchManager inicializado');
+            } else {
+                console.warn('SearchManager no disponible');
+            }
 
             // Renderizar UI inicial de playlists
             UIManager.updatePlaylistsUI();
@@ -170,7 +195,9 @@ class App {
                 const flatList = PlaylistManager.getFlattenedPlaylist();
                 if (flatList.length > 0) {
                     AppState.reproduccionIniciada = true;
-                    PlaybackController.playFirstVideo();
+                    if (window.PlaybackController) {
+                        PlaybackController.playFirstVideo();
+                    }
                     botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
                 } else {
                     mostrarMensajeFlotante("No hay videos en la lista para reproducir.");
@@ -180,11 +207,15 @@ class App {
                 if (playerState === YT.PlayerState.PLAYING) {
                     activePlayer.pauseVideo();
                     botonPlay.innerHTML = '<i class="fas fa-play"></i>';
-                    PlaybackController.stopMonitoring();
+                    if (window.PlaybackController) {
+                        PlaybackController.stopMonitoring();
+                    }
                 } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
                     activePlayer.playVideo();
                     botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                    PlaybackController.startMonitoring();
+                    if (window.PlaybackController) {
+                        PlaybackController.startMonitoring();
+                    }
                 }
             }
         });
@@ -204,9 +235,11 @@ class App {
                 return;
             }
             console.log("Botón Mix/Next presionado.");
-            PlaybackController.stopMonitoring();
-            PlaybackController.playNextVideo();
-            setTimeout(() => PlaybackController.startMonitoring(), 500);
+            if (window.PlaybackController) {
+                PlaybackController.stopMonitoring();
+                PlaybackController.playNextVideo();
+                setTimeout(() => PlaybackController.startMonitoring(), 500);
+            }
         });
     }
 
@@ -218,6 +251,11 @@ class App {
             return;
         }
 
+        if (!window.SearchManager) {
+            console.error('SearchManager no disponible');
+            return;
+        }
+
         const debouncedSearch = SearchManager.createDebouncedSearch(500);
 
         searchInput.addEventListener('input', (event) => {
@@ -225,11 +263,15 @@ class App {
             if (query.length > 2) {
                 debouncedSearch(query);
             } else {
-                SearchState.resultsDiv.innerHTML = '';
+                if (SearchState.resultsDiv) {
+                    SearchState.resultsDiv.innerHTML = '';
+                }
                 SearchState.currentSearchQuery = '';
                 SearchState.nextPageContext = null;
                 SearchState.isLoadingMore = false;
-                SearchManager.hideLoadMoreSpinner();
+                if (SearchManager.hideLoadMoreSpinner) {
+                    SearchManager.hideLoadMoreSpinner();
+                }
             }
         });
     }
@@ -249,14 +291,14 @@ class App {
             const playlistIdFromUrl = Utils.extractPlaylistId(url);
 
             if (!playlistIdFromUrl) {
-                alert('URL de la playlist no válida.');
+                mostrarMensajeFlotante('URL de la playlist no válida.');
                 return;
             }
             
             searchInput2.value = '';
 
             try {
-               console.log('Cargando playlist...');
+                console.log('Cargando playlist...');
                 const playlistInfo = await Utils.getPlaylistInfo(playlistIdFromUrl);
                 if (playlistInfo) {
                     playlistInfo.id = playlistIdFromUrl;
@@ -264,6 +306,7 @@ class App {
                 }
             } catch (error) {
                 console.error("Error en proceso de añadir URL:", error);
+                mostrarMensajeFlotante('Error al cargar la playlist. Verifica la URL.');
             }
         });
 
@@ -326,7 +369,9 @@ class App {
 
         if (endedVideoMatchesCurrent && !AppState.isTransitioning && !AppState.isAudioFading) {
             console.log(`Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
-            PlaybackController.playNextVideo();
+            if (window.PlaybackController) {
+                PlaybackController.playNextVideo();
+            }
         } else if (playerNum !== AppState.currentPlayer) {
             console.log(`Otro player ${playerNum} estado ENDED. Video: ${videoId}. (No es el reproductor activo actual)`);
         }
@@ -336,11 +381,10 @@ class App {
     checkGoogleTokenOnLoad() {
         const token = localStorage.getItem('google_token');
         if (token) {
-            console.log('Token encontrado en localStorage:', token);
-            // Aquí podrías inicializar funciones autenticadas
-             googleSignInButton.disabled = false;
+            console.log('Token encontrado en localStorage al cargar la página');
+            // La autenticación se maneja en auth.js
         } else {
-            console.log('No hay token de Google disponible');
+            console.log('No hay token de Google disponible al cargar');
         }
     }
 
@@ -353,8 +397,8 @@ class App {
         
         if (!hasLoadedPlaylists) {
             setTimeout(() => {
-                mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
-            }, 1000);
+                mostrarMensajeFlotante("¡Bienvenido! Puedes añadir playlists de YouTube o cargar tu biblioteca personal.");
+            }, 2000);
         }
     }
 
@@ -363,12 +407,15 @@ class App {
         console.log('Reiniciando aplicación...');
         
         // Detener reproducción
-        PlaybackController.stopMonitoring();
+        if (window.PlaybackController) {
+            PlaybackController.stopMonitoring();
+        }
+        
         if (AppState.player1) {
-            try { AppState.player1.stopVideo(); } catch(e) {}
+            try { AppState.player1.stopVideo(); } catch(e) { console.warn('Error deteniendo player1:', e); }
         }
         if (AppState.player2) {
-            try { AppState.player2.stopVideo(); } catch(e) {}
+            try { AppState.player2.stopVideo(); } catch(e) { console.warn('Error deteniendo player2:', e); }
         }
 
         // Limpiar estados
@@ -384,21 +431,32 @@ class App {
             flattenedIndex: -1
         };
 
-        // Limpiar caché de SponsorBlock
-        SponsorBlockManager.clearAllSegmentCache();
+        // Limpiar caché de SponsorBlock si está disponible
+        if (window.SponsorBlockManager) {
+            SponsorBlockManager.clearAllSegmentCache();
+        }
 
         // Actualizar UI
         UIManager.updatePlaylistsUI();
-        document.getElementById('botonPlay').innerHTML = '<i class="fas fa-play"></i>';
-        document.getElementById('botonPlay').disabled = PlaylistManager.getFlattenedPlaylist().length === 0;
+        const playButton = document.getElementById('botonPlay');
+        if (playButton) {
+            playButton.innerHTML = '<i class="fas fa-play"></i>';
+            playButton.disabled = PlaylistManager.getFlattenedPlaylist().length === 0;
+        }
         
+        mostrarMensajeFlotante('Aplicación reiniciada correctamente');
         console.log('Aplicación reiniciada');
     }
 
     // Obtener estadísticas de la aplicación
     getStats() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
-        const sponsorBlockStats = SponsorBlockManager.getCacheStats();
+        const playlistStats = PlaylistManager.getPlaylistStats();
+        
+        let sponsorBlockStats = {};
+        if (window.SponsorBlockManager) {
+            sponsorBlockStats = SponsorBlockManager.getCacheStats();
+        }
         
         return {
             playlists: PlaylistState.playlistsData.length,
@@ -406,19 +464,76 @@ class App {
             currentVideo: PlaylistState.currentPlayingInfo.videoId,
             currentIndex: PlaylistState.currentPlayingInfo.flattenedIndex,
             isPlaying: AppState.reproduccionIniciada,
-            sponsorBlock: sponsorBlockStats
+            playersInitialized: AppState.playersInitialized,
+            youtubeAPIReady: AppState.youtubeAPIReady,
+            playlistStats: playlistStats,
+            sponsorBlock: sponsorBlockStats,
+            authStatus: window.authManager?.getDebugInfo() || 'Not available'
         };
     }
 
     // Método para debugging
     debug() {
-        console.log('=== DEBUG INFO ===');
+        console.log('=== YT CROSSMIX DEBUG INFO ===');
         console.log('App State:', AppState);
         console.log('Playlist State:', PlaylistState);
         console.log('Search State:', SearchState);
         console.log('SponsorBlock State:', SponsorBlockState);
-        console.log('Stats:', this.getStats());
-        console.log('==================');
+        console.log('Comprehensive Stats:', this.getStats());
+        
+        if (window.authManager) {
+            console.log('Auth Manager Debug:', window.authManager.getDebugInfo());
+        }
+        
+        console.log('Available Global Objects:', {
+            YouTubeAPIManager: !!window.YouTubeAPIManager,
+            PlaylistManager: !!window.PlaylistManager,
+            SearchManager: !!window.SearchManager,
+            PlaybackController: !!window.PlaybackController,
+            SponsorBlockManager: !!window.SponsorBlockManager,
+            UIManager: !!window.UIManager,
+            Utils: !!window.Utils,
+            authManager: !!window.authManager
+        });
+        
+        console.log('==============================');
+        
+        // Mostrar información también en la UI
+        const stats = this.getStats();
+        mostrarMensajeFlotante(`Debug: ${stats.playlists} playlists, ${stats.totalVideos} videos totales. Ver consola para más detalles.`);
+    }
+
+    // Método para obtener información de salud del sistema
+    getHealthCheck() {
+        const health = {
+            app: {
+                initialized: this.initialized,
+                authInitialized: this.authInitialized
+            },
+            youtube: {
+                apiReady: AppState.youtubeAPIReady,
+                playersInitialized: AppState.playersInitialized,
+                player1Ready: !!AppState.player1,
+                player2Ready: !!AppState.player2
+            },
+            data: {
+                playlists: PlaylistState.playlistsData.length,
+                videos: PlaylistManager.getFlattenedPlaylist().length,
+                currentPlaying: !!PlaylistState.currentPlayingInfo.videoId
+            },
+            modules: {
+                YouTubeAPIManager: typeof YouTubeAPIManager !== 'undefined',
+                PlaylistManager: typeof PlaylistManager !== 'undefined',
+                SearchManager: typeof window.SearchManager !== 'undefined',
+                PlaybackController: typeof window.PlaybackController !== 'undefined',
+                SponsorBlockManager: typeof window.SponsorBlockManager !== 'undefined',
+                UIManager: typeof UIManager !== 'undefined',
+                Utils: typeof Utils !== 'undefined'
+            },
+            auth: window.authManager?.getDebugInfo() || null
+        };
+
+        return health;
     }
 }
 
@@ -427,7 +542,10 @@ const app = new App();
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    app.init();
+    app.init().catch(error => {
+        console.error('Error fatal inicializando la aplicación:', error);
+        mostrarMensajeFlotante('Error fatal al inicializar. Recarga la página.');
+    });
 });
 
 // Exportar para uso global si es necesario
