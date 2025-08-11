@@ -1,6 +1,7 @@
-// Módulo de Autenticación de Google y API de YouTube (Versión Modular Mejorada)
+// Módulo de Autenticación de Google y API de YouTube (Versión Modular Corregida)
 import { PlaylistManager } from './playlistManager.js';
 import { Utils } from './utils.js';
+import { mostrarMensajeFlotante } from './ui.js';
 
 class GoogleAuthManager {
     constructor() {
@@ -11,30 +12,52 @@ class GoogleAuthManager {
         this.gisReady = false;
         this.isAuthenticated = false;
         this.authStatusCallback = null;
+        this.isInitializing = false;
     }
 
     // Inicializar el módulo de autenticación
     async initialize() {
+        if (this.isInitializing) {
+            console.log('GoogleAuthManager ya se está inicializando...');
+            return this;
+        }
+        
         console.log('Inicializando GoogleAuthManager...');
+        this.isInitializing = true;
         
-        // Configurar listeners para botones
-        this.setupButtonListeners();
-        
-        // Cargar scripts de Google
-        await this.loadGoogleScripts();
-        
-        // Verificar estado de autenticación guardado
-        this.checkSavedAuthStatus();
-        
-        return this;
+        try {
+            // Configurar listeners para botones
+            this.setupButtonListeners();
+            
+            // Cargar scripts de Google
+            await this.loadGoogleScripts();
+            
+            // Verificar estado de autenticación guardado
+            this.checkSavedAuthStatus();
+            
+            this.isInitializing = false;
+            console.log('GoogleAuthManager inicializado correctamente');
+            return this;
+        } catch (error) {
+            console.error('Error inicializando GoogleAuthManager:', error);
+            this.isInitializing = false;
+            throw error;
+        }
     }
 
     // Cargar scripts de Google API
     async loadGoogleScripts() {
-        return new Promise((resolve) => {
-            // Hacer las funciones disponibles globalmente para los callbacks
-            window.gapiInitialize = () => this.gapiInitialize();
-            window.gisInitalize = () => this.gisInitialize();
+        return new Promise((resolve, reject) => {
+            let scriptsLoaded = 0;
+            const totalScripts = 2;
+            
+            const checkAllLoaded = () => {
+                scriptsLoaded++;
+                if (scriptsLoaded === totalScripts) {
+                    // Pequeña pausa para asegurar que todo esté cargado
+                    setTimeout(() => resolve(), 100);
+                }
+            };
             
             // Cargar GAPI
             if (!window.gapi) {
@@ -42,10 +65,13 @@ class GoogleAuthManager {
                 gapiScript.src = 'https://apis.google.com/js/api.js';
                 gapiScript.async = true;
                 gapiScript.defer = true;
-                gapiScript.onload = () => this.gapiInitialize();
+                gapiScript.onload = () => {
+                    this.gapiInitialize().then(checkAllLoaded).catch(reject);
+                };
+                gapiScript.onerror = () => reject(new Error('Error cargando GAPI script'));
                 document.head.appendChild(gapiScript);
             } else {
-                this.gapiInitialize();
+                this.gapiInitialize().then(checkAllLoaded).catch(reject);
             }
             
             // Cargar GIS
@@ -54,87 +80,99 @@ class GoogleAuthManager {
                 gisScript.src = 'https://accounts.google.com/gsi/client';
                 gisScript.async = true;
                 gisScript.defer = true;
-                gisScript.onload = () => this.gisInitialize();
+                gisScript.onload = () => {
+                    this.gisInitialize().then(checkAllLoaded).catch(reject);
+                };
+                gisScript.onerror = () => reject(new Error('Error cargando GIS script'));
                 document.head.appendChild(gisScript);
             } else {
-                this.gisInitialize();
+                this.gisInitialize().then(checkAllLoaded).catch(reject);
             }
-            
-            // Resolver cuando ambos estén listos
-            const checkReady = setInterval(() => {
-                if (this.gapiReady && this.gisReady) {
-                    clearInterval(checkReady);
-                    resolve();
-                }
-            }, 100);
         });
     }
 
     // Inicializar GAPI
-    gapiInitialize() {
-        if (!window.gapi) return;
-        
-        gapi.load('client', () => {
-            gapi.client.init({}).then(() => {
-                return gapi.client.load('https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest');
-            }).then(() => {
-                console.log("GAPI client for YouTube loaded.");
-                this.gapiReady = true;
-                this.tryStartApp();
-            }).catch(err => {
-                console.error("Error inicializando GAPI client", err);
+    async gapiInitialize() {
+        return new Promise((resolve, reject) => {
+            if (!window.gapi) {
+                reject(new Error('GAPI no está disponible'));
+                return;
+            }
+            
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: '', // No necesitamos API key para OAuth
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+                    });
+                    
+                    console.log("GAPI client for YouTube loaded.");
+                    this.gapiReady = true;
+                    resolve();
+                } catch (err) {
+                    console.error("Error inicializando GAPI client:", err);
+                    reject(err);
+                }
             });
         });
     }
 
     // Inicializar GIS (Google Identity Services)
-    gisInitialize() {
-        if (!window.google?.accounts?.oauth2) {
-            console.error('Google Identity Services no está disponible');
-            return;
-        }
-        
-        this.tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: this.CLIENT_ID,
-            scope: this.SCOPES,
-            callback: (tokenResponse) => this.tokenResponseCallback(tokenResponse),
+    async gisInitialize() {
+        return new Promise((resolve, reject) => {
+            if (!window.google?.accounts?.oauth2) {
+                reject(new Error('Google Identity Services no está disponible'));
+                return;
+            }
+            
+            try {
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: this.CLIENT_ID,
+                    scope: this.SCOPES,
+                    callback: (tokenResponse) => this.tokenResponseCallback(tokenResponse),
+                });
+                
+                console.log("GIS client initialized.");
+                this.gisReady = true;
+                resolve();
+            } catch (error) {
+                console.error("Error inicializando GIS client:", error);
+                reject(error);
+            }
         });
-        
-        console.log("GIS client initialized.");
-        this.gisReady = true;
-        this.tryStartApp();
-    }
-
-    // Verificar si ambas APIs están listas
-    tryStartApp() {
-        if (this.gapiReady && this.gisReady) {
-            console.log("Ambas APIs de Google están listas. Comprobando estado de autenticación.");
-            this.checkAuthStatus();
-        }
     }
 
     // Manejar respuesta del token
     async tokenResponseCallback(tokenResponse) {
         if (tokenResponse && tokenResponse.access_token) {
-            gapi.client.setToken(tokenResponse);
-            
-            // Guardar token en localStorage con timestamp
-            const tokenData = {
-                ...tokenResponse,
-                timestamp: Date.now()
-            };
-            localStorage.setItem('google_token', JSON.stringify(tokenData));
-            
-            console.log("Acceso concedido. Token guardado.");
-            this.isAuthenticated = true;
-            this.updateUI(true);
-            
-            // Obtener playlists automáticamente
-            await this.getPlaylists();
-            
-            // Ejecutar callback si existe
-            if (this.authStatusCallback) {
-                this.authStatusCallback(true);
+            try {
+                // Configurar el token en gapi
+                gapi.client.setToken(tokenResponse);
+                
+                // Guardar token en localStorage con timestamp
+                const tokenData = {
+                    ...tokenResponse,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('google_token', JSON.stringify(tokenData));
+                
+                console.log("Acceso concedido. Token guardado.");
+                this.isAuthenticated = true;
+                this.updateUI(true);
+                
+                // Obtener playlists automáticamente
+                await this.getPlaylists();
+                
+                // Ejecutar callback si existe
+                if (this.authStatusCallback) {
+                    this.authStatusCallback(true);
+                }
+                
+                mostrarMensajeFlotante("Autenticación exitosa. Cargando tus playlists...");
+                
+            } catch (error) {
+                console.error("Error procesando token:", error);
+                mostrarMensajeFlotante("Error al procesar la autenticación.");
             }
         } else {
             console.error("No se obtuvo el token de acceso o la autenticación fue denegada.");
@@ -144,6 +182,8 @@ class GoogleAuthManager {
             if (this.authStatusCallback) {
                 this.authStatusCallback(false);
             }
+            
+            mostrarMensajeFlotante("Autenticación denegada o fallida.");
         }
     }
 
@@ -160,12 +200,19 @@ class GoogleAuthManager {
                 
                 if (tokenAge < maxAge && tokenData.access_token) {
                     console.log('Token recuperado de localStorage');
-                    gapi.client.setToken(tokenData);
-                    this.isAuthenticated = true;
-                    this.updateUI(true);
                     
-                    // Obtener playlists si el token es válido
-                    this.validateAndRefreshToken(tokenData);
+                    if (this.gapiReady) {
+                        gapi.client.setToken(tokenData);
+                        this.isAuthenticated = true;
+                        this.updateUI(true);
+                        
+                        // Validar el token haciendo una llamada simple
+                        this.validateAndRefreshToken(tokenData);
+                    } else {
+                        // Si GAPI no está listo, esperar un poco
+                        setTimeout(() => this.checkSavedAuthStatus(), 500);
+                        return;
+                    }
                 } else {
                     console.log('Token expirado, limpiando...');
                     localStorage.removeItem('google_token');
@@ -185,7 +232,7 @@ class GoogleAuthManager {
     async validateAndRefreshToken(tokenData) {
         try {
             // Intentar hacer una llamada simple para verificar si el token funciona
-            await gapi.client.youtube.playlists.list({
+            const response = await gapi.client.youtube.playlists.list({
                 'part': ['snippet'],
                 'mine': true,
                 'maxResults': 1
@@ -195,50 +242,21 @@ class GoogleAuthManager {
             await this.getPlaylists();
             
         } catch (error) {
-            console.log('Token inválido o expirado, solicitando nuevo...');
+            console.log('Token inválido o expirado:', error);
             localStorage.removeItem('google_token');
             this.isAuthenticated = false;
             this.updateUI(false);
-            
-            // Opcionalmente, solicitar nuevo token automáticamente
-            // this.handleAuthClick();
-        }
-    }
-
-    // Verificar estado de autenticación actual
-    checkAuthStatus() {
-        let token = gapi.client.getToken();
-        
-        if (!token) {
-            // Intentar recuperar el token guardado
-            const savedToken = localStorage.getItem('google_token');
-            if (savedToken) {
-                try {
-                    const parsedToken = JSON.parse(savedToken);
-                    if (parsedToken && parsedToken.access_token) {
-                        gapi.client.setToken(parsedToken);
-                        token = parsedToken;
-                    }
-                } catch (e) {
-                    localStorage.removeItem('google_token');
-                }
-            }
-        }
-        
-        if (token && token.access_token) {
-            console.log("Autenticación verificada: token existente y válido.");
-            this.isAuthenticated = true;
-            this.updateUI(true);
-            this.getPlaylists();
-        } else {
-            console.log("No hay token activo. Mostrando botón de inicio de sesión.");
-            this.isAuthenticated = false;
-            this.updateUI(false);
+            mostrarMensajeFlotante("Sesión expirada. Por favor, inicia sesión nuevamente.");
         }
     }
 
     // Obtener playlists del usuario
     async getPlaylists() {
+        if (!this.isAuthenticated || !this.gapiReady) {
+            console.error('No autenticado o GAPI no está listo');
+            return;
+        }
+
         this.showLoadingSpinner();
         
         try {
@@ -253,14 +271,19 @@ class GoogleAuthManager {
                     'pageToken': nextPageToken
                 });
                 
-                if (response.result.items) {
+                if (response.result && response.result.items) {
                     allPlaylists = allPlaylists.concat(response.result.items);
                 }
                 
-                nextPageToken = response.result.nextPageToken;
+                nextPageToken = response.result?.nextPageToken;
             } while (nextPageToken);
             
             console.log(`Se obtuvieron ${allPlaylists.length} playlists de YouTube`);
+            
+            if (allPlaylists.length === 0) {
+                mostrarMensajeFlotante("No se encontraron playlists en tu biblioteca de YouTube.");
+                return;
+            }
             
             // Disparar evento para que PlaylistManager procese las playlists
             document.dispatchEvent(new CustomEvent('playlistsFetched', { 
@@ -269,7 +292,14 @@ class GoogleAuthManager {
                         
         } catch (err) {
             console.error("Error al obtener playlists de YouTube:", err);
-            this.updateUI(false);
+            mostrarMensajeFlotante("Error al cargar las playlists de YouTube.");
+            
+            // Si el error es de autenticación, limpiar token
+            if (err.status === 401) {
+                localStorage.removeItem('google_token');
+                this.isAuthenticated = false;
+                this.updateUI(false);
+            }
         } finally {
             this.hideLoadingSpinner();
         }
@@ -277,7 +307,7 @@ class GoogleAuthManager {
 
     // Obtener videos de una playlist específica
     async getPlaylistVideos(playlistId) {
-        if (!this.isAuthenticated) {
+        if (!this.isAuthenticated || !this.gapiReady) {
             console.error('No autenticado para obtener videos de playlist');
             return null;
         }
@@ -294,21 +324,30 @@ class GoogleAuthManager {
                     'pageToken': nextPageToken
                 });
                 
-                if (response.result.items) {
+                if (response.result && response.result.items) {
+                    // Filtrar videos válidos (no eliminados/privados)
+                    const validItems = response.result.items.filter(item => 
+                        item.snippet.resourceId && 
+                        item.snippet.resourceId.videoId &&
+                        item.snippet.title !== 'Private video' &&
+                        item.snippet.title !== 'Deleted video'
+                    );
+                    
                     // Formatear videos para compatibilidad con el sistema
-                    const formattedVideos = response.result.items.map(item => ({
+                    const formattedVideos = validItems.map(item => ({
                         videoId: item.snippet.resourceId.videoId,
                         title: item.snippet.title,
-                        thumbnail: item.snippet.thumbnails.medium?.url || 
-                                 item.snippet.thumbnails.default.url,
-                        duration: 0, // YouTube API no proporciona duración aquí
-                        channelTitle: item.snippet.channelTitle
+                        thumbnail: item.snippet.thumbnails?.medium?.url || 
+                                 item.snippet.thumbnails?.default?.url ||
+                                 'https://via.placeholder.com/120x90?text=No+Thumb',
+                        duration: 0, // Se obtendrá en el siguiente paso
+                        channelTitle: item.snippet.channelTitle || 'Canal desconocido'
                     }));
                     
                     allVideos = allVideos.concat(formattedVideos);
                 }
                 
-                nextPageToken = response.result.nextPageToken;
+                nextPageToken = response.result?.nextPageToken;
             } while (nextPageToken);
             
             // Obtener duraciones de los videos (requiere llamada adicional)
@@ -326,6 +365,8 @@ class GoogleAuthManager {
 
     // Obtener duraciones de videos
     async fetchVideoDurations(videos) {
+        if (!videos || videos.length === 0) return;
+        
         try {
             // YouTube API permite hasta 50 IDs por llamada
             const chunks = [];
@@ -341,10 +382,10 @@ class GoogleAuthManager {
                     'id': videoIds
                 });
                 
-                if (response.result.items) {
+                if (response.result && response.result.items) {
                     response.result.items.forEach(item => {
                         const video = videos.find(v => v.videoId === item.id);
-                        if (video) {
+                        if (video && item.contentDetails) {
                             // Convertir duración ISO 8601 a segundos
                             video.duration = Utils.parseISO8601Duration(item.contentDetails.duration);
                         }
@@ -358,31 +399,57 @@ class GoogleAuthManager {
 
     // Manejar click en iniciar sesión
     handleAuthClick() {
-        if (this.tokenClient) {
-            this.tokenClient.requestAccessToken({ prompt: 'consent' });
-        } else {
+        if (!this.gisReady || !this.tokenClient) {
+            mostrarMensajeFlotante("El sistema de autenticación no está listo. Intenta de nuevo en unos segundos.");
             console.error('Cliente de autenticación no inicializado');
+            return;
+        }
+
+        try {
+            this.tokenClient.requestAccessToken({ 
+                prompt: 'consent' 
+            });
+        } catch (error) {
+            console.error('Error al solicitar token:', error);
+            mostrarMensajeFlotante("Error al iniciar el proceso de autenticación.");
         }
     }
 
     // Manejar click en cerrar sesión
     handleSignOutClick() {
-        const token = gapi.client.getToken();
-        
-        if (token !== null) {
-            google.accounts.oauth2.revoke(token.access_token, () => {
+        try {
+            const token = gapi.client.getToken();
+            
+            if (token && token.access_token) {
+                // Revocar token
+                google.accounts.oauth2.revoke(token.access_token, () => {
+                    console.log('Token revocado exitosamente.');
+                });
+                
+                // Limpiar token del cliente
                 gapi.client.setToken('');
-                
-                // Eliminar token guardado
-                localStorage.removeItem('google_token');
-                
-                console.log('Token revocado y sesión cerrada.');
-                this.isAuthenticated = false;
-                this.updateUI(false);
-                
-                // Disparar evento de cierre de sesión
-                document.dispatchEvent(new CustomEvent('userLoggedOut'));
-            });
+            }
+            
+            // Eliminar token guardado
+            localStorage.removeItem('google_token');
+            
+            console.log('Sesión cerrada.');
+            this.isAuthenticated = false;
+            this.updateUI(false);
+            
+            // Disparar evento de cierre de sesión
+            document.dispatchEvent(new CustomEvent('userLoggedOut'));
+            
+            mostrarMensajeFlotante("Sesión cerrada exitosamente.");
+            
+        } catch (error) {
+            console.error('Error al cerrar sesión:', error);
+            
+            // Forzar limpieza local incluso si hay error
+            localStorage.removeItem('google_token');
+            this.isAuthenticated = false;
+            this.updateUI(false);
+            document.dispatchEvent(new CustomEvent('userLoggedOut'));
         }
     }
 
@@ -390,33 +457,66 @@ class GoogleAuthManager {
     updateUI(isLoggedIn) {
         const signInButton = document.getElementById('googleSignInButton');
         const signOutButton = document.getElementById('googleSignOutButton');
-        const playlistContainer = document.getElementById('sidebar-actions-container');
         
         if (isLoggedIn) {
-            if (signInButton) signInButton.classList.add('hidden');
-            if (signOutButton) signOutButton.classList.remove('hidden');
-            if (playlistContainer) playlistContainer.classList.remove('hidden');
+            if (signInButton) {
+                signInButton.classList.add('hidden');
+                signInButton.disabled = false;
+            }
+            if (signOutButton) {
+                signOutButton.classList.remove('hidden');
+                signOutButton.disabled = false;
+            }
         } else {
-            if (signInButton) signInButton.classList.remove('hidden');
-            if (signOutButton) signOutButton.classList.add('hidden');
+            if (signInButton) {
+                signInButton.classList.remove('hidden');
+                signInButton.disabled = false;
+            }
+            if (signOutButton) {
+                signOutButton.classList.add('hidden');
+                signOutButton.disabled = false;
+            }
         }
     }
 
     // Configurar listeners de botones
     setupButtonListeners() {
-        const signInButton = document.getElementById('googleSignInButton');
-        const signOutButton = document.getElementById('googleSignOutButton');
-        
-        if (signInButton) {
-            signInButton.addEventListener('click', () => this.handleAuthClick());
+        // Esperar a que el DOM esté listo
+        const setupButtons = () => {
+            const signInButton = document.getElementById('googleSignInButton');
+            const signOutButton = document.getElementById('googleSignOutButton');
+            
+            if (signInButton) {
+                // Remover listeners existentes
+                signInButton.replaceWith(signInButton.cloneNode(true));
+                const newSignInButton = document.getElementById('googleSignInButton');
+                
+                newSignInButton.addEventListener('click', () => {
+                    console.log('Click en botón de iniciar sesión');
+                    this.handleAuthClick();
+                });
+            }
+            
+            if (signOutButton) {
+                // Remover listeners existentes
+                signOutButton.replaceWith(signOutButton.cloneNode(true));
+                const newSignOutButton = document.getElementById('googleSignOutButton');
+                
+                newSignOutButton.addEventListener('click', () => {
+                    console.log('Click en botón de cerrar sesión');
+                    this.handleSignOutClick();
+                });
+            }
+            
+            // Estado inicial
+            this.updateUI(false);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupButtons);
+        } else {
+            setupButtons();
         }
-        
-        if (signOutButton) {
-            signOutButton.addEventListener('click', () => this.handleSignOutClick());
-        }
-        
-        // Estado inicial
-        this.updateUI(false);
     }
 
     // Mostrar spinner de carga
@@ -442,13 +542,24 @@ class GoogleAuthManager {
 
     // Métodos de utilidad
     isUserAuthenticated() {
-        return this.isAuthenticated;
+        return this.isAuthenticated && this.gapiReady;
     }
 
     async forceTokenRefresh() {
         if (this.tokenClient) {
             this.tokenClient.requestAccessToken({ prompt: '' });
         }
+    }
+
+    // Método para debugging
+    getDebugInfo() {
+        return {
+            isAuthenticated: this.isAuthenticated,
+            gapiReady: this.gapiReady,
+            gisReady: this.gisReady,
+            hasToken: !!gapi?.client?.getToken(),
+            tokenClient: !!this.tokenClient
+        };
     }
 }
 
