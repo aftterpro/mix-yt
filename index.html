@@ -341,132 +341,151 @@
     </footer>
     <!-- Scripts -->
     <script type="module">
-        // Importar y usar los módulos existentes
-        import './app.js';
-        import { authManager } from './auth.js';
-        
-        console.log('Módulos cargados, inicializando aplicación...');
-        
-        // Variables globales para la nueva UI
-        let currentView = 'home';
-        let isMobileMenuOpen = false;
-        
-        // Elementos DOM
-        const sidebar = document.getElementById('sidebar');
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const mobileOverlay = document.getElementById('mobileOverlay');
-        const navItems = document.querySelectorAll('.nav-item[data-view]');
-        const contentViews = document.querySelectorAll('.content-view');
+    // Importar módulo principal
+import './app.js';
 
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                console.log('DOM cargado, inicializando...');
-                
-                // Inicializar autenticación
-                await authManager.initialize();
-                console.log('Autenticación inicializada');
-                
-                // Configurar navegación
-                setupNavigation();
-                
-                // Configurar menú móvil
-                setupMobileMenu();
-                
-                // Configurar nuevos event listeners
-                setupUIEnhancements();
-                
-                console.log('UI mejorada inicializada correctamente');
-                
-            } catch (error) {
-                console.error('Error inicializando UI mejorada:', error);
-            }
-        });
+console.log('Módulos cargados, inicializando aplicación...');
 
+// Variables globales para la nueva UI
+let currentView = 'home';
+let isMobileMenuOpen = false;
+let authManager = null;
+
+// Elementos DOM
+let sidebar, mobileMenuToggle, mobileOverlay, navItems, contentViews;
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        console.log('DOM cargado, inicializando...');
+        
+        // Obtener elementos DOM
+        sidebar = document.getElementById('sidebar');
+        mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        mobileOverlay = document.getElementById('mobileOverlay');
+        navItems = document.querySelectorAll('.nav-item[data-view]');
+        contentViews = document.querySelectorAll('.content-view');
+        
+        // Inicializar autenticación (con manejo de errores)
+        try {
+            const authModule = await import('./auth.js');
+            authManager = authModule.authManager;
+            await authManager.initialize();
+            window.authManager = authManager;
+            console.log('Autenticación inicializada');
+        } catch (error) {
+            console.warn('Auth module no disponible:', error);
+        }
+        
         // Configurar navegación
-        function setupNavigation() {
-            navItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const view = item.dataset.view;
-                    switchView(view);
-                });
-            });
-        }
-
-        // Cambiar vista
-        function switchView(view) {
-            // Actualizar navegación activa
-            navItems.forEach(item => {
-                item.classList.toggle('active', item.dataset.view === view);
-            });
-
-            // Mostrar vista correspondiente
-            contentViews.forEach(contentView => {
-                const isActive = contentView.id === `${view}View`;
-                contentView.style.display = isActive ? 'block' : 'none';
-                
-                if (isActive) {
-                    contentView.classList.add('fade-in');
-                }
-            });
-
-            currentView = view;
-            
-            // Cerrar menú móvil si está abierto
-            if (isMobileMenuOpen) {
-                toggleMobileMenu();
-            }
-        }
-
+        setupNavigation();
+        
         // Configurar menú móvil
-        function setupMobileMenu() {
-            mobileMenuToggle?.addEventListener('click', toggleMobileMenu);
-            mobileOverlay?.addEventListener('click', toggleMobileMenu);
-            
-            // Cerrar menú al cambiar tamaño de ventana
-            window.addEventListener('resize', () => {
-                if (window.innerWidth > 768 && isMobileMenuOpen) {
-                    toggleMobileMenu();
-                }
-            });
+        setupMobileMenu();
+        
+        // Configurar nuevos event listeners
+        setupUIEnhancements();
+        
+        console.log('UI mejorada inicializada correctamente');
+        
+    } catch (error) {
+        console.error('Error inicializando UI mejorada:', error);
+    }
+});
+
+// Configurar navegación
+function setupNavigation() {
+    if (!navItems.length) return;
+    
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const view = item.dataset.view;
+            switchView(view);
+        });
+    });
+}
+
+// Cambiar vista
+function switchView(view) {
+    // Actualizar navegación activa
+    navItems.forEach(item => {
+        item.classList.toggle('active', item.dataset.view === view);
+    });
+
+    // Mostrar vista correspondiente
+    contentViews.forEach(contentView => {
+        const isActive = contentView.id === `${view}View`;
+        contentView.style.display = isActive ? 'block' : 'none';
+        
+        if (isActive) {
+            contentView.classList.add('fade-in');
         }
+    });
 
-        function toggleMobileMenu() {
-            isMobileMenuOpen = !isMobileMenuOpen;
-            sidebar?.classList.toggle('open', isMobileMenuOpen);
-            mobileOverlay?.classList.toggle('active', isMobileMenuOpen);
-            document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+    currentView = view;
+    
+    // Cerrar menú móvil si está abierto
+    if (isMobileMenuOpen) {
+        toggleMobileMenu();
+    }
+}
+
+// Configurar menú móvil
+function setupMobileMenu() {
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+    }
+    
+    if (mobileOverlay) {
+        mobileOverlay.addEventListener('click', toggleMobileMenu);
+    }
+    
+    // Cerrar menú al cambiar tamaño de ventana
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768 && isMobileMenuOpen) {
+            toggleMobileMenu();
         }
+    });
+}
 
-        // Mejoras de UI adicionales
-        function setupUIEnhancements() {
-            // Efecto de hover en tarjetas de resultado
-            document.addEventListener('mouseover', (e) => {
-                if (e.target.closest('.result-card, .playlist-card')) {
-                    const card = e.target.closest('.result-card, .playlist-card');
-                    card.style.transform = 'translateY(-4px)';
-                }
-            });
+function toggleMobileMenu() {
+    isMobileMenuOpen = !isMobileMenuOpen;
+    
+    if (sidebar) sidebar.classList.toggle('open', isMobileMenuOpen);
+    if (mobileOverlay) mobileOverlay.classList.toggle('active', isMobileMenuOpen);
+    
+    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
+}
 
-            document.addEventListener('mouseout', (e) => {
-                if (e.target.closest('.result-card, .playlist-card')) {
-                    const card = e.target.closest('.result-card, .playlist-card');
-                    card.style.transform = 'translateY(0)';
-                }
-            });
-
-            // Mejorar feedback de botones
-            document.addEventListener('click', (e) => {
-                if (e.target.matches('button') || e.target.closest('button')) {
-                    const button = e.target.matches('button') ? e.target : e.target.closest('button');
-                    button.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        button.style.transform = '';
-                    }, 150);
-                }
-            });
+// Mejoras de UI adicionales
+function setupUIEnhancements() {
+    // Efecto de hover en tarjetas
+    document.addEventListener('mouseover', (e) => {
+        const card = e.target.closest('.result-card, .playlist-card');
+        if (card) {
+            card.style.transform = 'translateY(-4px)';
         }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('.result-card, .playlist-card');
+        if (card) {
+            card.style.transform = 'translateY(0)';
+        }
+    });
+
+    // Feedback de botones
+    document.addEventListener('click', (e) => {
+        const button = e.target.closest('button');
+        if (button) {
+            button.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                button.style.transform = '';
+            }, 150);
+        }
+    });
+}
 
         // Integración con el app existente
         window.addEventListener('load', () => {
