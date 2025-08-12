@@ -17,12 +17,18 @@ export class YouTubeAPIManager {
     static initializePlayers() {
         if (AppState.player1 && AppState.player2) return;
 
-        AppState.player1 = new YT.Player('player1', {
-            height: '100%',
-            width: '100%',
-            playerVars: {
-                'playsinline': 1
-            },
+AppState.player1 = new YT.Player('player1', {
+    height: '100%',
+    width: '100%',
+    playerVars: {
+        'playsinline': 1,
+        'controls': 1,           // Mostrar controles
+        'modestbranding': 0,     // Mostrar logo YouTube
+        'rel': 0,               // No mostrar videos relacionados
+        'showinfo': 1,          // Mostrar información del video
+        'enablejsapi': 1,       // Habilitar API JavaScript
+        'origin': window.location.origin
+    },
             events: {
                 'onReady': YouTubeAPIManager.onPlayerReady,
                 'onStateChange': YouTubeAPIManager.onPlayerStateChange,
@@ -30,12 +36,18 @@ export class YouTubeAPIManager {
             }
         });
 
-        AppState.player2 = new YT.Player('player2', {
-            height: '100%',
-            width: '100%',
-            playerVars: {
-                'playsinline': 1
-            },
+AppState.player2 = new YT.Player('player2', {
+    height: '100%',
+    width: '100%',
+    playerVars: {
+        'playsinline': 1,
+        'controls': 1,           // Mostrar controles
+        'modestbranding': 0,     // Mostrar logo YouTube
+        'rel': 0,               // No mostrar videos relacionados
+        'showinfo': 1,          // Mostrar información del video
+        'enablejsapi': 1,       // Habilitar API JavaScript
+        'origin': window.location.origin
+    },
             events: {
                 'onReady': YouTubeAPIManager.onPlayerReady,
                 'onStateChange': YouTubeAPIManager.onPlayerStateChange,
@@ -157,3 +169,4 @@ export class YouTubeAPIManager {
 window.onYouTubeIframeAPIReady = function() {
     YouTubeAPIManager.initializePlayers();
 };
+
