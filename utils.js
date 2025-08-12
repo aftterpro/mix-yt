@@ -56,7 +56,20 @@ export class Utils {
 
         return 0;
     }
-
+static parseISO8601Duration(duration) {
+    if (!duration || typeof duration !== 'string') return 0;
+    
+    // Formato PT0H0M0S (YouTube API)
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+    if (match) {
+        const hours = parseInt(match[1] || '0', 10);
+        const minutes = parseInt(match[2] || '0', 10);
+        const seconds = parseFloat(match[3] || '0');
+        return Math.floor(hours * 3600 + minutes * 60 + seconds);
+    }
+    
+    return 0;
+}
     // Extraer ID de playlist de URL
     static extractPlaylistId(url) {
         try {
