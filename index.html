@@ -633,6 +633,98 @@ document.querySelectorAll('.tab').forEach(tab => {
                 button.style.background = '';
             }, 2000);
         };
+        // Funcionalidad del botón Cola
+document.addEventListener('DOMContentLoaded', () => {
+    const queueButton = document.getElementById('queueButton');
+    if (queueButton) {
+        queueButton.addEventListener('click', () => {
+            showQueueModal();
+        });
+    }
+});
+
+function showQueueModal() {
+    // Crear modal de cola
+    const modal = document.createElement('div');
+    modal.className = 'queue-modal';
+    modal.innerHTML = `
+        <div class="queue-modal-content">
+            <div class="queue-modal-header">
+                <h3>Cola de Reproducción</h3>
+                <button class="queue-modal-close">&times;</button>
+            </div>
+            <div class="queue-modal-body" id="queueModalBody">
+                <!-- Se llenará con JavaScript -->
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Llenar con playlists
+    updateQueueModal();
+    
+    // Cerrar modal
+    modal.querySelector('.queue-modal-close').addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+function updateQueueModal() {
+    const modalBody = document.getElementById('queueModalBody');
+    if (!modalBody) return;
+    
+    // Obtener playlists del estado global
+    const playlists = window.playlistState?.playlistsData || [];
+    
+    if (playlists.length === 0) {
+        modalBody.innerHTML = '<p class="no-playlists">No hay playlists cargadas</p>';
+        return;
+    }
+    
+    let html = '';
+    playlists.forEach(playlist => {
+        html += `
+            <div class="queue-playlist">
+                <div class="queue-playlist-header">
+                    <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="queue-playlist-thumb">
+                    <div class="queue-playlist-info">
+                        <h4>${playlist.name}</h4>
+                        <p>${playlist.videos.length} videos</p>
+                    </div>
+                </div>
+                <div class="queue-playlist-videos">
+                    ${playlist.videos.map((video, index) => `
+                        <div class="queue-video-item ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? 'playing' : ''}">
+                            <span class="queue-video-index">${index + 1}</span>
+                            <img src="${video.thumbnail}" alt="${video.title}" class="queue-video-thumb">
+                            <div class="queue-video-info">
+                                <p class="queue-video-title">${video.title}</p>
+                                <p class="queue-video-duration">${formatDuration(video.duration)}</p>
+                            </div>
+                            ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? '<i class="fas fa-volume-up playing-icon"></i>' : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    modalBody.innerHTML = html;
+}
+
+function formatDuration(duration) {
+    if (!duration) return '0:00';
+    const minutes = Math.floor(duration / 60);
+    const seconds = Math.floor(duration % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
     </script>    
 </body>
 </html>
