@@ -60,7 +60,15 @@ setupGlobalReferences() {
             
             // 5. Cargar API de YouTube
             YouTubeAPIManager.loadYouTubeAPI();
-            
+            // Verificar que la API se cargue correctamente
+            setTimeout(() => {
+            if (typeof YT === 'undefined' || !YT.Player) {
+                console.error('La API de YouTube no se cargó correctamente');
+                mostrarMensajeFlotante('Error cargando reproductores. Recarga la página.');
+                } else {
+                console.log('API de YouTube cargada correctamente');
+                }
+            }, 3000);
             // 6. Mostrar mensaje de bienvenida inicial (opcional)
             this.showWelcomeMessage();
             
