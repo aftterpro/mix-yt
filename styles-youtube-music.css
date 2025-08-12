@@ -1289,12 +1289,6 @@ body {
     color: var(--text-secondary);
     font-size: 14px;
 }
-.video-player.hidden {
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
-}
 
 .video-player.fade-in {
     opacity: 1;
