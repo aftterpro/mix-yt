@@ -14,47 +14,56 @@ export class YouTubeAPIManager {
         document.head.appendChild(script);
     }
 
-    static initializePlayers() {
-        if (AppState.player1 && AppState.player2) return;
-
-AppState.player1 = new YT.Player('player1', {
-    height: '100%',
-    width: '100%',
-    playerVars: {
-        'playsinline': 1,
-        'controls': 1,           // Mostrar controles
-        'modestbranding': 0,     // Mostrar logo YouTube
-        'rel': 0,               // No mostrar videos relacionados
-        'showinfo': 1,          // Mostrar información del video
-        'enablejsapi': 1,       // Habilitar API JavaScript
-        'origin': window.location.origin
-    },
-            events: {
-                'onReady': YouTubeAPIManager.onPlayerReady,
-                'onStateChange': YouTubeAPIManager.onPlayerStateChange,
-                'onError': YouTubeAPIManager.onPlayerError
-            }
-        });
-
-AppState.player2 = new YT.Player('player2', {
-    height: '100%',
-    width: '100%',
-    playerVars: {
-        'playsinline': 1,
-        'controls': 1,           // Mostrar controles
-        'modestbranding': 0,     // Mostrar logo YouTube
-        'rel': 0,               // No mostrar videos relacionados
-        'showinfo': 1,          // Mostrar información del video
-        'enablejsapi': 1,       // Habilitar API JavaScript
-        'origin': window.location.origin
-    },
-            events: {
-                'onReady': YouTubeAPIManager.onPlayerReady,
-                'onStateChange': YouTubeAPIManager.onPlayerStateChange,
-                'onError': YouTubeAPIManager.onPlayerError
-            }
-        });
+static initializePlayers() {
+    if (AppState.player1 && AppState.player2) {
+        console.log('Reproductores ya inicializados');
+        return;
     }
+
+    console.log('Inicializando reproductores YouTube...');
+
+    AppState.player1 = new YT.Player('player1', {
+        height: '315',
+        width: '560',
+        playerVars: {
+            'playsinline': 1,
+            'controls': 1,
+            'modestbranding': 0,
+            'rel': 0,
+            'showinfo': 1,
+            'enablejsapi': 1,
+            'origin': window.location.origin,
+            'autoplay': 0,
+            'mute': 0
+        },
+        events: {
+            'onReady': YouTubeAPIManager.onPlayerReady,
+            'onStateChange': YouTubeAPIManager.onPlayerStateChange,
+            'onError': YouTubeAPIManager.onPlayerError
+        }
+    });
+
+    AppState.player2 = new YT.Player('player2', {
+        height: '315',
+        width: '560',
+        playerVars: {
+            'playsinline': 1,
+            'controls': 1,
+            'modestbranding': 0,
+            'rel': 0,
+            'showinfo': 1,
+            'enablejsapi': 1,
+            'origin': window.location.origin,
+            'autoplay': 0,
+            'mute': 0
+        },
+        events: {
+            'onReady': YouTubeAPIManager.onPlayerReady,
+            'onStateChange': YouTubeAPIManager.onPlayerStateChange,
+            'onError': YouTubeAPIManager.onPlayerError
+        }
+    });
+}
 
     static onPlayerReady(event) {
         // Verificar si AMBOS están listos
@@ -169,4 +178,5 @@ AppState.player2 = new YT.Player('player2', {
 window.onYouTubeIframeAPIReady = function() {
     YouTubeAPIManager.initializePlayers();
 };
+
 
