@@ -17,25 +17,24 @@ class App {
     }
 
     // Configurar referencias globales para compatibilidad
-    setupGlobalReferences() {
-        // Hacer disponibles las clases y estados globalmente para módulos que los necesiten
-        window.appState = AppState;
-        window.playlistState = PlaylistState;
-        window.searchState = SearchState;
-        window.sponsorBlockState = SponsorBlockState;
-        
-        // Referencias globales para clases - CORREGIDO
-        window.SearchManager = SearchManager;
-        window.PlaylistManager = PlaylistManager;
-        window.PlaybackController = PlaybackController;
-        window.SponsorBlockManager = SponsorBlockManager;
-        window.YouTubeAPIManager = YouTubeAPIManager;
-        window.UIManager = UIManager;
-        window.Utils = Utils;
-        
-        // Referencias globales para funciones que se llaman desde HTML
-        window.onYouTubeIframeAPIReady = () => YouTubeAPIManager.initializePlayers();
-    }
+setupGlobalReferences() {
+    // Primero los estados
+    window.appState = AppState;
+    window.playlistState = PlaylistState;
+    window.searchState = SearchState;
+    window.sponsorBlockState = SponsorBlockState;
+    
+    // Luego las clases (solo si están definidas)
+    if (typeof Utils !== 'undefined') window.Utils = Utils;
+    if (typeof UIManager !== 'undefined') window.UIManager = UIManager;
+    
+    // Funciones críticas
+    window.onYouTubeIframeAPIReady = () => {
+        if (window.YouTubeAPIManager) {
+            YouTubeAPIManager.initializePlayers();
+        }
+    };
+}
 
     // Inicialización principal de la aplicación
     async init() {
