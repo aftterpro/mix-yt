@@ -1,24 +1,66 @@
-// Manejo de Interface de Usuario
+// Manejo de Interface de Usuario - CORREGIDO
 import { PlaylistState, CONFIG } from './config.js';
 import { PlaylistManager } from './playlistManager.js';
 import { Utils } from './utils.js';
 
-// Función para mostrar mensajes flotantes
+// Función para mostrar mensajes flotantes - CORREGIDA
 export function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'floating-messages';
-    const playlistContainer = document.getElementById('floatingMessageContainer');
-    playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
+    
+    // CORRECCIÓN: Buscar el contenedor correcto y usar fallback
+    let playlistContainer = document.getElementById('floatingMessageContainer');
+    
+    // Si no existe, buscar alternativas o crear uno
+    if (!playlistContainer) {
+        playlistContainer = document.getElementById('playlistContainer');
+    }
+    
+    // Si tampoco existe, usar el body como fallback
+    if (!playlistContainer) {
+        playlistContainer = document.body;
+    }
+    
+    // CORRECCIÓN: Usar appendChild en lugar de insertAdjacentElement si no es válido
+    if (playlistContainer === document.body) {
+        // Para el body, usar appendChild directamente
+        playlistContainer.appendChild(mensajeDiv);
+    } else {
+        // Para otros contenedores, usar insertAdjacentElement
+        try {
+            playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
+        } catch (error) {
+            console.warn('Error usando insertAdjacentElement, usando appendChild:', error);
+            playlistContainer.appendChild(mensajeDiv);
+        }
+    }
+
+    // Añadir estilos inline para asegurar visibilidad
+    mensajeDiv.style.position = 'fixed';
+    mensajeDiv.style.top = '20px';
+    mensajeDiv.style.right = '20px';
+    mensajeDiv.style.zIndex = '10000';
+    mensajeDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    mensajeDiv.style.color = 'white';
+    mensajeDiv.style.padding = '10px 15px';
+    mensajeDiv.style.borderRadius = '5px';
+    mensajeDiv.style.fontSize = '14px';
+    mensajeDiv.style.maxWidth = '300px';
+    mensajeDiv.style.wordWrap = 'break-word';
+    mensajeDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+    mensajeDiv.style.transition = 'opacity 0.3s ease';
 
     setTimeout(() => {
         mensajeDiv.classList.add('fadeOut');
+        mensajeDiv.style.opacity = '0';
         setTimeout(() => {
-            mensajeDiv.remove();
+            if (mensajeDiv.parentNode) {
+                mensajeDiv.remove();
+            }
         }, 1000);
     }, 6000);
 }
-
 export class UIManager {
     // Actualizar UI de playlists completa
     static updatePlaylistsUI() {
@@ -566,5 +608,6 @@ export class UIManager {
         });
     }
 }
+
 
 
