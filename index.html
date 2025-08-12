@@ -113,19 +113,22 @@
                     </a>
                 </div>
                <!-- Vista Recientes -->
-                <div class="content-view" id="recientesView" style="display: none;">
-                        <div class="content-header">
-                    <div class="content-tabs">
-                        <div class="tab active">Tus Playlists</div>
-                    <div class="tab">Añadidas Recientemente</div>
-                    </div>
-                    </div>
-                        <div class="content-body">
-                        <div class="playlists-grid" id="playlistsGrid">
-                        <!-- Se cargarán las playlists de YouTube aquí -->
-                    </div>
-                    </div>
-                </div>
+<div class="content-view" id="recientesView" style="display: none;">
+    <div class="content-header">
+        <div class="content-tabs">
+            <div class="tab active">Tus Playlists de YouTube</div>
+        </div>
+    </div>
+    <div class="content-body">
+        <div class="playlists-grid" id="playlistsGrid">
+            <div class="no-playlists-message">
+                <i class="fas fa-music"></i>
+                <p>No hay playlists de YouTube cargadas</p>
+                <p>Inicia sesión para ver tus playlists</p>
+            </div>
+        </div>
+    </div>
+</div>
                 <!-- Añadir Playlist -->
                 <div class="nav-section">
                     <div class="playlist-add-section">
@@ -703,45 +706,47 @@ function updateQueueModal() {
     const modalBody = document.getElementById('queueModalBody');
     if (!modalBody) return;
     
-    // Obtener playlists del estado global
-    const playlists = window.playlistState?.playlistsData || [];
+    // Solo mostrar playlist de cola si existe y tiene videos
+    const queuePlaylist = window.playlistState?.playlistsData?.find(p => p.id === 'queue');
     
-    if (playlists.length === 0) {
-        modalBody.innerHTML = '<p class="no-playlists">No hay playlists cargadas</p>';
+    if (!queuePlaylist || queuePlaylist.videos.length === 0) {
+        modalBody.innerHTML = `
+            <div class="no-playlists">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Busca música y usa "Reproducir Después" para llenar la cola</p>
+            </div>
+        `;
         return;
     }
     
-    let html = '';
-    playlists.forEach(playlist => {
-        html += `
-            <div class="queue-playlist">
-                <div class="queue-playlist-header">
-                    <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="queue-playlist-thumb">
-                    <div class="queue-playlist-info">
-                        <h4>${playlist.name}</h4>
-                        <p>${playlist.videos.length} videos</p>
-                    </div>
-                </div>
-                <div class="queue-playlist-videos">
-                    ${playlist.videos.map((video, index) => `
-                        <div class="queue-video-item ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? 'playing' : ''}">
-                            <span class="queue-video-index">${index + 1}</span>
-                            <img src="${video.thumbnail}" alt="${video.title}" class="queue-video-thumb">
-                            <div class="queue-video-info">
-                                <p class="queue-video-title">${video.title}</p>
-                                <p class="queue-video-duration">${formatDuration(video.duration)}</p>
-                            </div>
-                            ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? '<i class="fas fa-volume-up playing-icon"></i>' : ''}
-                        </div>
-                    `).join('')}
+    let html = `
+        <div class="queue-playlist">
+            <div class="queue-playlist-header">
+                <img src="${queuePlaylist.thumbnailUrl}" alt="${queuePlaylist.name}" class="queue-playlist-thumb">
+                <div class="queue-playlist-info">
+                    <h4>${queuePlaylist.name}</h4>
+                    <p>${queuePlaylist.videos.length} videos</p>
                 </div>
             </div>
-        `;
-    });
+            <div class="queue-playlist-videos">
+                ${queuePlaylist.videos.map((video, index) => `
+                    <div class="queue-video-item ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? 'playing' : ''}">
+                        <span class="queue-video-index">${index + 1}</span>
+                        <img src="${video.thumbnail}" alt="${video.title}" class="queue-video-thumb">
+                        <div class="queue-video-info">
+                            <p class="queue-video-title">${video.title}</p>
+                            <p class="queue-video-duration">${formatDuration(video.duration)}</p>
+                        </div>
+                        ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? '<i class="fas fa-volume-up playing-icon"></i>' : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
     
     modalBody.innerHTML = html;
 }
-
 function formatDuration(duration) {
     if (!duration) return '0:00';
     const minutes = Math.floor(duration / 60);
