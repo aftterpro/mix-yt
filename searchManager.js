@@ -193,8 +193,8 @@ static handleSearchResultAddClick(event, videoData) {
 
     console.log("Añadiendo video para 'Reproducir Después':", videoData.title);
     
-    // Añadir directamente a la cola como "Reproducir Después"
-    UIManager.handlePlayNextAction(videoData.videoId, 'search', videoData);
+    // Usar la nueva función del UIManager
+    UIManager.handlePlayNextActionFromSearch(videoData.videoId, videoData);
     
     // Feedback visual
     const button = event.currentTarget;
@@ -207,7 +207,6 @@ static handleSearchResultAddClick(event, videoData) {
         button.style.background = '';
     }, 2000);
 }
-
     // Manejo de scroll infinito
     static handleScroll() {
         if (SearchState.isLoadingMore || !SearchState.nextPageContext || !SearchState.currentSearchQuery) {
@@ -251,6 +250,7 @@ static handleSearchResultAddClick(event, videoData) {
         }, delay);
     }
 }
+
 
 
 
