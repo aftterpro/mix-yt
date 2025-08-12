@@ -345,7 +345,7 @@
     <script type="module">
     // Importar módulo principal
 import './app.js';
-
+import { PlaylistGridManager } from './playlistGridManager.js';
 console.log('Módulos cargados, inicializando aplicación...');
 
 // Variables globales para la nueva UI
@@ -431,6 +431,9 @@ function switchView(view) {
     if (isMobileMenuOpen) {
         toggleMobileMenu();
     }
+    if (view === 'recientes') {
+        loadRecientesContent();
+    }
 }
 
 // Configurar menú móvil
@@ -450,7 +453,12 @@ function setupMobileMenu() {
         }
     });
 }
-
+function loadRecientesContent() {
+    // Renderizar grid de playlists de YouTube
+    if (typeof PlaylistGridManager !== 'undefined') {
+        PlaylistGridManager.renderPlaylistsGrid();
+    }
+}
 function toggleMobileMenu() {
     isMobileMenuOpen = !isMobileMenuOpen;
     
