@@ -7,24 +7,18 @@ import { Utils } from './utils.js';
 
 export class SearchManager {
 
-    static initialize() {
-        // Busca el elemento correcto que sí existe en tu HTML
-        const searchResultsElement = document.getElementById('searchResults');
+static initialize() {
+    const searchResultsElement = document.getElementById('searchResults');
+    
+    if (searchResultsElement) {
+        SearchState.resultsContainer = searchResultsElement;
+        SearchState.resultsDiv = searchResultsElement;
         
-        // Comprobación de seguridad para evitar errores futuros
-        if (searchResultsElement) {
-            // Asigna el mismo elemento a ambas variables, ya que sirve para las dos cosas
-            SearchState.resultsContainer = searchResultsElement;
-            SearchState.resultsDiv = searchResultsElement;
-            
-            // Ahora esto funcionará sin problemas
-            SearchState.resultsContainer.addEventListener('scroll', SearchManager.handleScroll);
-        } else {
-            // Si no lo encuentra, muestra un error claro en la consola en lugar de romper la app
-            console.error("Error crítico: El elemento de resultados de búsqueda ('searchResults') no fue encontrado en el DOM.");
-        }
+        SearchState.resultsContainer.addEventListener('scroll', SearchManager.handleScroll);
+    } else {
+        console.error("Error: Elemento 'searchResults' no encontrado en el DOM.");
     }
-
+}
     // Realizar búsqueda
     static async performSearch(query, nextPage = null) {
         if (!SearchState.resultsDiv) return;
@@ -253,4 +247,5 @@ export class SearchManager {
         }, delay);
     }
 }
+
 
