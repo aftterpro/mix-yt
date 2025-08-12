@@ -607,7 +607,72 @@ export class UIManager {
             });
         });
     }
+    // Manejar acción "Reproducir Después" desde búsqueda
+static handlePlayNextActionFromSearch(videoId, videoData) {
+    // Si no hay video reproduciéndose, añadir al principio
+    if (PlaylistState.currentPlayingInfo.flattenedIndex < 0) {
+        // Crear playlist temporal si no existe
+        if (!PlaylistState.playlistsData.some(p => p.id === 'queue')) {
+            PlaylistState.playlistsData.unshift({
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
+                videos: [],
+                isExpanded: true
+            });
+        }
+        
+        const queuePlaylist = PlaylistState.playlistsData.find(p => p.id === 'queue');
+        queuePlaylist.videos.push({
+            videoId: videoData.videoId,
+            title: videoData.title,
+            thumbnail: videoData.thumbnail,
+            duration: videoData.duration || 0
+        });
+        
+        console.log(`Video ${videoId} añadido a cola (no hay reproducción activa)`);
+    } else {
+        // Añadir después del video actual
+        const targetFlatIndex = PlaylistState.currentPlayingInfo.flattenedIndex + 1;
+        UIManager.insertVideoAtFlatIndex(videoData, targetFlatIndex);
+        console.log(`Video ${videoId} añadido para reproducir después del actual`);
+    }
+    
+    UIManager.updatePlaylistsUI();
+    mostrarMensajeFlotante(`"${videoData.title}" añadido a la cola`);
 }
 
+// Insertar video en índice específico de la lista aplanada
+static insertVideoAtFlatIndex(videoData, targetFlatIndex) {
+    const flatList = PlaylistManager.getFlattenedPlaylist();
+    targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length));
 
+    let cumulativeIndex = 0;
+    let targetLocalIndex = -1;
+    let targetPlaylistId = null;
 
+    for (const p of PlaylistState.playlistsData) {
+        const playlistVideoCount = p.videos.length;
+        const endOfPlaylistIndex = cumulativeIndex + playlistVideoCount;
+
+        if (targetFlatIndex <= endOfPlaylistIndex) {
+            targetPlaylistId = p.id;
+            targetLocalIndex = targetFlatIndex - cumulativeIndex;
+            break;
+        }
+        cumulativeIndex += playlistVideoCount;
+    }
+
+    if (targetPlaylistId && targetLocalIndex >= 0) {
+        const targetPlaylist = PlaylistState.playlistsData.find(p => p.id === targetPlaylistId);
+        const videoObject = {
+            videoId: videoData.videoId,
+            title: videoData.title,
+            thumbnail: videoData.thumbnail,
+            duration: videoData.duration || 0
+        };
+        
+        targetPlaylist.videos.splice(targetLocalIndex, 0, videoObject);
+    }
+}
+}
