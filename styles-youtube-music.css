@@ -1185,6 +1185,20 @@ body {
     gap: var(--spacing-sm);
 }
 /* ===== ESTILOS PARA EL REPRODUCTOR Y SU CONTENEDOR ===== */
+.video-player {
+     position: absolute;
+     top: 471px;
+     left: 164px;
+     width: 66%;
+     height: 37%;
+     opacity: 1;
+     filter: blur(0px) brightness(1.0);
+     background-color: #000;
+     transition: opacity var(--crossfade-duration) ease-in-out,
+                 filter var(--crossfade-duration) ease-in-out,
+                 transform var(--crossfade-duration) ease-in-out;
+     will-change: opacity, filter, transform;
+ }
 /* Contenedor principal del reproductor. Asumo que es el padre directo de 'player1' y 'player2' */
 .player-container {
     position: relative;
