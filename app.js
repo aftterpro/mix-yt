@@ -45,10 +45,6 @@ setupGlobalReferences() {
 
         try {
             console.log('Iniciando YT CrossMix...');
-            
-            // 1. Inicializar playlist manual si no existe
-            this.initializeManualPlaylist();
-            
             // 2. Configurar event listeners globales
             this.setupGlobalEventListeners();
             
@@ -80,21 +76,6 @@ setupGlobalReferences() {
             mostrarMensajeFlotante('Error al inicializar la aplicación');
         }
     }
-
-    // Inicializar playlist manual por defecto
-    initializeManualPlaylist() {
-        if (!PlaylistState.playlistsData.some(p => p.id === 'manual')) {
-            PlaylistState.playlistsData.push({
-                id: 'manual',
-                name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico',
-                videos: [],
-                isExpanded: true
-            });
-            console.log('Playlist manual inicializada');
-        }
-    }
-
     // Configurar listeners de eventos globales
     setupGlobalEventListeners() {
         // Event listeners para YouTube Library
