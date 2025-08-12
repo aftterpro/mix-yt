@@ -1,4 +1,9 @@
 // Gestor del Grid de Playlists
+import { PlaylistState, CONFIG } from './config.js';
+import { PlaylistManager } from './playlistManager.js';
+import { UIManager, mostrarMensajeFlotante } from './ui.js';
+import { Utils } from './utils.js';
+
 export class PlaylistGridManager {
     static renderPlaylistsGrid() {
         const playlistsGrid = document.getElementById('playlistsGrid');
