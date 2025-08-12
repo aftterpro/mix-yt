@@ -1,4 +1,4 @@
-// Controlador Principal Modular
+// Controlador Principal Modular - CORREGIDO
 import { CONFIG, AppState, PlaylistState, SearchState, SponsorBlockState } from './config.js';
 import { YouTubeAPIManager } from './youtubeAPI.js';
 import { PlaylistManager } from './playlistManager.js';
@@ -7,7 +7,6 @@ import { PlaybackController } from './playbackController.js';
 import { SponsorBlockManager } from './sponsorblock.js';
 import { mostrarMensajeFlotante } from './ui.js';
 import { Utils } from './utils.js';
-
 import { UIManager } from './ui.js';
 
 class App {
@@ -24,6 +23,15 @@ class App {
         window.playlistState = PlaylistState;
         window.searchState = SearchState;
         window.sponsorBlockState = SponsorBlockState;
+        
+        // Referencias globales para clases - CORREGIDO
+        window.SearchManager = SearchManager;
+        window.PlaylistManager = PlaylistManager;
+        window.PlaybackController = PlaybackController;
+        window.SponsorBlockManager = SponsorBlockManager;
+        window.YouTubeAPIManager = YouTubeAPIManager;
+        window.UIManager = UIManager;
+        window.Utils = Utils;
         
         // Referencias globales para funciones que se llaman desde HTML
         window.onYouTubeIframeAPIReady = () => YouTubeAPIManager.initializePlayers();
@@ -147,9 +155,13 @@ class App {
     // Inicializar módulos individuales
     async initializeModules() {
         try {
-            // Inicializar búsqueda
-            SearchManager.initialize();
-            console.log('SearchManager inicializado');
+            // Inicializar búsqueda - VERIFICACIÓN AÑADIDA
+            if (typeof SearchManager !== 'undefined' && SearchManager.initialize) {
+                SearchManager.initialize();
+                console.log('SearchManager inicializado');
+            } else {
+                console.warn('SearchManager no disponible durante inicialización');
+            }
 
             // Renderizar UI inicial de playlists
             UIManager.updatePlaylistsUI();
@@ -193,7 +205,7 @@ class App {
                 const flatList = PlaylistManager.getFlattenedPlaylist();
                 if (flatList.length > 0) {
                     AppState.reproduccionIniciada = true;
-                    if (window.PlaybackController) {
+                    if (PlaybackController) {
                         PlaybackController.playFirstVideo();
                     }
                     botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
@@ -205,13 +217,13 @@ class App {
                 if (playerState === YT.PlayerState.PLAYING) {
                     activePlayer.pauseVideo();
                     botonPlay.innerHTML = '<i class="fas fa-play"></i>';
-                    if (window.PlaybackController) {
+                    if (PlaybackController) {
                         PlaybackController.stopMonitoring();
                     }
                 } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
                     activePlayer.playVideo();
                     botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                    if (window.PlaybackController) {
+                    if (PlaybackController) {
                         PlaybackController.startMonitoring();
                     }
                 }
@@ -233,7 +245,7 @@ class App {
                 return;
             }
             console.log("Botón Mix/Next presionado.");
-            if (window.PlaybackController) {
+            if (PlaybackController) {
                 PlaybackController.stopMonitoring();
                 PlaybackController.playNextVideo();
                 setTimeout(() => PlaybackController.startMonitoring(), 500);
@@ -249,8 +261,9 @@ class App {
             return;
         }
 
-        if (!window.SearchManager) {
-            console.error('SearchManager no disponible');
+        // VERIFICACIÓN MEJORADA de SearchManager
+        if (typeof SearchManager === 'undefined' || !SearchManager.createDebouncedSearch) {
+            console.error('SearchManager no está disponible o no tiene el método createDebouncedSearch');
             return;
         }
 
@@ -367,7 +380,7 @@ class App {
 
         if (endedVideoMatchesCurrent && !AppState.isTransitioning && !AppState.isAudioFading) {
             console.log(`Video actual (${videoId}) terminó inesperadamente. Intentando playNextVideo.`);
-            if (window.PlaybackController) {
+            if (PlaybackController) {
                 PlaybackController.playNextVideo();
             }
         } else if (playerNum !== AppState.currentPlayer) {
@@ -405,7 +418,7 @@ class App {
         console.log('Reiniciando aplicación...');
         
         // Detener reproducción
-        if (window.PlaybackController) {
+        if (PlaybackController) {
             PlaybackController.stopMonitoring();
         }
         
@@ -430,7 +443,7 @@ class App {
         };
 
         // Limpiar caché de SponsorBlock si está disponible
-        if (window.SponsorBlockManager) {
+        if (SponsorBlockManager) {
             SponsorBlockManager.clearAllSegmentCache();
         }
 
@@ -452,7 +465,7 @@ class App {
         const playlistStats = PlaylistManager.getPlaylistStats();
         
         let sponsorBlockStats = {};
-        if (window.SponsorBlockManager) {
+        if (SponsorBlockManager) {
             sponsorBlockStats = SponsorBlockManager.getCacheStats();
         }
         
@@ -484,13 +497,13 @@ class App {
         }
         
         console.log('Available Global Objects:', {
-            YouTubeAPIManager: !!window.YouTubeAPIManager,
-            PlaylistManager: !!window.PlaylistManager,
-            SearchManager: !!window.SearchManager,
-            PlaybackController: !!window.PlaybackController,
-            SponsorBlockManager: !!window.SponsorBlockManager,
-            UIManager: !!window.UIManager,
-            Utils: !!window.Utils,
+            YouTubeAPIManager: !!YouTubeAPIManager,
+            PlaylistManager: !!PlaylistManager,
+            SearchManager: !!SearchManager,
+            PlaybackController: !!PlaybackController,
+            SponsorBlockManager: !!SponsorBlockManager,
+            UIManager: !!UIManager,
+            Utils: !!Utils,
             authManager: !!window.authManager
         });
         
@@ -522,9 +535,9 @@ class App {
             modules: {
                 YouTubeAPIManager: typeof YouTubeAPIManager !== 'undefined',
                 PlaylistManager: typeof PlaylistManager !== 'undefined',
-                SearchManager: typeof window.SearchManager !== 'undefined',
-                PlaybackController: typeof window.PlaybackController !== 'undefined',
-                SponsorBlockManager: typeof window.SponsorBlockManager !== 'undefined',
+                SearchManager: typeof SearchManager !== 'undefined',
+                PlaybackController: typeof PlaybackController !== 'undefined',
+                SponsorBlockManager: typeof SponsorBlockManager !== 'undefined',
                 UIManager: typeof UIManager !== 'undefined',
                 Utils: typeof Utils !== 'undefined'
             },
