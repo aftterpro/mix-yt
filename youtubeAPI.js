@@ -5,14 +5,45 @@ import { PlaybackController } from './playbackController.js';
 import { SponsorBlockManager } from './sponsorblock.js';
 
 export class YouTubeAPIManager {
-    static loadYouTubeAPI() {
-        if (AppState.youtubeAPIReady) return;
-        AppState.youtubeAPIReady = true;
-        const script = document.createElement('script');
-        script.src = 'https://www.youtube.com/iframe_api';
-        script.async = true;
-        document.head.appendChild(script);
+static loadYouTubeAPI() {
+    if (AppState.youtubeAPIReady) {
+        console.log('API de YouTube ya está lista, inicializando reproductores...');
+        YouTubeAPIManager.initializePlayers();
+        return;
     }
+    
+    // Verificar si YT ya está disponible
+    if (typeof YT !== 'undefined' && YT.Player) {
+        console.log('YT ya está disponible, inicializando directamente...');
+        AppState.youtubeAPIReady = true;
+        YouTubeAPIManager.initializePlayers();
+        return;
+    }
+    
+    console.log('Cargando script de YouTube API...');
+    AppState.youtubeAPIReady = true;
+    
+    // Configurar callback global ANTES de cargar el script
+    window.onYouTubeIframeAPIReady = function() {
+        console.log('YouTube API lista, inicializando reproductores...');
+        YouTubeAPIManager.initializePlayers();
+    };
+    
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    script.onload = function() {
+        console.log('Script de YouTube cargado');
+        // Backup: si el callback no se ejecuta en 2 segundos, forzar inicialización
+        setTimeout(() => {
+            if (!AppState.playersInitialized) {
+                console.log('Forzando inicialización de reproductores...');
+                YouTubeAPIManager.initializePlayers();
+            }
+        }, 2000);
+    };
+    document.head.appendChild(script);
+}
 
 static initializePlayers() {
     if (AppState.player1 && AppState.player2) {
@@ -178,5 +209,6 @@ static initializePlayers() {
 window.onYouTubeIframeAPIReady = function() {
     YouTubeAPIManager.initializePlayers();
 };
+
 
 
