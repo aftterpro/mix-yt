@@ -209,7 +209,8 @@ setupGlobalReferences() {
                     }
                     botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
                 } else {
-                    mostrarMensajeFlotante("No hay videos en la lista para reproducir.");
+        mostrarMensajeFlotante("No hay videos para reproducir. Busca música en 'Explorar' o añade una playlist.");
+        return;
                 }
             } else {
                 // Play/Pause después del inicio
