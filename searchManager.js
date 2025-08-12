@@ -160,8 +160,7 @@ static initialize() {
 
         // Botón Añadir
         const addToPlaylistButton = document.createElement('button');
-        addToPlaylistButton.innerHTML = '<i class="fa-solid fa-plus"></i><span class="add-text"> Añadir</span>';
-        addToPlaylistButton.classList.add('add-to-playlist', 'search-result-add-button');
+addToPlaylistButton.innerHTML = '<i class="fa-solid fa-arrow-right-to-line"></i><span class="add-text"> Reproducir Después</span>';        addToPlaylistButton.classList.add('add-to-playlist', 'search-result-add-button');
         
         // Guardar datos del video en el botón
         addToPlaylistButton.dataset.videoId = videoId;
@@ -188,21 +187,26 @@ static initialize() {
     }
 
     // Manejar click en botón añadir de resultado de búsqueda
-    static handleSearchResultAddClick(event, videoData) {
-        event.preventDefault();
-        event.stopPropagation();
+static handleSearchResultAddClick(event, videoData) {
+    event.preventDefault();
+    event.stopPropagation();
 
-        const addButton = event.currentTarget;
-        const userLoadedPlaylists = PlaylistState.playlistsData.filter(p => p.id !== 'manual' || p.videos.length > 0);
-
-        if (userLoadedPlaylists.length === 0) {
-            console.log("No loaded playlists or only empty manual, adding direct to manual playlist.");
-            PlaylistManager.addVideoToManualPlaylist(videoData);
-        } else {
-            console.log("Showing menu to select destination playlist (Add action).");
-            UIManager.showPlaylistSelectionPopup(addButton, videoData, 'add');
-        }
-    }
+    console.log("Añadiendo video para 'Reproducir Después':", videoData.title);
+    
+    // Añadir directamente a la cola como "Reproducir Después"
+    UIManager.handlePlayNextAction(videoData.videoId, 'search', videoData);
+    
+    // Feedback visual
+    const button = event.currentTarget;
+    const originalContent = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-check"></i> Añadido';
+    button.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+    
+    setTimeout(() => {
+        button.innerHTML = originalContent;
+        button.style.background = '';
+    }, 2000);
+}
 
     // Manejo de scroll infinito
     static handleScroll() {
@@ -247,5 +251,6 @@ static initialize() {
         }, delay);
     }
 }
+
 
 
