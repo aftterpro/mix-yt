@@ -529,6 +529,19 @@ function setupUIEnhancements() {
             document.addEventListener('searchResultsUpdated', (event) => {
                 updateSearchResultsUI(event.detail);
             });
+                // Escuchar cambios en playlists para actualizar vista recientes
+    document.addEventListener('playlistsUpdated', (event) => {
+        if (currentView === 'recientes') {
+            loadRecientesContent();
+        }
+    });
+    
+    // Escuchar cuando se cargan playlists de YouTube
+    document.addEventListener('playlistsFetched', (event) => {
+        if (currentView === 'recientes') {
+            setTimeout(() => loadRecientesContent(), 500);
+        }
+    });
         }
 
         // Actualizar UI del reproductor
