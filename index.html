@@ -119,9 +119,9 @@
                         Playlists creadas
                         <span class="playlist-count" id="playlistCount"></span>
                     </div>
-                    <div id="playlistsContainer">
-                        <!-- Las playlists se cargarán aquí dinámicamente -->
-                    </div>
+                    <div id="playlistContainer">
+                    <!-- Las playlists se renderizarán aquí -->
+                </div>
                 </div>
 
                 <!-- Añadir Playlist -->
@@ -327,7 +327,7 @@
     <div id="loadingSpinner" class="loading-spinner hidden">
         <div class="spinner"></div>
     </div>
-
+<div id="floatingMessageContainer" class="floating-messages"></div>
     <div id="errorContainer" class="error-container hidden"></div>
     <div id="floatingMessageContainer" class="floating-messages"></div>
     <!-- Pie de pagina -->
@@ -582,7 +582,15 @@
                 </div>
             `).join('');
         }
-
+// Funcionalidad de tabs
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        // Remover active de todos
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        // Añadir active al clickeado
+        tab.classList.add('active');
+    });
+});
         // Mostrar detalle de playlist
         function showPlaylistDetail(playlistId) {
             // Esta función se conectaría con el sistema de playlists existente
