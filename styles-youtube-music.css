@@ -29,7 +29,7 @@
     --spacing-sm: 7px;
     --spacing-md: 12px;
     --spacing-lg: 25px;
-    --spacing-xl: 7px;
+    --spacing-xl: 32px;
     /* Animaciones */
     --transition-fast: 0.15s ease;
     --transition-normal: 0.25s ease;
@@ -698,52 +698,23 @@ body {
 }
 
 @media (max-width: 768px) {
-    .app-container {
-        grid-template-areas: 
-            "topbar"
-            "main"
-            "player";
-        grid-template-columns: 1fr;
-        grid-template-rows: var(--topbar-height) 1fr var(--player-height);
+    .mobile-menu-toggle {
+        display: block;
     }
-
+    
+    .mobile-overlay {
+        display: block;
+    }
+    
     .sidebar {
-        position: fixed;
-        left: -100%;
-        top: 0;
-        width: 280px;
-        height: 100vh;
-        z-index: 1000;
-        transition: var(--transition-normal);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
     }
-
+    
     .sidebar.open {
-        left: 0;
-    }
-
-    .search-results {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: var(--spacing-sm);
-    }
-
-    .content-body {
-        padding: 0 var(--spacing-md) var(--spacing-md);
-    }
-
-    .now-playing-art {
-        width: 240px;
-        height: 240px;
-    }
-
-    .now-playing-title {
-        font-size: 24px;
-    }
-
-    .player-volume {
-        display: none;
+        transform: translateX(0);
     }
 }
-
 @media (max-width: 480px) {
     .search-results {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
