@@ -521,10 +521,9 @@ body {
 }
 
 .video-container {
-    width: 100%;
-    max-width: 640px;
+    max-width: 10px;
+    height: 10px;
     margin: 0 auto;
-    aspect-ratio: 16/9;
     background-color: #000;
     border-radius: var(--border-radius);
     overflow: hidden;
