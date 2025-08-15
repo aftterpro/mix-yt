@@ -192,19 +192,14 @@
             <!-- Vista Reproduciendo -->
             <div class="content-view playing-view" id="playingView">
                 <div class="now-playing-container">
-                    <img src="https://via.placeholder.com/280x280?text=♪" 
-                         alt="Now Playing" 
-                         class="now-playing-art" 
-                         id="nowPlayingArt">
-                    <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
-                    <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix</p>
-                    
                     <div class="video-container" id="videoContainer">
                         <div id="player1" class="video-player"></div>
                         <div id="player2" class="video-player hidden"></div>
                     </div>
-                </div>
+                    <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
+                    <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix</p>
 
+                </div>
                 <!-- Cola de Reproducción -->
                 <div class="queue-section">
                     <h3 class="queue-title">Cola de reproducción</h3>
@@ -240,7 +235,7 @@
         </main>
 
         <!-- Reproductor Inferior -->
-        <div class="bottom-player">
+      <div class="bottom-player" onclick="switchToNowPlaying()" style="cursor: pointer;">
             <div class="player-info">
                 <img src="https://via.placeholder.com/56x56?text=♪" 
                      alt="Playing" 
@@ -525,7 +520,13 @@ function setupUIEnhancements() {
         }
     });
 }
-
+// Función para cambiar a vista reproduciendo al hacer click en barra
+function switchToNowPlaying() {
+    // Solo cambiar si hay algo reproduciéndose
+    if (window.playlistState?.currentPlayingInfo?.videoId) {
+        switchView('playing');
+    }
+}
         // Integración con el app existente
         window.addEventListener('load', () => {
             const app = window.YTCrossMixApp;
