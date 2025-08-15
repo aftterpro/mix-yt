@@ -1142,17 +1142,6 @@ body {
 .playing-view.active {
     display: block;
 }
-
-.now-playing-art {
-    width: 280px;
-    height: 280px;
-    border-radius: var(--border-radius);
-    margin: 0 auto var(--spacing-lg);
-    object-fit: cover;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
-    animation: subtle-pulse 3s ease-in-out infinite;
-}
-
 @keyframes subtle-pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.02); }
@@ -1174,12 +1163,12 @@ body {
     margin-bottom: var(--spacing-xl);
     font-weight: 500;
 }
-
 .video-container {
     position: relative;
-    width: 560px;
-    height: 315px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 800px;
+    aspect-ratio: 16/9;
+    margin: 0 auto var(--spacing-xl);
     background-color: #000;
     border-radius: var(--border-radius);
     overflow: hidden;
@@ -1196,8 +1185,16 @@ body {
     padding: 0 var(--spacing-md);
     gap: var(--spacing-md);
     backdrop-filter: blur(20px);
+    transition: var(--transition-fast);
+}
+.bottom-player:hover {
+    background: linear-gradient(to right, var(--tertiary-bg), var(--hover-bg));
+    transform: translateY(-1px);
 }
 
+.bottom-player:active {
+    transform: translateY(0);
+}
 .player-info {
     display: flex;
     align-items: center;
@@ -1446,12 +1443,6 @@ body {
     .user-menu {
         gap: var(--spacing-sm);
     }
-    
-    .now-playing-art {
-        width: 200px;
-        height: 200px;
-    }
-    
     .now-playing-title {
         font-size: 20px;
     }
@@ -1590,15 +1581,15 @@ body {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
 }
-
 /* Now Playing Container */
 .now-playing-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--spacing-xl) var(--spacing-lg);
+    padding: var(--spacing-lg);
+    max-width: 1200px;
+    margin: 0 auto;
 }
-
 /* Queue Section */
 .queue-section {
     margin-top: var(--spacing-xl);
@@ -2351,13 +2342,7 @@ body {
     
     .playlist-actions {
         justify-content: center;
-    }
-    
-    .now-playing-art {
-        width: 240px;
-        height: 240px;
-    }
-    
+    } 
     .now-playing-title {
         font-size: 24px;
     }
@@ -2396,12 +2381,6 @@ body {
     .search-results {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     }
-    
-    .now-playing-art {
-        width: 200px;
-        height: 200px;
-    }
-    
     .now-playing-title {
         font-size: 20px;
     }
