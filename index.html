@@ -413,20 +413,45 @@ function setupNavigation() {
 
 // Cambiar vista
 function switchView(view) {
-    // Actualizar navegación activa
-    navItems.forEach(item => {
-        item.classList.toggle('active', item.dataset.view === view);
-    });
-
-    // Mostrar vista correspondiente
+    // Fade out vista actual
     contentViews.forEach(contentView => {
-        const isActive = contentView.id === `${view}View`;
-        contentView.style.display = isActive ? 'block' : 'none';
-        
-        if (isActive) {
-            contentView.classList.add('fade-in');
+        if (contentView.style.display !== 'none') {
+            contentView.classList.add('fade-out');
         }
     });
+
+    // Actualizar navegación activa con delay
+    setTimeout(() => {
+        navItems.forEach(item => {
+            item.classList.toggle('active', item.dataset.view === view);
+        });
+
+        // Mostrar nueva vista con animación
+        contentViews.forEach(contentView => {
+            const isActive = contentView.id === `${view}View`;
+            
+            if (isActive) {
+                contentView.style.display = 'block';
+                contentView.classList.remove('fade-out');
+                requestAnimationFrame(() => {
+                    contentView.classList.add('fade-in');
+                    
+                    // Animar search results si es la vista de búsqueda
+                    if (view === 'search') {
+                        const searchResults = contentView.querySelector('.search-results');
+                        if (searchResults) {
+                            setTimeout(() => {
+                                searchResults.classList.add('loaded');
+                            }, 200);
+                        }
+                    }
+                });
+            } else {
+                contentView.style.display = 'none';
+                contentView.classList.remove('fade-in', 'fade-out');
+            }
+        });
+    }, 150);
 
     currentView = view;
     
@@ -434,6 +459,7 @@ function switchView(view) {
     if (isMobileMenuOpen) {
         toggleMobileMenu();
     }
+    
     if (view === 'recientes') {
         loadRecientesContent();
     }
