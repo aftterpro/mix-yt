@@ -359,9 +359,18 @@ setupGlobalReferences() {
                 }
                 AppState.hasOutroCrossfadeStarted = false;
             }
+            // Al final de la función, después de las actualizaciones existentes
+            if (state === YT.PlayerState.PLAYING && videoId) {
+        // Si estamos en vista playing, asegurar que el video sea visible
+        if (currentView === 'playing') {
+        const videoContainer = document.getElementById('videoContainer');
+        if (videoContainer) {
+            videoContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            }
+            }
         }
     }
-
     // Manejar final de reproducción
     handlePlayerEnded(detail) {
         const { playerNum, videoId } = detail;
