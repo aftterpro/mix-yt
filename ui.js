@@ -3,31 +3,25 @@ import { PlaylistState, CONFIG } from './config.js';
 import { PlaylistManager } from './playlistManager.js';
 import { Utils } from './utils.js';
 
-// Función para mostrar mensajes flotantes - CORREGIDA
+// Función para mostrar mensajes flotantes
 export function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
-    mensajeDiv.className = 'floating-messages';
+    mensajeDiv.className = 'floating-message';
     
-    // CORRECCIÓN: Buscar el contenedor correcto y usar fallback
     let playlistContainer = document.getElementById('floatingMessageContainer');
     
-    // Si no existe, buscar alternativas o crear uno
     if (!playlistContainer) {
         playlistContainer = document.getElementById('playlistContainer');
     }
     
-    // Si tampoco existe, usar el body como fallback
     if (!playlistContainer) {
         playlistContainer = document.body;
     }
     
-    // CORRECCIÓN: Usar appendChild en lugar de insertAdjacentElement si no es válido
     if (playlistContainer === document.body) {
-        // Para el body, usar appendChild directamente
         playlistContainer.appendChild(mensajeDiv);
     } else {
-        // Para otros contenedores, usar insertAdjacentElement
         try {
             playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
         } catch (error) {
@@ -36,30 +30,48 @@ export function mostrarMensajeFlotante(mensaje) {
         }
     }
 
-    // Añadir estilos inline para asegurar visibilidad
-    mensajeDiv.style.position = 'fixed';
-    mensajeDiv.style.top = '20px';
-    mensajeDiv.style.right = '20px';
-    mensajeDiv.style.zIndex = '10000';
-    mensajeDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    mensajeDiv.style.color = 'white';
-    mensajeDiv.style.padding = '10px 15px';
-    mensajeDiv.style.borderRadius = '5px';
-    mensajeDiv.style.fontSize = '14px';
-    mensajeDiv.style.maxWidth = '300px';
-    mensajeDiv.style.wordWrap = 'break-word';
-    mensajeDiv.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
-    mensajeDiv.style.transition = 'opacity 0.3s ease';
+    // Estilos mejorados
+    Object.assign(mensajeDiv.style, {
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        zIndex: '10000',
+        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
+        color: 'white',
+        padding: '12px 20px',
+        borderRadius: '12px',
+        fontSize: '14px',
+        fontWeight: '500',
+        maxWidth: '320px',
+        wordWrap: 'break-word',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.15)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        transform: 'translateY(100px) scale(0.8)',
+        opacity: '0',
+        transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+    });
 
+    // Animación de entrada
+    requestAnimationFrame(() => {
+        Object.assign(mensajeDiv.style, {
+            transform: 'translateY(0) scale(1)',
+            opacity: '1'
+        });
+    });
+
+    // Animación de salida
     setTimeout(() => {
-        mensajeDiv.classList.add('fadeOut');
-        mensajeDiv.style.opacity = '0';
+        Object.assign(mensajeDiv.style, {
+            transform: 'translateY(-20px) scale(0.9)',
+            opacity: '0'
+        });
         setTimeout(() => {
             if (mensajeDiv.parentNode) {
                 mensajeDiv.remove();
             }
-        }, 1000);
-    }, 6000);
+        }, 400);
+    }, 4000);
 }
 export class UIManager {
     // Actualizar UI de playlists completa
@@ -676,3 +688,4 @@ static insertVideoAtFlatIndex(videoData, targetFlatIndex) {
     }
 }
 }
+
