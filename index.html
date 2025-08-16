@@ -4,1084 +4,1459 @@
     <meta charset="UTF-8">
     <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
     
-    <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
-    <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
+    <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones.">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
     
-    <!-- PWA Meta Tags -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <!-- Fuentes -->
+    <!-- Fuentes de YouTube Music -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     
-    <!-- Estilos -->
-    <link rel="stylesheet" type="text/css" href="./styles-youtube-music.css">
-    <link rel="stylesheet" type="text/css" href="./efecto.css">
-    <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
-    <link rel="icon" href="./electronic.ico">
-    
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "YT CrossMix",
-      "url": "https://mix-yt.netlify.app", 
-      "description": "Mezclador de playlists de YouTube con efecto crossfade automático para transiciones suaves.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://mix-yt.netlify.app",  
-        "query-input": "required name=search_term_string"
-      }
-    }
-    </script>
+    <style>
+        /* YouTube Music Color Scheme */
+        :root {
+            /* Dark Theme Colors */
+            --yt-spec-base-background: #0f0f0f;
+            --yt-spec-raised-background: #212121;
+            --yt-spec-menu-background: #282828;
+            --yt-spec-inverted-background: #f1f1f1;
+            
+            /* Text Colors */
+            --yt-spec-text-primary: #f1f1f1;
+            --yt-spec-text-secondary: #aaaaaa;
+            --yt-spec-text-disabled: #717171;
+            
+            /* Brand Colors */
+            --yt-spec-call-to-action: #ff0000;
+            --yt-spec-brand-background-solid: #ff0000;
+            --yt-spec-brand-background-primary: #ff0000;
+            
+            /* Interactive Colors */
+            --yt-spec-outline: #303030;
+            --yt-spec-touch-response: rgba(255, 255, 255, 0.1);
+            --yt-spec-icon-active-other: #ff0000;
+            
+            /* Layout */
+            --ytmusic-nav-bar-height: 64px;
+            --ytmusic-player-bar-height: 72px;
+            --ytmusic-sidebar-width: 240px;
+            --ytmusic-sidebar-mini-width: 72px;
+            
+            /* Spacing */
+            --ytmusic-spacing-xs: 4px;
+            --ytmusic-spacing-sm: 8px;
+            --ytmusic-spacing-md: 16px;
+            --ytmusic-spacing-lg: 24px;
+            --ytmusic-spacing-xl: 32px;
+            
+            /* Border Radius */
+            --ytmusic-border-radius: 4px;
+            --ytmusic-border-radius-lg: 8px;
+            --ytmusic-border-radius-xl: 12px;
+            
+            /* Transitions */
+            --ytmusic-transition-timing: 0.2s cubic-bezier(0.05, 0, 0, 1);
+        }
+
+        /* Reset and Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--yt-spec-base-background);
+            color: var(--yt-spec-text-primary);
+            overflow: hidden;
+            height: 100vh;
+            line-height: 1.4;
+        }
+
+        /* Main Layout */
+        .ytmusic-app {
+            display: flex;
+            height: 100vh;
+            background-color: var(--yt-spec-base-background);
+        }
+
+        /* Sidebar */
+        .ytmusic-sidebar {
+            width: var(--ytmusic-sidebar-width);
+            background-color: var(--yt-spec-base-background);
+            border-right: 1px solid var(--yt-spec-outline);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+            transition: width var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-sidebar.mini {
+            width: var(--ytmusic-sidebar-mini-width);
+        }
+
+        .ytmusic-sidebar-header {
+            padding: var(--ytmusic-spacing-md);
+            display: flex;
+            align-items: center;
+            height: var(--ytmusic-nav-bar-height);
+            border-bottom: 1px solid var(--yt-spec-outline);
+        }
+
+        .ytmusic-menu-button {
+            background: none;
+            border: none;
+            color: var(--yt-spec-text-primary);
+            font-size: 20px;
+            padding: var(--ytmusic-spacing-sm);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color var(--ytmusic-transition-timing);
+            margin-right: var(--ytmusic-spacing-md);
+        }
+
+        .ytmusic-menu-button:hover {
+            background-color: var(--yt-spec-touch-response);
+        }
+
+        .ytmusic-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--ytmusic-spacing-sm);
+        }
+
+        .ytmusic-logo-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #ff0000, #cc0000);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .ytmusic-logo-text {
+            font-size: 20px;
+            font-weight: 400;
+            color: var(--yt-spec-text-primary);
+        }
+
+        .ytmusic-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--ytmusic-spacing-sm) 0;
+        }
+
+        .ytmusic-nav-section {
+            margin-bottom: var(--ytmusic-spacing-lg);
+        }
+
+        .ytmusic-nav-item {
+            display: flex;
+            align-items: center;
+            padding: var(--ytmusic-spacing-sm) var(--ytmusic-spacing-md);
+            color: var(--yt-spec-text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 400;
+            cursor: pointer;
+            transition: all var(--ytmusic-transition-timing);
+            border-radius: 0;
+        }
+
+        .ytmusic-nav-item:hover {
+            background-color: var(--yt-spec-touch-response);
+            color: var(--yt-spec-text-primary);
+        }
+
+        .ytmusic-nav-item.active {
+            background-color: var(--yt-spec-touch-response);
+            color: var(--yt-spec-text-primary);
+            font-weight: 500;
+        }
+
+        .ytmusic-nav-item .material-icons {
+            margin-right: var(--ytmusic-spacing-md);
+            font-size: 24px;
+        }
+
+        /* Main Content */
+        .ytmusic-main {
+            flex: 1;
+            margin-left: var(--ytmusic-sidebar-width);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            transition: margin-left var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-main.sidebar-mini {
+            margin-left: var(--ytmusic-sidebar-mini-width);
+        }
+
+        /* Top Bar */
+        .ytmusic-header {
+            height: var(--ytmusic-nav-bar-height);
+            background-color: var(--yt-spec-base-background);
+            border-bottom: 1px solid var(--yt-spec-outline);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--ytmusic-spacing-lg);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .ytmusic-search-container {
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+        }
+
+        .ytmusic-search-form {
+            display: flex;
+            align-items: center;
+            background-color: var(--yt-spec-raised-background);
+            border: 1px solid var(--yt-spec-outline);
+            border-radius: var(--ytmusic-border-radius-xl);
+            overflow: hidden;
+        }
+
+        .ytmusic-search-input {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 12px var(--ytmusic-spacing-md);
+            color: var(--yt-spec-text-primary);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .ytmusic-search-input::placeholder {
+            color: var(--yt-spec-text-disabled);
+        }
+
+        .ytmusic-search-button {
+            background: none;
+            border: none;
+            color: var(--yt-spec-text-secondary);
+            padding: 12px var(--ytmusic-spacing-md);
+            cursor: pointer;
+            transition: color var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-search-button:hover {
+            color: var(--yt-spec-text-primary);
+        }
+
+        .ytmusic-user-menu {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: var(--ytmusic-spacing-sm);
+        }
+
+        .ytmusic-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff0000, #cc0000);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Content Area */
+        .ytmusic-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: var(--ytmusic-player-bar-height);
+        }
+
+        .ytmusic-page {
+            display: none;
+            min-height: calc(100vh - var(--ytmusic-nav-bar-height) - var(--ytmusic-player-bar-height));
+        }
+
+        .ytmusic-page.active {
+            display: block;
+        }
+
+        .ytmusic-page-header {
+            padding: var(--ytmusic-spacing-xl) var(--ytmusic-spacing-lg) var(--ytmusic-spacing-lg);
+        }
+
+        .ytmusic-page-title {
+            font-size: 32px;
+            font-weight: 400;
+            margin-bottom: var(--ytmusic-spacing-sm);
+            color: var(--yt-spec-text-primary);
+        }
+
+        .ytmusic-page-subtitle {
+            font-size: 14px;
+            color: var(--yt-spec-text-secondary);
+        }
+
+        /* Cards Grid */
+        .ytmusic-shelf {
+            margin-bottom: var(--ytmusic-spacing-xl);
+            padding: 0 var(--ytmusic-spacing-lg);
+        }
+
+        .ytmusic-shelf-header {
+            margin-bottom: var(--ytmusic-spacing-md);
+        }
+
+        .ytmusic-shelf-title {
+            font-size: 22px;
+            font-weight: 400;
+            color: var(--yt-spec-text-primary);
+        }
+
+        .ytmusic-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: var(--ytmusic-spacing-md);
+        }
+
+        .ytmusic-card {
+            background-color: var(--yt-spec-raised-background);
+            border-radius: var(--ytmusic-border-radius);
+            padding: var(--ytmusic-spacing-md);
+            cursor: pointer;
+            transition: all var(--ytmusic-transition-timing);
+            border: 1px solid transparent;
+        }
+
+        .ytmusic-card:hover {
+            background-color: var(--yt-spec-menu-background);
+            border-color: var(--yt-spec-outline);
+        }
+
+        .ytmusic-card-thumbnail {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: var(--ytmusic-border-radius);
+            overflow: hidden;
+            margin-bottom: var(--ytmusic-spacing-sm);
+            position: relative;
+        }
+
+        .ytmusic-card-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .ytmusic-play-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-card:hover .ytmusic-play-overlay {
+            opacity: 1;
+        }
+
+        .ytmusic-play-button {
+            width: 48px;
+            height: 48px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .ytmusic-card-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--yt-spec-text-primary);
+            margin-bottom: 4px;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .ytmusic-card-subtitle {
+            font-size: 12px;
+            color: var(--yt-spec-text-secondary);
+            line-height: 1.3;
+        }
+
+        /* Search Results */
+        .ytmusic-search-results {
+            padding: var(--ytmusic-spacing-lg);
+        }
+
+        .ytmusic-track-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .ytmusic-track-item {
+            display: flex;
+            align-items: center;
+            padding: var(--ytmusic-spacing-sm) var(--ytmusic-spacing-md);
+            border-radius: var(--ytmusic-border-radius);
+            cursor: pointer;
+            transition: background-color var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-track-item:hover {
+            background-color: var(--yt-spec-touch-response);
+        }
+
+        .ytmusic-track-thumbnail {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--ytmusic-border-radius);
+            margin-right: var(--ytmusic-spacing-md);
+            object-fit: cover;
+        }
+
+        .ytmusic-track-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .ytmusic-track-title {
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--yt-spec-text-primary);
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ytmusic-track-subtitle {
+            font-size: 12px;
+            color: var(--yt-spec-text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ytmusic-track-duration {
+            color: var(--yt-spec-text-secondary);
+            font-size: 12px;
+            margin-right: var(--ytmusic-spacing-md);
+        }
+
+        .ytmusic-track-menu {
+            background: none;
+            border: none;
+            color: var(--yt-spec-text-secondary);
+            padding: var(--ytmusic-spacing-xs);
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0;
+            transition: all var(--ytmusic-transition-timing);
+        }
+
+        .ytmusic-track-item:hover .ytmusic-track-menu {
+            opacity: 1;
+        }
+
+        .ytmusic-track-menu:hover {
+            background-color: var(--yt-spec-touch-response);
+            color: var(--yt-spec-text-primary);
+        }
+
+        /* Player Bar */
+        .ytmusic-player-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--ytmusic-player-bar-height);
+            background-color: var(--yt-spec-raised-background);
+            border-top: 1px solid var(--yt-spec-outline);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--ytmusic-spacing-md);
+            z-index: 200;
+        }
+
+        .ytmusic-player-info {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .ytmusic-player-thumbnail {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--ytmusic-border-radius);
+            margin-right: var(--ytmusic-spacing-md);
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .ytmusic-player-details {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .ytmusic-player-title {
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--yt-spec-text-primary);
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .ytmusic-player-artist {
+            font-size: 12px;
+            color: var(--yt-spec-text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .ytmusic-player-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--ytmusic-spacing-md);
+            flex: 1;
+            justify-content: center;
+            max-width: 600px;
+        }
+
+        .ytmusic-control-button {
+            background: none;
+            border: none;
+            color: var(--yt-spec-text-primary);
+            cursor: pointer;
+            padding: var(--ytmusic-spacing-xs);
+            border-radius: 50%;
+            transition: all var(--ytmusic-transition-timing);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ytmusic-control-button:hover {
+            background-color: var(--yt-spec-touch-response);
+        }
+
+        .ytmusic-control-button.primary {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+        }
+
+        .ytmusic-control-button.secondary {
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+        }
+
+        .ytmusic-player-extras {
+            display: flex;
+            align-items: center;
+            gap: var(--ytmusic-spacing-sm);
+            flex: 1;
+            justify-content: flex-end;
+            max-width: 300px;
+        }
+
+        .ytmusic-volume-container {
+            display: flex;
+            align-items: center;
+            gap: var(--ytmusic-spacing-sm);
+        }
+
+        .ytmusic-volume-slider {
+            width: 80px;
+            height: 4px;
+            background-color: var(--yt-spec-outline);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .ytmusic-volume-slider::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 60%;
+            height: 100%;
+            background-color: var(--yt-spec-text-primary);
+            border-radius: 2px;
+        }
+
+        /* Video Container */
+        .ytmusic-video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16/9;
+            margin: var(--ytmusic-spacing-xl) auto;
+            background-color: #000;
+            border-radius: var(--ytmusic-border-radius-lg);
+            overflow: hidden;
+        }
+
+        .ytmusic-video-player {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .ytmusic-sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .ytmusic-sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .ytmusic-main {
+                margin-left: 0;
+            }
+            
+            .ytmusic-cards-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .ytmusic-player-bar {
+                flex-direction: column;
+                height: auto;
+                padding: var(--ytmusic-spacing-sm);
+            }
+            
+            .ytmusic-player-info,
+            .ytmusic-player-controls,
+            .ytmusic-player-extras {
+                max-width: none;
+                width: 100%;
+            }
+            
+            .ytmusic-player-controls {
+                order: -1;
+                margin-bottom: var(--ytmusic-spacing-sm);
+            }
+            
+            .ytmusic-cards-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--yt-spec-base-background);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--yt-spec-outline);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--yt-spec-text-disabled);
+        }
+
+        /* Loading States */
+        .ytmusic-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--ytmusic-spacing-xl);
+        }
+
+        .ytmusic-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--yt-spec-outline);
+            border-top: 3px solid var(--yt-spec-brand-background-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty States */
+        .ytmusic-empty-state {
+            text-align: center;
+            padding: var(--ytmusic-spacing-xl);
+            color: var(--yt-spec-text-secondary);
+        }
+
+        .ytmusic-empty-state .material-icons {
+            font-size: 48px;
+            margin-bottom: var(--ytmusic-spacing-md);
+            opacity: 0.5;
+        }
+    </style>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Mobile Header -->
-        <header class="mobile-header">
-            <div class="mobile-logo">
-                <div class="logo-icon"><i class="fas fa-music"></i></div>
-                <span class="logo-text">YT CrossMix</span>
-            </div>
-            
-            <div class="mobile-search">
-                <input type="text" 
-                       class="mobile-search-input" 
-                       id="searchInput"
-                       placeholder="Buscar canciones, artistas, playlists..."
-                       aria-label="Buscar videos">
-                <i class="fas fa-search search-icon"></i>
-            </div>
-            
-            <div class="mobile-header-actions">
-                <button class="control-button" id="debugButton" title="Debug" onclick="window.YTCrossMixApp?.debug()">
-                    <i class="fas fa-bug"></i>
+    <div class="ytmusic-app">
+        <!-- Sidebar -->
+        <nav class="ytmusic-sidebar" id="sidebar">
+            <div class="ytmusic-sidebar-header">
+                <button class="ytmusic-menu-button" id="menuToggle">
+                    <span class="material-icons">menu</span>
                 </button>
-                <button class="control-button" id="resetButton" title="Reset" onclick="window.YTCrossMixApp?.reset()">
-                    <i class="fas fa-refresh"></i>
-                </button>
-                <button class="mobile-avatar" id="googleSignInButton" title="Cargar mi Biblioteca">
-                    <i class="fab fa-google"></i>
-                </button>
-                <button class="mobile-avatar hidden" id="googleSignOutButton" title="Cerrar Sesión">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-            </div>
-        </header>
-
-        <!-- Desktop Sidebar -->
-        <aside class="desktop-sidebar">
-            <div class="desktop-sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-music"></i>
-                </div>
-                <h1 class="app-name">YT CrossMix</h1>
-            </div>
-            
-            <nav class="desktop-sidebar-nav">
-                <!-- Navegación Principal -->
-                <div class="nav-section">
-                    <a href="#" class="desktop-nav-item active" data-view="home">
-                        <i class="fas fa-home"></i>
-                        Inicio
-                    </a>
-                    <a href="#" class="desktop-nav-item" data-view="search">
-                        <i class="fas fa-search"></i>
-                        Explorar
-                    </a>
-                    <a href="#" class="desktop-nav-item" data-view="library">
-                        <i class="fas fa-list"></i>
-                        Biblioteca
-                    </a>
-                    <a href="#" class="desktop-nav-item" data-view="playing">
-                        <i class="fas fa-play-circle"></i>
-                        Reproduciendo
-                    </a>
-                </div>
-
-                <!-- Añadir Playlist Desktop -->
-                <div class="desktop-playlist-section">
-                    <div class="nav-section-title">Añadir Playlist</div>
-                    <div class="playlist-add-section">
-                        <input type="text" 
-                               id="desktopPlaylistInput"
-                               class="playlist-url-input"
-                               placeholder="URL de playlist de YouTube..."
-                               aria-label="URL de la playlist">
-                        <button id="desktopAddPlaylistBtn" class="add-playlist-button">
-                            <i class="fa-solid fa-plus"></i>
-                            <span>Añadir Playlist</span>
-                        </button>
+                <div class="ytmusic-logo">
+                    <div class="ytmusic-logo-icon">
+                        <span class="material-icons">music_note</span>
                     </div>
+                    <span class="ytmusic-logo-text">CrossMix</span>
                 </div>
-            </nav>
-        </aside>
+            </div>
+
+            <div class="ytmusic-nav">
+                <div class="ytmusic-nav-section">
+                    <a href="#" class="ytmusic-nav-item active" data-page="home">
+                        <span class="material-icons">home</span>
+                        <span>Inicio</span>
+                    </a>
+                    <a href="#" class="ytmusic-nav-item" data-page="search">
+                        <span class="material-icons">search</span>
+                        <span>Explorar</span>
+                    </a>
+                    <a href="#" class="ytmusic-nav-item" data-page="library">
+                        <span class="material-icons">library_music</span>
+                        <span>Biblioteca</span>
+                    </a>
+                    <a href="#" class="ytmusic-nav-item" data-page="playing">
+                        <span class="material-icons">play_circle</span>
+                        <span>Reproduciendo</span>
+                    </a>
+                </div>
+
+                <div class="ytmusic-nav-section">
+                    <a href="#" class="ytmusic-nav-item">
+                        <span class="material-icons">queue_music</span>
+                        <span>Cola</span>
+                    </a>
+                    <a href="#" class="ytmusic-nav-item">
+                        <span class="material-icons">history</span>
+                        <span>Historial</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
 
         <!-- Main Content -->
-        <main class="mobile-main">
-            <!-- Vista Inicio -->
-            <div class="content-view active" id="homeView">
-                <div class="content-header">
-                    <div class="content-tabs">
-                        <div class="tab active">Música</div>
-                        <div class="tab">Playlists</div>
-                        <div class="tab">Recientes</div>
-                    </div>
+        <div class="ytmusic-main" id="mainContent">
+            <!-- Header -->
+            <header class="ytmusic-header">
+                <div class="ytmusic-search-container">
+                    <form class="ytmusic-search-form">
+                        <input 
+                            type="text" 
+                            class="ytmusic-search-input"
+                            id="searchInput"
+                            placeholder="Buscar canciones, artistas, playlists..."
+                        >
+                        <button type="button" class="ytmusic-search-button">
+                            <span class="material-icons">search</span>
+                        </button>
+                    </form>
                 </div>
-                <div class="content-body">
-                    <div class="welcome-section">
-                        <h2 class="welcome-title">Bienvenido a YT CrossMix</h2>
-                        <p class="welcome-subtitle">Crea mezclas perfectas con transiciones suaves entre canciones</p>
-                    </div>
-                    
-                    <div class="playlist-overview" id="playlistOverview">
-                        <!-- Vista general de playlists se carga aquí -->
-                    </div>
-                </div>
-            </div>
 
-            <!-- Vista Búsqueda -->
-            <div class="content-view" id="searchView">
-                <div class="content-header">
-                    <div class="content-tabs">
-                        <div class="tab active">Canciones</div>
-                        <div class="tab">Videos</div>
-                        <div class="tab">Artistas</div>
-                        <div class="tab">Playlists</div>
-                    </div>
+                <div class="ytmusic-user-menu">
+                    <button class="ytmusic-control-button">
+                        <span class="material-icons">settings</span>
+                    </button>
+                    <button class="ytmusic-avatar" id="userAvatar">
+                        <span class="material-icons">person</span>
+                    </button>
                 </div>
-                <div class="content-body">
-                    <div class="search-results" id="searchResults">
-                        <div class="search-placeholder">
-                            <i class="fas fa-search"></i>
-                            <p>Busca música, artistas o playlists</p>
+            </header>
+
+            <!-- Content Pages -->
+            <div class="ytmusic-content">
+                <!-- Home Page -->
+                <div class="ytmusic-page active" id="homePage">
+                    <div class="ytmusic-page-header">
+                        <h1 class="ytmusic-page-title">Inicio</h1>
+                        <p class="ytmusic-page-subtitle">Tu música, tus mezclas perfectas</p>
+                    </div>
+
+                    <div class="ytmusic-shelf">
+                        <div class="ytmusic-shelf-header">
+                            <h2 class="ytmusic-shelf-title">Playlists recientes</h2>
+                        </div>
+                        <div class="ytmusic-cards-grid" id="libraryGrid">
+                            <!-- Library content will be populated by JavaScript -->
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Vista Biblioteca -->
-            <div class="content-view" id="libraryView">
-                <div class="library-header">
-                    <h2>Tu Biblioteca</h2>
-                    <button class="auth-btn" id="mobileSignInButton">
-                        <i class="fab fa-google"></i>
-                        Iniciar Sesión
-                    </button>
-                </div>
-                
-                <!-- Añadir Playlist Mobile -->
-                <div class="playlist-add-section">
-                    <input type="text" 
-                           id="searchInput2"
-                           class="playlist-url-input"
-                           placeholder="URL de playlist de YouTube..."
-                           aria-label="URL de la playlist">
-                    <button id="añadirUrlButton" class="add-playlist-button">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>Añadir Playlist</span>
-                    </button>
-                </div>
-                
-                <!-- Grid de Playlists -->
-                <div class="playlists-grid" id="playlistsGrid">
-                    <div class="no-playlists-message">
-                        <i class="fas fa-music"></i>
-                        <p>No hay playlists de YouTube cargadas</p>
-                        <p>Inicia sesión para ver tus playlists</p>
+                <!-- Playing Page -->
+                <div class="ytmusic-page" id="playingPage">
+                    <div class="ytmusic-page-header">
+                        <h1 class="ytmusic-page-title">Reproduciendo ahora</h1>
                     </div>
-                </div>
-            </div>
 
-            <!-- Vista Reproduciendo -->
-            <div class="content-view playing-view" id="playingView">
-                <div class="now-playing-container">
-                    <div class="video-container" id="videoContainer">
-                        <div id="player1" class="video-player"></div>
-                        <div id="player2" class="video-player hidden"></div>
-                    </div>
-                    <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
-                    <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix</p>
-                </div>
-                
-                <!-- Cola de Reproducción -->
-                <div class="queue-section">
-                    <h3 class="queue-title">Cola de reproducción</h3>
-                    <div class="queue-list" id="queueList">
-                        <!-- Lista de canciones en cola -->
-                    </div>
-                    
-                    <!-- Container para playlist items (compatibilidad) -->
-                    <div id="playlistContainer" class="playlist-container-mobile">
-                        <!-- Los videos de las playlists aparecerán aquí -->
-                    </div>
-                </div>
-            </div>
-        </main>
+                    <div style="padding: 0 var(--ytmusic-spacing-lg);">
+                        <div class="ytmusic-video-container" id="videoContainer">
+                            <div id="player1" class="ytmusic-video-player"></div>
+                            <div id="player2" class="ytmusic-video-player" style="display: none;"></div>
+                        </div>
 
-        <!-- Mini Player -->
-        <div class="mini-player" id="miniPlayer">
-            <div class="mini-player-track">
-                <img src="https://via.placeholder.com/40x40?text=♪" 
-                     alt="Playing" 
-                     class="mini-track-image" 
-                     id="miniTrackImage">
-                <div class="mini-track-info">
-                    <div class="mini-track-title" id="miniTrackTitle">Selecciona música</div>
-                    <div class="mini-track-artist" id="miniTrackArtist">YT CrossMix</div>
-                </div>
-            </div>
-            
-            <div class="mini-player-controls">
-                <button class="mini-control-btn" id="miniPlayBtn" title="Reproducir/Pausar">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button class="mini-control-btn" id="miniNextBtn" title="Siguiente">
-                    <i class="fas fa-step-forward"></i>
-                </button>
-            </div>
-            
-            <!-- Desktop additional controls -->
-            <div class="desktop-player-extras">
-                <button class="mini-control-btn" id="queueButton" title="Cola">
-                    <i class="fas fa-list"></i>
-                </button>
-                <div class="player-volume">
-                    <button class="mini-control-btn" id="volumeButton" title="Volumen">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <div class="volume-slider" id="volumeSlider">
-                        <div class="volume-fill"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom Navigation (Mobile Only) -->
-        <nav class="bottom-nav">
-            <button class="nav-tab active" data-view="home">
-                <i class="fas fa-home"></i>
-                <span>Inicio</span>
-            </button>
-            <button class="nav-tab" data-view="search">
-                <i class="fas fa-search"></i>
-                <span>Explorar</span>
-            </button>
-            <button class="nav-tab" data-view="library">
-                <i class="fas fa-list"></i>
-                <span>Biblioteca</span>
-            </button>
-            <button class="nav-tab" data-view="playing">
-                <i class="fas fa-play-circle"></i>
-                <span>Reproduciendo</span>
-            </button>
-        </nav>
-    </div>
-
-    <!-- Templates -->
-    <template id="playlist-item-template">
-        <div class="playlist-item-modern" draggable="true">
-            <div class="playlist-item-index"></div>
-            <img src="" alt="" class="playlist-item-thumbnail">
-            <div class="playlist-item-info">
-                <div class="playlist-item-title"></div>
-                <div class="playlist-item-artist"></div>
-            </div>
-            <div class="playlist-item-duration"></div>
-            <div class="playlist-item-actions">
-                <button class="playlist-item-action" title="Más opciones">
-                    <i class="fas fa-ellipsis-h"></i>
-                </button>
-            </div>
-        </div>
-    </template>
-
-    <template id="search-result-template">
-        <div class="result-card">
-            <img src="" alt="" class="result-thumbnail">
-            <h3 class="result-title"></h3>
-            <p class="result-artist"></p>
-            <button class="add-button">
-                <i class="fas fa-plus"></i>
-                Añadir
-            </button>
-        </div>
-    </template>
-
-    <template id="playlist-card-template">
-        <div class="playlist-card" data-playlist-id="">
-            <img src="" alt="" class="playlist-card-thumbnail">
-            <div class="playlist-card-info">
-                <h3 class="playlist-card-name"></h3>
-                <p class="playlist-card-meta"></p>
-            </div>
-            <div class="playlist-card-overlay">
-                <button class="playlist-play-button">
-                    <i class="fas fa-play"></i>
-                </button>
-            </div>
-        </div>
-    </template>
-
-    <!-- UI Elements -->
-    <div id="loadingSpinner" class="loading-spinner hidden">
-        <div class="spinner"></div>
-    </div>
-    <div id="floatingMessageContainer" class="floating-messages"></div>
-    <div id="errorContainer" class="error-container hidden"></div>
-
-    <!-- Footer -->
-    <footer class="page-footer">
-        <p>
-            Con la tecnología de SponsorBlock. Created by 
-            <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.
-            Utilizamos la API de 
-            <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.
-        </p>
-    </footer>
-
-    <!-- Scripts -->
-    <script type="module">
-    // Importar módulo principal
-    import './app.js';
-    import { PlaylistGridManager } from './playlistGridManager.js';
-    console.log('Módulos cargados, inicializando aplicación...');
-
-    // Variables globales para la nueva UI
-    let currentView = 'home';
-    let authManager = null;
-
-    // Elementos DOM
-    let navTabs, desktopNavItems, contentViews;
-
-    // Inicialización
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            console.log('DOM cargado, inicializando...');
-            
-            // Obtener elementos DOM
-            navTabs = document.querySelectorAll('.nav-tab');
-            desktopNavItems = document.querySelectorAll('.desktop-nav-item');
-            contentViews = document.querySelectorAll('.content-view');
-            
-            // Inicializar autenticación
-            try {
-                const authModule = await import('./auth.js');
-                authManager = authModule.authManager;
-                await authManager.initialize();
-                window.authManager = authManager;
-                console.log('Autenticación inicializada');
-            } catch (error) {
-                console.warn('Auth module no disponible:', error);
-            }
-            
-            // Configurar navegación
-            setupBottomNavigation();
-            setupDesktopNavigation();
-            
-            // Configurar mini player
-            setupMiniPlayer();
-            
-            // Configurar desktop playlist input
-            setupDesktopPlaylistInput();
-            
-            // Configurar event listeners adicionales
-            setupUIEnhancements();
-            
-            console.log('UI mejorada inicializada correctamente');
-            
-        } catch (error) {
-            console.error('Error inicializando UI mejorada:', error);
-        }
-    });
-
-    // Configurar navegación bottom (mobile)
-    function setupBottomNavigation() {
-        if (!navTabs.length) return;
-        
-        navTabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
-                const view = tab.dataset.view;
-                switchView(view);
-                
-                // Actualizar tabs activos
-                navTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Sincronizar desktop navigation
-                syncDesktopNavigation(view);
-            });
-        });
-    }
-
-    // Configurar navegación desktop (sidebar)
-    function setupDesktopNavigation() {
-        if (!desktopNavItems.length) return;
-        
-        desktopNavItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const view = item.dataset.view;
-                switchView(view);
-                
-                // Actualizar desktop nav activo
-                desktopNavItems.forEach(nav => nav.classList.remove('active'));
-                item.classList.add('active');
-                
-                // Sincronizar mobile navigation
-                syncMobileNavigation(view);
-            });
-        });
-    }
-
-    // Sincronizar navegaciones
-    function syncDesktopNavigation(view) {
-        const desktopNav = document.querySelector(`.desktop-nav-item[data-view="${view}"]`);
-        if (desktopNav) {
-            desktopNavItems.forEach(nav => nav.classList.remove('active'));
-            desktopNav.classList.add('active');
-        }
-    }
-
-    function syncMobileNavigation(view) {
-        const mobileNav = document.querySelector(`.nav-tab[data-view="${view}"]`);
-        if (mobileNav) {
-            navTabs.forEach(tab => tab.classList.remove('active'));
-            mobileNav.classList.add('active');
-        }
-    }
-
-    // Cambiar vista
-    function switchView(view) {
-        console.log('Switching to view:', view);
-        
-        // Ocultar todas las vistas
-        contentViews.forEach(contentView => {
-            contentView.classList.remove('active');
-        });
-        
-        // Mostrar vista seleccionada
-        const targetView = document.getElementById(`${view}View`);
-        if (targetView) {
-            targetView.classList.add('active');
-            
-            // Cargar contenido específico de la vista
-            loadViewContent(view);
-        }
-        
-        currentView = view;
-        window.currentView = view; // Global para otros módulos
-        
-        // Disparar evento personalizado
-        document.dispatchEvent(new CustomEvent('viewChanged', { 
-            detail: { view } 
-        }));
-    }
-
-    // Cargar contenido específico de cada vista
-    function loadViewContent(view) {
-        switch (view) {
-            case 'home':
-                loadHomeContent();
-                break;
-            case 'search':
-                loadSearchContent();
-                break;
-            case 'library':
-                loadLibraryContent();
-                break;
-            case 'playing':
-                loadPlayingContent();
-                break;
-        }
-    }
-
-    function loadHomeContent() {
-        const playlistOverview = document.getElementById('playlistOverview');
-        if (!playlistOverview) return;
-
-        // Obtener estadísticas si la app está lista
-        if (window.YTCrossMixApp) {
-            try {
-                const stats = window.YTCrossMixApp.getStats();
-                renderHomeStats(playlistOverview, stats);
-            } catch (error) {
-                console.warn('Error obteniendo stats:', error);
-            }
-        }
-    }
-
-    function renderHomeStats(container, stats) {
-        container.innerHTML = `
-            <div class="overview-section">
-                <h3 class="overview-title">
-                    <i class="fas fa-list-ul"></i>
-                    Tus Playlists
-                </h3>
-                <div class="overview-content">
-                    <p>${stats.playlists} playlists cargadas</p>
-                    <p>${stats.totalVideos} videos en total</p>
-                </div>
-            </div>
-            
-            <div class="overview-section">
-                <h3 class="overview-title">
-                    <i class="fas fa-music"></i>
-                    Reproducción
-                </h3>
-                <div class="overview-content">
-                    <p>Estado: ${stats.isPlaying ? 'Reproduciendo' : 'Detenido'}</p>
-                    <p>Video actual: ${stats.currentVideo ? 'Sí' : 'Ninguno'}</p>
-                </div>
-            </div>
-            
-            <div class="overview-section">
-                <h3 class="overview-title">
-                    <i class="fas fa-cog"></i>
-                    Sistema
-                </h3>
-                <div class="overview-content">
-                    <p>API YouTube: ${stats.youtubeAPIReady ? '✅' : '❌'}</p>
-                    <p>Reproductores: ${stats.playersInitialized ? '✅' : '❌'}</p>
-                </div>
-            </div>
-        `;
-    }
-
-    function loadSearchContent() {
-        // Focus en el input de búsqueda
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            setTimeout(() => searchInput.focus(), 100);
-        }
-    }
-
-    function loadLibraryContent() {
-        // Renderizar grid de playlists de YouTube
-        if (typeof PlaylistGridManager !== 'undefined') {
-            PlaylistGridManager.renderPlaylistsGrid();
-        }
-    }
-
-    function loadPlayingContent() {
-        // Asegurar que el video container esté visible
-        const videoContainer = document.getElementById('videoContainer');
-        if (videoContainer && window.playlistState?.currentPlayingInfo?.videoId) {
-            videoContainer.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'center' 
-            });
-        }
-    }
-
-    // Configurar mini player
-    function setupMiniPlayer() {
-        const miniPlayer = document.getElementById('miniPlayer');
-        const miniPlayBtn = document.getElementById('miniPlayBtn');
-        const miniNextBtn = document.getElementById('miniNextBtn');
-        
-        // Click en mini player abre vista playing
-        if (miniPlayer) {
-            miniPlayer.addEventListener('click', (e) => {
-                // Solo si no se clickeó un botón de control
-                if (!e.target.closest('.mini-control-btn')) {
-                    switchView('playing');
-                    syncMobileNavigation('playing');
-                    syncDesktopNavigation('playing');
-                }
-            });
-        }
-        
-        // Conectar botones del mini player con controles principales
-        if (miniPlayBtn) {
-            miniPlayBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.getElementById('botonPlay')?.click();
-            });
-        }
-        
-        if (miniNextBtn) {
-            miniNextBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.getElementById('botonNext')?.click();
-            });
-        }
-
-        // Queue button functionality
-        const queueButton = document.getElementById('queueButton');
-        if (queueButton) {
-            queueButton.addEventListener('click', () => {
-                showQueueModal();
-            });
-        }
-    }
-
-    // Setup desktop playlist input
-    function setupDesktopPlaylistInput() {
-        const desktopInput = document.getElementById('desktopPlaylistInput');
-        const desktopBtn = document.getElementById('desktopAddPlaylistBtn');
-        
-        if (desktopInput && desktopBtn) {
-            desktopBtn.addEventListener('click', () => {
-                const mobileBtn = document.getElementById('añadirUrlButton');
-                const mobileInput = document.getElementById('searchInput2');
-                
-                if (mobileInput && mobileBtn) {
-                    mobileInput.value = desktopInput.value;
-                    mobileBtn.click();
-                    desktopInput.value = '';
-                }
-            });
-            
-            desktopInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    desktopBtn.click();
-                }
-            });
-        }
-    }
-
-    // Enhanced UI features
-    function setupUIEnhancements() {
-        // Efecto hover en tarjetas (solo desktop)
-        if (window.matchMedia('(hover: hover)').matches) {
-            document.addEventListener('mouseover', (e) => {
-                const card = e.target.closest('.result-card, .playlist-card, .playlist-card-mobile');
-                if (card && !card.classList.contains('hover-effect-active')) {
-                    card.classList.add('hover-effect-active');
-                    card.style.transform = 'translateY(-4px)';
-                }
-            });
-
-            document.addEventListener('mouseout', (e) => {
-                const card = e.target.closest('.result-card, .playlist-card, .playlist-card-mobile');
-                if (card && card.classList.contains('hover-effect-active')) {
-                    card.classList.remove('hover-effect-active');
-                    card.style.transform = 'translateY(0)';
-                }
-            });
-        }
-
-        // Feedback de botones
-        document.addEventListener('click', (e) => {
-            const button = e.target.closest('button');
-            if (button && !button.classList.contains('no-feedback')) {
-                button.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    button.style.transform = '';
-                }, 150);
-            }
-        });
-
-        // Sync mobile auth buttons
-        const mobileSignInBtn = document.getElementById('mobileSignInButton');
-        const headerSignInBtn = document.getElementById('googleSignInButton');
-        
-        if (mobileSignInBtn && headerSignInBtn) {
-            mobileSignInBtn.addEventListener('click', () => {
-                headerSignInBtn.click();
-            });
-        }
-    }
-
-    // Queue Modal functionality
-    function showQueueModal() {
-        const modal = document.createElement('div');
-        modal.className = 'queue-modal';
-        modal.innerHTML = `
-            <div class="queue-modal-content">
-                <div class="queue-modal-header">
-                    <h3>Cola de Reproducción</h3>
-                    <button class="queue-modal-close">&times;</button>
-                </div>
-                <div class="queue-modal-body" id="queueModalBody">
-                    <!-- Se llenará con JavaScript -->
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Llenar con playlists
-        updateQueueModal();
-        
-        // Cerrar modal
-        modal.querySelector('.queue-modal-close').addEventListener('click', () => {
-            modal.remove();
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-    }
-
-    function updateQueueModal() {
-        const modalBody = document.getElementById('queueModalBody');
-        if (!modalBody) return;
-        
-        const queuePlaylist = window.playlistState?.playlistsData?.find(p => p.id === 'queue');
-        
-        if (!queuePlaylist || queuePlaylist.videos.length === 0) {
-            modalBody.innerHTML = `
-                <div class="no-playlists">
-                    <i class="fas fa-music"></i>
-                    <p>La cola está vacía</p>
-                    <p>Busca música y usa "Reproducir Después" para llenar la cola</p>
-                </div>
-            `;
-            return;
-        }
-        
-        let html = `
-            <div class="queue-playlist">
-                <div class="queue-playlist-header">
-                    <img src="${queuePlaylist.thumbnailUrl}" alt="${queuePlaylist.name}" class="queue-playlist-thumb">
-                    <div class="queue-playlist-info">
-                        <h4>${queuePlaylist.name}</h4>
-                        <p>${queuePlaylist.videos.length} videos</p>
-                    </div>
-                </div>
-                <div class="queue-playlist-videos">
-                    ${queuePlaylist.videos.map((video, index) => `
-                        <div class="queue-video-item ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? 'playing' : ''}">
-                            <span class="queue-video-index">${index + 1}</span>
-                            <img src="${video.thumbnail}" alt="${video.title}" class="queue-video-thumb">
-                            <div class="queue-video-info">
-                                <p class="queue-video-title">${video.title}</p>
-                                <p class="queue-video-duration">${formatDuration(video.duration)}</p>
+                        <div class="ytmusic-shelf">
+                            <div class="ytmusic-shelf-header">
+                                <h2 class="ytmusic-shelf-title">Cola de reproducción</h2>
                             </div>
-                            ${window.playlistState?.currentPlayingInfo?.videoId === video.videoId ? '<i class="fas fa-volume-up playing-icon"></i>' : ''}
+                            <div class="ytmusic-track-list" id="queueList">
+                                <!-- Queue will be populated by JavaScript -->
+                            </div>
                         </div>
-                    `).join('')}
+                    </div>
                 </div>
             </div>
-        `;
-        
-        modalBody.innerHTML = html;
-    }
+        </div>
 
-    function formatDuration(duration) {
-        if (!duration) return '0:00';
-        const minutes = Math.floor(duration / 60);
-        const seconds = Math.floor(duration % 60);
-        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    // Integración con el app existente
-    window.addEventListener('load', () => {
-        const app = window.YTCrossMixApp;
-        
-        if (app) {
-            // Conectar eventos existentes con la nueva UI
-            connectExistingEvents();
-            
-            // Hacer disponibles funciones útiles
-            window.switchView = switchView;
-            window.authManager = authManager;
-            
-            console.log('Integración con app existente completada');
-        }
-    });
-
-    // Conectar eventos del app existente con la nueva UI
-    function connectExistingEvents() {
-        // Escuchar cambios en el estado de reproducción
-        document.addEventListener('playerStateChanged', (event) => {
-            updatePlayerUI(event.detail);
-        });
-
-        // Escuchar cambios en playlists
-        document.addEventListener('playlistsUpdated', (event) => {
-            updatePlaylistsUI(event.detail);
-        });
-
-        // Escuchar resultados de búsqueda
-        document.addEventListener('searchResultsUpdated', (event) => {
-            updateSearchResultsUI(event.detail);
-        });
-        
-        // Escuchar cambios en playlists para actualizar vista recientes
-        document.addEventListener('playlistsUpdated', (event) => {
-            if (currentView === 'library') {
-                loadLibraryContent();
-            }
-        });
-        
-        // Escuchar cuando se cargan playlists de YouTube
-        document.addEventListener('playlistsFetched', (event) => {
-            if (currentView === 'library') {
-                setTimeout(() => loadLibraryContent(), 500);
-            }
-        });
-    }
-
-    // Actualizar UI del reproductor
-    function updatePlayerUI(playerData) {
-        const { videoId, title, artist, thumbnail } = playerData;
-        
-        if (title) {
-            // Actualizar reproductor principal
-            const playerTitle = document.getElementById('playerTitle');
-            const nowPlayingTitle = document.getElementById('nowPlayingTitle');
-            const miniTrackTitle = document.getElementById('miniTrackTitle');
-            
-            if (playerTitle) playerTitle.textContent = title;
-            if (nowPlayingTitle) nowPlayingTitle.textContent = title;
-            if (miniTrackTitle) miniTrackTitle.textContent = title;
-        }
-        
-        if (artist) {
-            // Actualizar artista
-            const playerArtist = document.getElementById('playerArtist');
-            const nowPlayingArtist = document.getElementById('nowPlayingArtist');
-            const miniTrackArtist = document.getElementById('miniTrackArtist');
-            
-            if (playerArtist) playerArtist.textContent = artist;
-            if (nowPlayingArtist) nowPlayingArtist.textContent = artist;
-            if (miniTrackArtist) miniTrackArtist.textContent = artist;
-        }
-        
-        if (thumbnail) {
-            // Actualizar thumbnails
-            const playerThumbnail = document.getElementById('playerThumbnail');
-            const miniTrackImage = document.getElementById('miniTrackImage');
-            
-            if (playerThumbnail) playerThumbnail.src = thumbnail;
-            if (miniTrackImage) miniTrackImage.src = thumbnail;
-        }
-    }
-
-    // Actualizar UI de playlists
-    function updatePlaylistsUI(playlistsData) {
-        // Si estamos en vista library, actualizar
-        if (currentView === 'library') {
-            loadLibraryContent();
-        }
-        
-        // Actualizar home stats si estamos en home
-        if (currentView === 'home') {
-            loadHomeContent();
-        }
-    }
-
-    // Actualizar resultados de búsqueda
-    function updateSearchResultsUI(results) {
-        const container = document.getElementById('searchResults');
-        
-        if (!container) return;
-        
-        if (!results || results.length === 0) {
-            container.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>No se encontraron resultados</p>
+        <!-- Player Bar -->
+        <div class="ytmusic-player-bar">
+            <div class="ytmusic-player-info">
+                <img 
+                    src="https://via.placeholder.com/56x56?text=♪" 
+                    alt="Now playing" 
+                    class="ytmusic-player-thumbnail"
+                    id="playerThumbnail"
+                >
+                <div class="ytmusic-player-details">
+                    <div class="ytmusic-player-title" id="playerTitle">
+                        Selecciona una canción
+                    </div>
+                    <div class="ytmusic-player-artist" id="playerArtist">
+                        YT CrossMix
+                    </div>
                 </div>
-            `;
-            return;
-        }
-        
-        container.innerHTML = results.map(video => `
-            <div class="result-card" data-video-id="${video.videoId}">
-                <img src="${video.thumbnail}" alt="${video.title}" class="result-thumbnail">
-                <h3 class="result-title">${video.title}</h3>
-                <p class="result-artist">${video.author || 'Desconocido'}</p>
-                <button class="add-button" onclick="addVideoToPlaylist('${video.videoId}')">
-                    <i class="fas fa-plus"></i> Añadir
+            </div>
+
+            <div class="ytmusic-player-controls">
+                <button class="ytmusic-control-button secondary">
+                    <span class="material-icons">shuffle</span>
+                </button>
+                <button class="ytmusic-control-button secondary">
+                    <span class="material-icons">skip_previous</span>
+                </button>
+                <button class="ytmusic-control-button primary" id="playPauseBtn">
+                    <span class="material-icons">play_arrow</span>
+                </button>
+                <button class="ytmusic-control-button secondary" id="nextBtn">
+                    <span class="material-icons">skip_next</span>
+                </button>
+                <button class="ytmusic-control-button secondary">
+                    <span class="material-icons">repeat</span>
                 </button>
             </div>
-        `).join('');
-    }
 
-    // Funcionalidad de tabs
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remover active de todos
-                const tabContainer = tab.closest('.content-tabs');
-                if (tabContainer) {
-                    tabContainer.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    // Añadir active al clickeado
-                    tab.classList.add('active');
+            <div class="ytmusic-player-extras">
+                <button class="ytmusic-control-button secondary">
+                    <span class="material-icons">queue_music</span>
+                </button>
+                <div class="ytmusic-volume-container">
+                    <button class="ytmusic-control-button secondary">
+                        <span class="material-icons">volume_up</span>
+                    </button>
+                    <div class="ytmusic-volume-slider"></div>
+                </div>
+                <button class="ytmusic-control-button secondary">
+                    <span class="material-icons">fullscreen</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Elements for Compatibility -->
+    <div style="display: none;">
+        <button id="botonPlay"></button>
+        <button id="botonNext"></button>
+        <input id="searchInput2" type="text">
+        <button id="añadirUrlButton"></button>
+        <div id="playlistContainer"></div>
+        <div id="results"></div>
+        <div id="floatingMessageContainer"></div>
+    </div>
+
+    <script type="module">
+        // YouTube Music UI Controller
+        class YouTubeMusicController {
+            constructor() {
+                this.currentPage = 'home';
+                this.sidebarCollapsed = false;
+                this.isPlaying = false;
+                this.currentTrack = null;
+                this.queue = [];
+                
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.setupSearch();
+                this.loadSampleData();
+                this.integrateWithExistingApp();
+            }
+
+            switchPage(pageId) {
+                // Update navigation
+                document.querySelectorAll('.ytmusic-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                const activeNavItem = document.querySelector(`[data-page="${pageId}"]`);
+                if (activeNavItem) {
+                    activeNavItem.classList.add('active');
                 }
-            });
-        });
-    });
 
-    // Función global para añadir video
-    window.addVideoToPlaylist = function(videoId) {
-        // Esta función se conectaría con el PlaylistManager existente
-        console.log('Añadiendo video:', videoId);
-        
-        // Mostrar feedback visual
-        const button = event.target;
-        const originalContent = button.innerHTML;
-        button.innerHTML = '<i class="fas fa-check"></i> Añadido';
-        button.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-        
-        setTimeout(() => {
-            button.innerHTML = originalContent;
-            button.style.background = '';
-        }, 2000);
-    };
+                // Update pages
+                document.querySelectorAll('.ytmusic-page').forEach(page => {
+                    page.classList.remove('active');
+                });
 
-    // Función para cambiar a vista reproduciendo al hacer click en mini player
-    function switchToNowPlaying() {
-        // Solo cambiar si hay algo reproduciéndose
-        if (window.playlistState?.currentPlayingInfo?.videoId) {
-            switchView('playing');
-            syncMobileNavigation('playing');
-            syncDesktopNavigation('playing');
-        }
-    }
+                const targetPage = document.getElementById(`${pageId}Page`);
+                if (targetPage) {
+                    targetPage.classList.add('active');
+                }
 
-    // Hacer funciones disponibles globalmente
-    window.switchView = switchView;
-    window.switchToNowPlaying = switchToNowPlaying;
-    window.loadLibraryContent = loadLibraryContent;
+                this.currentPage = pageId;
+                this.loadPageContent(pageId);
 
-    // Sincronización de botones de autenticación
-    document.addEventListener('DOMContentLoaded', () => {
-        const headerSignIn = document.getElementById('googleSignInButton');
-        const headerSignOut = document.getElementById('googleSignOutButton');
-        const mobileSignIn = document.getElementById('mobileSignInButton');
+                // Trigger compatibility event
+                if (typeof window.switchView === 'function') {
+                    window.switchView(pageId);
+                }
+            }
 
-        // Sincronizar visibilidad
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                    const isHidden = headerSignIn?.classList.contains('hidden');
-                    if (mobileSignIn) {
-                        if (isHidden) {
-                            mobileSignIn.style.display = 'none';
-                        } else {
-                            mobileSignIn.style.display = 'flex';
+            toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('mainContent');
+                
+                this.sidebarCollapsed = !this.sidebarCollapsed;
+                
+                if (this.sidebarCollapsed) {
+                    sidebar.classList.add('mini');
+                    mainContent.classList.add('sidebar-mini');
+                } else {
+                    sidebar.classList.remove('mini');
+                    mainContent.classList.remove('sidebar-mini');
+                }
+            }
+
+            togglePlayPause() {
+                this.isPlaying = !this.isPlaying;
+                const playPauseBtn = document.getElementById('playPauseBtn');
+                const icon = playPauseBtn.querySelector('.material-icons');
+                
+                if (this.isPlaying) {
+                    icon.textContent = 'pause';
+                } else {
+                    icon.textContent = 'play_arrow';
+                }
+
+                // Trigger existing play button
+                const existingPlayBtn = document.getElementById('botonPlay');
+                if (existingPlayBtn) {
+                    existingPlayBtn.click();
+                }
+            }
+
+            nextTrack() {
+                // Trigger existing next button
+                const existingNextBtn = document.getElementById('botonNext');
+                if (existingNextBtn) {
+                    existingNextBtn.click();
+                }
+            }
+
+            handleSearch(query) {
+                if (query.length > 2) {
+                    this.switchPage('search');
+                    this.performSearch(query);
+                } else if (query.length === 0) {
+                    this.clearSearch();
+                }
+            }
+
+            async performSearch(query) {
+                const resultsContainer = document.getElementById('searchResults');
+                
+                // Show loading
+                resultsContainer.innerHTML = `
+                    <div class="ytmusic-loading">
+                        <div class="ytmusic-spinner"></div>
+                    </div>
+                `;
+
+                // Use existing search functionality
+                if (window.SearchManager && typeof window.SearchManager.performSearch === 'function') {
+                    try {
+                        await window.SearchManager.performSearch(query);
+                        this.updateSearchResultsUI();
+                    } catch (error) {
+                        console.error('Search error:', error);
+                        this.showSearchError();
+                    }
+                } else {
+                    // Fallback to mock results
+                    setTimeout(() => {
+                        this.showMockSearchResults(query);
+                    }, 1000);
+                }
+            }
+
+            updateSearchResultsUI() {
+                // This will be called to update the YouTube Music style search results
+                // Integration with existing search results
+                const existingResults = document.querySelector('#results .video-result, #searchResults .video-result');
+                if (existingResults) {
+                    this.convertSearchResultsToYTMusicStyle();
+                }
+            }
+
+            convertSearchResultsToYTMusicStyle() {
+                const resultsContainer = document.getElementById('searchResults');
+                const existingResults = document.querySelectorAll('.video-result');
+                
+                if (existingResults.length === 0) return;
+
+                const trackList = document.createElement('div');
+                trackList.className = 'ytmusic-track-list';
+
+                existingResults.forEach(result => {
+                    const title = result.querySelector('.video-title')?.textContent || '';
+                    const author = result.querySelector('.video-author')?.textContent || '';
+                    const thumbnail = result.querySelector('.thumbnail')?.src || '';
+                    const duration = result.querySelector('.duration')?.textContent || '';
+                    const videoId = result.dataset.videoId;
+
+                    const trackItem = this.createTrackItem({
+                        title,
+                        artist: author,
+                        thumbnail,
+                        duration,
+                        videoId
+                    });
+
+                    trackList.appendChild(trackItem);
+                });
+
+                resultsContainer.innerHTML = '';
+                resultsContainer.appendChild(trackList);
+            }
+
+            createTrackItem(track) {
+                const item = document.createElement('div');
+                item.className = 'ytmusic-track-item';
+                item.dataset.videoId = track.videoId;
+
+                item.innerHTML = `
+                    <img src="${track.thumbnail}" alt="${track.title}" class="ytmusic-track-thumbnail">
+                    <div class="ytmusic-track-info">
+                        <div class="ytmusic-track-title">${track.title}</div>
+                        <div class="ytmusic-track-subtitle">${track.artist}</div>
+                    </div>
+                    <div class="ytmusic-track-duration">${track.duration}</div>
+                    <button class="ytmusic-track-menu">
+                        <span class="material-icons">more_vert</span>
+                    </button>
+                `;
+
+                // Add click handlers
+                item.addEventListener('click', () => {
+                    this.playTrack(track);
+                });
+
+                const menuBtn = item.querySelector('.ytmusic-track-menu');
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showTrackMenu(track, menuBtn);
+                });
+
+                return item;
+            }
+
+            playTrack(track) {
+                this.currentTrack = track;
+                this.updatePlayerInfo(track);
+                
+                // Add to queue using existing functionality
+                if (window.UIManager && window.UIManager.handlePlayNextActionFromSearch) {
+                    window.UIManager.handlePlayNextActionFromSearch(track.videoId, track);
+                }
+                
+                this.switchPage('playing');
+            }
+
+            updatePlayerInfo(track) {
+                const playerTitle = document.getElementById('playerTitle');
+                const playerArtist = document.getElementById('playerArtist');
+                const playerThumbnail = document.getElementById('playerThumbnail');
+
+                if (playerTitle) playerTitle.textContent = track.title;
+                if (playerArtist) playerArtist.textContent = track.artist;
+                if (playerThumbnail) playerThumbnail.src = track.thumbnail;
+            }
+
+            showTrackMenu(track, anchor) {
+                // Create context menu (simplified for this demo)
+                console.log('Show menu for:', track.title);
+            }
+
+            loadPageContent(pageId) {
+                switch (pageId) {
+                    case 'home':
+                        this.loadHomeContent();
+                        break;
+                    case 'library':
+                        this.loadLibraryContent();
+                        break;
+                    case 'playing':
+                        this.loadPlayingContent();
+                        break;
+                }
+            }
+
+            loadHomeContent() {
+                const recentGrid = document.getElementById('recentGrid');
+                const playlistsGrid = document.getElementById('playlistsGrid');
+
+                // Load from existing data if available
+                if (window.PlaylistState && window.PlaylistState.playlistsData) {
+                    this.populatePlaylistsGrid(playlistsGrid, window.PlaylistState.playlistsData);
+                } else {
+                    this.loadSamplePlaylists(playlistsGrid);
+                }
+            }
+
+            loadLibraryContent() {
+                const libraryGrid = document.getElementById('libraryGrid');
+                
+                if (window.PlaylistState && window.PlaylistState.playlistsData) {
+                    this.populatePlaylistsGrid(libraryGrid, window.PlaylistState.playlistsData);
+                } else {
+                    libraryGrid.innerHTML = `
+                        <div class="ytmusic-empty-state">
+                            <span class="material-icons">library_music</span>
+                            <p>No hay playlists disponibles</p>
+                            <p>Añade algunas playlists para comenzar</p>
+                        </div>
+                    `;
+                }
+            }
+
+            loadPlayingContent() {
+                const queueList = document.getElementById('queueList');
+                
+                // Load queue from existing state
+                if (window.PlaylistManager) {
+                    const flatList = window.PlaylistManager.getFlattenedPlaylist();
+                    this.populateQueueList(queueList, flatList);
+                }
+            }
+
+            populatePlaylistsGrid(container, playlists) {
+                container.innerHTML = '';
+                
+                playlists.forEach(playlist => {
+                    const card = this.createPlaylistCard(playlist);
+                    container.appendChild(card);
+                });
+            }
+
+            createPlaylistCard(playlist) {
+                const card = document.createElement('div');
+                card.className = 'ytmusic-card';
+                card.dataset.playlistId = playlist.id;
+
+                card.innerHTML = `
+                    <div class="ytmusic-card-thumbnail">
+                        <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="ytmusic-card-image">
+                        <div class="ytmusic-play-overlay">
+                            <button class="ytmusic-play-button">
+                                <span class="material-icons">play_arrow</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ytmusic-card-title">${playlist.name}</div>
+                    <div class="ytmusic-card-subtitle">${playlist.videos.length} canciones</div>
+                `;
+
+                card.addEventListener('click', () => {
+                    this.openPlaylist(playlist);
+                });
+
+                return card;
+            }
+
+            populateQueueList(container, tracks) {
+                container.innerHTML = '';
+                
+                if (tracks.length === 0) {
+                    container.innerHTML = `
+                        <div class="ytmusic-empty-state">
+                            <span class="material-icons">queue_music</span>
+                            <p>La cola está vacía</p>
+                            <p>Añade música para comenzar a escuchar</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                tracks.forEach((track, index) => {
+                    const trackItem = this.createTrackItem({
+                        title: track.title,
+                        artist: track.channelTitle || 'Desconocido',
+                        thumbnail: track.thumbnail,
+                        duration: this.formatDuration(track.duration),
+                        videoId: track.videoId
+                    });
+                    
+                    // Highlight current playing track
+                    if (window.PlaylistState && 
+                        window.PlaylistState.currentPlayingInfo.videoId === track.videoId) {
+                        trackItem.style.backgroundColor = 'var(--yt-spec-touch-response)';
+                    }
+                    
+                    container.appendChild(trackItem);
+                });
+            }
+
+            formatDuration(seconds) {
+                if (!seconds || isNaN(seconds)) return '0:00';
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+
+            openPlaylist(playlist) {
+                this.switchPage('playing');
+                
+                // Use existing playlist functionality
+                if (window.UIManager && window.UIManager.playEntirePlaylist) {
+                    window.UIManager.playEntirePlaylist(playlist);
+                }
+            }
+
+            showSearchError() {
+                const resultsContainer = document.getElementById('searchResults');
+                resultsContainer.innerHTML = `
+                    <div class="ytmusic-empty-state">
+                        <span class="material-icons">error</span>
+                        <p>Error al buscar</p>
+                        <p>Inténtalo de nuevo</p>
+                    </div>
+                `;
+            }
+
+            showMockSearchResults(query) {
+                const resultsContainer = document.getElementById('searchResults');
+                const mockResults = [
+                    {
+                        title: `Resultado de búsqueda para "${query}"`,
+                        artist: 'Artista de ejemplo',
+                        thumbnail: 'https://via.placeholder.com/48x48?text=♪',
+                        duration: '3:45',
+                        videoId: 'mock1'
+                    },
+                    {
+                        title: `Otra canción con "${query}"`,
+                        artist: 'Otro artista',
+                        thumbnail: 'https://via.placeholder.com/48x48?text=♫',
+                        duration: '4:20',
+                        videoId: 'mock2'
+                    }
+                ];
+
+                const trackList = document.createElement('div');
+                trackList.className = 'ytmusic-track-list';
+
+                mockResults.forEach(track => {
+                    const trackItem = this.createTrackItem(track);
+                    trackList.appendChild(trackItem);
+                });
+
+                resultsContainer.innerHTML = '';
+                resultsContainer.appendChild(trackList);
+            }
+
+            loadSampleData() {
+                // Load sample playlists if no real data is available
+                this.loadSamplePlaylists(document.getElementById('playlistsGrid'));
+            }
+
+            loadSamplePlaylists(container) {
+                const samplePlaylists = [
+                    {
+                        id: 'sample1',
+                        name: 'Mi Mix Favorito',
+                        thumbnailUrl: 'https://via.placeholder.com/200x200?text=Mix+1',
+                        videos: Array(10).fill({}).map((_, i) => ({ title: `Canción ${i+1}`, duration: 180 }))
+                    },
+                    {
+                        id: 'sample2', 
+                        name: 'Éxitos del Rock',
+                        thumbnailUrl: 'https://via.placeholder.com/200x200?text=Rock',
+                        videos: Array(15).fill({}).map((_, i) => ({ title: `Rock ${i+1}`, duration: 240 }))
+                    }
+                ];
+
+                this.populatePlaylistsGrid(container, samplePlaylists);
+            }
+
+            integrateWithExistingApp() {
+                // Wait for existing app to load
+                if (window.YTCrossMixApp) {
+                    this.connectWithExistingApp();
+                } else {
+                    // Poll for app availability
+                    const checkApp = setInterval(() => {
+                        if (window.YTCrossMixApp) {
+                            clearInterval(checkApp);
+                            this.connectWithExistingApp();
                         }
+                    }, 500);
+                }
+
+                // Listen for playlist updates
+                document.addEventListener('playlistsUpdated', () => {
+                    this.loadHomeContent();
+                    this.loadLibraryContent();
+                });
+
+                // Listen for player state changes
+                document.addEventListener('playerStateChanged', (event) => {
+                    const { videoId, state } = event.detail;
+                    this.updatePlayerState(videoId, state);
+                });
+
+                // Create proxy buttons for compatibility
+                this.createCompatibilityButtons();
+            }
+
+            connectWithExistingApp() {
+                console.log('Connected with existing YT CrossMix app');
+                
+                // Sync initial state
+                if (window.PlaylistState) {
+                    this.loadHomeContent();
+                    this.loadLibraryContent();
+                }
+            }
+
+            updatePlayerState(videoId, state) {
+                // Update UI based on player state changes
+                if (state === 'playing') {
+                    this.isPlaying = true;
+                    const playPauseBtn = document.getElementById('playPauseBtn');
+                    if (playPauseBtn) {
+                        playPauseBtn.querySelector('.material-icons').textContent = 'pause';
+                    }
+                } else if (state === 'paused') {
+                    this.isPlaying = false;
+                    const playPauseBtn = document.getElementById('playPauseBtn');
+                    if (playPauseBtn) {
+                        playPauseBtn.querySelector('.material-icons').textContent = 'play_arrow';
                     }
                 }
-            });
-        });
-
-        if (headerSignIn) {
-            observer.observe(headerSignIn, { attributes: true });
-        }
-    });
-
-    // PWA features
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
-                .then(registration => {
-                    console.log('SW registered: ', registration);
-                })
-                .catch(registrationError => {
-                    console.log('SW registration failed: ', registrationError);
-                });
-        });
-    }
-
-    // Responsive behavior
-    window.addEventListener('resize', () => {
-        // Adjustments for orientation change on mobile
-        if (window.innerHeight < 500 && window.innerWidth > window.innerHeight) {
-            // Landscape mode on mobile
-            document.body.classList.add('landscape-mobile');
-        } else {
-            document.body.classList.remove('landscape-mobile');
-        }
-    });
-
-    // Touch gestures for mobile
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    document.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    });
-
-    document.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipeGesture();
-    });
-
-    function handleSwipeGesture() {
-        const swipeThreshold = 100;
-        const diff = touchStartX - touchEndX;
-
-        // Only handle swipes on main content area
-        if (Math.abs(diff) > swipeThreshold && currentView !== 'playing') {
-            const views = ['home', 'search', 'library'];
-            const currentIndex = views.indexOf(currentView);
-            
-            if (diff > 0 && currentIndex < views.length - 1) {
-                // Swipe left - next view
-                switchView(views[currentIndex + 1]);
-                syncMobileNavigation(views[currentIndex + 1]);
-                syncDesktopNavigation(views[currentIndex + 1]);
-            } else if (diff < 0 && currentIndex > 0) {
-                // Swipe right - previous view
-                switchView(views[currentIndex - 1]);
-                syncMobileNavigation(views[currentIndex - 1]);
-                syncDesktopNavigation(views[currentIndex - 1]);
             }
-        }
-    }
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-        // Only when not typing in inputs
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        
-        switch (e.key) {
-            case ' ': // Spacebar - play/pause
-                e.preventDefault();
-                document.getElementById('botonPlay')?.click();
-                break;
-            case 'ArrowRight': // Next track
-                e.preventDefault();
-                document.getElementById('botonNext')?.click();
-                break;
-            case '/': // Focus search
-                e.preventDefault();
-                const searchInput = document.getElementById('searchInput');
-                if (searchInput) {
-                    searchInput.focus();
+            createCompatibilityButtons() {
+                // Map new buttons to existing functionality
+                const hiddenPlayBtn = document.getElementById('botonPlay');
+                const hiddenNextBtn = document.getElementById('botonNext');
+
+                if (hiddenPlayBtn) {
+                    // Sync button states
+                    const observer = new MutationObserver(() => {
+                        const isPlayButton = hiddenPlayBtn.innerHTML.includes('play');
+                        const playPauseBtn = document.getElementById('playPauseBtn');
+                        if (playPauseBtn) {
+                            const icon = playPauseBtn.querySelector('.material-icons');
+                            icon.textContent = isPlayButton ? 'play_arrow' : 'pause';
+                        }
+                    });
+                    observer.observe(hiddenPlayBtn, { childList: true });
                 }
-                break;
-            case 'h': // Home
-                if (e.ctrlKey || e.metaKey) return;
-                switchView('home');
-                syncMobileNavigation('home');
-                syncDesktopNavigation('home');
-                break;
-            case 's': // Search
-                if (e.ctrlKey || e.metaKey) return;
-                switchView('search');
-                syncMobileNavigation('search');
-                syncDesktopNavigation('search');
-                break;
-            case 'l': // Library
-                if (e.ctrlKey || e.metaKey) return;
-                switchView('library');
-                syncMobileNavigation('library');
-                syncDesktopNavigation('library');
-                break;
-            case 'p': // Playing
-                if (e.ctrlKey || e.metaKey) return;
-                switchView('playing');
-                syncMobileNavigation('playing');
-                syncDesktopNavigation('playing');
-                break;
-        }
-    });
+            }
 
-    console.log('YT CrossMix UI inicializada completamente');
-    </script>    
+            setupSearch() {
+                // Enhanced search functionality
+                let searchTimeout;
+                const searchInput = document.getElementById('searchInput');
+                
+                if (searchInput) {
+                    searchInput.addEventListener('input', (e) => {
+                        clearTimeout(searchTimeout);
+                        const query = e.target.value.trim();
+                        
+                        searchTimeout = setTimeout(() => {
+                            this.handleSearch(query);
+                        }, 300);
+                    });
+
+                    searchInput.addEventListener('focus', () => {
+                        if (this.currentPage !== 'search') {
+                            this.switchPage('search');
+                        }
+                    });
+                }
+            }
+
+        // Initialize YouTube Music UI
+        document.addEventListener('DOMContentLoaded', () => {
+            window.ytMusicController = new YouTubeMusicController();
+            console.log('YouTube Music UI initialized');
+        });
+
+        // Make controller available globally for integration
+        window.YouTubeMusicController = YouTubeMusicController;
+
+        // Integration with existing modules
+        import('./app.js').catch(() => {
+            console.log('Main app.js not found, running in standalone mode');
+        });
+    </script>
 </body>
 </html>
