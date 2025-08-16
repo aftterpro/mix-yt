@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es"> 
+<head>
+    <meta charset="UTF-8">
+    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
+    
+    <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
+    <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
+    
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" type="text/css" href="./styles-youtube-music.css">
+    <link rel="stylesheet" type="text/css" href="./efecto.css">
+    <link rel="stylesheet" type="text/css" href="./botones.css">
+    <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
+    <link rel="icon" href="./electronic.ico">
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "YT CrossMix",
+      "url": "https://mix-yt.netlify.app", 
+      "description": "Mezclador de playlists de YouTube con efecto crossfade automático para transiciones suaves.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://mix-yt.netlify.app",  
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header móvil -->
+        <header class="mobile-header">
+            <!-- Logo y título -->
+            <div class="mobile-logo">
+                <div class="logo-icon">
+                    <i class="fas fa-music"></i>
+                </div>
+                <span class="logo-text">YT CrossMix</span>
+            </div>
+            
+            <!-- Barra de búsqueda -->
+            <div class="mobile-search">
+                <input type="text" 
+                       class="mobile-search-input" 
+                       id="searchInput"
+                       placeholder="Buscar música..."
+                       aria-label="Buscar videos">
+            </div>
+            
+            <!-- Botones de usuario -->
+            <div class="mobile-user-actions">
+                <button class="mobile-menu-btn" id="debugButton" title="Debug" onclick="window.YTCrossMixApp?.debug()">
+                    <i class="fas fa-bug"></i>
+                </button>
+                <button class="mobile-menu-btn" id="resetButton" title="Reset" onclick="window.YTCrossMixApp?.reset()">
+                    <i class="fas fa-refresh"></i>
+                </button>
+                <button class="mobile-menu-btn" id="googleSignInButton" title="Cargar mi Biblioteca">
+                    <i class="fab fa-google"></i>
+                </button>
+                <button class="mobile-menu-btn hidden" id="googleSignOutButton" title="Cerrar Sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sidebar para desktop -->
+        <aside class="desktop-sidebar" id="sidebar" style="display: none;">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-music"></i>
+                </div>
+                <h1 class="app-name">YT CrossMix</h1>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <!-- Navegación Principal -->
+                <div class="nav-section">
+                    <a href="#" class="nav-item active" data-view="home">
+                        <i class="fas fa-home"></i>
+                        Inicio
+                    </a>
+                    <a href="#" class="nav-item" data-view="search">
+                        <i class="fas fa-search"></i>
+                        Explorar
+                    </a>
+                    <a href="#" class="nav-item" data-view="playing">
+                        <i class="fas fa-music"></i>
+                        Reproduciendo
+                    </a>
+                </div>
+
+                <!-- Tu Biblioteca -->
+                <div class="nav-section">
+                    <div class="nav-section-title">Tu biblioteca</div>
+                    <a href="#" class="nav-item" data-view="library">
+                        <i class="fas fa-folder"></i>
+                        Biblioteca
+                    </a>
+                    <a href="#" class="nav-item">
+                        <i class="fas fa-heart"></i>
+                        Me gusta
+                    </a>
+                    <a href="#" class="nav-item" data-view="recientes">
+                        <i class="fas fa-clock"></i>
+                        Recientes
+                    </a>
+                </div>
+
+                <!-- Añadir Playlist -->
+                <div class="nav-section">
+                    <div class="playlist-add-section">
+                        <input type="text" 
+                               id="searchInput2"
+                               class="playlist-url-input"
+                               placeholder="URL de playlist de YouTube..."
+                               aria-label="URL de la playlist">
+                        <button id="añadirUrlButton" class="add-playlist-button">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Añadir Playlist</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Contenido principal móvil -->
+        <main class="mobile-main">
+            <!-- Vista Inicio -->
+            <div class="content-view active" id="homeView">
+                <div class="content-header">
+                    <div class="content-tabs">
+                        <div class="tab active">Música</div>
+                        <div class="tab">Playlists</div>
+                        <div class="tab">Recientes</div>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div class="welcome-section">
+                        <h2 class="welcome-title">Bienvenido a YT CrossMix</h2>
+                        <p class="welcome-subtitle">Crea mezclas perfectas con transiciones suaves entre canciones</p>
+                    </div>
+                    
+                    <div class="playlist-overview" id="playlistOverview">
+                        <!-- Vista general se carga aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista Búsqueda -->
+            <div class="content-view" id="searchView">
+                <div class="content-header">
+                    <div class="content-tabs">
+                        <div class="tab active">Canciones</div>
+                        <div class="tab">Videos</div>
+                        <div class="tab">Artistas</div>
+                        <div class="tab">Playlists</div>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div class="search-results" id="searchResults">
+                        <div class="search-placeholder">
+                            <i class="fas fa-search"></i>
+                            <p>Busca música, artistas o playlists</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista Biblioteca -->
+            <div class="content-view" id="libraryView">
+                <div class="content-header">
+                    <div class="library-header">
+                        <h2>Tu Biblioteca</h2>
+                        <button class="auth-btn" id="authToggleBtn">
+                            <i class="fab fa-google"></i>
+                            Conectar
+                        </button>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div id="playlistsGrid" class="playlists-grid-mobile">
+                        <!-- Grid de playlists -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista Reproduciendo -->
+            <div class="content-view" id="playingView">
+                <div class="now-playing-container">
+                    <div class="video-container" id="videoContainer">
+                        <div id="player1" class="video-player"></div>
+                        <div id="player2" class="video-player hidden"></div>
+                    </div>
+                    <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
+                    <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix</p>
+                </div>
+                
+                <!-- Lista de reproducción -->
+                <div class="queue-section">
+                    <h3 class="queue-title">Cola de reproducción</h3>
+                    <div id="playlistContainer" class="playlist-container-mobile">
+                        <!-- Playlists se cargan aquí -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Mini reproductor -->
+        <div class="mini-player" id="miniPlayer">
+            <div class="mini-player-track">
+                <img src="https://via.placeholder.com/40x40" 
+                     alt="Playing" 
+                     class="mini-track-image" 
+                     id="miniTrackImage">
+                <div class="mini-track-info">
+                    <div class="mini-track-title" id="miniTrackTitle">Selecciona música</div>
+                    <div class="mini-track-artist" id="miniTrackArtist">YT CrossMix</div>
+                </div>
+            </div>
+            
+            <div class="mini-player-controls">
+                <button class="mini-control-btn" id="miniPlayBtn" title="Reproducir/Pausar">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="mini-control-btn" id="miniNextBtn" title="Siguiente">
+                    <i class="fas fa-step-forward"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navegación inferior -->
+        <nav class="bottom-nav">
+            <button class="nav-tab active" data-view="home">
+                <i class="fas fa-home"></i>
+                <span>Inicio</span>
+            </button>
+            <button class="nav-tab" data-view="search">
+                <i class="fas fa-search"></i>
+                <span>Explorar</span>
+            </button>
+            <button class="nav-tab" data-view="library">
+                <i class="fas fa-folder"></i>
+                <span>Biblioteca</span>
+            </button>
+            <button class="nav-tab" data-view="playing">
+                <i class="fas fa-music"></i>
+                <span>Reproduciendo</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Overlay para móvil -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Elementos de UI -->
+    <div id="loadingSpinner" class="loading-spinner hidden">
+        <div class="spinner"></div>
+    </div>
+    <div id="floatingMessageContainer" class="floating-messages"></div>
+    <div id="errorContainer" class="error-container hidden"></div>
+
+    <!-- Pie de página -->
+    <footer class="page-footer">
+        <p>
+            Con la tecnología de SponsorBlock. Created by 
+            <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.
+            Utilizamos la API de 
+            <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.
+        </p>
+    </footer>
+
+    <!-- Scripts -->
+    <script type="module">
+        import './app.js';
+        import { PlaylistGridManager } from './playlistGridManager.js';
+        
+        console.log('Módulos cargados, inicializando aplicación...');
+
+        // Variables globales para la nueva UI móvil
+        let currentView = 'home';
+        let authManager = null;
+
+        // Elementos DOM
+        let navTabs, contentViews;
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('DOM cargado, inicializando UI móvil...');
+                
+                // Obtener elementos DOM
+                navTabs = document.querySelectorAll('.nav-tab[data-view]');
+                contentViews = document.querySelectorAll('.content-view');
+                
+                // Configurar navegación móvil
+                setupMobileNavigation();
+                
+                // Configurar mini player
+                setupMiniPlayer();
+                
+                // Inicializar autenticación
+                try {
+                    const authModule = await import('./auth.js');
+                    authManager = authModule.authManager;
+                    await authManager.initialize();
+                    window.authManager = authManager;
+                    console.log('Autenticación inicializada');
+                } catch (error) {
+                    console.warn('Auth module no disponible:', error);
+                }
+                
+                // Integrar con el sistema existente
+                connectWithExistingSystem();
+                
+                console.log('UI móvil inicializada correctamente');
+                
+            } catch (error) {
+                console.error('Error inicializando UI móvil:', error);
+            }
+        });
+
+        // Configurar navegación móvil
+        function setupMobileNavigation() {
+            navTabs.forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    const view = tab.dataset.view;
+                    switchView(view);
+                });
+            });
+        }
+
+        // Cambiar vista
+        function switchView(view) {
+            // Actualizar navegación activa
+            navTabs.forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.view === view);
+            });
+
+            // Mostrar vista correspondiente
+            contentViews.forEach(contentView => {
+                const isActive = contentView.id === `${view}View`;
+                contentView.classList.toggle('active', isActive);
+            });
+
+            currentView = view;
+            
+            // Cargar contenido específico
+            if (view === 'library') {
+                loadLibraryContent();
+            }
+            
+            // Disparar evento para integración
+            document.dispatchEvent(new CustomEvent('viewChanged', { 
+                detail: { view } 
+            }));
+        }
+
+        // Cargar contenido de biblioteca
+        function loadLibraryContent() {
+            if (typeof PlaylistGridManager !== 'undefined') {
+                setTimeout(() => {
+                    PlaylistGridManager.renderPlaylistsGrid();
+                }, 100);
+            }
+        }
+
+        // Configurar mini player
+        function setupMiniPlayer() {
+            const miniPlayer = document.getElementById('miniPlayer');
+            const miniPlayBtn = document.getElementById('miniPlayBtn');
+            const miniNextBtn = document.getElementById('miniNextBtn');
+            
+            // Click en mini player va a playing view
+            if (miniPlayer) {
+                miniPlayer.addEventListener('click', (e) => {
+                    if (!e.target.closest('.mini-control-btn')) {
+                        switchView('playing');
+                    }
+                });
+            }
+            
+            // Conectar controles con el sistema principal
+            if (miniPlayBtn) {
+                miniPlayBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const mainPlayBtn = document.getElementById('botonPlay');
+                    if (mainPlayBtn) mainPlayBtn.click();
+                });
+            }
+            
+            if (miniNextBtn) {
+                miniNextBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const mainNextBtn = document.getElementById('botonNext');
+                    if (mainNextBtn) mainNextBtn.click();
+                });
+            }
+        }
+
+        // Conectar con el sistema existente
+        function connectWithExistingSystem() {
+            // Escuchar cambios en el estado de reproducción
+            document.addEventListener('playerStateChanged', (event) => {
+                updateMiniPlayer(event.detail);
+            });
+
+            // Escuchar cuando se cargan playlists
+            document.addEventListener('playlistsFetched', (event) => {
+                if (currentView === 'library') {
+                    setTimeout(() => loadLibraryContent(), 500);
+                }
+            });
+
+            // Funciones globales para compatibilidad
+            window.switchView = switchView;
+        }
+
+        // Actualizar mini player
+        function updateMiniPlayer(data) {
+            const miniTitle = document.getElementById('miniTrackTitle');
+            const miniArtist = document.getElementById('miniTrackArtist');
+            const miniImage = document.getElementById('miniTrackImage');
+            const miniPlayBtn = document.getElementById('miniPlayBtn');
+            
+            if (data.title && miniTitle) {
+                miniTitle.textContent = data.title;
+            }
+            if (data.artist && miniArtist) {
+                miniArtist.textContent = data.artist;
+            }
+            if (data.thumbnail && miniImage) {
+                miniImage.src = data.thumbnail;
+            }
+            if (data.isPlaying && miniPlayBtn) {
+                miniPlayBtn.innerHTML = data.isPlaying ? 
+                    '<i class="fas fa-pause"></i>' : 
+                    '<i class="fas fa-play"></i>';
+            }
+        }
+
+        // Funcionalidad de tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const parent = tab.closest('.content-tabs');
+                parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            });
+        });
+
+        // Detectar viewport para mostrar/ocultar sidebar
+        function handleViewportChange() {
+            const sidebar = document.getElementById('sidebar');
+            const isDesktop = window.innerWidth >= 1024;
+            
+            if (sidebar) {
+                sidebar.style.display = isDesktop ? 'block' : 'none';
+            }
+        }
+
+        window.addEventListener('resize', handleViewportChange);
+        handleViewportChange(); // Ejecutar al cargar
+
+        // Exportar funciones globales necesarias
+        window.switchView = switchView;
+    </script>    
+</body>
+</html>
