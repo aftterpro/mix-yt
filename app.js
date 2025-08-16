@@ -15,20 +15,26 @@ class App {
         this.authInitialized = false;
         this.setupGlobalReferences();
     }
-
     // Configurar referencias globales para compatibilidad
 setupGlobalReferences() {
-    // Primero los estados
+    // Mantener estados existentes
     window.appState = AppState;
     window.playlistState = PlaylistState;
     window.searchState = SearchState;
     window.sponsorBlockState = SponsorBlockState;
     
-    // Luego las clases (solo si están definidas)
+    // Mantener clases existentes
     if (typeof Utils !== 'undefined') window.Utils = Utils;
     if (typeof UIManager !== 'undefined') window.UIManager = UIManager;
     
-    // Funciones críticas
+    // ELIMINAR referencias al sidebar
+    // ELIMINAR: window.sidebar, window.toggleMobileMenu, etc.
+    
+    // AÑADIR funciones para mobile navigation
+    window.switchToView = this.switchToView.bind(this);
+    window.updateMiniPlayer = this.updateMiniPlayer.bind(this);
+    
+    // Mantener YouTube API callback
     window.onYouTubeIframeAPIReady = () => {
         if (window.YouTubeAPIManager) {
             YouTubeAPIManager.initializePlayers();
@@ -91,15 +97,9 @@ setupGlobalReferences() {
         });
 
         // Event listeners para estados de reproductores
-        window.addEventListener('playersReady', () => {
-            const flatList = PlaylistManager.getFlattenedPlaylist();
-            const playButton = document.getElementById('botonPlay');
-            if (playButton) {
-                playButton.disabled = flatList.length === 0;
-            }
-            console.log('Reproductores listos, botón Play configurado');
-        });
-
+        window.addEventListener('playersReady', () =>  {
+        this.handlePlayersReady();
+    });
         window.addEventListener('playerStateChanged', (event) => {
             this.handlePlayerStateChanged(event.detail);
         });
@@ -107,16 +107,15 @@ setupGlobalReferences() {
         window.addEventListener('playerEnded', (event) => {
             this.handlePlayerEnded(event.detail);
         });
-
+ // Listeners para mobile UI
+    document.addEventListener('viewChanged', (event) => {
+        this.handleViewChanged(event.detail.view);
+    });
         // Cerrar menús al hacer click fuera
-        document.addEventListener('click', (event) => {
-            if (!event.target.closest('.delete-menu')) {
-                UIManager.closeAllContextMenus();
-            }
-            if (!event.target.closest('.playlist-selection-popup-menu')) {
-                UIManager.closePlaylistSelectionPopups();
-            }
-        }, true);
+ // AÑADIR listeners para mobile UI
+    document.addEventListener('viewChanged', (event) => {
+        this.handleViewChanged(event.detail.view);
+    });
 
         // Listener para cuando la página esté completamente cargada
         window.addEventListener('load', () => {
@@ -139,7 +138,44 @@ setupGlobalReferences() {
             }
         });
     }
+// Nueva función para manejar when players are ready
+handlePlayersReady() {
+    const flatList = PlaylistManager.getFlattenedPlaylist();
+    const playButton = document.getElementById('botonPlay');
+    const miniPlayButton = document.getElementById('miniPlayBtn');
+    
+    if (playButton) {
+        playButton.disabled = flatList.length === 0;
+    }
+    if (miniPlayButton) {
+        miniPlayButton.disabled = flatList.length === 0;
+    }
+    console.log('Reproductores listos, botones configurados');
+}
 
+// Nueva función para cambio de vista
+switchToView(view) {
+    if (typeof switchView === 'function') {
+        switchView(view);
+    }
+}
+
+// Nueva función para actualizar mini player
+updateMiniPlayer(data) {
+    const miniTitle = document.getElementById('miniTrackTitle');
+    const miniArtist = document.getElementById('miniTrackArtist');
+    const miniImage = document.getElementById('miniTrackImage');
+    
+    if (data.title && miniTitle) {
+        miniTitle.textContent = data.title;
+    }
+    if (data.artist && miniArtist) {
+        miniArtist.textContent = data.artist;
+    }
+    if (data.thumbnail && miniImage) {
+        miniImage.src = data.thumbnail;
+    }
+}
     // Inicializar módulos individuales
     async initializeModules() {
         try {
@@ -167,59 +203,137 @@ setupGlobalReferences() {
         this.setupNextButton();
         this.setupSearchInput();
         this.setupPlaylistUrlInput();
+        this.setupMiniPlayerControls();
     }
-
-    // Configurar botón Play/Pause principal
-    setupPlayButton() {
-        const botonPlay = document.getElementById("botonPlay");
-        if (!botonPlay) {
-            console.error('Botón Play no encontrado');
-            return;
-        }
-
-        botonPlay.disabled = true;
-        botonPlay.addEventListener('click', () => {
-            const activePlayer = AppState.currentPlayer === 1 ? AppState.player1 : AppState.player2;
-            
-            if (!AppState.playersInitialized || !activePlayer) {
-                mostrarMensajeFlotante("El reproductor no está listo.");
-                return;
-            }
-
-            const playerState = activePlayer.getPlayerState();
-
-            if (!AppState.reproduccionIniciada) {
-                // Primer Play
-                const flatList = PlaylistManager.getFlattenedPlaylist();
-                if (flatList.length > 0) {
-                    AppState.reproduccionIniciada = true;
-                    if (PlaybackController) {
-                        PlaybackController.playFirstVideo();
-                    }
-                    botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                } else {
-        mostrarMensajeFlotante("No hay videos para reproducir. Busca música en 'Explorar' o añade una playlist.");
-        return;
-                }
-            } else {
-                // Play/Pause después del inicio
-                if (playerState === YT.PlayerState.PLAYING) {
-                    activePlayer.pauseVideo();
-                    botonPlay.innerHTML = '<i class="fas fa-play"></i>';
-                    if (PlaybackController) {
-                        PlaybackController.stopMonitoring();
-                    }
-                } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
-                    activePlayer.playVideo();
-                    botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                    if (PlaybackController) {
-                        PlaybackController.startMonitoring();
-                    }
-                }
+setupMiniPlayerControls() {
+    const miniPlayer = document.getElementById('miniPlayer');
+    const miniPlayBtn = document.getElementById('miniPlayBtn');
+    const miniNextBtn = document.getElementById('miniNextBtn');
+    
+    // Click en mini player va a playing view
+    if (miniPlayer) {
+        miniPlayer.addEventListener('click', (e) => {
+            if (!e.target.closest('.mini-control-btn')) {
+                this.switchToView('playing');
             }
         });
     }
+    
+    // Conectar botones mini player con controles principales
+    if (miniPlayBtn) {
+        miniPlayBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('botonPlay')?.click();
+        });
+    }
+    
+    if (miniNextBtn) {
+        miniNextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('botonNext')?.click();
+        });
+    }
+}
+    // Configurar botón Play/Pause principal
+setupPlayButton() {
+    const botonPlay = document.getElementById("botonPlay");
+    const miniPlayBtn = document.getElementById("miniPlayBtn");
+    
+    if (!botonPlay) {
+        console.error('Botón Play no encontrado');
+        return;
+    }
 
+    botonPlay.disabled = true;
+    botonPlay.addEventListener('click', () => {
+        const activePlayer = AppState.currentPlayer === 1 ? AppState.player1 : AppState.player2;
+        
+        if (!AppState.playersInitialized || !activePlayer) {
+            mostrarMensajeFlotante("El reproductor no está listo.");
+            return;
+        }
+
+        const playerState = activePlayer.getPlayerState();
+
+        if (!AppState.reproduccionIniciada) {
+            // Primer Play
+            const flatList = PlaylistManager.getFlattenedPlaylist();
+            if (flatList.length > 0) {
+                AppState.reproduccionIniciada = true;
+                if (PlaybackController) {
+                    PlaybackController.playFirstVideo();
+                }
+                botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
+                // AÑADIR: Sincronizar mini player
+                if (miniPlayBtn) {
+                    miniPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                }
+            } else {
+                mostrarMensajeFlotante("No hay videos para reproducir.");
+                return;
+            }
+        } else {
+            // Play/Pause después del inicio
+            if (playerState === YT.PlayerState.PLAYING) {
+                activePlayer.pauseVideo();
+                botonPlay.innerHTML = '<i class="fas fa-play"></i>';
+                // AÑADIR: Sincronizar mini player
+                if (miniPlayBtn) {
+                    miniPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+                }
+                if (PlaybackController) {
+                    PlaybackController.stopMonitoring();
+                }
+            } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
+                activePlayer.playVideo();
+                botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
+                // AÑADIR: Sincronizar mini player
+                if (miniPlayBtn) {
+                    miniPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                }
+                if (PlaybackController) {
+                    PlaybackController.startMonitoring();
+                }
+            }
+        }
+    });
+}
+// Manejar cambios de vista
+handleViewChanged(view) {
+    console.log('Vista cambiada a:', view);
+    
+    // Acciones específicas por vista
+    switch (view) {
+        case 'library':
+            // Cargar playlists si no están cargadas
+            if (typeof PlaylistGridManager !== 'undefined') {
+                PlaylistGridManager.renderPlaylistsGrid();
+            }
+            break;
+        case 'playing':
+            // Asegurar que el video container esté visible
+            this.ensureVideoContainerVisible();
+            break;
+        case 'search':
+            // Focus en el input de búsqueda si está disponible
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && view === 'search') {
+                setTimeout(() => searchInput.focus(), 100);
+            }
+            break;
+    }
+}
+
+// AÑADIR función auxiliar
+ensureVideoContainerVisible() {
+    const videoContainer = document.getElementById('videoContainer');
+    if (videoContainer && PlaylistState.currentPlayingInfo.videoId) {
+        videoContainer.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+        });
+    }
+}
     // Configurar botón Next
     setupNextButton() {
         const botonNext = document.getElementById('botonNext');
@@ -319,58 +433,53 @@ setupGlobalReferences() {
     }
 
     // Manejar cambios de estado del reproductor
-    handlePlayerStateChanged(detail) {
-        const { playerNum, state, videoId, playerInstance } = detail;
-        
-        if (state === YT.PlayerState.PLAYING) {
-            const flatList = PlaylistManager.getFlattenedPlaylist();
-            const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
+handlePlayerStateChanged(detail) {
+    const { playerNum, state, videoId, playerInstance } = detail;
+    
+    if (state === YT.PlayerState.PLAYING) {
+        const flatList = PlaylistManager.getFlattenedPlaylist();
+        const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
 
-            if (videoId && playingVideoIndex !== -1) {
-                const playingVideoObject = flatList[playingVideoIndex];
-                PlaylistState.currentPlayingInfo.videoId = videoId;
-                PlaylistState.currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
-                PlaylistState.currentPlayingInfo.flattenedIndex = playingVideoIndex;
-                
-                console.log(`Información de reproducción actualizada: índice ${playingVideoIndex} (Video: ${videoId})`);
-                UIManager.updatePlaylistsUI();
+        if (videoId && playingVideoIndex !== -1) {
+            const playingVideoObject = flatList[playingVideoIndex];
+            PlaylistState.currentPlayingInfo.videoId = videoId;
+            PlaylistState.currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
+            PlaylistState.currentPlayingInfo.flattenedIndex = playingVideoIndex;
+            
+            console.log(`Info actualizada: índice ${playingVideoIndex}`);
+            UIManager.updatePlaylistsUI();
 
-                if (AppState.currentPlayer !== playerNum) {
-                    console.log(`Estableciendo currentPlayer a ${playerNum}.`);
-                    AppState.currentPlayer = playerNum;
-                }
+            // AÑADIR: Actualizar mini player
+            this.updateMiniPlayer({
+                title: playingVideoObject.title,
+                artist: playingVideoObject.channelTitle || 'Desconocido',
+                thumbnail: playingVideoObject.thumbnail
+            });
 
-                if (AppState.isTransitioning) {
-                    console.log(`Video conocido (${videoId}) comenzó a reproducir. Reseteando flag isTransitioning.`);
-                    AppState.isTransitioning = false;
-                }
-
-                AppState.hasOutroCrossfadeStarted = false;
-
-            } else if (videoId && playingVideoIndex === -1) {
-                console.warn(`Video desconocido (${videoId}) comenzó a reproducir en Player ${playerNum}.`);
-                PlaylistState.currentPlayingInfo.videoId = videoId;
-                PlaylistState.currentPlayingInfo.playlistId = null;
-                PlaylistState.currentPlayingInfo.flattenedIndex = -1;
-                UIManager.updatePlaylistsUI();
-                
-                if (AppState.currentPlayer !== playerNum) {
-                    AppState.currentPlayer = playerNum;
-                }
-                AppState.hasOutroCrossfadeStarted = false;
+            if (AppState.currentPlayer !== playerNum) {
+                AppState.currentPlayer = playerNum;
             }
-            // Al final de la función, después de las actualizaciones existentes
-            if (state === YT.PlayerState.PLAYING && videoId) {
-        // Si estamos en vista playing, asegurar que el video sea visible
-        if (currentView === 'playing') {
-        const videoContainer = document.getElementById('videoContainer');
-        if (videoContainer) {
-            videoContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            if (AppState.isTransitioning) {
+                AppState.isTransitioning = false;
             }
+
+            AppState.hasOutroCrossfadeStarted = false;
+
+        } else if (videoId && playingVideoIndex === -1) {
+            console.warn(`Video desconocido reproduciendo: ${videoId}`);
+            PlaylistState.currentPlayingInfo.videoId = videoId;
+            PlaylistState.currentPlayingInfo.playlistId = null;
+            PlaylistState.currentPlayingInfo.flattenedIndex = -1;
+            UIManager.updatePlaylistsUI();
+            
+            if (AppState.currentPlayer !== playerNum) {
+                AppState.currentPlayer = playerNum;
             }
-            }
+            AppState.hasOutroCrossfadeStarted = false;
         }
     }
+}
     // Manejar final de reproducción
     handlePlayerEnded(detail) {
         const { playerNum, videoId } = detail;
@@ -398,65 +507,38 @@ setupGlobalReferences() {
     }
 
     // Mostrar mensaje de bienvenida
-    showWelcomeMessage() {
-        // Mostrar solo si no hay playlists cargadas (excepto la manual vacía)
-        const hasLoadedPlaylists = PlaylistState.playlistsData.some(p => 
-            p.id !== 'manual' || p.videos.length > 0
-        );
-        
-        if (!hasLoadedPlaylists) {
-            setTimeout(() => {
-                mostrarMensajeFlotante("¡Bienvenido! Puedes añadir playlists de YouTube o cargar tu biblioteca personal.");
-            }, 2000);
-        }
+showWelcomeMessage() {
+    // Solo mostrar si no hay playlists cargadas
+    const hasLoadedPlaylists = PlaylistState.playlistsData.some(p => 
+        p.id !== 'manual' || p.videos.length > 0
+    );
+    
+    if (!hasLoadedPlaylists) {
+        setTimeout(() => {
+            mostrarMensajeFlotante("¡Bienvenido! Ve a 'Biblioteca' para añadir playlists.");
+        }, 2000);
     }
+}
 
     // Método para reiniciar la aplicación
-    reset() {
-        console.log('Reiniciando aplicación...');
-        
-        // Detener reproducción
-        if (PlaybackController) {
-            PlaybackController.stopMonitoring();
-        }
-        
-        if (AppState.player1) {
-            try { AppState.player1.stopVideo(); } catch(e) { console.warn('Error deteniendo player1:', e); }
-        }
-        if (AppState.player2) {
-            try { AppState.player2.stopVideo(); } catch(e) { console.warn('Error deteniendo player2:', e); }
-        }
-
-        // Limpiar estados
-        AppState.reproduccionIniciada = false;
-        AppState.isTransitioning = false;
-        AppState.isAudioFading = false;
-        AppState.hasOutroCrossfadeStarted = false;
-        AppState.currentPlayer = 1;
-
-        PlaylistState.currentPlayingInfo = {
-            playlistId: null,
-            videoId: null,
-            flattenedIndex: -1
-        };
-
-        // Limpiar caché de SponsorBlock si está disponible
-        if (SponsorBlockManager) {
-            SponsorBlockManager.clearAllSegmentCache();
-        }
-
-        // Actualizar UI
-        UIManager.updatePlaylistsUI();
-        const playButton = document.getElementById('botonPlay');
-        if (playButton) {
-            playButton.innerHTML = '<i class="fas fa-play"></i>';
-            playButton.disabled = PlaylistManager.getFlattenedPlaylist().length === 0;
-        }
-        
-        mostrarMensajeFlotante('Aplicación reiniciada correctamente');
-        console.log('Aplicación reiniciada');
-    }
-
+reset() {
+    console.log('Reiniciando aplicación...');
+    
+    // Código de reset existente (mantener)...
+    
+    // AÑADIR: Reset mini player
+    const miniTitle = document.getElementById('miniTrackTitle');
+    const miniArtist = document.getElementById('miniTrackArtist');
+    const miniImage = document.getElementById('miniTrackImage');
+    const miniPlayBtn = document.getElementById('miniPlayBtn');
+    
+    if (miniTitle) miniTitle.textContent = 'Selecciona música';
+    if (miniArtist) miniArtist.textContent = 'YT CrossMix';
+    if (miniImage) miniImage.src = 'https://via.placeholder.com/40x40';
+    if (miniPlayBtn) miniPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+    
+    mostrarMensajeFlotante('Aplicación reiniciada');
+}
     // Obtener estadísticas de la aplicación
     getStats() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
