@@ -1119,7 +1119,6 @@ body {
     align-items: center;
     padding: 0 var(--spacing-md);
     z-index: 999;
-    cursor: pointer;
 }
 
 .mini-player-track {
