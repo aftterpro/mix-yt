@@ -683,6 +683,13 @@ static closeAllContextMenus() {
 }
     // Habilitar drag and drop
     static enableDragAndDrop(scopeElement = document) {
+    const isMobile = 'ontouchstart' in window;
+
+    if (isMobile) {
+        // En mobile, usar touch events en lugar de drag
+        UIManager.enableTouchReorder(scopeElement);
+        return;
+    }
         const playlistContainer = scopeElement === document 
             ? document.getElementById('playlistContainer') 
             : scopeElement.closest('.playlist-group');
@@ -826,6 +833,11 @@ static closeAllContextMenus() {
             });
         });
     }
+    static enableTouchReorder(scopeElement) {
+    // Implementar reordenamiento táctil simple
+    // Por ahora, desactivar en mobile y usar solo context menus
+    console.log('Touch reorder not implemented yet, using context menus');
+}
     // Manejar acción "Reproducir Después" desde búsqueda
 static handlePlayNextActionFromSearch(videoId, videoData) {
     // Si no hay video reproduciéndose, añadir al principio
@@ -856,9 +868,19 @@ static handlePlayNextActionFromSearch(videoId, videoData) {
         UIManager.insertVideoAtFlatIndex(videoData, targetFlatIndex);
         console.log(`Video ${videoId} añadido para reproducir después del actual`);
     }
+       const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+        // Mostrar mini toast en mobile
+        mostrarMensajeFlotante(`♪ "${videoData.title}" añadido`);
+        
+        // Vibración si está disponible
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+    }
     
     UIManager.updatePlaylistsUI();
-    mostrarMensajeFlotante(`"${videoData.title}" añadido a la cola`);
 }
 
 // Insertar video en índice específico de la lista aplanada
@@ -895,5 +917,6 @@ static insertVideoAtFlatIndex(videoData, targetFlatIndex) {
     }
 }
 }
+
 
 
