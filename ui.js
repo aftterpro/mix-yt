@@ -9,32 +9,18 @@ export function mostrarMensajeFlotante(mensaje) {
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'floating-message';
     
-    let playlistContainer = document.getElementById('floatingMessageContainer');
+    let container = document.getElementById('floatingMessageContainer') || 
+                   document.querySelector('.mobile-main') || 
+                   document.body;
     
-    if (!playlistContainer) {
-        playlistContainer = document.getElementById('playlistContainer');
-    }
-    
-    if (!playlistContainer) {
-        playlistContainer = document.body;
-    }
-    
-    if (playlistContainer === document.body) {
-        playlistContainer.appendChild(mensajeDiv);
-    } else {
-        try {
-            playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
-        } catch (error) {
-            console.warn('Error usando insertAdjacentElement, usando appendChild:', error);
-            playlistContainer.appendChild(mensajeDiv);
-        }
-    }
+    container.appendChild(mensajeDiv);
 
-    // Estilos mejorados
     Object.assign(mensajeDiv.style, {
         position: 'fixed',
-        bottom: '20px',
-        right: '20px',
+        // CAMBIAR posición para no interferir con bottom nav
+        bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))', // bottom-nav + mini-player + margin
+        left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: '10000',
         background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
         color: 'white',
@@ -42,12 +28,13 @@ export function mostrarMensajeFlotante(mensaje) {
         borderRadius: '12px',
         fontSize: '14px',
         fontWeight: '500',
-        maxWidth: '320px',
+        maxWidth: 'calc(100vw - 32px)', // AÑADIR: responsive width
         wordWrap: 'break-word',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.15)',
+        textAlign: 'center', // AÑADIR
+        boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
         backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
-        transform: 'translateY(100px) scale(0.8)',
+        transform: 'translateX(-50%) translateY(100px) scale(0.8)',
         opacity: '0',
         transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
     });
@@ -75,61 +62,271 @@ export function mostrarMensajeFlotante(mensaje) {
 }
 export class UIManager {
     // Actualizar UI de playlists completa
-    static updatePlaylistsUI() {
-        const playlistContainer = document.getElementById('playlistContainer');
-        if (!playlistContainer) return;
-        
-        const currentScrollTop = playlistContainer.scrollTop;
-        playlistContainer.innerHTML = '';
+static updatePlaylistsUI() {
+    // CAMBIAR: Buscar contenedor según la vista activa
+    const currentView = window.currentView || 'home';
+    let playlistContainer;
+    
+    if (currentView === 'library') {
+        playlistContainer = document.getElementById('playlistsGrid');
+    } else {
+        playlistContainer = document.getElementById('playlistContainer');
+    }
+    
+    if (!playlistContainer) return;
+    
+    const currentScrollTop = playlistContainer.scrollTop;
+    playlistContainer.innerHTML = '';
+    const playingVideoId = PlaylistState.currentPlayingInfo.videoId;
 
-        const playingVideoId = PlaylistState.currentPlayingInfo.videoId;
-
-        if (PlaylistState.playlistsData.length === 0) {
-            playlistContainer.innerHTML = '<p style="padding: 10px; color: #888; text-align: center;">Añade playlists o videos.</p>';
-            return;
-        }
-
-        PlaylistState.playlistsData.forEach((playlist) => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = `playlist-group ${playlist.isExpanded ? 'expanded' : ''}`;
-            groupDiv.dataset.playlistId = playlist.id;
-
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'playlist-group-header';
-            headerDiv.innerHTML = `
-                <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="playlist-group-thumb" loading="lazy">
-                <span class="playlist-group-name">${playlist.name} (${playlist.videos.length})</span>
-                <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} expand-icon"></i>
-            `;
-            headerDiv.addEventListener('click', () => PlaylistManager.togglePlaylistExpansion(playlist.id));
-            groupDiv.appendChild(headerDiv);
-
-            const videosDiv = document.createElement('div');
-            videosDiv.className = 'playlist-group-videos';
-            
-            if (playlist.isExpanded) {
-                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-            } else {
-                videosDiv.style.maxHeight = '0px';
-            }
-
-            playlist.videos.forEach((video) => {
-                const item = UIManager.createPlaylistItemElement(video, playlist.id, playingVideoId);
-                videosDiv.appendChild(item);
-            });
-
-            groupDiv.appendChild(videosDiv);
-            playlistContainer.appendChild(groupDiv);
-
-            if (playlist.isExpanded) {
-                videosDiv.style.maxHeight = videosDiv.scrollHeight + 'px';
-            }
-        });
-
-        playlistContainer.scrollTop = currentScrollTop;
-        UIManager.enableDragAndDrop();
+    if (PlaylistState.playlistsData.length === 0) {
+        playlistContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-music"></i>
+                <p>No hay playlists</p>
+                <p>Ve a Biblioteca para añadir música</p>
+            </div>
+        `;
+        return;
     }
 
+    if (currentView === 'library') {
+        UIManager.renderPlaylistCards(playlistContainer);
+    } else {
+        UIManager.renderPlaylistList(playlistContainer, playingVideoId);
+    }
+    
+    playlistContainer.scrollTop = currentScrollTop;
+    UIManager.enableDragAndDrop();
+}
+// Renderizar cards para library view
+static renderPlaylistCards(container) {
+    const grid = document.createElement('div');
+    grid.className = 'playlists-grid-mobile';
+    
+    PlaylistState.playlistsData.forEach(playlist => {
+        const card = UIManager.createPlaylistCard(playlist);
+        grid.appendChild(card);
+    });
+    
+    container.appendChild(grid);
+}
+
+// Renderizar lista para otras vistas
+static renderPlaylistList(container, playingVideoId) {
+    PlaylistState.playlistsData.forEach((playlist) => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = `playlist-group-mobile ${playlist.isExpanded ? 'expanded' : ''}`;
+        groupDiv.dataset.playlistId = playlist.id;
+
+        // Header más compacto para mobile
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'playlist-group-header-mobile';
+        headerDiv.innerHTML = `
+            <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" 
+                 class="playlist-group-thumb-mobile" loading="lazy">
+            <div class="playlist-info-mobile">
+                <span class="playlist-name-mobile">${playlist.name}</span>
+                <span class="playlist-count-mobile">${playlist.videos.length} videos</span>
+            </div>
+            <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} expand-icon-mobile"></i>
+        `;
+        headerDiv.addEventListener('click', () => PlaylistManager.togglePlaylistExpansion(playlist.id));
+        groupDiv.appendChild(headerDiv);
+
+        // Videos container
+        const videosDiv = document.createElement('div');
+        videosDiv.className = 'playlist-group-videos-mobile';
+        
+        if (playlist.isExpanded) {
+            playlist.videos.forEach((video) => {
+                const item = UIManager.createMobilePlaylistItem(video, playlist.id, playingVideoId);
+                videosDiv.appendChild(item);
+            });
+        }
+
+        groupDiv.appendChild(videosDiv);
+        container.appendChild(groupDiv);
+    });
+}
+    static createPlaylistCard(playlist) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card-mobile';
+    card.dataset.playlistId = playlist.id;
+    
+    card.innerHTML = `
+        <div class="playlist-card-image">
+            <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
+            <div class="playlist-card-overlay">
+                <button class="playlist-play-btn">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+        <div class="playlist-card-info">
+            <h3 class="playlist-card-title">${playlist.name}</h3>
+            <p class="playlist-card-meta">${playlist.videos.length} videos</p>
+        </div>
+    `;
+    
+    // Event listeners
+    card.addEventListener('click', () => {
+        if (playlist.videos.length > 0) {
+            UIManager.showMobilePlaylistDetail(playlist);
+        } else {
+            PlaylistManager.togglePlaylistExpansion(playlist.id);
+        }
+    });
+    
+    const playBtn = card.querySelector('.playlist-play-btn');
+    playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        UIManager.playEntirePlaylist(playlist);
+    });
+    
+    return card;
+}
+    static createMobilePlaylistItem(video, playlistId, playingVideoId) {
+    const item = document.createElement('div');
+    item.className = 'playlist-item-mobile';
+    item.draggable = true;
+    item.dataset.videoId = video.videoId;
+    item.dataset.playlistId = playlistId;
+    
+    if (video.videoId === playingVideoId) {
+        item.classList.add('playing');
+    }
+    
+    item.innerHTML = `
+        <img src="${video.thumbnail}" alt="${video.title}" 
+             class="playlist-item-thumb-mobile" loading="lazy">
+        <div class="playlist-item-info-mobile">
+            <h4 class="playlist-item-title-mobile">${video.title}</h4>
+            <p class="playlist-item-duration-mobile">${Utils.formatDuration(video.duration)}</p>
+        </div>
+        <button class="playlist-item-menu-mobile">
+            <i class="fas fa-ellipsis-v"></i>
+        </button>
+        ${video.videoId === playingVideoId ? '<i class="fas fa-volume-up playing-icon-mobile"></i>' : ''}
+    `;
+    
+    // Context menu para mobile
+    const menuBtn = item.querySelector('.playlist-item-menu-mobile');
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        UIManager.showMobileContextMenu(e.target, video, playlistId);
+    });
+    
+    return item;
+}
+    static showMobileContextMenu(trigger, video, playlistId) {
+    UIManager.closeAllContextMenus();
+    
+    // Crear bottom sheet modal para mobile
+    const modal = document.createElement('div');
+    modal.className = 'mobile-context-modal';
+    modal.innerHTML = `
+        <div class="mobile-context-backdrop"></div>
+        <div class="mobile-context-sheet">
+            <div class="mobile-context-header">
+                <img src="${video.thumbnail}" alt="${video.title}" class="context-video-thumb">
+                <div class="context-video-info">
+                    <h4>${video.title}</h4>
+                    <p>${Utils.formatDuration(video.duration)}</p>
+                </div>
+            </div>
+            <div class="mobile-context-actions">
+                <button class="mobile-context-action" data-action="play-next">
+                    <i class="fas fa-arrow-right-to-line"></i>
+                    Reproducir Después
+                </button>
+                <button class="mobile-context-action" data-action="move">
+                    <i class="fas fa-folder-tree"></i>
+                    Mover a Playlist
+                </button>
+                <button class="mobile-context-action danger" data-action="delete">
+                    <i class="fas fa-trash"></i>
+                    Eliminar
+                </button>
+            </div>
+            <button class="mobile-context-close">Cancelar</button>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Animación de entrada
+    requestAnimationFrame(() => {
+        modal.classList.add('show');
+    });
+    
+    // Event listeners
+    modal.querySelector('.mobile-context-backdrop').addEventListener('click', () => {
+        UIManager.closeMobileContextMenu(modal);
+    });
+    
+    modal.querySelector('.mobile-context-close').addEventListener('click', () => {
+        UIManager.closeMobileContextMenu(modal);
+    });
+    
+    // Action buttons
+    modal.querySelectorAll('.mobile-context-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            UIManager.handleMobileContextAction(action, video, playlistId);
+            UIManager.closeMobileContextMenu(modal);
+        });
+    });
+}
+    static closeMobileContextMenu(modal) {
+    modal.classList.add('hide');
+    setTimeout(() => modal.remove(), 300);
+}
+
+static handleMobileContextAction(action, video, playlistId) {
+    switch (action) {
+        case 'play-next':
+            UIManager.handlePlayNextActionFromSearch(video.videoId, video);
+            break;
+        case 'move':
+            UIManager.showMobilePlaylistSelector(video, playlistId);
+            break;
+        case 'delete':
+            PlaylistManager.deleteVideo(playlistId, video.videoId);
+            mostrarMensajeFlotante('Video eliminado');
+            break;
+    }
+}
+
+static showMobilePlaylistDetail(playlist) {
+    // Cambiar a playing view y mostrar la playlist
+    if (typeof switchView === 'function') {
+        switchView('playing');
+        // Trigger update para mostrar videos de esta playlist
+        setTimeout(() => {
+            UIManager.updatePlaylistsUI();
+        }, 100);
+    }
+}
+
+static playEntirePlaylist(playlist) {
+    if (playlist.videos.length === 0) {
+        mostrarMensajeFlotante('Esta playlist está vacía');
+        return;
+    }
+    
+    // Comenzar reproducción desde el primer video
+    if (window.PlaybackController) {
+        PlaybackController.playFirstVideo();
+    }
+    
+    mostrarMensajeFlotante(`Reproduciendo "${playlist.name}"`);
+    
+    // Cambiar a vista playing
+    if (typeof switchView === 'function') {
+        switchView('playing');
+    }
+}
     // Actualizar UI de una sola playlist
     static updateSinglePlaylistUI(playlistId) {
         const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
@@ -468,12 +665,22 @@ export class UIManager {
     }
 
     // Cerrar todos los menús contextuales
-    static closeAllContextMenus() {
-        document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(menu => {
-            menu.style.display = 'none';
-        });
-    }
-
+static closeAllContextMenus() {
+    // Cerrar menús desktop existentes
+    document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(menu => {
+        menu.style.display = 'none';
+    });
+    
+    // AÑADIR: Cerrar modales mobile
+    document.querySelectorAll('.mobile-context-modal').forEach(modal => {
+        UIManager.closeMobileContextMenu(modal);
+    });
+    
+    // AÑADIR: Cerrar playlist selectors
+    document.querySelectorAll('.mobile-playlist-selector').forEach(selector => {
+        selector.remove();
+    });
+}
     // Habilitar drag and drop
     static enableDragAndDrop(scopeElement = document) {
         const playlistContainer = scopeElement === document 
@@ -688,4 +895,5 @@ static insertVideoAtFlatIndex(videoData, targetFlatIndex) {
     }
 }
 }
+
 
