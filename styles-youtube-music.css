@@ -3079,3 +3079,76 @@ body {
         animation: none !important;
     }
 }
+
+/* ===== DESKTOP LAYOUT ===== */
+@media (min-width: 1024px) {
+    /* Volver a layout con sidebar para desktop */
+    .app-container {
+        display: grid;
+        grid-template-areas: 
+            "sidebar header"
+            "sidebar main"
+            "miniplayer miniplayer";
+        grid-template-columns: 260px 1fr;
+        grid-template-rows: 64px 1fr 72px;
+    }
+    
+    .mobile-header {
+        grid-area: header;
+        height: 64px;
+    }
+    
+    .mobile-main {
+        grid-area: main;
+        padding-bottom: 0;
+    }
+    
+    /* Mostrar sidebar en desktop */
+    .desktop-sidebar {
+        grid-area: sidebar;
+        display: block;
+        background: var(--secondary-bg);
+        border-right: 1px solid var(--border-color);
+        overflow-y: auto;
+    }
+    
+    /* Ocultar bottom navigation en desktop */
+    .bottom-nav {
+        display: none;
+    }
+    
+    /* Mini player se convierte en full player */
+    .mini-player {
+        grid-area: miniplayer;
+        height: 72px;
+        position: relative;
+        bottom: auto;
+    }
+    
+    /* Content view absoluto → relativo */
+    .content-view {
+        position: relative;
+        height: auto;
+        overflow-y: visible;
+    }
+    
+    /* Grid más columnas en desktop */
+   .playlists-grid-mobile {
+       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+       gap: var(--spacing-lg);
+       padding: var(--spacing-lg);
+   }
+   
+   /* Cards más grandes en desktop */
+   .playlist-card-mobile {
+       max-width: none;
+   }
+   
+   .playlist-card-title {
+       font-size: 14px;
+   }
+   
+   .playlist-card-meta {
+       font-size: 12px;
+   }
+}
