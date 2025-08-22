@@ -1,4 +1,4 @@
-//  Sistema de Integración Corregido para YT CrossMix
+//  Sistema de Integración Corregido para YT CrossMix - VERSIÓN CORREGIDA
 class YTCrossMixIntegration {
     constructor() {
         this.isInitialized = false;
@@ -18,7 +18,7 @@ class YTCrossMixIntegration {
             bottomNav: null,
             miniPlayer: null,
             
-            // Vistas principales
+            // Vistas principales - CORREGIDO: usar querySelectorAll para arrays
             contentViews: null,
             searchResults: null,
             playlistsGrid: null,
@@ -105,7 +105,7 @@ class YTCrossMixIntegration {
         });
     }
 
-    // Obtener referencias a elementos DOM críticos
+    // Obtener referencias a elementos DOM críticos - CORREGIDO
     getDOMReferences() {
         const elements = {
             // Headers y navegación
@@ -113,8 +113,7 @@ class YTCrossMixIntegration {
             bottomNav: '#bottomNav, .bottom-nav',
             miniPlayer: '#miniPlayer, .mini-player',
             
-            // Vistas principales
-            contentViews: '.content-view',
+            // Vistas principales - USAR querySelectorAll para arrays
             searchResults: '#searchResults',
             playlistsGrid: '#playlistsGrid',
             
@@ -139,15 +138,24 @@ class YTCrossMixIntegration {
                 console.warn(`⚠️ Elemento no encontrado: ${selector}`);
             }
         });
+        
+        // CORREGIDO: Obtener contentViews como NodeList
+        this.domElements.contentViews = document.querySelectorAll('.content-view');
+        console.log(`📱 Encontradas ${this.domElements.contentViews.length} vistas de contenido`);
     }
 
     // Verificar elementos DOM críticos
     verifyDOMElements() {
-        const critical = ['contentViews', 'searchInput'];
+        const critical = ['searchInput'];
         const missing = critical.filter(key => !this.domElements[key]);
         
         if (missing.length > 0) {
             throw new Error(`Elementos DOM críticos faltantes: ${missing.join(', ')}`);
+        }
+        
+        // Verificar que contentViews tenga elementos
+        if (!this.domElements.contentViews || this.domElements.contentViews.length === 0) {
+            throw new Error('No se encontraron vistas de contenido (.content-view)');
         }
     }
 
@@ -179,14 +187,14 @@ class YTCrossMixIntegration {
         });
     }
 
-    // Cambiar vista activa
+    // Cambiar vista activa - CORREGIDO
     switchView(newView) {
         if (this.currentView === newView) return;
         
         console.log(`📱 Cambiando vista: ${this.currentView} → ${newView}`);
         
-        // Actualizar vistas de contenido
-        if (this.domElements.contentViews) {
+        // CORREGIDO: Usar forEach en NodeList
+        if (this.domElements.contentViews && this.domElements.contentViews.length > 0) {
             this.domElements.contentViews.forEach(view => {
                 const isActive = view.id === `${newView}View`;
                 view.classList.toggle('active', isActive);
@@ -393,8 +401,14 @@ class YTCrossMixIntegration {
         console.log('🎵 Play/Pause clicked');
         
         // Integración con sistema existente
-        if (window.YTCrossMixApp && window.YTCrossMixApp.handlePlayPause) {
+        if (window.YTCrossMixApp && typeof window.YTCrossMixApp.handlePlayPause === 'function') {
             window.YTCrossMixApp.handlePlayPause();
+            return;
+        }
+
+        // Si existe el botón principal, hacer click en él
+        if (this.domElements.playButton) {
+            this.domElements.playButton.click();
             return;
         }
 
@@ -414,8 +428,14 @@ class YTCrossMixIntegration {
         console.log('⏭️ Next clicked');
         
         // Integración con sistema existente
-        if (window.YTCrossMixApp && window.YTCrossMixApp.handleNext) {
+        if (window.YTCrossMixApp && typeof window.YTCrossMixApp.handleNext === 'function') {
             window.YTCrossMixApp.handleNext();
+            return;
+        }
+
+        // Si existe el botón principal, hacer click en él
+        if (this.domElements.nextButton) {
+            this.domElements.nextButton.click();
             return;
         }
 
@@ -636,6 +656,12 @@ class YTCrossMixIntegration {
     showMessage(message, duration = 4000) {
         console.log('💬 Mensaje:', message);
         
+        // Usar la función existente si está disponible
+        if (typeof mostrarMensajeFlotante === 'function') {
+            mostrarMensajeFlotante(message);
+            return;
+        }
+        
         // Crear elemento de mensaje
         const messageEl = document.createElement('div');
         messageEl.className = 'floating-message';
@@ -738,6 +764,7 @@ class YTCrossMixIntegration {
             domElements: Object.fromEntries(
                 Object.entries(this.domElements).map(([key, el]) => [key, !!el])
             ),
+            contentViewsCount: this.domElements.contentViews ? this.domElements.contentViews.length : 0,
             viewport: {
                 width: window.innerWidth,
                 height: window.innerHeight,
@@ -801,10 +828,12 @@ class YTCrossMixIntegration {
             
             // Override funciones si es necesario
             const originalReset = window.YTCrossMixApp.reset;
-            window.YTCrossMixApp.reset = () => {
-                if (originalReset) originalReset.call(window.YTCrossMixApp);
-                this.reset();
-            };
+            if (typeof originalReset === 'function') {
+                window.YTCrossMixApp.reset = () => {
+                    originalReset.call(window.YTCrossMixApp);
+                    this.reset();
+                };
+            }
         }
 
         // Conectar con gestores existentes
@@ -819,6 +848,12 @@ class YTCrossMixIntegration {
             if (e.detail && e.detail.state === 1) { // PLAYING
                 this.isPlaying = true;
                 this.updatePlayButtonState();
+                
+                // Actualizar track info si está disponible
+                if (e.detail.videoId) {
+                    // Intentar obtener info del video
+                    this.syncTrackInfo(e.detail);
+                }
             } else {
                 this.isPlaying = false;
                 this.updatePlayButtonState();
@@ -830,6 +865,24 @@ class YTCrossMixIntegration {
                 this.loadLibraryContent();
             }
         });
+    }
+
+    // Sincronizar información del track
+    syncTrackInfo(playerDetail) {
+        // Intentar obtener información del video actual
+        if (window.PlaylistState && window.PlaylistState.currentPlayingInfo) {
+            const currentInfo = window.PlaylistState.currentPlayingInfo;
+            const flatList = window.PlaylistManager ? window.PlaylistManager.getFlattenedPlaylist() : [];
+            const currentVideo = flatList.find(v => v.videoId === currentInfo.videoId);
+            
+            if (currentVideo) {
+                this.updateCurrentTrack({
+                    title: currentVideo.title,
+                    artist: currentVideo.channelTitle || 'Desconocido',
+                    thumbnail: currentVideo.thumbnail
+                });
+            }
+        }
     }
 }
 
@@ -856,7 +909,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Funciones globales para compatibilidad
 window.switchView = (view) => integration.switchView(view);
 window.updateMiniPlayer = (data) => integration.updateCurrentTrack(data);
-window.mostrarMensajeFlotante = (msg) => integration.showMessage(msg);
 
 // Exportar para uso en módulos
 export { YTCrossMixIntegration, integration };
