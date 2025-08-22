@@ -2,15 +2,13 @@
 
 /* ===== VARIABLES CSS ===== */
 :root {
-    --mobile-safe-area-bottom: env(safe-area-inset-bottom);
+    --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-safe-area-top: env(safe-area-inset-top);
     /* Nuevas variables mobile */
-    --mobile-header-height: 56px;
+    --mobile-header-height: 64px;
     --mobile-mini-player-height: 64px;
-    --mobile-bottom-nav-height: 64px;
-    --mobile-safe-area-top: env(safe-area-inset-top);
-    --mobile-safe-area-bottom: env(safe-area-inset-bottom);
-    
+    --mobile-bottom-nav-height: 80px;
+    --mobile-safe-area-top: env(safe-area-inset-top);    
     /* Colores principales */
     --primary-bg: #0f0f0f;
     --secondary-bg: #1a1a1a;
@@ -78,12 +76,6 @@ body {
         color: var(--text-primary, #ffffff);
 }
     /* Contenido principal */
-    .mobile-main {
-        flex: 1;
-        overflow-y: auto;
-        padding-bottom: 144px; /* espacio para mini player + bottom nav */
-        position: relative;
-    }
     .content-view {
         display: none;
         height: 100%;
@@ -654,9 +646,14 @@ body {
 /* ===== CONTENIDO PRINCIPAL ===== */
 .mobile-main {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-    position: relative;
-    padding-bottom: calc(var(--mobile-mini-player-height) + var(--mobile-bottom-nav-height));
+    margin-bottom: calc(
+        var(--mobile-mini-player-height) + 
+        var(--mobile-bottom-nav-height) + 
+        var(--mobile-safe-area-bottom)
+    );
 }
 
 .content-header {
@@ -698,15 +695,15 @@ body {
     padding: 0 var(--spacing-lg) var(--spacing-lg);
 }
 /* ===== GRID DE RESULTADOS ===== */
-/* Cards en 2 columnas para mobile */
+/* Grids responsivos */
 .search-results,
 .playlists-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+    width: 100%;
+    box-sizing: border-box;
 }
-
 /* Cards más compactas */
 .video-result,
 .playlist-card {
@@ -2684,17 +2681,9 @@ body {
     transform: translateY(0);
 }
 @media (min-width: 768px) {
-    /* En desktop, mostrar más columnas */
     .search-results,
     .playlists-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: var(--spacing-md);
-    }
-    
-    /* Centrar contenido en desktop */
-    .mobile-main {
-        max-width: 1200px;
-        margin: 0 auto;
     }
 }
 /* Transiciones entre vistas */
@@ -3226,20 +3215,6 @@ body {
             font-size: 14px;
         }
     }
-
-@media (min-width: 768px) {
-    /* Desktop fallbacks */
-    .playlists-grid-mobile {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: var(--spacing-md);
-    }
-    
-    .mobile-context-modal {
-        /* Could show as dropdown instead of bottom sheet */
-        display: none; /* Use desktop context menus instead */
-    }
-}
-
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
     .mobile-context-backdrop {
