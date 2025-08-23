@@ -134,7 +134,7 @@ class YTCrossMixIntegration {
             playlistsGrid: '#playlistsGrid',
             
             // Controles
-            searchInput: '#searchInput',
+            searchInput: '#searchInput, #sidebarSearchInput',
             playButton: '#botonPlay, #playButton',
             nextButton: '#botonNext, #nextButton',
             miniPlayBtn: '#miniPlayBtn',
@@ -162,7 +162,7 @@ class YTCrossMixIntegration {
 
     // Verificar elementos DOM críticos
     verifyDOMElements() {
-        const critical = ['searchInput'];
+        const critical = [];
         const missing = critical.filter(key => !this.domElements[key]);
         
         if (missing.length > 0) {
@@ -460,17 +460,36 @@ class YTCrossMixIntegration {
     }
 
     // Configurar búsqueda
-    setupSearch() {
-        if (!this.domElements.searchInput) {
-            console.warn('⚠️ Search input no encontrado, creando fallback...');
-            this.createSearchFallback();
-            return;
-        }
+setupSearch() {
+    // Buscar tanto el input móvil como el del sidebar
+    const mobileSearchInput = document.getElementById('searchInput');
+    const sidebarSearchInput = document.getElementById('sidebarSearchInput');
+    
+    const inputs = [mobileSearchInput, sidebarSearchInput].filter(Boolean);
+    
+    if (inputs.length === 0) {
+        console.warn('⚠️ Search inputs no encontrados, creando fallback...');
+        this.createSearchFallback();
+        return;
+    }
 
+    console.log(`📱 Configurando ${inputs.length} input(s) de búsqueda`);
+
+    inputs.forEach((input, index) => {
         let searchTimeout = null;
+        const inputType = input.id === 'searchInput' ? 'mobile' : 'sidebar';
+        
+        console.log(`🔍 Configurando búsqueda ${inputType}`);
 
-        this.domElements.searchInput.addEventListener('input', (e) => {
+        input.addEventListener('input', (e) => {
             const query = e.target.value.trim();
+            
+            // Sincronizar ambos inputs (evitar bucle infinito)
+            inputs.forEach(otherInput => {
+                if (otherInput !== input && otherInput.value !== query) {
+                    otherInput.value = query;
+                }
+            });
             
             // Limpiar timeout anterior
             if (searchTimeout) {
@@ -493,7 +512,7 @@ class YTCrossMixIntegration {
         });
 
         // Enter para buscar
-        this.domElements.searchInput.addEventListener('keypress', (e) => {
+        input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const query = e.target.value.trim();
                 if (query.length > 0) {
@@ -501,30 +520,65 @@ class YTCrossMixIntegration {
                 }
             }
         });
-    }
+
+        // Focus específico para sidebar en desktop
+        if (inputType === 'sidebar' && this.isDesktop) {
+            input.addEventListener('focus', () => {
+                if (this.currentView !== 'search') {
+                    this.switchView('search');
+                }
+            });
+        }
+    });
+}
 
     // NUEVO: Crear fallback de búsqueda si no existe
-    createSearchFallback() {
-        // Buscar en el header mobile
-        const mobileHeader = this.domElements.mobileHeader;
-        if (mobileHeader) {
-            const searchContainer = mobileHeader.querySelector('.mobile-search');
-            if (searchContainer && !searchContainer.querySelector('input')) {
-                const searchInput = document.createElement('input');
-                searchInput.type = 'text';
-                searchInput.id = 'searchInput';
-                searchInput.className = 'mobile-search-input';
-                searchInput.placeholder = 'Buscar música...';
-                searchContainer.appendChild(searchInput);
-                
-                this.domElements.searchInput = searchInput;
-                console.log('✅ Search input fallback creado');
-                
-                // Configurar eventos
-                this.setupSearch();
-            }
+ createSearchFallback() {
+    // Intentar crear en el header mobile
+    const mobileHeader = this.domElements.mobileHeader;
+    if (mobileHeader && !document.getElementById('searchInput')) {
+        const searchContainer = mobileHeader.querySelector('.mobile-search');
+        if (searchContainer) {
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.id = 'searchInput';
+            searchInput.className = 'mobile-search-input';
+            searchInput.placeholder = 'Buscar música...';
+            searchContainer.appendChild(searchInput);
+            
+            console.log('✅ Search input móvil fallback creado');
         }
     }
+
+    // Intentar crear en sidebar
+    const sidebar = this.domElements.sidebar;
+    if (sidebar && !document.getElementById('sidebarSearchInput')) {
+        const sidebarNav = sidebar.querySelector('.sidebar-nav');
+        if (sidebarNav) {
+            // Crear contenedor de búsqueda
+            const searchDiv = document.createElement('div');
+            searchDiv.className = 'sidebar-search';
+            
+            const searchInput = document.createElement('input');
+            searchInput.type = 'text';
+            searchInput.id = 'sidebarSearchInput';
+            searchInput.className = 'sidebar-search-input';
+            searchInput.placeholder = 'Buscar música...';
+            
+            searchDiv.appendChild(searchInput);
+            
+            // Insertar al principio del sidebar-nav
+            sidebarNav.insertBefore(searchDiv, sidebarNav.firstChild);
+            
+            console.log('✅ Search input sidebar fallback creado');
+        }
+    }
+
+    // Reintentar configuración después de crear fallbacks
+    setTimeout(() => {
+        this.setupSearch();
+    }, 100);
+}
 
     // Configurar manejo de errores
     setupErrorHandling() {
@@ -995,51 +1049,6 @@ class YTCrossMixIntegration {
             });
         }
     }
-
-    // Configurar búsqueda
-    setupSearch() {
-        if (!this.domElements.searchInput) {
-            console.warn('⚠️ Search input no encontrado, creando fallback...');
-            this.createSearchFallback();
-            return;
-        }
-
-        let searchTimeout = null;
-
-        this.domElements.searchInput.addEventListener('input', (e) => {
-            const query = e.target.value.trim();
-            
-            // Limpiar timeout anterior
-            if (searchTimeout) {
-                clearTimeout(searchTimeout);
-            }
-            
-            // Cambiar a vista de búsqueda automáticamente si hay query
-            if (query.length > 0 && this.currentView !== 'search') {
-                this.switchView('search');
-            }
-            
-            // Debounce de búsqueda
-            searchTimeout = setTimeout(() => {
-                if (query.length > 2) {
-                    this.performSearch(query);
-                } else if (query.length === 0) {
-                    this.clearSearchResults();
-                }
-            }, 300);
-        });
-
-        // Enter para buscar
-        this.domElements.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const query = e.target.value.trim();
-                if (query.length > 0) {
-                    this.performSearch(query);
-                }
-            }
-        });
-    }
-
     // NUEVO: Crear fallback de búsqueda si no existe
     createSearchFallback() {
         // Buscar en el header mobile
