@@ -241,7 +241,7 @@ class YTCrossMixIntegration {
         this.setupMiniPlayer();
     }
 
-    // NUEVO: Configurar controles desktop
+   //Configurar controles desktop
     setupDesktopControls() {
         if (!this.domElements.bottomPlayer) return;
 
@@ -249,7 +249,11 @@ class YTCrossMixIntegration {
         const prevBtn = this.domElements.bottomPlayer.querySelector('#prevButton');
         const playBtn = this.domElements.bottomPlayer.querySelector('#botonPlay');
         const nextBtn = this.domElements.bottomPlayer.querySelector('#botonNext');
-
+        const queueButton = this.domElements.bottomPlayer.querySelector('#queueButton');
+    
+        if (queueButton) {
+        queueButton.addEventListener('click', () => this.toggleQueue());
+        }
         if (playBtn) {
             playBtn.addEventListener('click', () => this.handlePlayPause());
         }
@@ -577,22 +581,6 @@ class YTCrossMixIntegration {
             lastTouchEnd = now;
         });
     }
-
-    // CORREGIDO: Manejar play/pause
-    handlePlayPause() {
-        console.log('🎵 Play/Pause clicked');
-        
-        // PRIMERA PRIORIDAD: Usar el botón original del sistema
-        const originalPlayButton = document.getElementById('botonPlay');
-        if (originalPlayBu            // Contenedores
-            videoContainer: null,
-            playlistContainer: null,
-            floatingMessages: null
-        };
-        
-        this.setupEventListeners();
-    }
-
     // Inicialización principal
     async initialize() {
         if (this.initPromise) {
@@ -812,7 +800,10 @@ class YTCrossMixIntegration {
             prevBtn.addEventListener('click', () => this.handlePrevious());
         }
     }
-
+    toggleQueue() {
+    // Cambiar a playing view y mostrar cola
+    this.switchView('playing');
+    }
     // Configurar navegación
     setupNavigation() {
         // Navegación mobile (bottom nav)
@@ -830,7 +821,7 @@ class YTCrossMixIntegration {
 
         // Navegación desktop (sidebar)
         if (this.domElements.sidebar) {
-            const sidebarNavItems = this.domElements.sidebar.querySelectorAll('.nav-item[data-view]');
+        const sidebarNavItems = this.domElements.sidebar.querySelectorAll('.nav-item');
             sidebarNavItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -1130,14 +1121,14 @@ class YTCrossMixIntegration {
 
     // CORREGIDO: Manejar play/pause
     handlePlayPause() {
-        console.log('🎵 Play/Pause clicked');
-        
-        // PRIMERA PRIORIDAD: Usar el botón original del sistema
-        const originalPlayButton = document.getElementById('botonPlay');
-        if (originalPlayButton && !originalPlayButton.disabled) {
-            originalPlayButton.click();
-            return;
-        }
+    console.log('🎵 Play/Pause clicked');
+    
+    // PRIMERA PRIORIDAD: Usar el botón original del sistema
+    const originalPlayButton = document.getElementById('botonPlay');
+    if (originalPlayButton && !originalPlayButton.disabled) {
+        originalPlayButton.click();
+        return;
+    }
 
         // SEGUNDA PRIORIDAD: Integración con app principal
         if (window.YTCrossMixApp && typeof window.YTCrossMixApp.handlePlayPause === 'function') {
