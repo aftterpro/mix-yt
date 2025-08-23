@@ -1,4 +1,4 @@
-//  Sistema de Integración Corregido V2 - SOLUCIONANDO PROBLEMAS DESKTOP/MOBILE
+//  Sistema de Integración
 class YTCrossMixIntegration {
     constructor() {
         this.isInitialized = false;
@@ -35,6 +35,556 @@ class YTCrossMixIntegration {
             miniNextBtn: null,
             
             // Contenedores
+            videoContainer: null,
+            playlistContainer: null,
+            floatingMessages: null
+        };
+        
+        this.setupEventListeners();
+    }
+
+    // Inicialización principal
+    async initialize() {
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        this.initPromise = this._doInitialize();
+        return this.initPromise;
+    }
+
+    async _doInitialize() {
+        try {
+            console.log('🚀 Iniciando YT CrossMix Integration V2...');
+            
+            // 1. Detectar tipo de dispositivo
+            this.detectDeviceType();
+            
+            // 2. Esperar a que el DOM esté listo
+            await this.waitForDOM();
+            
+            // 3. Obtener referencias DOM
+            this.getDOMReferences();
+            
+            // 4. Verificar elementos críticos
+            this.verifyDOMElements();
+            
+            // 5. Configurar interfaz según dispositivo
+            this.setupDeviceInterface();
+            
+            // 6. Configurar navegación
+            this.setupNavigation();
+            
+            // 7. Configurar controles de reproducción
+            this.setupPlaybackControls();
+            
+            // 8. Configurar búsqueda
+            this.setupSearch();
+            
+            // 9. Configurar manejo de errores
+            this.setupErrorHandling();
+            
+            // 10. Inicializar vista por defecto
+            this.switchView('home');
+            
+            // 11. Marcar como inicializado
+            this.isInitialized = true;
+            
+            console.log('✅ YT CrossMix Integration V2 inicializado correctamente');
+            this.dispatchEvent('integrationReady');
+            
+            return true;
+        } catch (error) {
+            console.error('💥 Error en inicialización:', error);
+            this.showError('Error al inicializar la aplicación');
+            throw error;
+        }
+    }
+
+    // NUEVO: Detectar tipo de dispositivo
+    detectDeviceType() {
+        this.isDesktop = window.innerWidth >= 1024;
+        this.isMobile = !this.isDesktop;
+        console.log(`📱 Dispositivo detectado: ${this.isDesktop ? 'Desktop' : 'Mobile'}`);
+    }
+
+    // Esperar a que el DOM esté listo
+    waitForDOM() {
+        return new Promise((resolve) => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve, { once: true });
+            } else {
+                resolve();
+            }
+        });
+    }
+
+    // CORREGIDO: Obtener referencias DOM
+    getDOMReferences() {
+        const elements = {
+            // Headers y navegación
+            mobileHeader: '#mobileHeader, .mobile-header',
+            bottomNav: '#bottomNav, .bottom-nav',
+            miniPlayer: '#miniPlayer, .mini-player',
+            sidebar: '#sidebar, .desktop-sidebar',
+            bottomPlayer: '.bottom-player', // NUEVO
+            
+            // Vistas principales
+            searchResults: '#searchResults',
+            playlistsGrid: '#playlistsGrid',
+            
+            // Controles
+            searchInput: '#searchInput',
+            playButton: '#botonPlay, #playButton',
+            nextButton: '#botonNext, #nextButton',
+            miniPlayBtn: '#miniPlayBtn',
+            miniNextBtn: '#miniNextBtn',
+            
+            // Contenedores
+            videoContainer: '#videoContainer',
+            playlistContainer: '#playlistContainer',
+            floatingMessages: '#floatingMessageContainer'
+        };
+
+        Object.entries(elements).forEach(([key, selector]) => {
+            const element = document.querySelector(selector);
+            this.domElements[key] = element;
+            
+            if (!element) {
+                console.warn(`⚠️ Elemento no encontrado: ${selector}`);
+            }
+        });
+        
+        // CORREGIDO: Obtener contentViews como NodeList
+        this.domElements.contentViews = document.querySelectorAll('.content-view');
+        console.log(`📱 Encontradas ${this.domElements.contentViews.length} vistas de contenido`);
+    }
+
+    // Verificar elementos DOM críticos
+    verifyDOMElements() {
+        const critical = ['searchInput'];
+        const missing = critical.filter(key => !this.domElements[key]);
+        
+        if (missing.length > 0) {
+            console.warn(`⚠️ Elementos críticos faltantes: ${missing.join(', ')}`);
+            // No hacer throw, usar fallbacks
+        }
+        
+        // Verificar que contentViews tenga elementos
+        if (!this.domElements.contentViews || this.domElements.contentViews.length === 0) {
+            console.warn('⚠️ No se encontraron vistas de contenido (.content-view)');
+        }
+    }
+
+    // NUEVO: Configurar interfaz según dispositivo
+    setupDeviceInterface() {
+        if (this.isDesktop) {
+            this.setupDesktopInterface();
+        } else {
+            this.setupMobileInterface();
+        }
+    }
+
+    // NUEVO: Configurar interfaz desktop
+    setupDesktopInterface() {
+        console.log('🖥️ Configurando interfaz desktop...');
+        
+        // Mostrar sidebar
+        if (this.domElements.sidebar) {
+            this.domElements.sidebar.style.display = 'block';
+        }
+        
+        // Mostrar bottom player
+        if (this.domElements.bottomPlayer) {
+            this.domElements.bottomPlayer.style.display = 'flex';
+        }
+        
+        // Ocultar elementos mobile
+        if (this.domElements.mobileHeader) {
+            this.domElements.mobileHeader.style.display = 'none';
+        }
+        if (this.domElements.bottomNav) {
+            this.domElements.bottomNav.style.display = 'none';
+        }
+        if (this.domElements.miniPlayer) {
+            this.domElements.miniPlayer.style.display = 'none';
+        }
+        
+        // Configurar controles desktop
+        this.setupDesktopControls();
+    }
+
+    // NUEVO: Configurar interfaz mobile
+    setupMobileInterface() {
+        console.log('📱 Configurando interfaz mobile...');
+        
+        // Mostrar elementos mobile
+        if (this.domElements.mobileHeader) {
+            this.domElements.mobileHeader.style.display = 'flex';
+        }
+        if (this.domElements.bottomNav) {
+            this.domElements.bottomNav.style.display = 'flex';
+        }
+        if (this.domElements.miniPlayer) {
+            this.domElements.miniPlayer.style.display = 'flex';
+        }
+        
+        // Ocultar elementos desktop
+        if (this.domElements.sidebar) {
+            this.domElements.sidebar.style.display = 'none';
+        }
+        if (this.domElements.bottomPlayer) {
+            this.domElements.bottomPlayer.style.display = 'none';
+        }
+        
+        // Configurar controles mobile
+        this.setupMiniPlayer();
+    }
+
+    // NUEVO: Configurar controles desktop
+    setupDesktopControls() {
+        if (!this.domElements.bottomPlayer) return;
+
+        // Botones de control en bottom player
+        const prevBtn = this.domElements.bottomPlayer.querySelector('#prevButton');
+        const playBtn = this.domElements.bottomPlayer.querySelector('#botonPlay');
+        const nextBtn = this.domElements.bottomPlayer.querySelector('#botonNext');
+
+        if (playBtn) {
+            playBtn.addEventListener('click', () => this.handlePlayPause());
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => this.handleNext());
+        }
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => this.handlePrevious());
+        }
+    }
+
+    // Configurar navegación
+    setupNavigation() {
+        // Navegación mobile (bottom nav)
+        if (this.domElements.bottomNav) {
+            this.domElements.bottomNav.addEventListener('click', (e) => {
+                const navTab = e.target.closest('.nav-tab');
+                if (!navTab) return;
+                
+                const view = navTab.dataset.view;
+                if (view) {
+                    this.switchView(view);
+                }
+            });
+        }
+
+        // Navegación desktop (sidebar)
+        if (this.domElements.sidebar) {
+            const sidebarNavItems = this.domElements.sidebar.querySelectorAll('.nav-item[data-view]');
+            sidebarNavItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const view = item.dataset.view;
+                    if (view) {
+                        this.switchView(view);
+                    }
+                });
+            });
+        }
+    }
+
+    // CORREGIDO: Cambiar vista - MANTENER EXPANSIONES
+    switchView(newView) {
+        if (this.currentView === newView) return;
+        
+        console.log(`📱 Cambiando vista: ${this.currentView} → ${newView}`);
+        
+        // GUARDAR estado de expansiones antes de cambiar vista
+        if (this.currentView === 'library' || this.currentView === 'playing') {
+            this.savePlaylistExpansions();
+        }
+        
+        // Actualizar vistas de contenido
+        if (this.domElements.contentViews && this.domElements.contentViews.length > 0) {
+            this.domElements.contentViews.forEach(view => {
+                const isActive = view.id === `${newView}View`;
+                view.classList.toggle('active', isActive);
+                view.style.display = isActive ? 'flex' : 'none';
+            });
+        }
+
+        // Actualizar navegación bottom (mobile)
+        if (this.domElements.bottomNav) {
+            const navTabs = this.domElements.bottomNav.querySelectorAll('.nav-tab');
+            navTabs.forEach(tab => {
+                const isActive = tab.dataset.view === newView;
+                tab.classList.toggle('active', isActive);
+            });
+        }
+
+        // Actualizar navegación sidebar (desktop)
+        if (this.domElements.sidebar) {
+            const sidebarItems = this.domElements.sidebar.querySelectorAll('.nav-item');
+            sidebarItems.forEach(item => {
+                const isActive = item.dataset.view === newView;
+                item.classList.toggle('active', isActive);
+            });
+        }
+
+        const oldView = this.currentView;
+        this.currentView = newView;
+
+        // Acciones específicas por vista
+        this.handleViewChange(oldView, newView);
+        
+        // Disparar evento
+        this.dispatchEvent('viewChanged', { 
+            from: oldView, 
+            to: newView 
+        });
+    }
+
+    // NUEVO: Guardar estado de expansiones
+    savePlaylistExpansions() {
+        this.expandedPlaylists.clear();
+        
+        // Guardar qué playlists están expandidas
+        const expandedElements = document.querySelectorAll('.playlist-group-mobile.expanded');
+        expandedElements.forEach(element => {
+            const playlistId = element.dataset.playlistId;
+            if (playlistId) {
+                this.expandedPlaylists.add(playlistId);
+            }
+        });
+        
+        console.log('💾 Guardadas expansiones:', Array.from(this.expandedPlaylists));
+    }
+
+    // NUEVO: Restaurar estado de expansiones
+    restorePlaylistExpansions() {
+        console.log('📂 Restaurando expansiones:', Array.from(this.expandedPlaylists));
+        
+        // Aplicar estado de expansión a las playlists
+        if (window.PlaylistState && window.PlaylistState.playlistsData) {
+            window.PlaylistState.playlistsData.forEach(playlist => {
+                if (this.expandedPlaylists.has(playlist.id)) {
+                    playlist.isExpanded = true;
+                }
+            });
+        }
+    }
+
+    // CORREGIDO: Manejar cambio de vista
+    handleViewChange(fromView, toView) {
+        switch (toView) {
+            case 'search':
+                // Focus en búsqueda
+                if (this.domElements.searchInput) {
+                    setTimeout(() => {
+                        this.domElements.searchInput.focus();
+                    }, 100);
+                }
+                break;
+                
+            case 'playing':
+                // Restaurar expansiones y actualizar UI
+                this.restorePlaylistExpansions();
+                setTimeout(() => {
+                    if (window.UIManager && typeof window.UIManager.updatePlaylistsUI === 'function') {
+                        window.UIManager.updatePlaylistsUI();
+                    }
+                }, 50);
+                
+                // Scroll al video container si está disponible
+                if (this.domElements.videoContainer) {
+                    this.domElements.videoContainer.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+                break;
+                
+            case 'library':
+                // Cargar contenido de biblioteca
+                this.loadLibraryContent();
+                break;
+        }
+    }
+
+    // Configurar controles de reproducción
+    setupPlaybackControls() {
+        // Botón play principal
+        if (this.domElements.playButton) {
+            this.domElements.playButton.addEventListener('click', () => {
+                this.handlePlayPause();
+            });
+        }
+
+        // Botón next principal
+        if (this.domElements.nextButton) {
+            this.domElements.nextButton.addEventListener('click', () => {
+                this.handleNext();
+            });
+        }
+    }
+
+    // Configurar mini player (mobile)
+    setupMiniPlayer() {
+        if (!this.domElements.miniPlayer) return;
+
+        // Click en mini player va a playing view
+        this.domElements.miniPlayer.addEventListener('click', (e) => {
+            if (!e.target.closest('.mini-control-btn')) {
+                this.switchView('playing');
+            }
+        });
+
+        // Controles mini player
+        if (this.domElements.miniPlayBtn) {
+            this.domElements.miniPlayBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handlePlayPause();
+            });
+        }
+
+        if (this.domElements.miniNextBtn) {
+            this.domElements.miniNextBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleNext();
+            });
+        }
+    }
+
+    // Configurar búsqueda
+    setupSearch() {
+        if (!this.domElements.searchInput) {
+            console.warn('⚠️ Search input no encontrado, creando fallback...');
+            this.createSearchFallback();
+            return;
+        }
+
+        let searchTimeout = null;
+
+        this.domElements.searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            
+            // Limpiar timeout anterior
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Cambiar a vista de búsqueda automáticamente si hay query
+            if (query.length > 0 && this.currentView !== 'search') {
+                this.switchView('search');
+            }
+            
+            // Debounce de búsqueda
+            searchTimeout = setTimeout(() => {
+                if (query.length > 2) {
+                    this.performSearch(query);
+                } else if (query.length === 0) {
+                    this.clearSearchResults();
+                }
+            }, 300);
+        });
+
+        // Enter para buscar
+        this.domElements.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value.trim();
+                if (query.length > 0) {
+                    this.performSearch(query);
+                }
+            }
+        });
+    }
+
+    // NUEVO: Crear fallback de búsqueda si no existe
+    createSearchFallback() {
+        // Buscar en el header mobile
+        const mobileHeader = this.domElements.mobileHeader;
+        if (mobileHeader) {
+            const searchContainer = mobileHeader.querySelector('.mobile-search');
+            if (searchContainer && !searchContainer.querySelector('input')) {
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.id = 'searchInput';
+                searchInput.className = 'mobile-search-input';
+                searchInput.placeholder = 'Buscar música...';
+                searchContainer.appendChild(searchInput);
+                
+                this.domElements.searchInput = searchInput;
+                console.log('✅ Search input fallback creado');
+                
+                // Configurar eventos
+                this.setupSearch();
+            }
+        }
+    }
+
+    // Configurar manejo de errores
+    setupErrorHandling() {
+        // Error global de JavaScript
+        window.addEventListener('error', (e) => {
+            console.error('Error global capturado:', e.error);
+            // Solo mostrar errores críticos al usuario
+            if (e.error && e.error.message && !e.error.message.includes('Extension')) {
+                this.showError('Error en la aplicación');
+            }
+        });
+
+        // Error de promesas no capturadas
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Promise rechazada:', e.reason);
+            // No mostrar todos los errores de promise
+            e.preventDefault();
+        });
+    }
+
+    // Configurar listeners de eventos globales
+    setupEventListeners() {
+        // Resize y orientación
+        window.addEventListener('resize', this.debounce(() => {
+            this.handleResize();
+        }, 250));
+
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.handleResize(), 100);
+        });
+
+        // Estados de conexión
+        window.addEventListener('online', () => {
+            this.showMessage('Conexión restaurada');
+        });
+
+        window.addEventListener('offline', () => {
+            this.showMessage('Sin conexión a internet');
+        });
+
+        // Prevenir zoom accidental en mobile
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        });
+    }
+
+    // CORREGIDO: Manejar play/pause
+    handlePlayPause() {
+        console.log('🎵 Play/Pause clicked');
+        
+        // PRIMERA PRIORIDAD: Usar el botón original del sistema
+        const originalPlayButton = document.getElementById('botonPlay');
+        if (originalPlayBu            // Contenedores
             videoContainer: null,
             playlistContainer: null,
             floatingMessages: null
