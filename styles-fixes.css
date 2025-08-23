@@ -16,7 +16,22 @@
         z-index: 100;
         padding: var(--spacing-lg);
     }
-    
+    .sidebar-search {
+    margin-bottom: var(--spacing-lg);
+    }
+    .sidebar-search input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--primary-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-size: 13px;
+    margin-bottom: var(--spacing-sm);
+    transition: var(--transition-fast);
+    outline: none;
+    box-sizing: border-box;
+}
     /* Ocultar elementos mobile en desktop */
     .mobile-header,
     .bottom-nav,
