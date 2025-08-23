@@ -145,64 +145,74 @@
             </div>
         </header>
 
-        <!-- Sidebar para desktop -->
-        <aside class="desktop-sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-music"></i>
-                </div>
-                <h1 class="app-name">YT CrossMix</h1>
+<!-- Sidebar para desktop -->
+<aside class="desktop-sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <i class="fas fa-music"></i>
+        </div>
+        <h1 class="app-name">YT CrossMix</h1>
+    </div>
+    
+    <!-- Búsqueda en sidebar para desktop -->
+    <div class="sidebar-search">
+        <input type="text" 
+               id="sidebarSearchInput"
+               class="sidebar-search-input"
+               placeholder="Buscar música..."
+               aria-label="Buscar videos">
+    </div>
+    
+    <nav class="sidebar-nav">
+        <!-- Navegación Principal -->
+        <div class="nav-section">
+            <a href="#" class="nav-item active" data-view="home">
+                <i class="fas fa-home"></i>
+                Inicio
+            </a>
+            <a href="#" class="nav-item" data-view="search">
+                <i class="fas fa-search"></i>
+                Explorar
+            </a>
+            <a href="#" class="nav-item" data-view="playing">
+                <i class="fas fa-music"></i>
+                Reproduciendo
+            </a>
+        </div>
+
+        <!-- Tu Biblioteca -->
+        <div class="nav-section">
+            <div class="nav-section-title">Tu biblioteca</div>
+            <a href="#" class="nav-item" data-view="library">
+                <i class="fas fa-folder"></i>
+                Biblioteca
+            </a>
+            <a href="#" class="nav-item" data-view="favorites">
+                <i class="fas fa-heart"></i>
+                Me gusta
+            </a>
+            <a href="#" class="nav-item" data-view="recientes">
+                <i class="fas fa-clock"></i>
+                Recientes
+            </a>
+        </div>
+
+        <!-- Añadir Playlist -->
+        <div class="nav-section">
+            <div class="playlist-add-section">
+                <input type="text" 
+                       id="searchInput2"
+                       class="playlist-url-input"
+                       placeholder="URL de playlist de YouTube..."
+                       aria-label="URL de la playlist">
+                <button id="añadirUrlButton" class="add-playlist-button">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Añadir Playlist</span>
+                </button>
             </div>
-            
-            <nav class="sidebar-nav">
-                <!-- Navegación Principal -->
-                <div class="nav-section">
-                    <a href="#" class="nav-item" data-view="home">
-                        Inicio
-                    </a>
-                    <a href="#" class="nav-item" data-view="search">
-                        <i class="fas fa-search"></i>
-                        Explorar
-                    </a>
-                    <a href="#" class="nav-item" data-view="playing">
-                        <i class="fas fa-music"></i>
-                        Reproduciendo
-                    </a>
-                </div>
-
-                <!-- Tu Biblioteca -->
-                <div class="nav-section">
-                    <div class="nav-section-title">Tu biblioteca</div>
-                    <a href="#" class="nav-item" data-view="library">
-                        <i class="fas fa-folder"></i>
-                        Biblioteca
-                    </a>
-                    <a href="#" class="nav-item">
-                        <i class="fas fa-heart"></i>
-                        Me gusta
-                    </a>
-                    <a href="#" class="nav-item" data-view="recientes">
-                        <i class="fas fa-clock"></i>
-                        Recientes
-                    </a>
-                </div>
-
-                <!-- Añadir Playlist -->
-                <div class="nav-section">
-                    <div class="playlist-add-section">
-                        <input type="text" 
-                               id="searchInput2"
-                               class="playlist-url-input"
-                               placeholder="URL de playlist de YouTube..."
-                               aria-label="URL de la playlist">
-                        <button id="añadirUrlButton" class="add-playlist-button">
-                            <i class="fa-solid fa-plus"></i>
-                            <span>Añadir Playlist</span>
-                        </button>
-                    </div>
-                </div>
-            </nav>
-        </aside>
+        </div>
+    </nav>
+</aside>
 
         <!-- Contenido principal móvil -->
         <main class="mobile-main" id="mobileMain">
