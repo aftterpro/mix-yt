@@ -21,6 +21,8 @@
     <link rel="stylesheet" type="text/css" href="./efecto.css">
     <link rel="stylesheet" type="text/css" href="./botones.css">
     <link rel="stylesheet" type="text/css" href="./loadingSpinner.css">
+    <link rel="stylesheet" type="text/css" href="./styles-fixes.css">
+
     <link rel="icon" href="./electronic.ico">
     
     <!-- PWA Manifest -->
@@ -360,45 +362,44 @@
         </nav>
         
         <!-- Reproductor inferior original (para compatibilidad) -->
-        <div class="bottom-player" style="display: none;">
-            <div class="player-info">
-                <img src="https://via.placeholder.com/56x56?text=♪" 
-                     alt="Playing" 
-                     class="player-thumbnail" 
-                     id="playerThumbnail">
-                <div class="player-text">
-                    <div class="player-title" id="playerTitle">Selecciona una canción</div>
-                    <div class="player-artist" id="playerArtist">YT CrossMix</div>
-                </div>
-            </div>
-            
-            <div class="player-controls">
-                <button class="control-button" id="prevButton" title="Anterior">
-                    <i class="fas fa-step-backward"></i>
-                </button>
-                <button class="control-button primary" id="botonPlay" title="Reproducir/Pausar">
-                    <i class="fas fa-play"></i>
-                </button>
-                <button class="control-button" id="botonNext" title="Siguiente">
-                    <i class="fas fa-step-forward"></i>
-                </button>
-            </div>
+  <div class="bottom-player">
+    <div class="player-info">
+        <img src="https://via.placeholder.com/56x56?text=♪" 
+             alt="Playing" 
+             class="player-thumbnail" 
+             id="playerThumbnail">
+        <div class="player-text">
+            <div class="player-title" id="playerTitle">Selecciona una canción</div>
+            <div class="player-artist" id="playerArtist">YT CrossMix</div>
+        </div>
+    </div>
+    
+    <div class="player-controls">
+        <button class="control-button" id="prevButton" title="Anterior" disabled>
+            <i class="fas fa-step-backward"></i>
+        </button>
+        <button class="control-button primary" id="botonPlay" title="Reproducir/Pausar" disabled>
+            <i class="fas fa-play"></i>
+        </button>
+        <button class="control-button" id="botonNext" title="Siguiente" disabled>
+            <i class="fas fa-step-forward"></i>
+        </button>
+    </div>
 
-            <div class="player-extras">
-                <button class="control-button" id="queueButton" title="Cola">
-                    <i class="fas fa-list"></i>
-                </button>
-                <div class="player-volume">
-                    <button class="control-button" id="volumeButton" title="Volumen">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <div class="volume-slider" id="volumeSlider">
-                        <div class="volume-fill"></div>
-                    </div>
-                </div>
+    <div class="player-extras">
+        <button class="control-button" id="queueButton" title="Cola">
+            <i class="fas fa-list"></i>
+        </button>
+        <div class="player-volume">
+            <button class="control-button" id="volumeButton" title="Volumen">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <div class="volume-slider" id="volumeSlider">
+                <div class="volume-fill"></div>
             </div>
         </div>
-
+    </div>
+</div>
         <!-- Pie de página -->
         <footer class="page-footer">
             <p>
@@ -762,6 +763,84 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js').catch(console.error);
         }
+        // Fix para eventos de click en mobile
+    document.addEventListener('DOMContentLoaded', function() {
+    // Asegurar que los botones funcionen en mobile
+    const ensureClickable = (selector, handler) => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+            if (el) {
+                // Remover listeners existentes
+                el.onclick = null;
+                
+                // Añadir nuevo listener
+                el.addEventListener('click', handler);
+                el.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    handler(e);
+                });
+                
+                // Asegurar que sea clickeable
+                el.style.cursor = 'pointer';
+                el.style.userSelect = 'none';
+                el.style.webkitUserSelect = 'none';
+                el.style.webkitTouchCallout = 'none';
+            }
+        });
+    };
+    
+    // Fix para botones principales
+    setTimeout(() => {
+        ensureClickable('#botonPlay', (e) => {
+            console.log('Play button clicked via fix');
+            if (window.integration) {
+                window.integration.handlePlayPause();
+            }
+        });
+        
+        ensureClickable('#botonNext', (e) => {
+            console.log('Next button clicked via fix');
+            if (window.integration) {
+                window.integration.handleNext();
+            }
+        });
+        
+        ensureClickable('.mini-control-btn', (e) => {
+            e.stopPropagation();
+            const isPlay = e.target.closest('#miniPlayBtn');
+            const isNext = e.target.closest('#miniNextBtn');
+            
+            if (isPlay && window.integration) {
+                window.integration.handlePlayPause();
+            } else if (isNext && window.integration) {
+                window.integration.handleNext();
+            }
+        });
+        
+        console.log('✅ Mobile click fixes aplicados');
+    }, 1000);
+});
+
+// Función para debug rápido
+window.debugIntegration = function() {
+    if (window.integration) {
+        window.integration.debug();
+    } else {
+        console.log('Integration no disponible');
+    }
+};
+
+// Fix para viewport en mobile
+const setViewportHeight = () => {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+};
+
+window.addEventListener('resize', setViewportHeight);
+window.addEventListener('orientationchange', () => {
+    setTimeout(setViewportHeight, 100);
+});
+setViewportHeight();
     </script>    
 </body>
 </html>
