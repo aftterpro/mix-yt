@@ -1,0 +1,553 @@
+/* ===== CORRECCIONES CRÍTICAS CSS - AÑADIR AL FINAL DE styles-youtube-music.css ===== */
+
+/* ===== SIDEBAR DESKTOP CORREGIDO ===== */
+@media (min-width: 1024px) {
+    /* Sidebar siempre visible en desktop */
+    .desktop-sidebar {
+        display: block !important;
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 260px;
+        background: var(--secondary-bg);
+        border-right: 1px solid var(--border-color);
+        overflow-y: auto;
+        z-index: 100;
+        padding: var(--spacing-lg);
+    }
+    
+    /* Ocultar elementos mobile en desktop */
+    .mobile-header,
+    .bottom-nav,
+    .mini-player {
+        display: none !important;
+    }
+    
+    /* Ajustar contenedor principal */
+    .app-container {
+        padding-left: 260px;
+    }
+    
+    .mobile-main {
+        margin-bottom: 80px; /* Espacio para bottom player */
+    }
+    
+    /* MOSTRAR bottom player en desktop */
+    .bottom-player {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 260px; /* Después del sidebar */
+        right: 0;
+        height: 80px;
+        background: var(--secondary-bg);
+        border-top: 1px solid var(--border-color);
+        z-index: 999;
+        padding: 0 var(--spacing-lg);
+        align-items: center;
+        gap: var(--spacing-lg);
+    }
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 1023px) {
+    /* Ocultar elementos desktop en mobile */
+    .desktop-sidebar,
+    .bottom-player {
+        display: none !important;
+    }
+    
+    /* Mostrar elementos mobile */
+    .mobile-header,
+    .bottom-nav,
+    .mini-player {
+        display: flex !important;
+    }
+    
+    /* Sin padding left en mobile */
+    .app-container {
+        padding-left: 0;
+    }
+}
+
+/* ===== BOTTOM PLAYER DESKTOP STYLES ===== */
+.bottom-player {
+    display: none; /* Por defecto oculto */
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+    min-width: 0;
+}
+
+.player-thumbnail {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--border-radius);
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--tertiary-bg);
+}
+
+.player-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.player-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.player-artist {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+.control-button {
+    width: 40px;
+    height: 40px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.control-button:hover {
+    background: var(--hover-bg);
+}
+
+.control-button.primary {
+    background: var(--accent-color);
+    color: white;
+    transform: scale(1.1);
+}
+
+.control-button.primary:hover {
+    background: var(--accent-hover);
+    transform: scale(1.15);
+}
+
+.control-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.player-extras {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-shrink: 0;
+}
+
+.player-volume {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.volume-slider {
+    width: 80px;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+}
+
+.volume-fill {
+    height: 100%;
+    background: var(--accent-color);
+    border-radius: 2px;
+    width: 70%; /* Default volume */
+    transition: width var(--transition-fast);
+}
+
+/* ===== SIDEBAR NAVIGATION STYLES ===== */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.logo {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+    border-radius: var(--border-radius-small);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.app-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.nav-section-title {
+    padding: var(--spacing-sm) 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-xs);
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    transition: var(--transition-fast);
+    gap: var(--spacing-md);
+    margin-bottom: 2px;
+}
+
+.nav-item:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.nav-item.active {
+    background-color: rgba(255, 107, 53, 0.15);
+    color: var(--accent-color);
+    font-weight: 600;
+}
+
+.nav-item i {
+    width: 20px;
+    text-align: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* ===== PLAYLIST ADD SECTION SIDEBAR ===== */
+.playlist-add-section {
+    background: var(--tertiary-bg);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.playlist-url-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--primary-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-size: 13px;
+    margin-bottom: var(--spacing-sm);
+    transition: var(--transition-fast);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.playlist-url-input:focus {
+    border-color: var(--accent-color);
+    background-color: var(--secondary-bg);
+}
+
+.playlist-url-input::placeholder {
+    color: var(--text-muted);
+}
+
+.add-playlist-button {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    min-height: 36px;
+}
+
+.add-playlist-button:hover {
+    background: linear-gradient(135deg, var(--accent-hover), #d4481f);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+}
+
+/* ===== SEARCH INPUT MEJORAS ===== */
+.mobile-search-input {
+    width: 100%;
+    height: 36px;
+    background: var(--tertiary-bg);
+    border: 1px solid transparent;
+    border-radius: 18px;
+    padding: 0 16px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    transition: var(--transition-fast);
+    box-sizing: border-box;
+}
+
+.mobile-search-input:focus {
+    background: var(--hover-bg);
+    border-color: var(--accent-color);
+}
+
+.mobile-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* ===== FIXES PARA ELEMENTOS OCULTOS ===== */
+
+/* Asegurar que las vistas no se oculten incorrectamente */
+.content-view {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.content-view.active {
+    display: flex !important;
+}
+
+/* Fix para playlist expansions */
+.playlist-group-mobile.expanded .playlist-group-videos-mobile {
+    max-height: none;
+    overflow: visible;
+}
+
+.playlist-group-videos-mobile {
+    overflow: hidden;
+    transition: max-height var(--transition-normal) ease-in-out;
+}
+
+/* ===== FLOATING MESSAGES POSITION FIX ===== */
+.floating-message {
+    position: fixed !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 10000 !important;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9)) !important;
+    color: white !important;
+    padding: 12px 20px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    max-width: calc(100vw - 32px) !important;
+    word-wrap: break-word !important;
+    text-align: center !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.15) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ===== MOBILE HEADER SEARCH FIX ===== */
+.mobile-search {
+    flex: 1;
+    margin: 0 16px;
+    min-width: 0;
+    position: relative;
+}
+
+.mobile-search .mobile-search-input {
+    width: 100%;
+}
+
+/* ===== BUTTON HOVER EFFECTS ===== */
+.nav-tab:active,
+.mini-control-btn:active,
+.control-button:active {
+    transform: scale(0.95);
+}
+
+/* ===== LOADING STATES ===== */
+.loading-spinner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(10px);
+}
+
+.loading-spinner.hidden {
+    display: none;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border-top: 3px solid var(--accent-color);
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+.video-result,
+.playlist-card,
+.mini-player,
+.nav-tab,
+.control-button {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+/* ===== ACCESSIBILITY IMPROVEMENTS ===== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Touch targets para mobile */
+@media (hover: none) and (pointer: coarse) {
+    .nav-tab,
+    .mini-control-btn,
+    .control-button,
+    .mobile-menu-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* ===== Z-INDEX HIERARCHY ===== */
+.desktop-sidebar { z-index: 100; }
+.mobile-header { z-index: 1000; }
+.content-header { z-index: 10; }
+.bottom-nav { z-index: 999; }
+.mini-player { z-index: 998; }
+.bottom-player { z-index: 999; }
+.mobile-context-modal { z-index: 10000; }
+.floating-message { z-index: 10001; }
+.loading-spinner { z-index: 2000; }
+
+/* ===== SAFE AREAS PARA iOS ===== */
+@supports (padding: max(0px)) {
+    .mobile-header {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+        padding-top: env(safe-area-inset-top);
+    }
+    
+    .bottom-nav {
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .mini-player {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+    }
+    
+    .floating-message {
+        bottom: calc(64px + 64px + 20px + env(safe-area-inset-bottom)) !important;
+    }
+}
+
+/* ===== DEBUG HELPERS (remover en producción) ===== */
+.debug-border { border: 1px solid red !important; }
+.debug-bg { background: rgba(255, 0, 0, 0.1) !important; }
+
+/* ===== PRINT STYLES ===== */
+@media print {
+    .mobile-header,
+    .bottom-nav,
+    .mini-player,
+    .bottom-player,
+    .desktop-sidebar,
+    .mobile-context-modal,
+    .floating-message,
+    .loading-spinner {
+        display: none !important;
+    }
+    
+    .mobile-main,
+    .app-container {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    * {
+        background: white !important;
+        color: black !important;
+        box-shadow: none !important;
+    }
+}
+.
