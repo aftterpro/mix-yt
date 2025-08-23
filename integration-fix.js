@@ -832,28 +832,6 @@ setupSearch() {
         // Configurar controles mobile
         this.setupMiniPlayer();
     }
-
-    // NUEVO: Configurar controles desktop
-    setupDesktopControls() {
-        if (!this.domElements.bottomPlayer) return;
-
-        // Botones de control en bottom player
-        const prevBtn = this.domElements.bottomPlayer.querySelector('#prevButton');
-        const playBtn = this.domElements.bottomPlayer.querySelector('#botonPlay');
-        const nextBtn = this.domElements.bottomPlayer.querySelector('#botonNext');
-
-        if (playBtn) {
-            playBtn.addEventListener('click', () => this.handlePlayPause());
-        }
-        
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => this.handleNext());
-        }
-        
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => this.handlePrevious());
-        }
-    }
     toggleQueue() {
     // Cambiar a playing view y mostrar cola
     this.switchView('playing');
@@ -1356,8 +1334,17 @@ setupSearch() {
         
         // Disparar evento
         this.dispatchEvent('trackChanged', trackInfo);
+        this.updateBottomPlayer(trackInfo);
     }
-
+updateBottomPlayer(trackInfo) {
+    const playerTitle = document.getElementById('playerTitle');
+    const playerArtist = document.getElementById('playerArtist'); 
+    const playerThumbnail = document.getElementById('playerThumbnail');
+    
+    if (playerTitle) playerTitle.textContent = trackInfo.title || 'Selecciona una canción';
+    if (playerArtist) playerArtist.textContent = trackInfo.artist || 'YT CrossMix';
+    if (playerThumbnail && trackInfo.thumbnail) playerThumbnail.src = trackInfo.thumbnail;
+}
     // Actualizar mini player
     updateMiniPlayer(trackInfo) {
         if (!this.domElements.miniPlayer || !trackInfo) return;
