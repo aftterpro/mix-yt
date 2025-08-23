@@ -18,6 +18,7 @@
     }
     .sidebar-search {
     margin-bottom: var(--spacing-lg);
+    padding: 0 var(--spacing-sm
     }
     .sidebar-search input {
     width: 100%;
@@ -31,6 +32,25 @@
     transition: var(--transition-fast);
     outline: none;
     box-sizing: border-box;
+}
+  .sidebar-search-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--primary-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    transition: var(--transition-fast);
+}
+    .sidebar-search-input:focus {
+    border-color: var(--accent-color);
+    background-color: var(--secondary-bg);
+}
+
+.sidebar-search-input::placeholder {
+    color: var(--text-muted);
 }
     /* Ocultar elementos mobile en desktop */
     .mobile-header,
