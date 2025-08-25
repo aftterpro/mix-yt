@@ -1,13 +1,12 @@
 // Manejo de Interface de Usuario - CONSOLIDADO Y CORREGIDO
-import { PlaylistState, CONFIG } from './config.js';
 import { PlaylistManager } from './playlistManager.js';
+
+// Importar dependencias necesarias
+import { PlaylistState, CONFIG } from './config.js';
 import { Utils } from './utils.js';
 
-// ===== FUNCIONES DE LOADING =====
+// ===== FUNCIONES DE LOADING MEJORADAS =====
 
-/**
- * Mostrar spinner de carga global
- */
 export function showLoadingSpinner() {
     let spinner = document.getElementById('loadingSpinner');
     if (!spinner) {
@@ -18,22 +17,27 @@ export function showLoadingSpinner() {
         document.body.appendChild(spinner);
     }
     spinner.classList.remove('hidden');
+    spinner.style.display = 'flex';
+    console.log('✨ Loading spinner mostrado');
 }
 
-/**
- * Ocultar spinner de carga global
- */
 export function hideLoadingSpinner() {
     const spinner = document.getElementById('loadingSpinner');
     if (spinner) {
         spinner.classList.add('hidden');
+        setTimeout(() => {
+            spinner.style.display = 'none';
+        }, 300);
     }
+    console.log('✨ Loading spinner ocultado');
 }
 
-/**
- * Mostrar spinner pequeño en un contenedor específico
- */
 export function showLoadMoreSpinner(container) {
+    if (!container) {
+        console.warn('⚠️ Container no proporcionado para load more spinner');
+        return;
+    }
+    
     let spinner = container.querySelector('#loadMoreSpinner');
     if (!spinner) {
         spinner = document.createElement('div');
@@ -43,45 +47,51 @@ export function showLoadMoreSpinner(container) {
         container.appendChild(spinner);
     }
     spinner.classList.remove('hidden');
+    spinner.style.display = 'flex';
 }
 
-/**
- * Ocultar spinner pequeño
- */
 export function hideLoadMoreSpinner(container) {
     const spinner = container ? 
         container.querySelector('#loadMoreSpinner') : 
         document.getElementById('loadMoreSpinner');
+    
     if (spinner) {
         spinner.classList.add('hidden');
+        setTimeout(() => {
+            spinner.style.display = 'none';
+        }, 300);
     }
 }
 
-// ===== MENSAJES FLOTANTES =====
+// ===== MENSAJES FLOTANTES MEJORADOS =====
 
-/**
- * Función para mostrar mensajes flotantes - MEJORADA
- */
-export function mostrarMensajeFlotante(mensaje) {
+export function mostrarMensajeFlotante(mensaje, duracion = 4000, tipo = 'info') {
+    if (!mensaje) {
+        console.warn('⚠️ Mensaje vacío enviado a mostrarMensajeFlotante');
+        return;
+    }
+    
+    console.log('💬 Mensaje flotante:', mensaje);
+    
+    // Crear elemento del mensaje
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'floating-message';
     
-    // Buscar contenedor apropiado
-    let container = document.getElementById('floatingMessageContainer') || 
-                   document.querySelector('.mobile-main') || 
-                   document.body;
+    // Buscar contenedor apropiado o usar body
+    const container = document.getElementById('floatingMessageContainer') || 
+                     document.querySelector('.mobile-main') || 
+                     document.body;
     
     container.appendChild(mensajeDiv);
 
-    // Estilos optimizados para mobile
-    Object.assign(mensajeDiv.style, {
+    // Estilos optimizados según tipo
+    const baseStyles = {
         position: 'fixed',
-        bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))', // bottom-nav + mini-player + margin
+        bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))',
         left: '50%',
         transform: 'translateX(-50%) translateY(100px) scale(0.8)',
-        zIndex: '10000',
-        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
+        zIndex: '10001',
         color: 'white',
         padding: '12px 20px',
         borderRadius: '12px',
@@ -95,7 +105,21 @@ export function mostrarMensajeFlotante(mensaje) {
         border: '1px solid rgba(255, 255, 255, 0.1)',
         opacity: '0',
         transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-        willChange: 'transform, opacity'
+        willChange: 'transform, opacity',
+        pointerEvents: 'none'
+    };
+
+    // Colores según tipo
+    const typeColors = {
+        info: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
+        success: 'linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.9))',
+        error: 'linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(211, 47, 47, 0.9))',
+        warning: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(245, 124, 0, 0.9))'
+    };
+
+    Object.assign(mensajeDiv.style, {
+        ...baseStyles,
+        background: typeColors[tipo] || typeColors.info
     });
 
     // Animación de entrada
@@ -106,100 +130,194 @@ export function mostrarMensajeFlotante(mensaje) {
         });
     });
 
-    // Animación de salida
+    // Auto-remove con animación de salida
     setTimeout(() => {
         Object.assign(mensajeDiv.style, {
             transform: 'translateX(-50%) translateY(-20px) scale(0.9)',
             opacity: '0'
         });
+        
         setTimeout(() => {
             if (mensajeDiv.parentNode) {
                 mensajeDiv.remove();
             }
         }, 400);
-    }, 4000);
+    }, duracion);
+
+    // Permitir click para cerrar antes
+    mensajeDiv.addEventListener('click', () => {
+        mensajeDiv.style.opacity = '0';
+        setTimeout(() => {
+            if (mensajeDiv.parentNode) {
+                mensajeDiv.remove();
+            }
+        }, 200);
+    });
 }
 
-// ===== GESTOR PRINCIPAL DE UI =====
+// ===== UI MANAGER PRINCIPAL MEJORADO =====
 
 export class UIManager {
     
-    // ===== ACTUALIZACIÓN DE PLAYLISTS =====
+    // ===== ACTUALIZACIÓN DE PLAYLISTS MEJORADA =====
     
-    /**
-     * Actualizar UI de playlists completa - CORREGIDO
-     */
     static updatePlaylistsUI() {
-        console.log('🔄 Actualizando UI de playlists...');
+        console.log('🔄 UIManager: Actualizando UI de playlists...');
         
-        // Determinar contenedor según la vista activa
-        const currentView = window.integration?.currentView || window.currentView || 'home';
-        let playlistContainer;
-        
-        if (currentView === 'library') {
-            playlistContainer = document.getElementById('playlistsGrid');
-        } else if (currentView === 'playing') {
-            playlistContainer = document.getElementById('playlistContainer');
-        } else {
-            // Fallback: buscar cualquier contenedor disponible
-            playlistContainer = document.getElementById('playlistContainer') || 
-                              document.getElementById('playlistsGrid');
+        try {
+            // Determinar contenedor según vista activa
+            const currentView = window.integration?.currentView || 
+                               UIManager.getCurrentView() || 
+                               'home';
+            
+            let playlistContainer = UIManager.getPlaylistContainer(currentView);
+            
+            if (!playlistContainer) {
+                console.warn('⚠️ No se encontró contenedor de playlists para vista:', currentView);
+                return;
+            }
+            
+            // Preservar scroll position
+            const currentScrollTop = playlistContainer.scrollTop;
+            
+            // Obtener video actualmente reproduciéndose
+            const playingVideoId = PlaylistState.currentPlayingInfo?.videoId || null;
+            
+            // Renderizar contenido según estado
+            if (!PlaylistState.playlistsData || PlaylistState.playlistsData.length === 0) {
+                UIManager.renderEmptyState(playlistContainer, currentView);
+            } else {
+                if (currentView === 'library') {
+                    UIManager.renderPlaylistCards(playlistContainer);
+                } else {
+                    UIManager.renderPlaylistList(playlistContainer, playingVideoId);
+                }
+            }
+            
+            // Restaurar scroll position
+            if (currentScrollTop > 0) {
+                playlistContainer.scrollTop = currentScrollTop;
+            }
+            
+            // Habilitar interactividad
+            UIManager.enableInteractivity();
+            
+            console.log('✅ UI de playlists actualizada correctamente');
+            
+        } catch (error) {
+            console.error('💥 Error actualizando UI de playlists:', error);
+            mostrarMensajeFlotante('Error actualizando interfaz', 3000, 'error');
         }
-        
-        if (!playlistContainer) {
-            console.warn('No se encontró contenedor de playlists para la vista:', currentView);
-            return;
-        }
-        
-        const currentScrollTop = playlistContainer.scrollTop;
-        playlistContainer.innerHTML = '';
-        const playingVideoId = PlaylistState.currentPlayingInfo.videoId;
-
-        if (PlaylistState.playlistsData.length === 0) {
-            UIManager.renderEmptyState(playlistContainer);
-            return;
-        }
-
-        if (currentView === 'library') {
-            UIManager.renderPlaylistCards(playlistContainer);
-        } else {
-            UIManager.renderPlaylistList(playlistContainer, playingVideoId);
-        }
-        
-        playlistContainer.scrollTop = currentScrollTop;
-        UIManager.enableDragAndDrop();
-        
-        console.log('✅ UI de playlists actualizada');
     }
     
-    /**
-     * Renderizar estado vacío
-     */
-    static renderEmptyState(container) {
+    // ===== HELPERS MEJORADOS =====
+    
+    static getCurrentView() {
+        // Detectar vista activa
+        const activeView = document.querySelector('.content-view.active');
+        if (activeView) {
+            const viewId = activeView.id;
+            return viewId.replace('View', '');
+        }
+        
+        // Fallback: revisar navegación activa
+        const activeNavTab = document.querySelector('.nav-tab.active');
+        if (activeNavTab) {
+            return activeNavTab.dataset.view;
+        }
+        
+        return 'home';
+    }
+    
+    static getPlaylistContainer(view) {
+        const containers = {
+            library: '#playlistsGrid',
+            playing: '#playlistContainer',
+            home: '#playlistOverview'
+        };
+        
+        let container = document.querySelector(containers[view]);
+        
+        // Fallback: buscar cualquier contenedor disponible
+        if (!container) {
+            container = document.querySelector('#playlistContainer') || 
+                       document.querySelector('#playlistsGrid') ||
+                       document.querySelector('.playlists-grid-mobile');
+        }
+        
+        return container;
+    }
+    
+    static renderEmptyState(container, view) {
+        const emptyStates = {
+            library: {
+                icon: 'fas fa-music',
+                title: 'No hay playlists',
+                subtitle: 'Conecta tu cuenta de Google para ver tus playlists de YouTube',
+                action: 'Conectar'
+            },
+            playing: {
+                icon: 'fas fa-music',
+                title: 'Cola de reproducción vacía',
+                subtitle: 'Añade música desde la búsqueda o biblioteca',
+                action: null
+            },
+            home: {
+                icon: 'fas fa-headphones',
+                title: 'Bienvenido a YT CrossMix',
+                subtitle: 'Comienza añadiendo playlists desde la biblioteca',
+                action: 'Explorar'
+            }
+        };
+        
+        const state = emptyStates[view] || emptyStates.home;
+        
         container.innerHTML = `
             <div class="empty-state">
-                <i class="fas fa-music"></i>
-                <p>No hay playlists</p>
-                <p>Ve a Biblioteca para añadir música</p>
+                <i class="${state.icon}"></i>
+                <p><strong>${state.title}</strong></p>
+                <p>${state.subtitle}</p>
+                ${state.action ? `<button class="empty-state-action" onclick="UIManager.handleEmptyStateAction('${view}')">${state.action}</button>` : ''}
             </div>
         `;
     }
-
-    /**
-     * Renderizar cards para library view
-     */
+    
+    static handleEmptyStateAction(view) {
+        switch (view) {
+            case 'library':
+                // Trigger auth
+                const authBtn = document.getElementById('googleSignInButton') || 
+                               document.getElementById('authToggleBtn');
+                if (authBtn) authBtn.click();
+                break;
+            case 'home':
+                // Switch to library
+                if (window.integration && window.integration.switchView) {
+                    window.integration.switchView('library');
+                }
+                break;
+        }
+    }
+    
+    // ===== RENDERIZADO DE CONTENIDO =====
+    
     static renderPlaylistCards(container) {
+        console.log('📱 Renderizando cards de playlists...');
+        
+        // Crear wrapper grid
         const grid = document.createElement('div');
         grid.className = 'playlists-grid-mobile';
         
-        PlaylistState.playlistsData.forEach(playlist => {
-            const card = UIManager.createPlaylistCard(playlist);
+        // Renderizar cada playlist como card
+        PlaylistState.playlistsData.forEach((playlist, index) => {
+            const card = UIManager.createPlaylistCard(playlist, index);
             grid.appendChild(card);
         });
         
+        // Reemplazar contenido
+        container.innerHTML = '';
         container.appendChild(grid);
     }
-
     /**
      * Renderizar lista para otras vistas
      */
@@ -679,3 +797,4 @@ export class UIManager {
         UIManager.updatePlaylistsUI();
     }
 }
+
