@@ -1,6 +1,5 @@
 // Manejo de Interface de Usuario - CONSOLIDADO Y CORREGIDO
 import { PlaylistManager } from './playlistManager.js';
-
 // Importar dependencias necesarias
 import { PlaylistState, CONFIG } from './config.js';
 import { Utils } from './utils.js';
@@ -318,61 +317,37 @@ export class UIManager {
         container.innerHTML = '';
         container.appendChild(grid);
     }
-    /**
-     * Renderizar lista para otras vistas
-     */
+    
     static renderPlaylistList(container, playingVideoId) {
+        console.log('📝 Renderizando lista de playlists...');
+        
+        container.innerHTML = '';
+        
         PlaylistState.playlistsData.forEach((playlist) => {
-            const groupDiv = document.createElement('div');
-            groupDiv.className = `playlist-group-mobile ${playlist.isExpanded ? 'expanded' : ''}`;
-            groupDiv.dataset.playlistId = playlist.id;
-
-            // Header más compacto para mobile
-            const headerDiv = document.createElement('div');
-            headerDiv.className = 'playlist-group-header-mobile';
-            headerDiv.innerHTML = `
-                <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" 
-                     class="playlist-group-thumb-mobile" loading="lazy" 
-                     onerror="this.src='https://via.placeholder.com/40x40?text=♪'">
-                <div class="playlist-info-mobile">
-                    <span class="playlist-name-mobile">${Utils.escapeHtml(playlist.name)}</span>
-                    <span class="playlist-count-mobile">${playlist.videos.length} videos</span>
-                </div>
-                <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} expand-icon-mobile"></i>
-            `;
-            headerDiv.addEventListener('click', () => UIManager.togglePlaylistExpansion(playlist.id));
-            groupDiv.appendChild(headerDiv);
-
-            // Videos container
-            const videosDiv = document.createElement('div');
-            videosDiv.className = 'playlist-group-videos-mobile';
-            
-            if (playlist.isExpanded) {
-                playlist.videos.forEach((video) => {
-                    const item = UIManager.createMobilePlaylistItem(video, playlist.id, playingVideoId);
-                    videosDiv.appendChild(item);
-                });
-            }
-
-            groupDiv.appendChild(videosDiv);
+            const groupDiv = UIManager.createPlaylistGroup(playlist, playingVideoId);
             container.appendChild(groupDiv);
         });
     }
     
-    // ===== CREACIÓN DE ELEMENTOS =====
+    // ===== CREACIÓN DE ELEMENTOS MEJORADA =====
     
-    /**
-     * Crear card de playlist para library
-     */
-    static createPlaylistCard(playlist) {
+    static createPlaylistCard(playlist, index = 0) {
         const card = document.createElement('div');
         card.className = 'playlist-card-mobile';
         card.dataset.playlistId = playlist.id;
+        card.style.animationDelay = `${index * 0.1}s`;
+        
+        // Determinar thumbnail seguro
+        const thumbnail = playlist.thumbnailUrl || 
+                         (playlist.videos[0]?.thumbnail) ||
+                         'https://via.placeholder.com/180x180?text=♪';
         
         card.innerHTML = `
             <div class="playlist-card-image">
-                <img src="${playlist.thumbnailUrl}" alt="${Utils.escapeHtml(playlist.name)}" 
-                     loading="lazy" onerror="this.src='https://via.placeholder.com/180x180?text=♪'">
+                <img src="${thumbnail}" 
+                     alt="${Utils.escapeHtml(playlist.name)}" 
+                     loading="lazy" 
+                     onerror="this.src='https://via.placeholder.com/180x180?text=♪'">
                 <div class="playlist-card-overlay">
                     <button class="playlist-play-btn" title="Reproducir playlist">
                         <i class="fas fa-play"></i>
@@ -380,49 +355,161 @@ export class UIManager {
                 </div>
             </div>
             <div class="playlist-card-info">
-                <h3 class="playlist-card-title" title="${Utils.escapeHtml(playlist.name)}">${Utils.escapeHtml(playlist.name)}</h3>
-                <p class="playlist-card-meta">${playlist.videos.length} videos</p>
+                <h3 class="playlist-card-title" title="${Utils.escapeHtml(playlist.name)}">
+                    ${Utils.escapeHtml(playlist.name)}
+                </h3>
+                <p class="playlist-card-meta">
+                    ${playlist.videos?.length || 0} videos
+                    ${playlist.isLoaded === false ? ' • No cargada' : ''}
+                </p>
+                ${UIManager.createPlaylistCardActions(playlist)}
             </div>
         `;
         
         // Event listeners
-        card.addEventListener('click', (e) => {
-            // Evitar doble trigger si se hace click en el botón play
-            if (e.target.closest('.playlist-play-btn')) return;
-            
-            UIManager.handlePlaylistCardClick(playlist);
-        });
-        
-        const playBtn = card.querySelector('.playlist-play-btn');
-        playBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            UIManager.playEntirePlaylist(playlist);
-        });
+        UIManager.setupPlaylistCardListeners(card, playlist);
         
         return card;
     }
     
-    /**
-     * Crear item de playlist para mobile
-     */
-    static createMobilePlaylistItem(video, playlistId, playingVideoId) {
+    static createPlaylistCardActions(playlist) {
+        if (playlist.videos?.length > 0) {
+            return `
+                <div class="playlist-card-actions">
+                    <button class="playlist-add-all-btn" title="Añadir todos los videos">
+                        <i class="fas fa-plus"></i>
+                        Añadir Todo
+                    </button>
+                </div>
+            `;
+        }
+        return '';
+    }
+    
+    static setupPlaylistCardListeners(card, playlist) {
+        // Click general en la card
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.playlist-play-btn, .playlist-add-all-btn')) return;
+            UIManager.handlePlaylistCardClick(playlist);
+        });
+        
+        // Botón play
+        const playBtn = card.querySelector('.playlist-play-btn');
+        if (playBtn) {
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                UIManager.playEntirePlaylist(playlist);
+            });
+        }
+        
+        // Botón añadir todo
+        const addAllBtn = card.querySelector('.playlist-add-all-btn');
+        if (addAllBtn) {
+            addAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                UIManager.addAllToQueue(playlist);
+            });
+        }
+        
+        // Hover effects para mobile
+        if ('ontouchstart' in window) {
+            card.addEventListener('touchstart', () => {
+                card.classList.add('touch-active');
+            });
+            
+            card.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    card.classList.remove('touch-active');
+                }, 150);
+            });
+        }
+    }
+    
+    static createPlaylistGroup(playlist, playingVideoId) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = `playlist-group-mobile ${playlist.isExpanded ? 'expanded' : ''}`;
+        groupDiv.dataset.playlistId = playlist.id;
+
+        // Header del grupo
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'playlist-group-header-mobile';
+        
+        const thumbnail = playlist.thumbnailUrl || 
+                         'https://via.placeholder.com/40x40?text=♪';
+        
+        headerDiv.innerHTML = `
+            <img src="${thumbnail}" 
+                 alt="${Utils.escapeHtml(playlist.name)}" 
+                 class="playlist-group-thumb-mobile" 
+                 loading="lazy" 
+                 onerror="this.src='https://via.placeholder.com/40x40?text=♪'">
+            <div class="playlist-info-mobile">
+                <span class="playlist-name-mobile">${Utils.escapeHtml(playlist.name)}</span>
+                <span class="playlist-count-mobile">
+                    ${playlist.videos?.length || 0} videos
+                    ${playlist.isLoaded === false ? ' • Cargando...' : ''}
+                </span>
+            </div>
+            <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} expand-icon-mobile"></i>
+        `;
+        
+        // Event listener para toggle
+        headerDiv.addEventListener('click', () => {
+            UIManager.togglePlaylistExpansion(playlist.id);
+        });
+        
+        groupDiv.appendChild(headerDiv);
+
+        // Container de videos
+        const videosDiv = document.createElement('div');
+        videosDiv.className = 'playlist-group-videos-mobile';
+        
+        if (playlist.isExpanded && playlist.videos?.length > 0) {
+            playlist.videos.forEach((video, index) => {
+                const item = UIManager.createPlaylistItem(video, playlist.id, playingVideoId, index);
+                videosDiv.appendChild(item);
+            });
+        } else if (playlist.isExpanded && playlist.videos?.length === 0) {
+            videosDiv.innerHTML = `
+                <div class="playlist-empty-state">
+                    <p>Esta playlist está vacía</p>
+                </div>
+            `;
+        }
+
+        groupDiv.appendChild(videosDiv);
+        return groupDiv;
+    }
+    
+    static createPlaylistItem(video, playlistId, playingVideoId, index = 0) {
         const item = document.createElement('div');
         item.className = 'playlist-item-mobile';
-        item.draggable = false; // Desactivar drag en mobile por ahora
         item.dataset.videoId = video.videoId;
         item.dataset.playlistId = playlistId;
+        item.style.animationDelay = `${index * 0.05}s`;
         
+        // Marcar como playing si corresponde
         if (video.videoId === playingVideoId) {
             item.classList.add('playing');
         }
         
+        const thumbnail = video.thumbnail || 
+                         'https://via.placeholder.com/48x36?text=♪';
+        
         item.innerHTML = `
-            <img src="${video.thumbnail}" alt="${Utils.escapeHtml(video.title)}" 
-                 class="playlist-item-thumb-mobile" loading="lazy"
+            <img src="${thumbnail}" 
+                 alt="${Utils.escapeHtml(video.title)}" 
+                 class="playlist-item-thumb-mobile" 
+                 loading="lazy"
                  onerror="this.src='https://via.placeholder.com/48x36?text=♪'">
             <div class="playlist-item-info-mobile">
-                <h4 class="playlist-item-title-mobile" title="${Utils.escapeHtml(video.title)}">${Utils.escapeHtml(video.title)}</h4>
-                <p class="playlist-item-duration-mobile">${Utils.formatDuration(video.duration)}</p>
+                <h4 class="playlist-item-title-mobile" title="${Utils.escapeHtml(video.title)}">
+                    ${Utils.escapeHtml(video.title)}
+                </h4>
+                <p class="playlist-item-duration-mobile">
+                    ${Utils.formatDuration(video.duration)}
+                    ${video.channelTitle ? ` • ${video.channelTitle}` : ''}
+                </p>
             </div>
             <button class="playlist-item-menu-mobile" title="Opciones">
                 <i class="fas fa-ellipsis-v"></i>
@@ -430,12 +517,21 @@ export class UIManager {
             ${video.videoId === playingVideoId ? '<i class="fas fa-volume-up playing-icon-mobile"></i>' : ''}
         `;
         
-        // Context menu para mobile
+        // Event listeners
+        UIManager.setupPlaylistItemListeners(item, video, playlistId);
+        
+        return item;
+    }
+    
+    static setupPlaylistItemListeners(item, video, playlistId) {
+        // Context menu
         const menuBtn = item.querySelector('.playlist-item-menu-mobile');
-        menuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            UIManager.showMobileContextMenu(e.target, video, playlistId);
-        });
+        if (menuBtn) {
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                UIManager.showMobileContextMenu(e.target, video, playlistId);
+            });
+        }
         
         // Click en el item (reproducir)
         item.addEventListener('click', (e) => {
@@ -443,70 +539,111 @@ export class UIManager {
             UIManager.handleVideoItemClick(video, playlistId);
         });
         
-        return item;
-    }
-    
-    // ===== MANEJADORES DE EVENTOS =====
-    
-    /**
-     * Manejar click en card de playlist
-     */
-    static handlePlaylistCardClick(playlist) {
-        if (playlist.videos.length > 0) {
-            UIManager.showMobilePlaylistDetail(playlist);
-        } else {
-            UIManager.togglePlaylistExpansion(playlist.id);
+        // Touch feedback
+        if ('ontouchstart' in window) {
+            item.addEventListener('touchstart', () => {
+                item.style.backgroundColor = 'var(--hover-bg)';
+            });
+            
+            item.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    item.style.backgroundColor = '';
+                }, 150);
+            });
         }
     }
     
-    /**
-     * Manejar click en item de video
-     */
+    // ===== MANEJADORES DE EVENTOS MEJORADOS =====
+    
+    static handlePlaylistCardClick(playlist) {
+        console.log('🎵 Click en playlist card:', playlist.name);
+        
+        if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+            // Cargar playlist de YouTube
+            UIManager.togglePlaylistExpansion(playlist.id);
+        } else if (playlist.videos?.length > 0) {
+            // Mostrar detalle o cambiar a playing
+            if (window.integration && typeof window.integration.switchView === 'function') {
+                window.integration.switchView('playing');
+            }
+        } else {
+            mostrarMensajeFlotante('Esta playlist está vacía', 2000, 'warning');
+        }
+    }
+    
     static handleVideoItemClick(video, playlistId) {
         console.log('🎵 Click en video:', video.title);
         
-        // Si hay un PlaybackController, usarlo para reproducir este video específico
-        if (window.PlaybackController) {
-            // Aquí podrías implementar lógica para saltar a un video específico
-            // Por ahora, añadimos como "reproducir después"
-            UIManager.handlePlayNextActionFromSearch(video.videoId, video);
-        }
+        // Añadir como "reproducir después"
+        UIManager.handlePlayNextActionFromSearch(video.videoId, video);
         
-        mostrarMensajeFlotante(`♪ "${video.title}" añadido a reproducir`);
-    }
-    
-    /**
-     * Toggle expansión de playlist
-     */
-    static async togglePlaylistExpansion(playlistId) {
-        if (PlaylistManager && typeof PlaylistManager.togglePlaylistExpansion === 'function') {
-            await PlaylistManager.togglePlaylistExpansion(playlistId);
-        } else {
-            // Fallback básico
-            const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
-            if (playlist) {
-                playlist.isExpanded = !playlist.isExpanded;
-                UIManager.updatePlaylistsUI();
+        // Feedback visual mejorado
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            mostrarMensajeFlotante(`♪ Añadido: ${video.title}`, 2000, 'success');
+            
+            // Vibración si está disponible
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
             }
+        } else {
+            mostrarMensajeFlotante(`"${video.title}" añadido para reproducir después`, 3000, 'success');
         }
     }
     
-    // ===== CONTEXT MENUS MOBILE =====
+    static async togglePlaylistExpansion(playlistId) {
+        console.log('🔄 Toggle expansión playlist:', playlistId);
+        
+        try {
+            if (window.PlaylistManager && typeof window.PlaylistManager.togglePlaylistExpansion === 'function') {
+                await window.PlaylistManager.togglePlaylistExpansion(playlistId);
+            } else {
+                // Fallback básico
+                const playlist = PlaylistState.playlistsData?.find(p => p.id === playlistId);
+                if (playlist) {
+                    playlist.isExpanded = !playlist.isExpanded;
+                    UIManager.updatePlaylistsUI();
+                }
+            }
+        } catch (error) {
+            console.error('💥 Error toggle expansión:', error);
+            mostrarMensajeFlotante('Error expandiendo playlist', 3000, 'error');
+        }
+    }
     
-    /**
-     * Mostrar menú contextual móvil
-     */
+    // ===== CONTEXT MENUS MOBILE MEJORADOS =====
+    
     static showMobileContextMenu(trigger, video, playlistId) {
+        console.log('📋 Mostrando context menu mobile para:', video.title);
+        
+        // Cerrar menús existentes
         UIManager.closeAllContextMenus();
         
-        // Crear bottom sheet modal para mobile
+        const modal = UIManager.createMobileContextModal(video, playlistId);
+        document.body.appendChild(modal);
+        
+        // Animación de entrada
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+        });
+        
+        // Setup de eventos
+        UIManager.setupContextModalEvents(modal, video, playlistId);
+    }
+    
+    static createMobileContextModal(video, playlistId) {
         const modal = document.createElement('div');
         modal.className = 'mobile-context-modal';
+        
+        const thumbnail = video.thumbnail || 'https://via.placeholder.com/56x42?text=♪';
+        
         modal.innerHTML = `
             <div class="mobile-context-backdrop"></div>
             <div class="mobile-context-sheet">
                 <div class="mobile-context-header">
-                    <img src="${video.thumbnail}" alt="${Utils.escapeHtml(video.title)}" class="context-video-thumb"
+                    <img src="${thumbnail}" 
+                         alt="${Utils.escapeHtml(video.title)}" 
+                         class="context-video-thumb"
                          onerror="this.src='https://via.placeholder.com/56x42?text=♪'">
                     <div class="context-video-info">
                         <h4>${Utils.escapeHtml(video.title)}</h4>
@@ -518,11 +655,19 @@ export class UIManager {
                         <i class="fas fa-arrow-right-to-line"></i>
                         Reproducir Después
                     </button>
-                    <button class="mobile-context-action" data-action="move">
+                    <button class="mobile-context-action" data-action="add-to-queue">
+                        <i class="fas fa-plus"></i>
+                        Añadir a Cola
+                    </button>
+                    <button class="mobile-context-action" data-action="copy-link">
+                        <i class="fas fa-link"></i>
+                        Copiar Enlace
+                    </button>
+                    <button class="mobile-context-action" data-action="move" ${playlistId === 'manual' ? '' : 'style="display:none"'}>
                         <i class="fas fa-folder-tree"></i>
                         Mover a Playlist
                     </button>
-                    <button class="mobile-context-action danger" data-action="delete">
+                    <button class="mobile-context-action danger" data-action="delete" ${playlistId === 'manual' ? '' : 'style="display:none"'}>
                         <i class="fas fa-trash"></i>
                         Eliminar
                     </button>
@@ -531,23 +676,21 @@ export class UIManager {
             </div>
         `;
         
-        document.body.appendChild(modal);
-        
-        // Animación de entrada
-        requestAnimationFrame(() => {
-            modal.classList.add('show');
-        });
-        
-        // Event listeners
+        return modal;
+    }
+    
+    static setupContextModalEvents(modal, video, playlistId) {
+        // Cerrar con backdrop
         modal.querySelector('.mobile-context-backdrop').addEventListener('click', () => {
             UIManager.closeMobileContextMenu(modal);
         });
         
+        // Cerrar con botón
         modal.querySelector('.mobile-context-close').addEventListener('click', () => {
             UIManager.closeMobileContextMenu(modal);
         });
         
-        // Action buttons
+        // Actions
         modal.querySelectorAll('.mobile-context-action').forEach(btn => {
             btn.addEventListener('click', () => {
                 const action = btn.dataset.action;
@@ -555,14 +698,27 @@ export class UIManager {
                 UIManager.closeMobileContextMenu(modal);
             });
         });
+        
+        // ESC key para cerrar
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                UIManager.closeMobileContextMenu(modal);
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+        
+        // Prevenir scroll del body
+        document.body.style.overflow = 'hidden';
     }
     
-    /**
-     * Cerrar menú contextual móvil
-     */
     static closeMobileContextMenu(modal) {
         modal.classList.remove('show');
         modal.classList.add('hide');
+        
+        // Restaurar scroll del body
+        document.body.style.overflow = '';
+        
         setTimeout(() => {
             if (modal.parentNode) {
                 modal.remove();
@@ -570,210 +726,296 @@ export class UIManager {
         }, 300);
     }
     
-    /**
-     * Manejar acción del menú contextual móvil
-     */
     static handleMobileContextAction(action, video, playlistId) {
+        console.log('📋 Context action:', action, 'para video:', video.title);
+        
         switch (action) {
             case 'play-next':
+            case 'add-to-queue':
                 UIManager.handlePlayNextActionFromSearch(video.videoId, video);
                 break;
-            case 'move':
-                UIManager.showMobilePlaylistSelector(video, playlistId);
+                
+            case 'copy-link':
+                UIManager.copyVideoLink(video.videoId);
                 break;
+                
+            case 'move':
+                UIManager.showPlaylistSelector(video, playlistId);
+                break;
+                
             case 'delete':
                 UIManager.deleteVideoFromPlaylist(video, playlistId);
                 break;
+                
             default:
-                console.warn('Acción no reconocida:', action);
+                console.warn('⚠️ Acción no reconocida:', action);
         }
     }
     
-    /**
-     * Eliminar video de playlist
-     */
-    static deleteVideoFromPlaylist(video, playlistId) {
-        if (PlaylistManager && typeof PlaylistManager.deleteVideo === 'function') {
-            PlaylistManager.deleteVideo(playlistId, video.videoId);
-            mostrarMensajeFlotante('Video eliminado');
-        } else {
-            console.warn('PlaylistManager.deleteVideo no disponible');
-        }
-    }
+    // ===== ACCIONES ESPECÍFICAS =====
     
-    /**
-     * Mostrar selector de playlist móvil
-     */
-    static showMobilePlaylistSelector(video, sourcePlaylistId) {
-        // TODO: Implementar selector de playlists para mobile
-        mostrarMensajeFlotante('Selector de playlists próximamente...');
-    }
-    
-    // ===== ACCIONES DE REPRODUCCIÓN =====
-    
-    /**
-     * Mostrar detalle de playlist móvil
-     */
-    static showMobilePlaylistDetail(playlist) {
-        // Cambiar a playing view y mostrar la playlist
-        if (window.integration && typeof window.integration.switchView === 'function') {
-            window.integration.switchView('playing');
-        } else if (typeof switchView === 'function') {
-            switchView('playing');
-        }
-        
-        // Trigger update para mostrar videos de esta playlist
-        setTimeout(() => {
-            UIManager.updatePlaylistsUI();
-        }, 100);
-    }
-    
-    /**
-     * Reproducir playlist completa
-     */
     static playEntirePlaylist(playlist) {
-        if (playlist.videos.length === 0) {
-            mostrarMensajeFlotante('Esta playlist está vacía');
+        if (!playlist.videos || playlist.videos.length === 0) {
+            mostrarMensajeFlotante('Esta playlist está vacía', 2000, 'warning');
             return;
         }
         
-        // Comenzar reproducción desde el primer video
+        console.log('▶️ Reproduciendo playlist completa:', playlist.name);
+        
+        // Usar PlaybackController si está disponible
         if (window.PlaybackController && typeof window.PlaybackController.playFirstVideo === 'function') {
-            PlaybackController.playFirstVideo();
+            // Limpiar y configurar queue
+            UIManager.setupQueueFromPlaylist(playlist);
+            window.PlaybackController.playFirstVideo();
+        } else {
+            console.warn('⚠️ PlaybackController no disponible');
         }
         
-        mostrarMensajeFlotante(`Reproduciendo "${playlist.name}"`);
+        mostrarMensajeFlotante(`Reproduciendo "${playlist.name}" (${playlist.videos.length} videos)`, 3000, 'success');
         
         // Cambiar a vista playing
-        if (window.integration && typeof window.integration.switchView === 'function') {
+        if (window.integration && window.integration.switchView) {
             window.integration.switchView('playing');
-        } else if (typeof switchView === 'function') {
-            switchView('playing');
         }
     }
     
-    /**
-     * Manejar acción "Reproducir Después" desde búsqueda - MEJORADO
-     */
+    static addAllToQueue(playlist) {
+        if (!playlist.videos || playlist.videos.length === 0) {
+            mostrarMensajeFlotante('Esta playlist está vacía', 2000, 'warning');
+            return;
+        }
+        
+        console.log('➕ Añadiendo toda la playlist a la cola:', playlist.name);
+        
+        // Añadir todos los videos
+        playlist.videos.forEach(video => {
+            UIManager.handlePlayNextActionFromSearch(video.videoId, video);
+        });
+        
+        mostrarMensajeFlotante(`${playlist.videos.length} videos de "${playlist.name}" añadidos`, 3000, 'success');
+    }
+    
+    static setupQueueFromPlaylist(playlist) {
+        // Crear o actualizar playlist de cola
+        let queuePlaylist = PlaylistState.playlistsData?.find(p => p.id === 'queue');
+        if (!queuePlaylist) {
+            queuePlaylist = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
+                videos: [],
+                isExpanded: true
+            };
+            if (PlaylistState.playlistsData) {
+                PlaylistState.playlistsData.unshift(queuePlaylist);
+            }
+        }
+        
+        // Reemplazar videos de la cola
+        queuePlaylist.videos = [...playlist.videos];
+        
+        console.log('🎵 Cola configurada con', queuePlaylist.videos.length, 'videos');
+    }
+    
     static handlePlayNextActionFromSearch(videoId, videoData) {
         console.log('🎵 Añadiendo para reproducir después:', videoData.title);
         
-        // Si no hay video reproduciéndose, añadir al principio
-        if (PlaylistState.currentPlayingInfo.flattenedIndex < 0) {
-            // Crear playlist temporal si no existe
-            let queuePlaylist = PlaylistState.playlistsData.find(p => p.id === 'queue');
-            if (!queuePlaylist) {
-                queuePlaylist = {
-                    id: 'queue',
-                    name: 'Cola de Reproducción',
-                    thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
-                    videos: [],
-                    isExpanded: true
-                };
+        try {
+            // Determinar estrategia según estado actual
+            if (window.PlaylistState && window.PlaylistState.currentPlayingInfo) {
+                const currentIndex = window.PlaylistState.currentPlayingInfo.flattenedIndex;
+                
+                if (currentIndex < 0) {
+                    // No hay reproducción activa - crear queue
+                    UIManager.createQueueAndAdd(videoData);
+                } else {
+                    // Hay reproducción activa - añadir después del actual
+                    UIManager.insertVideoAfterCurrent(videoData, currentIndex);
+                }
+            } else {
+                // Fallback: crear queue básica
+                UIManager.createQueueAndAdd(videoData);
+            }
+            
+            // Feedback optimizado
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                mostrarMensajeFlotante(`♪ Añadido`, 1500, 'success');
+                
+                // Vibración táctil
+                if (navigator.vibrate) {
+                    navigator.vibrate(30);
+                }
+            } else {
+                mostrarMensajeFlotante(`"${videoData.title}" añadido para reproducir después`, 3000, 'success');
+            }
+            
+            // Actualizar UI
+            UIManager.updatePlaylistsUI();
+            
+        } catch (error) {
+            console.error('💥 Error añadiendo video:', error);
+            mostrarMensajeFlotante('Error añadiendo video', 2000, 'error');
+        }
+    }
+    
+    static createQueueAndAdd(videoData) {
+        // Buscar o crear playlist de cola
+        let queuePlaylist = PlaylistState.playlistsData?.find(p => p.id === 'queue') ||
+                           PlaylistState.playlistsData?.find(p => p.id === 'manual');
+        
+        if (!queuePlaylist) {
+            queuePlaylist = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
+                videos: [],
+                isExpanded: true
+            };
+            
+            if (PlaylistState.playlistsData) {
                 PlaylistState.playlistsData.unshift(queuePlaylist);
+            } else {
+                window.PlaylistState = { playlistsData: [queuePlaylist] };
             }
-            
-            const videoObject = {
-                videoId: videoData.videoId,
-                title: videoData.title,
-                thumbnail: videoData.thumbnail,
-                duration: videoData.duration || 0
-            };
-            
-            queuePlaylist.videos.push(videoObject);
-            console.log(`Video ${videoId} añadido a cola (no hay reproducción activa)`);
-        } else {
-            // Añadir después del video actual
-            const targetFlatIndex = PlaylistState.currentPlayingInfo.flattenedIndex + 1;
-            UIManager.insertVideoAtFlatIndex(videoData, targetFlatIndex);
-            console.log(`Video ${videoId} añadido para reproducir después del actual`);
         }
         
-        // Feedback optimizado para mobile
-        const isMobile = window.innerWidth <= 768;
+        // Añadir video
+        const videoObject = {
+            videoId: videoData.videoId,
+            title: videoData.title,
+            thumbnail: videoData.thumbnail,
+            duration: videoData.duration || 0,
+            channelTitle: videoData.channelTitle || videoData.artist || 'Desconocido'
+        };
         
-        if (isMobile) {
-            // Mostrar mini toast en mobile
-            mostrarMensajeFlotante(`♪ "${videoData.title}" añadido`);
-            
-            // Vibración si está disponible
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        } else {
-            mostrarMensajeFlotante(`"${videoData.title}" añadido para reproducir después`);
-        }
-        
-        UIManager.updatePlaylistsUI();
+        queuePlaylist.videos.push(videoObject);
+        console.log('➕ Video añadido a cola:', videoObject.title);
     }
     
-    /**
-     * Insertar video en índice específico de la lista aplanada
-     */
-    static insertVideoAtFlatIndex(videoData, targetFlatIndex) {
-        if (!PlaylistManager || typeof PlaylistManager.getFlattenedPlaylist !== 'function') {
-            console.warn('PlaylistManager no disponible para insertVideoAtFlatIndex');
-            return;
-        }
-        
-        const flatList = PlaylistManager.getFlattenedPlaylist();
-        targetFlatIndex = Math.max(0, Math.min(targetFlatIndex, flatList.length));
-
-        let cumulativeIndex = 0;
-        let targetLocalIndex = -1;
-        let targetPlaylistId = null;
-
-        for (const p of PlaylistState.playlistsData) {
-            const playlistVideoCount = p.videos.length;
-            const endOfPlaylistIndex = cumulativeIndex + playlistVideoCount;
-
-            if (targetFlatIndex <= endOfPlaylistIndex) {
-                targetPlaylistId = p.id;
-                targetLocalIndex = targetFlatIndex - cumulativeIndex;
-                break;
-            }
-            cumulativeIndex += playlistVideoCount;
-        }
-
-        if (targetPlaylistId && targetLocalIndex >= 0) {
-            const targetPlaylist = PlaylistState.playlistsData.find(p => p.id === targetPlaylistId);
-            const videoObject = {
-                videoId: videoData.videoId,
-                title: videoData.title,
-                thumbnail: videoData.thumbnail,
-                duration: videoData.duration || 0
-            };
-            
-            targetPlaylist.videos.splice(targetLocalIndex, 0, videoObject);
+    static insertVideoAfterCurrent(videoData, currentIndex) {
+        if (window.PlaylistManager && typeof window.PlaylistManager.insertVideoAtFlatIndex === 'function') {
+            const targetIndex = currentIndex + 1;
+            window.PlaylistManager.insertVideoAtFlatIndex(videoData, targetIndex);
+            console.log('➕ Video insertado en posición:', targetIndex);
+        } else {
+            // Fallback: añadir a cola
+            UIManager.createQueueAndAdd(videoData);
         }
     }
     
-    // ===== DRAG AND DROP =====
-    
-    /**
-     * Habilitar drag and drop - SIMPLIFICADO
-     */
-    static enableDragAndDrop(scopeElement = document) {
-        const isMobile = 'ontouchstart' in window;
-
-        if (isMobile) {
-            // En mobile, usar context menus en lugar de drag
-            console.log('🤚 Drag and drop deshabilitado en mobile, usando context menus');
-            return;
+    static copyVideoLink(videoId) {
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        if (Utils.copyToClipboard) {
+            Utils.copyToClipboard(url).then(success => {
+                if (success) {
+                    mostrarMensajeFlotante('Enlace copiado al portapapeles', 2000, 'success');
+                } else {
+                    mostrarMensajeFlotante('Error copiando enlace', 2000, 'error');
+                }
+            });
+        } else {
+            // Fallback manual
+            navigator.clipboard?.writeText(url).then(() => {
+                mostrarMensajeFlotante('Enlace copiado', 2000, 'success');
+            }).catch(() => {
+                mostrarMensajeFlotante('Error copiando enlace', 2000, 'error');
+            });
         }
-
+    }
+    
+    static deleteVideoFromPlaylist(video, playlistId) {
+        if (window.PlaylistManager && typeof window.PlaylistManager.deleteVideo === 'function') {
+            window.PlaylistManager.deleteVideo(playlistId, video.videoId);
+            mostrarMensajeFlotante('Video eliminado', 2000, 'success');
+        } else {
+            console.warn('⚠️ PlaylistManager.deleteVideo no disponible');
+            mostrarMensajeFlotante('Error eliminando video', 2000, 'error');
+        }
+    }
+    
+    static showPlaylistSelector(video, sourcePlaylistId) {
+        mostrarMensajeFlotante('Selector de playlists próximamente...', 2000, 'info');
+        // TODO: Implementar selector de playlists móvil
+    }
+    
+    // ===== INTERACTIVIDAD Y EVENTOS =====
+    
+    static enableInteractivity() {
+        // Habilitar drag & drop solo en desktop
+        if (window.innerWidth >= 1024) {
+            UIManager.enableDragAndDrop();
+        }
+        
+        // Configurar intersection observer para lazy loading
+        UIManager.setupLazyLoading();
+        
+        // Configurar touch gestures en mobile
+        if ('ontouchstart' in window) {
+            UIManager.setupTouchGestures();
+        }
+    }
+    
+    static enableDragAndDrop() {
         // TODO: Implementar drag and drop para desktop
-        console.log('🖱️ Drag and drop para desktop pendiente de implementación');
+        console.log('🖱️ Drag and drop pendiente de implementación');
+    }
+    
+    static setupLazyLoading() {
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            observer.unobserve(img);
+                        }
+                    }
+                });
+            });
+            
+            // Observar imágenes con data-src
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+    }
+    
+    static setupTouchGestures() {
+        // Configurar gestos básicos para mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (!e.changedTouches.length) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            // Detectar swipe horizontal (cambio de vista)
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 100) {
+                // TODO: Implementar navegación por swipe
+                console.log('👆 Swipe detectado:', deltaX > 0 ? 'derecha' : 'izquierda');
+            }
+        });
     }
     
     // ===== UTILIDADES =====
     
-    /**
-     * Cerrar todos los menús contextuales
-     */
     static closeAllContextMenus() {
-        // Cerrar menús desktop existentes
-        document.querySelectorAll('#playlistContainer .delete-menu-content').forEach(menu => {
+        // Cerrar menús contextuales desktop
+        document.querySelectorAll('.delete-menu-content').forEach(menu => {
             menu.style.display = 'none';
         });
         
@@ -782,19 +1024,41 @@ export class UIManager {
             UIManager.closeMobileContextMenu(modal);
         });
         
-        // Cerrar playlist selectors
-        document.querySelectorAll('.mobile-playlist-selector').forEach(selector => {
-            selector.remove();
-        });
+        // Restaurar scroll del body
+        document.body.style.overflow = '';
     }
     
-    /**
-     * Actualizar UI de una sola playlist - SIMPLIFICADO
-     */
     static updateSinglePlaylistUI(playlistId) {
         // Por simplicidad, actualizar toda la UI
-        // TODO: Optimizar para actualizar solo una playlist
+        // TODO: Optimizar para actualizar solo una playlist específica
+        console.log('🔄 Actualizando playlist específica:', playlistId);
         UIManager.updatePlaylistsUI();
+    }
+    
+    static getPlaylistStats() {
+        if (!PlaylistState.playlistsData) return { playlists: 0, videos: 0 };
+        
+        return {
+            playlists: PlaylistState.playlistsData.length,
+            videos: PlaylistState.playlistsData.reduce((total, p) => total + (p.videos?.length || 0), 0)
+        };
+    }
+    
+    // ===== DEBUG Y DIAGNÓSTICO =====
+    
+    static debug() {
+        console.log('=== UI MANAGER DEBUG ===');
+        console.log('Current View:', UIManager.getCurrentView());
+        console.log('Playlist Stats:', UIManager.getPlaylistStats());
+        console.log('DOM Elements:', {
+            playlistContainer: !!UIManager.getPlaylistContainer(UIManager.getCurrentView()),
+            searchResults: !!document.getElementById('searchResults'),
+            playlistsGrid: !!document.getElementById('playlistsGrid')
+        });
+        console.log('PlaylistState:', window.PlaylistState);
+        console.log('========================');
     }
 }
 
+// ===== EXPORT MEJORADO =====
+export { UIManager };
