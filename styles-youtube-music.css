@@ -483,17 +483,6 @@ body {
     line-height: 1.5;
 }
 /* ===== BOTTOM PLAYER DESKTOP STYLES ===== */
-.bottom-player {
-    display: none; /* Oculto por defecto, se muestra solo en desktop */
-}
-
-.player-info {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    flex: 1;
-    min-width: 0;
-}
 
 .player-thumbnail {
     width: 56px;
