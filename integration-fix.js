@@ -599,52 +599,6 @@ setupSearch() {
         });
     }
 
-    // Configurar listeners de eventos globales
-    setupEventListeners() {
-        // Resize y orientación
-        window.addEventListener('resize', this.debounce(() => {
-            this.handleResize();
-        }, 250));
-
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => this.handleResize(), 100);
-        });
-
-        // Estados de conexión
-        window.addEventListener('online', () => {
-            this.showMessage('Conexión restaurada');
-        });
-
-        window.addEventListener('offline', () => {
-            this.showMessage('Sin conexión a internet');
-        });
-
-        // Prevenir zoom accidental en mobile
-        document.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 1) {
-                e.preventDefault();
-            }
-        });
-
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (e) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        });
-    }
-    // Inicialización principal
-    async initialize() {
-        if (this.initPromise) {
-            return this.initPromise;
-        }
-
-        this.initPromise = this._doInitialize();
-        return this.initPromise;
-    }
-
     async _doInitialize() {
         try {
             console.log('🚀 Iniciando YT CrossMix Integration V2...');
@@ -691,13 +645,6 @@ setupSearch() {
             this.showError('Error al inicializar la aplicación');
             throw error;
         }
-    }
-
-    // NUEVO: Detectar tipo de dispositivo
-    detectDeviceType() {
-        this.isDesktop = window.innerWidth >= 1024;
-        this.isMobile = !this.isDesktop;
-        console.log(`📱 Dispositivo detectado: ${this.isDesktop ? 'Desktop' : 'Mobile'}`);
     }
 
     // Esperar a que el DOM esté listo
@@ -767,16 +714,6 @@ setupSearch() {
             console.warn('⚠️ No se encontraron vistas de contenido (.content-view)');
         }
     }
-
-    // NUEVO: Configurar interfaz según dispositivo
-    setupDeviceInterface() {
-        if (this.isDesktop) {
-            this.setupDesktopInterface();
-        } else {
-            this.setupMobileInterface();
-        }
-    }
-
     // NUEVO: Configurar interfaz desktop
     setupDesktopInterface() {
         console.log('🖥️ Configurando interfaz desktop...');
