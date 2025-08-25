@@ -1,4 +1,4 @@
-// Controlador Principal Modular - CORREGIDO
+// Controlador Principal Modular - CORREGIDO Y LIMPIO
 import { CONFIG, AppState, PlaylistState, SearchState, SponsorBlockState } from './config.js';
 import { YouTubeAPIManager } from './youtubeAPI.js';
 import { PlaylistManager } from './playlistManager.js';
@@ -15,20 +15,25 @@ class App {
         this.authInitialized = false;
         this.setupGlobalReferences();
     }
+    
     // Configurar referencias globales para compatibilidad
-setupGlobalReferences() {
-    // Mantener estados existentes
-    window.appState = AppState;
-    window.playlistState = PlaylistState;
-    window.searchState = SearchState;
-    window.sponsorBlockState = SponsorBlockState;  
-    // Mantener YouTube API callback
-    window.onYouTubeIframeAPIReady = () => {
-        if (window.YouTubeAPIManager) {
-            YouTubeAPIManager.initializePlayers();
-        }
-    };
-}
+    setupGlobalReferences() {
+        // Mantener estados existentes
+        window.appState = AppState;
+        window.playlistState = PlaylistState;
+        window.searchState = SearchState;
+        window.sponsorBlockState = SponsorBlockState;
+        
+        // NOTA: NO duplicar switchToView y updateMiniPlayer 
+        // (ahora los maneja integration-fix.js)
+        
+        // Mantener YouTube API callback
+        window.onYouTubeIframeAPIReady = () => {
+            if (window.YouTubeAPIManager) {
+                YouTubeAPIManager.initializePlayers();
+            }
+        };
+    }
 
     // Inicialización principal de la aplicación
     async init() {
@@ -38,38 +43,42 @@ setupGlobalReferences() {
         }
 
         try {
-            console.log('Iniciando YT CrossMix...');
-            // 2. Configurar event listeners globales
+            console.log('🎵 Iniciando YT CrossMix Core...');
+            
+            // Configurar event listeners globales
             this.setupGlobalEventListeners();
             
-            // 3. Inicializar módulos
+            // Inicializar módulos
             await this.initializeModules();
             
-            // 4. Configurar controles de la interfaz
+            // Configurar controles de la interfaz (SIN mini player)
             this.setupUIControls();
             
-            // 5. Cargar API de YouTube
+            // Cargar API de YouTube
             YouTubeAPIManager.loadYouTubeAPI();
+            
             // Verificar que la API se cargue correctamente
             setTimeout(() => {
-            if (typeof YT === 'undefined' || !YT.Player) {
-                console.error('La API de YouTube no se cargó correctamente');
-                mostrarMensajeFlotante('Error cargando reproductores. Recarga la página.');
+                if (typeof YT === 'undefined' || !YT.Player) {
+                    console.error('La API de YouTube no se cargó correctamente');
+                    mostrarMensajeFlotante('Error cargando reproductores. Recarga la página.');
                 } else {
-                console.log('API de YouTube cargada correctamente');
+                    console.log('✅ API de YouTube cargada correctamente');
                 }
             }, 3000);
-            // 6. Mostrar mensaje de bienvenida inicial (opcional)
+            
+            // Mostrar mensaje de bienvenida inicial (opcional)
             this.showWelcomeMessage();
             
             this.initialized = true;
-            console.log('YT CrossMix inicializado correctamente');
+            console.log('✅ YT CrossMix Core inicializado correctamente');
             
         } catch (error) {
-            console.error('Error durante la inicialización:', error);
+            console.error('💥 Error durante la inicialización del core:', error);
             mostrarMensajeFlotante('Error al inicializar la aplicación');
         }
     }
+    
     // Configurar listeners de eventos globales
     setupGlobalEventListeners() {
         // Event listeners para YouTube Library
@@ -85,9 +94,10 @@ setupGlobalReferences() {
         });
 
         // Event listeners para estados de reproductores
-        window.addEventListener('playersReady', () =>  {
-        this.handlePlayersReady();
-    });
+        window.addEventListener('playersReady', () => {
+            this.handlePlayersReady();
+        });
+        
         window.addEventListener('playerStateChanged', (event) => {
             this.handlePlayerStateChanged(event.detail);
         });
@@ -95,22 +105,13 @@ setupGlobalReferences() {
         window.addEventListener('playerEnded', (event) => {
             this.handlePlayerEnded(event.detail);
         });
- // Listeners para mobile UI
-    document.addEventListener('viewChanged', (event) => {
-        this.handleViewChanged(event.detail.view);
-    });
-        // Cerrar menús al hacer click fuera
- // AÑADIR listeners para mobile UI
-    document.addEventListener('viewChanged', (event) => {
-        this.handleViewChanged(event.detail.view);
-    });
 
         // Listener para cuando la página esté completamente cargada
         window.addEventListener('load', () => {
             this.checkGoogleTokenOnLoad();
         });
 
-        // Listener personalizado para errores de autenticación
+        // Listeners personalizados para errores de autenticación
         document.addEventListener('authError', (event) => {
             console.error('Error de autenticación:', event.detail);
             mostrarMensajeFlotante('Error de autenticación: ' + event.detail.message);
@@ -126,149 +127,119 @@ setupGlobalReferences() {
             }
         });
     }
-// Nueva función para manejar when players are ready
-handlePlayersReady() {
-    const flatList = PlaylistManager.getFlattenedPlaylist();
-    const playButton = document.getElementById('botonPlay');
-    const miniPlayButton = document.getElementById('miniPlayBtn');
     
-    if (playButton) {
-        playButton.disabled = flatList.length === 0;
+    // Nueva función para manejar when players are ready
+    handlePlayersReady() {
+        const flatList = PlaylistManager.getFlattenedPlaylist();
+        const playButton = document.getElementById('botonPlay');
+        const miniPlayButton = document.getElementById('miniPlayBtn');
+        
+        if (playButton) {
+            playButton.disabled = flatList.length === 0;
+        }
+        if (miniPlayButton) {
+            miniPlayButton.disabled = flatList.length === 0;
+        }
+        console.log('🎵 Reproductores listos, botones configurados');
     }
-    if (miniPlayButton) {
-        miniPlayButton.disabled = flatList.length === 0;
-    }
-    console.log('Reproductores listos, botones configurados');
-}
+
     // Inicializar módulos individuales
     async initializeModules() {
         try {
             // Inicializar búsqueda - VERIFICACIÓN AÑADIDA
             if (typeof SearchManager !== 'undefined' && SearchManager.initialize) {
                 SearchManager.initialize();
-                console.log('SearchManager inicializado');
+                console.log('✅ SearchManager inicializado');
             } else {
-                console.warn('SearchManager no disponible durante inicialización');
+                console.warn('⚠️ SearchManager no disponible durante inicialización');
             }
 
             // Renderizar UI inicial de playlists
             UIManager.updatePlaylistsUI();
-            console.log('UI inicial renderizada');
+            console.log('✅ UI inicial renderizada');
 
         } catch (error) {
-            console.error('Error inicializando módulos:', error);
+            console.error('💥 Error inicializando módulos:', error);
             throw error;
         }
     }
 
-    // Configurar controles de interfaz
+    // Configurar controles de interfaz (SIN mini player - lo maneja integration-fix.js)
     setupUIControls() {
         this.setupPlayButton();
         this.setupNextButton();
         this.setupSearchInput();
         this.setupPlaylistUrlInput();
-        this.setupMiniPlayerControls();
+        // ELIMINADO: setupMiniPlayerControls() - lo maneja integration-fix.js
     }
-    // Configurar botón Play/Pause principal
-setupPlayButton() {
-    const botonPlay = document.getElementById("botonPlay");
-    const miniPlayBtn = document.getElementById("miniPlayBtn");
     
-    if (!botonPlay) {
-        console.error('Botón Play no encontrado');
-        return;
-    }
-
-    botonPlay.disabled = true;
-    botonPlay.addEventListener('click', () => {
-        const activePlayer = AppState.currentPlayer === 1 ? AppState.player1 : AppState.player2;
+    // Configurar botón Play/Pause principal
+    setupPlayButton() {
+        const botonPlay = document.getElementById("botonPlay");
         
-        if (!AppState.playersInitialized || !activePlayer) {
-            mostrarMensajeFlotante("El reproductor no está listo.");
+        if (!botonPlay) {
+            console.error('Botón Play no encontrado');
             return;
         }
 
-        const playerState = activePlayer.getPlayerState();
-
-        if (!AppState.reproduccionIniciada) {
-            // Primer Play
-            const flatList = PlaylistManager.getFlattenedPlaylist();
-            if (flatList.length > 0) {
-                AppState.reproduccionIniciada = true;
-                if (PlaybackController) {
-                    PlaybackController.playFirstVideo();
-                }
-                botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                // AÑADIR: Sincronizar mini player
-                if (miniPlayBtn) {
-                    miniPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                }
-            } else {
-                mostrarMensajeFlotante("No hay videos para reproducir.");
+        botonPlay.disabled = true;
+        botonPlay.addEventListener('click', () => {
+            const activePlayer = AppState.currentPlayer === 1 ? AppState.player1 : AppState.player2;
+            
+            if (!AppState.playersInitialized || !activePlayer) {
+                mostrarMensajeFlotante("El reproductor no está listo.");
                 return;
             }
-        } else {
-            // Play/Pause después del inicio
-            if (playerState === YT.PlayerState.PLAYING) {
-                activePlayer.pauseVideo();
-                botonPlay.innerHTML = '<i class="fas fa-play"></i>';
-                // AÑADIR: Sincronizar mini player
-                if (miniPlayBtn) {
-                    miniPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
-                }
-                if (PlaybackController) {
-                    PlaybackController.stopMonitoring();
-                }
-            } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
-                activePlayer.playVideo();
-                botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
-                // AÑADIR: Sincronizar mini player
-                if (miniPlayBtn) {
-                    miniPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                }
-                if (PlaybackController) {
-                    PlaybackController.startMonitoring();
-                }
-            }
-        }
-    });
-}
-// Manejar cambios de vista
-handleViewChanged(view) {
-    console.log('Vista cambiada a:', view);
-    
-    // Acciones específicas por vista
-    switch (view) {
-        case 'library':
-            // Cargar playlists si no están cargadas
-            if (typeof PlaylistGridManager !== 'undefined') {
-                PlaylistGridManager.renderPlaylistsGrid();
-            }
-            break;
-        case 'playing':
-            // Asegurar que el video container esté visible
-            this.ensureVideoContainerVisible();
-            break;
-        case 'search':
-            // Focus en el input de búsqueda si está disponible
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput && view === 'search') {
-                setTimeout(() => searchInput.focus(), 100);
-            }
-            break;
-    }
-}
 
-// AÑADIR función auxiliar
-ensureVideoContainerVisible() {
-    const videoContainer = document.getElementById('videoContainer');
-    if (videoContainer && PlaylistState.currentPlayingInfo.videoId) {
-        videoContainer.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
+            const playerState = activePlayer.getPlayerState();
+
+            if (!AppState.reproduccionIniciada) {
+                // Primer Play
+                const flatList = PlaylistManager.getFlattenedPlaylist();
+                if (flatList.length > 0) {
+                    AppState.reproduccionIniciada = true;
+                    if (PlaybackController) {
+                        PlaybackController.playFirstVideo();
+                    }
+                    botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
+                    
+                    // Sincronizar con integration-fix.js si está disponible
+                    this.syncPlayButtonWithIntegration('pause');
+                } else {
+                    mostrarMensajeFlotante("No hay videos para reproducir.");
+                    return;
+                }
+            } else {
+                // Play/Pause después del inicio
+                if (playerState === YT.PlayerState.PLAYING) {
+                    activePlayer.pauseVideo();
+                    botonPlay.innerHTML = '<i class="fas fa-play"></i>';
+                    this.syncPlayButtonWithIntegration('play');
+                    
+                    if (PlaybackController) {
+                        PlaybackController.stopMonitoring();
+                    }
+                } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
+                    activePlayer.playVideo();
+                    botonPlay.innerHTML = '<i class="fas fa-pause"></i>';
+                    this.syncPlayButtonWithIntegration('pause');
+                    
+                    if (PlaybackController) {
+                        PlaybackController.startMonitoring();
+                    }
+                }
+            }
         });
     }
-}
+    
+    // Sincronizar con el sistema de integración si está disponible
+    syncPlayButtonWithIntegration(state) {
+        if (window.integration && typeof window.integration.updatePlayButtonState === 'function') {
+            window.integration.isPlaying = (state === 'pause');
+            window.integration.updatePlayButtonState();
+        }
+    }
+    
     // Configurar botón Next
     setupNextButton() {
         const botonNext = document.getElementById('botonNext');
@@ -368,53 +339,55 @@ ensureVideoContainerVisible() {
     }
 
     // Manejar cambios de estado del reproductor
-handlePlayerStateChanged(detail) {
-    const { playerNum, state, videoId, playerInstance } = detail;
-    
-    if (state === YT.PlayerState.PLAYING) {
-        const flatList = PlaylistManager.getFlattenedPlaylist();
-        const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
+    handlePlayerStateChanged(detail) {
+        const { playerNum, state, videoId, playerInstance } = detail;
+        
+        if (state === YT.PlayerState.PLAYING) {
+            const flatList = PlaylistManager.getFlattenedPlaylist();
+            const playingVideoIndex = flatList.findIndex(v => v.videoId === videoId);
 
-        if (videoId && playingVideoIndex !== -1) {
-            const playingVideoObject = flatList[playingVideoIndex];
-            PlaylistState.currentPlayingInfo.videoId = videoId;
-            PlaylistState.currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
-            PlaylistState.currentPlayingInfo.flattenedIndex = playingVideoIndex;
-            
-            console.log(`Info actualizada: índice ${playingVideoIndex}`);
-            UIManager.updatePlaylistsUI();
+            if (videoId && playingVideoIndex !== -1) {
+                const playingVideoObject = flatList[playingVideoIndex];
+                PlaylistState.currentPlayingInfo.videoId = videoId;
+                PlaylistState.currentPlayingInfo.playlistId = playingVideoObject.sourcePlaylistId;
+                PlaylistState.currentPlayingInfo.flattenedIndex = playingVideoIndex;
+                
+                console.log(`Info actualizada: índice ${playingVideoIndex}`);
+                UIManager.updatePlaylistsUI();
 
-            // AÑADIR: Actualizar mini player
-            this.updateMiniPlayer({
-                title: playingVideoObject.title,
-                artist: playingVideoObject.channelTitle || 'Desconocido',
-                thumbnail: playingVideoObject.thumbnail
-            });
+                // Sincronizar con integration-fix.js si está disponible
+                if (window.integration && typeof window.integration.updateCurrentTrack === 'function') {
+                    window.integration.updateCurrentTrack({
+                        title: playingVideoObject.title,
+                        artist: playingVideoObject.channelTitle || 'Desconocido',
+                        thumbnail: playingVideoObject.thumbnail
+                    });
+                }
 
-            if (AppState.currentPlayer !== playerNum) {
-                AppState.currentPlayer = playerNum;
+                if (AppState.currentPlayer !== playerNum) {
+                    AppState.currentPlayer = playerNum;
+                }
+
+                if (AppState.isTransitioning) {
+                    AppState.isTransitioning = false;
+                }
+
+                AppState.hasOutroCrossfadeStarted = false;
+
+            } else if (videoId && playingVideoIndex === -1) {
+                console.warn(`Video desconocido reproduciendo: ${videoId}`);
+                PlaylistState.currentPlayingInfo.videoId = videoId;
+                PlaylistState.currentPlayingInfo.playlistId = null;
+                PlaylistState.currentPlayingInfo.flattenedIndex = -1;
+                UIManager.updatePlaylistsUI();
+                
+                if (AppState.currentPlayer !== playerNum) {
+                    AppState.currentPlayer = playerNum;
+                }
+                AppState.hasOutroCrossfadeStarted = false;
             }
-
-            if (AppState.isTransitioning) {
-                AppState.isTransitioning = false;
-            }
-
-            AppState.hasOutroCrossfadeStarted = false;
-
-        } else if (videoId && playingVideoIndex === -1) {
-            console.warn(`Video desconocido reproduciendo: ${videoId}`);
-            PlaylistState.currentPlayingInfo.videoId = videoId;
-            PlaylistState.currentPlayingInfo.playlistId = null;
-            PlaylistState.currentPlayingInfo.flattenedIndex = -1;
-            UIManager.updatePlaylistsUI();
-            
-            if (AppState.currentPlayer !== playerNum) {
-                AppState.currentPlayer = playerNum;
-            }
-            AppState.hasOutroCrossfadeStarted = false;
         }
     }
-}
     // Manejar final de reproducción
     handlePlayerEnded(detail) {
         const { playerNum, videoId } = detail;
