@@ -21,13 +21,7 @@ setupGlobalReferences() {
     window.appState = AppState;
     window.playlistState = PlaylistState;
     window.searchState = SearchState;
-    window.sponsorBlockState = SponsorBlockState;
-    window.switchToView = this.switchToView.bind(this);
-    window.updateMiniPlayer = this.updateMiniPlayer.bind(this);
-    // AÑADIR funciones para mobile navigation
-    window.switchToView = this.switchToView.bind(this);
-    window.updateMiniPlayer = this.updateMiniPlayer.bind(this);
-    
+    window.sponsorBlockState = SponsorBlockState;  
     // Mantener YouTube API callback
     window.onYouTubeIframeAPIReady = () => {
         if (window.YouTubeAPIManager) {
@@ -146,30 +140,6 @@ handlePlayersReady() {
     }
     console.log('Reproductores listos, botones configurados');
 }
-
-// Nueva función para cambio de vista
-switchToView(view) {
-    if (typeof switchView === 'function') {
-        switchView(view);
-    }
-}
-
-// Nueva función para actualizar mini player
-updateMiniPlayer(data) {
-    const miniTitle = document.getElementById('miniTrackTitle');
-    const miniArtist = document.getElementById('miniTrackArtist');
-    const miniImage = document.getElementById('miniTrackImage');
-    
-    if (data.title && miniTitle) {
-        miniTitle.textContent = data.title;
-    }
-    if (data.artist && miniArtist) {
-        miniArtist.textContent = data.artist;
-    }
-    if (data.thumbnail && miniImage) {
-        miniImage.src = data.thumbnail;
-    }
-}
     // Inicializar módulos individuales
     async initializeModules() {
         try {
@@ -199,35 +169,6 @@ updateMiniPlayer(data) {
         this.setupPlaylistUrlInput();
         this.setupMiniPlayerControls();
     }
-setupMiniPlayerControls() {
-    const miniPlayer = document.getElementById('miniPlayer');
-    const miniPlayBtn = document.getElementById('miniPlayBtn');
-    const miniNextBtn = document.getElementById('miniNextBtn');
-    
-    // Click en mini player va a playing view
-    if (miniPlayer) {
-        miniPlayer.addEventListener('click', (e) => {
-            if (!e.target.closest('.mini-control-btn')) {
-                this.switchToView('playing');
-            }
-        });
-    }
-    
-    // Conectar botones mini player con controles principales
-    if (miniPlayBtn) {
-        miniPlayBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('botonPlay')?.click();
-        });
-    }
-    
-    if (miniNextBtn) {
-        miniNextBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('botonNext')?.click();
-        });
-    }
-}
     // Configurar botón Play/Pause principal
 setupPlayButton() {
     const botonPlay = document.getElementById("botonPlay");
