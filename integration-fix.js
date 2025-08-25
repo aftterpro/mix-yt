@@ -1,4 +1,5 @@
-//  Sistema de Integración
+// ===== CORRECCIÓN 1: integration-fix.js - SISTEMA DE INTEGRACIÓN ARREGLADO =====
+
 class YTCrossMixIntegration {
     constructor() {
         this.isInitialized = false;
@@ -11,30 +12,24 @@ class YTCrossMixIntegration {
         this.isPlaying = false;
         this.currentTrack = null;
         this.isDesktop = window.innerWidth >= 1024;
-        this.expandedPlaylists = new Set(); // NUEVO: Recordar playlists expandidas
+        this.expandedPlaylists = new Set();
         
-        // Referencias DOM críticas
+        // Referencias DOM críticas - CORREGIDAS
         this.domElements = {
-            // Headers y navegación
             mobileHeader: null,
             bottomNav: null,
             miniPlayer: null,
             sidebar: null,
-            bottomPlayer: null, // NUEVO: Bottom player desktop
-            
-            // Vistas principales
+            bottomPlayer: null,
             contentViews: null,
             searchResults: null,
             playlistsGrid: null,
-            
-            // Controles
             searchInput: null,
+            sidebarSearchInput: null,
             playButton: null,
             nextButton: null,
             miniPlayBtn: null,
             miniNextBtn: null,
-            
-            // Contenedores
             videoContainer: null,
             playlistContainer: null,
             floatingMessages: null
@@ -43,57 +38,35 @@ class YTCrossMixIntegration {
         this.setupEventListeners();
     }
 
-    // Inicialización principal
+    // ===== INICIALIZACIÓN CORREGIDA =====
     async initialize() {
-        if (this.initPromise) {
-            return this.initPromise;
-        }
-
+        if (this.initPromise) return this.initPromise;
+        
         this.initPromise = this._doInitialize();
         return this.initPromise;
     }
 
     async _doInitialize() {
         try {
-            console.log('🚀 Iniciando YT CrossMix Integration V2...');
+            console.log('🚀 Iniciando YT CrossMix Integration V3 (CORREGIDO)...');
             
-            // 1. Detectar tipo de dispositivo
-            this.detectDeviceType();
-            
-            // 2. Esperar a que el DOM esté listo
             await this.waitForDOM();
-            
-            // 3. Obtener referencias DOM
+            this.detectDeviceType();
             this.getDOMReferences();
-            
-            // 4. Verificar elementos críticos
             this.verifyDOMElements();
-            
-            // 5. Configurar interfaz según dispositivo
             this.setupDeviceInterface();
-            
-            // 6. Configurar navegación
             this.setupNavigation();
-            
-            // 7. Configurar controles de reproducción
             this.setupPlaybackControls();
-            
-            // 8. Configurar búsqueda
             this.setupSearch();
-            
-            // 9. Configurar manejo de errores
             this.setupErrorHandling();
-            
-            // 10. Inicializar vista por defecto
             this.switchView('home');
             
-            // 11. Marcar como inicializado
             this.isInitialized = true;
+            console.log('✅ YT CrossMix Integration V3 inicializado correctamente');
             
-            console.log('✅ YT CrossMix Integration V2 inicializado correctamente');
             this.dispatchEvent('integrationReady');
-            
             return true;
+            
         } catch (error) {
             console.error('💥 Error en inicialización:', error);
             this.showError('Error al inicializar la aplicación');
@@ -101,191 +74,241 @@ class YTCrossMixIntegration {
         }
     }
 
-    // NUEVO: Detectar tipo de dispositivo
-    detectDeviceType() {
-        this.isDesktop = window.innerWidth >= 1024;
-        this.isMobile = !this.isDesktop;
-        console.log(`📱 Dispositivo detectado: ${this.isDesktop ? 'Desktop' : 'Mobile'}`);
-    }
-
-    // Esperar a que el DOM esté listo
-    waitForDOM() {
-        return new Promise((resolve) => {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', resolve, { once: true });
-            } else {
-                resolve();
-            }
-        });
-    }
-
-    // CORREGIDO: Obtener referencias DOM
+    // ===== DOM REFERENCES CORREGIDAS =====
     getDOMReferences() {
-        const elements = {
-            // Headers y navegación
-            mobileHeader: '#mobileHeader, .mobile-header',
-            bottomNav: '#bottomNav, .bottom-nav',
-            miniPlayer: '#miniPlayer, .mini-player',
-            sidebar: '#sidebar, .desktop-sidebar',
-            bottomPlayer: '.bottom-player', // NUEVO
-            
-            // Vistas principales
-            searchResults: '#searchResults',
-            playlistsGrid: '#playlistsGrid',
-            
-            // Controles
-            searchInput: '#searchInput, #sidebarSearchInput',
+        const selectors = {
+            mobileHeader: '.mobile-header, #mobileHeader',
+            bottomNav: '.bottom-nav, #bottomNav',
+            miniPlayer: '.mini-player, #miniPlayer',
+            sidebar: '.desktop-sidebar, #sidebar',
+            bottomPlayer: '.bottom-player',
+            searchResults: '#searchResults, .search-results',
+            playlistsGrid: '#playlistsGrid, .playlists-grid-mobile',
+            searchInput: '#searchInput',
+            sidebarSearchInput: '#sidebarSearchInput',
             playButton: '#botonPlay, #playButton',
             nextButton: '#botonNext, #nextButton',
             miniPlayBtn: '#miniPlayBtn',
             miniNextBtn: '#miniNextBtn',
-            
-            // Contenedores
             videoContainer: '#videoContainer',
             playlistContainer: '#playlistContainer',
-            floatingMessages: '#floatingMessageContainer'
+            floatingMessages: '#floatingMessageContainer, .floating-messages'
         };
 
-        Object.entries(elements).forEach(([key, selector]) => {
+        Object.entries(selectors).forEach(([key, selector]) => {
             const element = document.querySelector(selector);
             this.domElements[key] = element;
             
-            if (!element) {
-                console.warn(`⚠️ Elemento no encontrado: ${selector}`);
+            if (!element && ['searchInput', 'miniPlayer', 'bottomNav'].includes(key)) {
+                console.warn(`⚠️ Elemento crítico no encontrado: ${key} (${selector})`);
             }
         });
         
-        // CORREGIDO: Obtener contentViews como NodeList
+        // CORREGIDO: ContentViews como NodeList
         this.domElements.contentViews = document.querySelectorAll('.content-view');
-        console.log(`📱 Encontradas ${this.domElements.contentViews.length} vistas de contenido`);
+        
+        // CREAR elementos faltantes críticos
+        this.createMissingElements();
+        
+        console.log(`📱 Referencias DOM obtenidas. ContentViews: ${this.domElements.contentViews.length}`);
     }
 
-    // Verificar elementos DOM críticos
-    verifyDOMElements() {
-        const critical = [];
-        const missing = critical.filter(key => !this.domElements[key]);
-        
-        if (missing.length > 0) {
-            console.warn(`⚠️ Elementos críticos faltantes: ${missing.join(', ')}`);
-            // No hacer throw, usar fallbacks
+    // ===== CREAR ELEMENTOS FALTANTES =====
+    createMissingElements() {
+        // Crear search input si no existe
+        if (!this.domElements.searchInput) {
+            const header = this.domElements.mobileHeader;
+            if (header) {
+                const searchDiv = document.createElement('div');
+                searchDiv.className = 'mobile-search';
+                searchDiv.innerHTML = '<input type="text" id="searchInput" class="mobile-search-input" placeholder="Buscar música...">';
+                
+                // Insertar después del logo
+                const logo = header.querySelector('.mobile-logo');
+                if (logo) {
+                    logo.parentNode.insertBefore(searchDiv, logo.nextSibling);
+                } else {
+                    header.appendChild(searchDiv);
+                }
+                
+                this.domElements.searchInput = document.getElementById('searchInput');
+                console.log('✅ Search input creado');
+            }
         }
-        
-        // Verificar que contentViews tenga elementos
-        if (!this.domElements.contentViews || this.domElements.contentViews.length === 0) {
-            console.warn('⚠️ No se encontraron vistas de contenido (.content-view)');
+
+        // Crear resultados de búsqueda si no existe
+        if (!this.domElements.searchResults) {
+            const searchView = document.getElementById('searchView');
+            if (searchView) {
+                const contentBody = searchView.querySelector('.content-body');
+                if (contentBody) {
+                    const resultsDiv = document.createElement('div');
+                    resultsDiv.id = 'searchResults';
+                    resultsDiv.className = 'search-results';
+                    resultsDiv.innerHTML = `
+                        <div class="search-placeholder">
+                            <i class="fas fa-search"></i>
+                            <p>Busca música, artistas o playlists</p>
+                        </div>
+                    `;
+                    contentBody.appendChild(resultsDiv);
+                    this.domElements.searchResults = resultsDiv;
+                    console.log('✅ Search results container creado');
+                }
+            }
+        }
+
+        // Crear playlists grid si no existe
+        if (!this.domElements.playlistsGrid) {
+            const libraryView = document.getElementById('libraryView');
+            if (libraryView) {
+                const contentBody = libraryView.querySelector('.content-body');
+                if (contentBody && !contentBody.querySelector('#playlistsGrid')) {
+                    const gridDiv = document.createElement('div');
+                    gridDiv.id = 'playlistsGrid';
+                    gridDiv.className = 'playlists-grid-mobile';
+                    gridDiv.innerHTML = `
+                        <div class="search-placeholder">
+                            <i class="fas fa-music"></i>
+                            <p>Conecta tu cuenta de Google para ver tus playlists</p>
+                        </div>
+                    `;
+                    contentBody.appendChild(gridDiv);
+                    this.domElements.playlistsGrid = gridDiv;
+                    console.log('✅ Playlists grid creado');
+                }
+            }
+        }
+
+        // Crear playlist container para playing view si no existe
+        if (!this.domElements.playlistContainer) {
+            const playingView = document.getElementById('playingView');
+            if (playingView) {
+                const queueSection = playingView.querySelector('.queue-section');
+                if (queueSection && !queueSection.querySelector('#playlistContainer')) {
+                    const containerDiv = document.createElement('div');
+                    containerDiv.id = 'playlistContainer';
+                    containerDiv.className = 'playlist-container-mobile';
+                    containerDiv.innerHTML = `
+                        <div class="search-placeholder">
+                            <i class="fas fa-music"></i>
+                            <p>No hay videos en la cola</p>
+                        </div>
+                    `;
+                    queueSection.appendChild(containerDiv);
+                    this.domElements.playlistContainer = containerDiv;
+                    console.log('✅ Playlist container creado');
+                }
+            }
         }
     }
 
-    // NUEVO: Configurar interfaz según dispositivo
+    // ===== CONFIGURACIÓN DE DISPOSITIVO CORREGIDA =====
+    detectDeviceType() {
+        this.isDesktop = window.innerWidth >= 1024;
+        this.isMobile = !this.isDesktop;
+        this.isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+        
+        document.body.classList.toggle('is-desktop', this.isDesktop);
+        document.body.classList.toggle('is-mobile', this.isMobile);
+        document.body.classList.toggle('is-tablet', this.isTablet);
+        
+        console.log(`📱 Dispositivo: ${this.isDesktop ? 'Desktop' : this.isTablet ? 'Tablet' : 'Mobile'}`);
+    }
+
     setupDeviceInterface() {
         if (this.isDesktop) {
             this.setupDesktopInterface();
         } else {
             this.setupMobileInterface();
         }
+        
+        // Configurar viewport height para mobile
+        this.setMobileViewport();
     }
 
-    // NUEVO: Configurar interfaz desktop
     setupDesktopInterface() {
         console.log('🖥️ Configurando interfaz desktop...');
         
-        // Mostrar sidebar
-        if (this.domElements.sidebar) {
-            this.domElements.sidebar.style.display = 'block';
-        }
-        
-        // Mostrar bottom player
-        if (this.domElements.bottomPlayer) {
-            this.domElements.bottomPlayer.style.display = 'flex';
-        }
+        // Mostrar elementos desktop
+        this.toggleElement(this.domElements.sidebar, true);
+        this.toggleElement(this.domElements.bottomPlayer, true);
         
         // Ocultar elementos mobile
-        if (this.domElements.mobileHeader) {
-            this.domElements.mobileHeader.style.display = 'none';
-        }
-        if (this.domElements.bottomNav) {
-            this.domElements.bottomNav.style.display = 'none';
-        }
-        if (this.domElements.miniPlayer) {
-            this.domElements.miniPlayer.style.display = 'none';
+        this.toggleElement(this.domElements.mobileHeader, false);
+        this.toggleElement(this.domElements.bottomNav, false);
+        this.toggleElement(this.domElements.miniPlayer, false);
+        
+        // Ajustar contenedor principal
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+            appContainer.style.paddingLeft = '260px';
         }
         
-        // Configurar controles desktop
         this.setupDesktopControls();
     }
 
-    // NUEVO: Configurar interfaz mobile
     setupMobileInterface() {
         console.log('📱 Configurando interfaz mobile...');
         
         // Mostrar elementos mobile
-        if (this.domElements.mobileHeader) {
-            this.domElements.mobileHeader.style.display = 'flex';
-        }
-        if (this.domElements.bottomNav) {
-            this.domElements.bottomNav.style.display = 'flex';
-        }
-        if (this.domElements.miniPlayer) {
-            this.domElements.miniPlayer.style.display = 'flex';
-        }
+        this.toggleElement(this.domElements.mobileHeader, true);
+        this.toggleElement(this.domElements.bottomNav, true);
+        this.toggleElement(this.domElements.miniPlayer, true);
         
         // Ocultar elementos desktop
-        if (this.domElements.sidebar) {
-            this.domElements.sidebar.style.display = 'none';
-        }
-        if (this.domElements.bottomPlayer) {
-            this.domElements.bottomPlayer.style.display = 'none';
+        this.toggleElement(this.domElements.sidebar, false);
+        this.toggleElement(this.domElements.bottomPlayer, false);
+        
+        // Ajustar contenedor principal
+        const appContainer = document.querySelector('.app-container');
+        if (appContainer) {
+            appContainer.style.paddingLeft = '0';
         }
         
-        // Configurar controles mobile
         this.setupMiniPlayer();
     }
 
-   //Configurar controles desktop
-    setupDesktopControls() {
-        if (!this.domElements.bottomPlayer) return;
-
-        // Botones de control en bottom player
-        const prevBtn = this.domElements.bottomPlayer.querySelector('#prevButton');
-        const playBtn = this.domElements.bottomPlayer.querySelector('#botonPlay');
-        const nextBtn = this.domElements.bottomPlayer.querySelector('#botonNext');
-        const queueButton = this.domElements.bottomPlayer.querySelector('#queueButton');
-    
-        if (queueButton) {
-        queueButton.addEventListener('click', () => this.toggleQueue());
-        }
-        if (playBtn) {
-            playBtn.addEventListener('click', () => this.handlePlayPause());
-        }
-        
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => this.handleNext());
-        }
-        
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => this.handlePrevious());
+    // ===== UTILITY PARA TOGGLE ELEMENTOS =====
+    toggleElement(element, show) {
+        if (element) {
+            element.style.display = show ? (element.classList.contains('bottom-player') ? 'flex' : 'block') : 'none';
         }
     }
 
-    // Configurar navegación
+    setMobileViewport() {
+        // Fix para viewport height en mobile
+        const setViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 100));
+    }
+
+    // ===== NAVEGACIÓN CORREGIDA =====
     setupNavigation() {
         // Navegación mobile (bottom nav)
         if (this.domElements.bottomNav) {
             this.domElements.bottomNav.addEventListener('click', (e) => {
-                const navTab = e.target.closest('.nav-tab');
-                if (!navTab) return;
-                
-                const view = navTab.dataset.view;
-                if (view) {
-                    this.switchView(view);
+                const navTab = e.target.closest('.nav-tab, [data-view]');
+                if (navTab) {
+                    const view = navTab.dataset.view;
+                    if (view) {
+                        this.switchView(view);
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
                 }
             });
         }
 
         // Navegación desktop (sidebar)
         if (this.domElements.sidebar) {
-            const sidebarNavItems = this.domElements.sidebar.querySelectorAll('.nav-item[data-view]');
-            sidebarNavItems.forEach(item => {
+            const navItems = this.domElements.sidebar.querySelectorAll('.nav-item, [data-view]');
+            navItems.forEach(item => {
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
                     const view = item.dataset.view;
@@ -297,14 +320,14 @@ class YTCrossMixIntegration {
         }
     }
 
-    // CORREGIDO: Cambiar vista - MANTENER EXPANSIONES
+    // ===== SWITCH VIEW CORREGIDO =====
     switchView(newView) {
         if (this.currentView === newView) return;
         
         console.log(`📱 Cambiando vista: ${this.currentView} → ${newView}`);
         
-        // GUARDAR estado de expansiones antes de cambiar vista
-        if (this.currentView === 'library' || this.currentView === 'playing') {
+        // Guardar expansiones
+        if (['library', 'playing'].includes(this.currentView)) {
             this.savePlaylistExpansions();
         }
         
@@ -313,27 +336,13 @@ class YTCrossMixIntegration {
             this.domElements.contentViews.forEach(view => {
                 const isActive = view.id === `${newView}View`;
                 view.classList.toggle('active', isActive);
+                // CORREGIDO: Usar flex en lugar de block para mobile
                 view.style.display = isActive ? 'flex' : 'none';
             });
         }
 
-        // Actualizar navegación bottom (mobile)
-        if (this.domElements.bottomNav) {
-            const navTabs = this.domElements.bottomNav.querySelectorAll('.nav-tab');
-            navTabs.forEach(tab => {
-                const isActive = tab.dataset.view === newView;
-                tab.classList.toggle('active', isActive);
-            });
-        }
-
-        // Actualizar navegación sidebar (desktop)
-        if (this.domElements.sidebar) {
-            const sidebarItems = this.domElements.sidebar.querySelectorAll('.nav-item');
-            sidebarItems.forEach(item => {
-                const isActive = item.dataset.view === newView;
-                item.classList.toggle('active', isActive);
-            });
-        }
+        // Actualizar navegación
+        this.updateNavigationActiveState(newView);
 
         const oldView = this.currentView;
         this.currentView = newView;
@@ -341,608 +350,129 @@ class YTCrossMixIntegration {
         // Acciones específicas por vista
         this.handleViewChange(oldView, newView);
         
-        // Disparar evento
-        this.dispatchEvent('viewChanged', { 
-            from: oldView, 
-            to: newView 
-        });
-    }
-
-    // NUEVO: Guardar estado de expansiones
-    savePlaylistExpansions() {
-        this.expandedPlaylists.clear();
+        // Scroll to top en cambio de vista
+        this.scrollToTop();
         
-        // Guardar qué playlists están expandidas
-        const expandedElements = document.querySelectorAll('.playlist-group-mobile.expanded');
-        expandedElements.forEach(element => {
-            const playlistId = element.dataset.playlistId;
-            if (playlistId) {
-                this.expandedPlaylists.add(playlistId);
+        this.dispatchEvent('viewChanged', { from: oldView, to: newView });
+    }
+
+    updateNavigationActiveState(activeView) {
+        // Actualizar bottom nav (mobile)
+        if (this.domElements.bottomNav) {
+            const navTabs = this.domElements.bottomNav.querySelectorAll('.nav-tab, [data-view]');
+            navTabs.forEach(tab => {
+                const isActive = tab.dataset.view === activeView;
+                tab.classList.toggle('active', isActive);
+            });
+        }
+
+        // Actualizar sidebar (desktop)
+        if (this.domElements.sidebar) {
+            const sidebarItems = this.domElements.sidebar.querySelectorAll('.nav-item, [data-view]');
+            sidebarItems.forEach(item => {
+                const isActive = item.dataset.view === activeView;
+                item.classList.toggle('active', isActive);
+            });
+        }
+    }
+
+    scrollToTop() {
+        const activeView = document.querySelector('.content-view.active');
+        if (activeView) {
+            const contentBody = activeView.querySelector('.content-body');
+            if (contentBody) {
+                contentBody.scrollTop = 0;
             }
-        });
+        }
+    }
+
+    // ===== BÚSQUEDA CORREGIDA =====
+    setupSearch() {
+        const inputs = [this.domElements.searchInput, this.domElements.sidebarSearchInput].filter(Boolean);
         
-        console.log('💾 Guardadas expansiones:', Array.from(this.expandedPlaylists));
-    }
-
-    // NUEVO: Restaurar estado de expansiones
-    restorePlaylistExpansions() {
-        console.log('📂 Restaurando expansiones:', Array.from(this.expandedPlaylists));
-        
-        // Aplicar estado de expansión a las playlists
-        if (window.PlaylistState && window.PlaylistState.playlistsData) {
-            window.PlaylistState.playlistsData.forEach(playlist => {
-                if (this.expandedPlaylists.has(playlist.id)) {
-                    playlist.isExpanded = true;
-                }
-            });
-        }
-    }
-
-    // CORREGIDO: Manejar cambio de vista
-    handleViewChange(fromView, toView) {
-        switch (toView) {
-            case 'search':
-                // Focus en búsqueda
-                if (this.domElements.searchInput) {
-                    setTimeout(() => {
-                        this.domElements.searchInput.focus();
-                    }, 100);
-                }
-                break;
-                
-            case 'playing':
-                // Restaurar expansiones y actualizar UI
-                this.restorePlaylistExpansions();
-                setTimeout(() => {
-                    if (window.UIManager && typeof window.UIManager.updatePlaylistsUI === 'function') {
-                        window.UIManager.updatePlaylistsUI();
-                    }
-                }, 50);
-                
-                // Scroll al video container si está disponible
-                if (this.domElements.videoContainer) {
-                    this.domElements.videoContainer.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-                }
-                break;
-                
-            case 'library':
-                // Cargar contenido de biblioteca
-                this.loadLibraryContent();
-                break;
-        }
-    }
-
-    // Configurar controles de reproducción
-    setupPlaybackControls() {
-        // Botón play principal
-        if (this.domElements.playButton) {
-            this.domElements.playButton.addEventListener('click', () => {
-                this.handlePlayPause();
-            });
+        if (inputs.length === 0) {
+            console.warn('⚠️ No se encontraron inputs de búsqueda');
+            return;
         }
 
-        // Botón next principal
-        if (this.domElements.nextButton) {
-            this.domElements.nextButton.addEventListener('click', () => {
-                this.handleNext();
-            });
-        }
-    }
+        console.log(`🔍 Configurando ${inputs.length} input(s) de búsqueda`);
 
-    // Configurar mini player (mobile)
-    setupMiniPlayer() {
-        if (!this.domElements.miniPlayer) return;
+        inputs.forEach((input) => {
+            let searchTimeout = null;
 
-        // Click en mini player va a playing view
-        this.domElements.miniPlayer.addEventListener('click', (e) => {
-            if (!e.target.closest('.mini-control-btn')) {
-                this.switchView('playing');
-            }
-        });
-
-        // Controles mini player
-        if (this.domElements.miniPlayBtn) {
-            this.domElements.miniPlayBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handlePlayPause();
-            });
-        }
-
-        if (this.domElements.miniNextBtn) {
-            this.domElements.miniNextBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.handleNext();
-            });
-        }
-    }
-
-    // Configurar búsqueda
-setupSearch() {
-    // Buscar tanto el input móvil como el del sidebar
-    const mobileSearchInput = document.getElementById('searchInput');
-    const sidebarSearchInput = document.getElementById('sidebarSearchInput');
-    
-    const inputs = [mobileSearchInput, sidebarSearchInput].filter(Boolean);
-    
-    if (inputs.length === 0) {
-        console.warn('⚠️ Search inputs no encontrados, creando fallback...');
-        this.createSearchFallback();
-        return;
-    }
-
-    console.log(`📱 Configurando ${inputs.length} input(s) de búsqueda`);
-
-    inputs.forEach((input, index) => {
-        let searchTimeout = null;
-        const inputType = input.id === 'searchInput' ? 'mobile' : 'sidebar';
-        
-        console.log(`🔍 Configurando búsqueda ${inputType}`);
-
-        input.addEventListener('input', (e) => {
-            const query = e.target.value.trim();
-            
-            // Sincronizar ambos inputs (evitar bucle infinito)
-            inputs.forEach(otherInput => {
-                if (otherInput !== input && otherInput.value !== query) {
-                    otherInput.value = query;
-                }
-            });
-            
-            // Limpiar timeout anterior
-            if (searchTimeout) {
-                clearTimeout(searchTimeout);
-            }
-            
-            // Cambiar a vista de búsqueda automáticamente si hay query
-            if (query.length > 0 && this.currentView !== 'search') {
-                this.switchView('search');
-            }
-            
-            // Debounce de búsqueda
-            searchTimeout = setTimeout(() => {
-                if (query.length > 2) {
-                    this.performSearch(query);
-                } else if (query.length === 0) {
-                    this.clearSearchResults();
-                }
-            }, 300);
-        });
-
-        // Enter para buscar
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            // Input event
+            input.addEventListener('input', (e) => {
                 const query = e.target.value.trim();
-                if (query.length > 0) {
-                    this.performSearch(query);
+                
+                // Sincronizar inputs
+                inputs.forEach(otherInput => {
+                    if (otherInput !== input && otherInput.value !== query) {
+                        otherInput.value = query;
+                    }
+                });
+                
+                // Limpiar timeout
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
                 }
-            }
-        });
+                
+                // Auto-switch to search view
+                if (query.length > 0 && this.currentView !== 'search') {
+                    this.switchView('search');
+                }
+                
+                // Debounced search
+                searchTimeout = setTimeout(() => {
+                    if (query.length > 2) {
+                        this.performSearch(query);
+                    } else if (query.length === 0) {
+                        this.clearSearchResults();
+                    }
+                }, 300);
+            });
 
-        // Focus específico para sidebar en desktop
-        if (inputType === 'sidebar' && this.isDesktop) {
+            // Enter key
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const query = e.target.value.trim();
+                    if (query.length > 0) {
+                        this.performSearch(query);
+                    }
+                }
+            });
+
+            // Focus behavior
             input.addEventListener('focus', () => {
-                if (this.currentView !== 'search') {
+                if (this.currentView !== 'search' && input.value.trim().length > 0) {
                     this.switchView('search');
                 }
             });
-        }
-    });
-}
-
-    // NUEVO: Crear fallback de búsqueda si no existe
- createSearchFallback() {
-    // Intentar crear en el header mobile
-    const mobileHeader = this.domElements.mobileHeader;
-    if (mobileHeader && !document.getElementById('searchInput')) {
-        const searchContainer = mobileHeader.querySelector('.mobile-search');
-        if (searchContainer) {
-            const searchInput = document.createElement('input');
-            searchInput.type = 'text';
-            searchInput.id = 'searchInput';
-            searchInput.className = 'mobile-search-input';
-            searchInput.placeholder = 'Buscar música...';
-            searchContainer.appendChild(searchInput);
-            
-            console.log('✅ Search input móvil fallback creado');
-        }
-    }
-
-    // Intentar crear en sidebar
-    const sidebar = this.domElements.sidebar;
-    if (sidebar && !document.getElementById('sidebarSearchInput')) {
-        const sidebarNav = sidebar.querySelector('.sidebar-nav');
-        if (sidebarNav) {
-            // Crear contenedor de búsqueda
-            const searchDiv = document.createElement('div');
-            searchDiv.className = 'sidebar-search';
-            
-            const searchInput = document.createElement('input');
-            searchInput.type = 'text';
-            searchInput.id = 'sidebarSearchInput';
-            searchInput.className = 'sidebar-search-input';
-            searchInput.placeholder = 'Buscar música...';
-            
-            searchDiv.appendChild(searchInput);
-            
-            // Insertar al principio del sidebar-nav
-            sidebarNav.insertBefore(searchDiv, sidebarNav.firstChild);
-            
-            console.log('✅ Search input sidebar fallback creado');
-        }
-    }
-
-    // Reintentar configuración después de crear fallbacks
-    setTimeout(() => {
-        this.setupSearch();
-    }, 100);
-}
-
-    // Configurar manejo de errores
-    setupErrorHandling() {
-        // Error global de JavaScript
-        window.addEventListener('error', (e) => {
-            console.error('Error global capturado:', e.error);
-            // Solo mostrar errores críticos al usuario
-            if (e.error && e.error.message && !e.error.message.includes('Extension')) {
-                this.showError('Error en la aplicación');
-            }
-        });
-
-        // Error de promesas no capturadas
-        window.addEventListener('unhandledrejection', (e) => {
-            console.error('Promise rechazada:', e.reason);
-            // No mostrar todos los errores de promise
-            e.preventDefault();
         });
     }
 
-    async _doInitialize() {
-        try {
-            console.log('🚀 Iniciando YT CrossMix Integration V2...');
-            
-            // 1. Detectar tipo de dispositivo
-            this.detectDeviceType();
-            
-            // 2. Esperar a que el DOM esté listo
-            await this.waitForDOM();
-            
-            // 3. Obtener referencias DOM
-            this.getDOMReferences();
-            
-            // 4. Verificar elementos críticos
-            this.verifyDOMElements();
-            
-            // 5. Configurar interfaz según dispositivo
-            this.setupDeviceInterface();
-            
-            // 6. Configurar navegación
-            this.setupNavigation();
-            
-            // 7. Configurar controles de reproducción
-            this.setupPlaybackControls();
-            
-            // 8. Configurar búsqueda
-            this.setupSearch();
-            
-            // 9. Configurar manejo de errores
-            this.setupErrorHandling();
-            
-            // 10. Inicializar vista por defecto
-            this.switchView('home');
-            
-            // 11. Marcar como inicializado
-            this.isInitialized = true;
-            
-            console.log('✅ YT CrossMix Integration V2 inicializado correctamente');
-            this.dispatchEvent('integrationReady');
-            
-            return true;
-        } catch (error) {
-            console.error('💥 Error en inicialización:', error);
-            this.showError('Error al inicializar la aplicación');
-            throw error;
-        }
-    }
-
-    // Esperar a que el DOM esté listo
-    waitForDOM() {
-        return new Promise((resolve) => {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', resolve, { once: true });
-            } else {
-                resolve();
-            }
-        });
-    }
-
-    // CORREGIDO: Obtener referencias DOM
-    getDOMReferences() {
-        const elements = {
-            // Headers y navegación
-            mobileHeader: '#mobileHeader, .mobile-header',
-            bottomNav: '#bottomNav, .bottom-nav',
-            miniPlayer: '#miniPlayer, .mini-player',
-            sidebar: '#sidebar, .desktop-sidebar',
-            bottomPlayer: '.bottom-player', // NUEVO
-            
-            // Vistas principales
-            searchResults: '#searchResults',
-            playlistsGrid: '#playlistsGrid',
-            
-            // Controles
-            searchInput: '#searchInput',
-            playButton: '#botonPlay, #playButton',
-            nextButton: '#botonNext, #nextButton',
-            miniPlayBtn: '#miniPlayBtn',
-            miniNextBtn: '#miniNextBtn',
-            
-            // Contenedores
-            videoContainer: '#videoContainer',
-            playlistContainer: '#playlistContainer',
-            floatingMessages: '#floatingMessageContainer'
-        };
-
-        Object.entries(elements).forEach(([key, selector]) => {
-            const element = document.querySelector(selector);
-            this.domElements[key] = element;
-            
-            if (!element) {
-                console.warn(`⚠️ Elemento no encontrado: ${selector}`);
-            }
-        });
-        
-        // CORREGIDO: Obtener contentViews como NodeList
-        this.domElements.contentViews = document.querySelectorAll('.content-view');
-        console.log(`📱 Encontradas ${this.domElements.contentViews.length} vistas de contenido`);
-    }
-
-    // Verificar elementos DOM críticos
-    verifyDOMElements() {
-        const critical = ['searchInput'];
-        const missing = critical.filter(key => !this.domElements[key]);
-        
-        if (missing.length > 0) {
-            console.warn(`⚠️ Elementos críticos faltantes: ${missing.join(', ')}`);
-            // No hacer throw, usar fallbacks
-        }
-        
-        // Verificar que contentViews tenga elementos
-        if (!this.domElements.contentViews || this.domElements.contentViews.length === 0) {
-            console.warn('⚠️ No se encontraron vistas de contenido (.content-view)');
-        }
-    }
-    // NUEVO: Configurar interfaz desktop
-    setupDesktopInterface() {
-        console.log('🖥️ Configurando interfaz desktop...');
-        
-        // Mostrar sidebar
-        if (this.domElements.sidebar) {
-            this.domElements.sidebar.style.display = 'block';
-        }
-        
-        // Mostrar bottom player
-        if (this.domElements.bottomPlayer) {
-            this.domElements.bottomPlayer.style.display = 'flex';
-        }
-        
-        // Ocultar elementos mobile
-        if (this.domElements.mobileHeader) {
-            this.domElements.mobileHeader.style.display = 'none';
-        }
-        if (this.domElements.bottomNav) {
-            this.domElements.bottomNav.style.display = 'none';
-        }
-        if (this.domElements.miniPlayer) {
-            this.domElements.miniPlayer.style.display = 'none';
-        }
-        
-        // Configurar controles desktop
-        this.setupDesktopControls();
-    }
-
-    // NUEVO: Configurar interfaz mobile
-    setupMobileInterface() {
-        console.log('📱 Configurando interfaz mobile...');
-        
-        // Mostrar elementos mobile
-        if (this.domElements.mobileHeader) {
-            this.domElements.mobileHeader.style.display = 'flex';
-        }
-        if (this.domElements.bottomNav) {
-            this.domElements.bottomNav.style.display = 'flex';
-        }
-        if (this.domElements.miniPlayer) {
-            this.domElements.miniPlayer.style.display = 'flex';
-        }
-        
-        // Ocultar elementos desktop
-        if (this.domElements.sidebar) {
-            this.domElements.sidebar.style.display = 'none';
-        }
-        if (this.domElements.bottomPlayer) {
-            this.domElements.bottomPlayer.style.display = 'none';
-        }
-        
-        // Configurar controles mobile
-        this.setupMiniPlayer();
-    }
-    toggleQueue() {
-    // Cambiar a playing view y mostrar cola
-    this.switchView('playing');
-    }
-    // Configurar navegación
-    setupNavigation() {
-        // Navegación mobile (bottom nav)
-        if (this.domElements.bottomNav) {
-            this.domElements.bottomNav.addEventListener('click', (e) => {
-                const navTab = e.target.closest('.nav-tab');
-                if (!navTab) return;
-                
-                const view = navTab.dataset.view;
-                if (view) {
-                    this.switchView(view);
-                }
-            });
-        }
-
-        // Navegación desktop (sidebar)
-        if (this.domElements.sidebar) {
-        const sidebarNavItems = this.domElements.sidebar.querySelectorAll('.nav-item');
-            sidebarNavItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const view = item.dataset.view;
-                    if (view) {
-                        this.switchView(view);
-                    }
-                });
-            });
-        }
-    }
-
-    // CORREGIDO: Cambiar vista - MANTENER EXPANSIONES
-    switchView(newView) {
-        if (this.currentView === newView) return;
-        
-        console.log(`📱 Cambiando vista: ${this.currentView} → ${newView}`);
-        
-        // GUARDAR estado de expansiones antes de cambiar vista
-        if (this.currentView === 'library' || this.currentView === 'playing') {
-            this.savePlaylistExpansions();
-        }
-        
-        // Actualizar vistas de contenido
-        if (this.domElements.contentViews && this.domElements.contentViews.length > 0) {
-            this.domElements.contentViews.forEach(view => {
-                const isActive = view.id === `${newView}View`;
-                view.classList.toggle('active', isActive);
-                view.style.display = isActive ? 'flex' : 'none';
-            });
-        }
-
-        // Actualizar navegación bottom (mobile)
-        if (this.domElements.bottomNav) {
-            const navTabs = this.domElements.bottomNav.querySelectorAll('.nav-tab');
-            navTabs.forEach(tab => {
-                const isActive = tab.dataset.view === newView;
-                tab.classList.toggle('active', isActive);
-            });
-        }
-
-        // Actualizar navegación sidebar (desktop)
-        if (this.domElements.sidebar) {
-            const sidebarItems = this.domElements.sidebar.querySelectorAll('.nav-item');
-            sidebarItems.forEach(item => {
-                const isActive = item.dataset.view === newView;
-                item.classList.toggle('active', isActive);
-            });
-        }
-
-        const oldView = this.currentView;
-        this.currentView = newView;
-
-        // Acciones específicas por vista
-        this.handleViewChange(oldView, newView);
-        
-        // Disparar evento
-        this.dispatchEvent('viewChanged', { 
-            from: oldView, 
-            to: newView 
-        });
-    }
-
-    // NUEVO: Guardar estado de expansiones
-    savePlaylistExpansions() {
-        this.expandedPlaylists.clear();
-        
-        // Guardar qué playlists están expandidas
-        const expandedElements = document.querySelectorAll('.playlist-group-mobile.expanded');
-        expandedElements.forEach(element => {
-            const playlistId = element.dataset.playlistId;
-            if (playlistId) {
-                this.expandedPlaylists.add(playlistId);
-            }
-        });
-        
-        console.log('💾 Guardadas expansiones:', Array.from(this.expandedPlaylists));
-    }
-
-    // NUEVO: Restaurar estado de expansiones
-    restorePlaylistExpansions() {
-        console.log('📂 Restaurando expansiones:', Array.from(this.expandedPlaylists));
-        
-        // Aplicar estado de expansión a las playlists
-        if (window.PlaylistState && window.PlaylistState.playlistsData) {
-            window.PlaylistState.playlistsData.forEach(playlist => {
-                if (this.expandedPlaylists.has(playlist.id)) {
-                    playlist.isExpanded = true;
-                }
-            });
-        }
-    }
-
-    // CORREGIDO: Manejar cambio de vista
-    handleViewChange(fromView, toView) {
-        switch (toView) {
-            case 'search':
-                // Focus en búsqueda
-                if (this.domElements.searchInput) {
-                    setTimeout(() => {
-                        this.domElements.searchInput.focus();
-                    }, 100);
-                }
-                break;
-                
-            case 'playing':
-                // Restaurar expansiones y actualizar UI
-                this.restorePlaylistExpansions();
-                setTimeout(() => {
-                    if (window.UIManager && typeof window.UIManager.updatePlaylistsUI === 'function') {
-                        window.UIManager.updatePlaylistsUI();
-                    }
-                }, 50);
-                
-                // Scroll al video container si está disponible
-                if (this.domElements.videoContainer) {
-                    this.domElements.videoContainer.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center'
-                    });
-                }
-                break;
-                
-            case 'library':
-                // Cargar contenido de biblioteca
-                this.loadLibraryContent();
-                break;
-        }
-    }
-
-    // Configurar controles de reproducción
+    // ===== CONTROLES DE REPRODUCCIÓN CORREGIDOS =====
     setupPlaybackControls() {
         // Botón play principal
         if (this.domElements.playButton) {
-            this.domElements.playButton.addEventListener('click', () => {
+            this.domElements.playButton.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.handlePlayPause();
             });
         }
 
         // Botón next principal
         if (this.domElements.nextButton) {
-            this.domElements.nextButton.addEventListener('click', () => {
+            this.domElements.nextButton.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.handleNext();
             });
         }
     }
 
-    // Configurar mini player (mobile)
     setupMiniPlayer() {
         if (!this.domElements.miniPlayer) return;
 
-        // Click en mini player va a playing view
+        // Click en mini player - ir a playing view
         this.domElements.miniPlayer.addEventListener('click', (e) => {
             if (!e.target.closest('.mini-control-btn')) {
                 this.switchView('playing');
@@ -964,173 +494,63 @@ setupSearch() {
             });
         }
     }
-    // NUEVO: Crear fallback de búsqueda si no existe
-    createSearchFallback() {
-        // Buscar en el header mobile
-        const mobileHeader = this.domElements.mobileHeader;
-        if (mobileHeader) {
-            const searchContainer = mobileHeader.querySelector('.mobile-search');
-            if (searchContainer && !searchContainer.querySelector('input')) {
-                const searchInput = document.createElement('input');
-                searchInput.type = 'text';
-                searchInput.id = 'searchInput';
-                searchInput.className = 'mobile-search-input';
-                searchInput.placeholder = 'Buscar música...';
-                searchContainer.appendChild(searchInput);
-                
-                this.domElements.searchInput = searchInput;
-                console.log('✅ Search input fallback creado');
-                
-                // Configurar eventos
-                this.setupSearch();
-            }
-        }
-    }
 
-    // Configurar manejo de errores
-    setupErrorHandling() {
-        // Error global de JavaScript
-        window.addEventListener('error', (e) => {
-            console.error('Error global capturado:', e.error);
-            // Solo mostrar errores críticos al usuario
-            if (e.error && e.error.message && !e.error.message.includes('Extension')) {
-                this.showError('Error en la aplicación');
-            }
-        });
-
-        // Error de promesas no capturadas
-        window.addEventListener('unhandledrejection', (e) => {
-            console.error('Promise rechazada:', e.reason);
-            // No mostrar todos los errores de promise
-            e.preventDefault();
-        });
-    }
-
-    // Configurar listeners de eventos globales
-    setupEventListeners() {
-        // Resize y orientación
-        window.addEventListener('resize', this.debounce(() => {
-            this.handleResize();
-        }, 250));
-
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => this.handleResize(), 100);
-        });
-
-        // Estados de conexión
-        window.addEventListener('online', () => {
-            this.showMessage('Conexión restaurada');
-        });
-
-        window.addEventListener('offline', () => {
-            this.showMessage('Sin conexión a internet');
-        });
-
-        // Prevenir zoom accidental en mobile
-        document.addEventListener('touchstart', (e) => {
-            if (e.touches.length > 1) {
-                e.preventDefault();
-            }
-        });
-
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (e) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        });
-    }
-
-    // CORREGIDO: Manejar play/pause
+    // ===== MANEJADORES DE REPRODUCCIÓN =====
     handlePlayPause() {
-    console.log('🎵 Play/Pause clicked');
-    
-    // PRIMERA PRIORIDAD: Usar el botón original del sistema
-    const originalPlayButton = document.getElementById('botonPlay');
-    if (originalPlayButton && !originalPlayButton.disabled) {
-        originalPlayButton.click();
-        return;
-    }
+        console.log('🎵 Play/Pause integración');
+        
+        // Usar el botón original del sistema
+        if (this.domElements.playButton && !this.domElements.playButton.disabled) {
+            this.domElements.playButton.click();
+            return;
+        }
 
-        // SEGUNDA PRIORIDAD: Integración con app principal
+        // Fallback con app principal
         if (window.YTCrossMixApp && typeof window.YTCrossMixApp.handlePlayPause === 'function') {
             window.YTCrossMixApp.handlePlayPause();
             return;
         }
 
-        // Fallback básico si no hay sistema principal
+        // Última opción: toggle manual
         this.isPlaying = !this.isPlaying;
         this.updatePlayButtonState();
-        
-        if (this.isPlaying) {
-            this.showMessage('Reproduciendo...');
-        } else {
-            this.showMessage('Pausado');
-        }
     }
 
-    // Manejar next
     handleNext() {
-        console.log('⏭️ Next clicked');
+        console.log('⏭️ Next integración');
         
-        // PRIMERA PRIORIDAD: Usar el botón original del sistema
-        const originalNextButton = document.getElementById('botonNext');
-        if (originalNextButton && !originalNextButton.disabled) {
-            originalNextButton.click();
+        if (this.domElements.nextButton && !this.domElements.nextButton.disabled) {
+            this.domElements.nextButton.click();
             return;
         }
 
-        // SEGUNDA PRIORIDAD: Integración con app principal
         if (window.YTCrossMixApp && typeof window.YTCrossMixApp.handleNext === 'function') {
             window.YTCrossMixApp.handleNext();
             return;
         }
 
-        // Fallback básico
         this.showMessage('Siguiente canción');
     }
 
-    // NUEVO: Manejar previous
-    handlePrevious() {
-        console.log('⏮️ Previous clicked');
-        this.showMessage('Canción anterior (no implementado)');
-    }
-
-    // Actualizar estado de botones de play
     updatePlayButtonState() {
         const playIcon = this.isPlaying ? 'fa-pause' : 'fa-play';
         
-        // Botón principal
-        if (this.domElements.playButton) {
-            const icon = this.domElements.playButton.querySelector('i');
+        // Actualizar todos los botones play
+        const playButtons = [
+            this.domElements.playButton,
+            this.domElements.miniPlayBtn,
+            this.domElements.bottomPlayer?.querySelector('#botonPlay')
+        ].filter(Boolean);
+
+        playButtons.forEach(button => {
+            const icon = button.querySelector('i');
             if (icon) {
                 icon.className = `fas ${playIcon}`;
             }
-        }
-
-        // Mini player (mobile)
-        if (this.domElements.miniPlayBtn) {
-            const icon = this.domElements.miniPlayBtn.querySelector('i');
-            if (icon) {
-                icon.className = `fas ${playIcon}`;
-            }
-        }
-
-        // Bottom player (desktop)
-        if (this.domElements.bottomPlayer) {
-            const bottomPlayBtn = this.domElements.bottomPlayer.querySelector('#botonPlay');
-            if (bottomPlayBtn) {
-                const icon = bottomPlayBtn.querySelector('i');
-                if (icon) {
-                    icon.className = `fas ${playIcon}`;
-                }
-            }
-        }
+        });
     }
 
-    // Realizar búsqueda
+    // ===== BÚSQUEDA =====
     async performSearch(query) {
         console.log('🔍 Buscando:', query);
         
@@ -1148,13 +568,13 @@ setupSearch() {
         `;
 
         try {
-            // Integración con SearchManager existente
+            // Usar SearchManager existente
             if (window.SearchManager && window.SearchManager.performSearch) {
                 await window.SearchManager.performSearch(query);
                 return;
             }
 
-            // Fallback básico - simular búsqueda
+            // Fallback
             await this.sleep(1000);
             this.renderMockSearchResults(query);
             
@@ -1169,44 +589,6 @@ setupSearch() {
         }
     }
 
-    // Renderizar resultados mock para testing
-    renderMockSearchResults(query) {
-        const mockResults = [
-            {
-                title: `Resultado 1 para "${query}"`,
-                author: 'Artista de Ejemplo',
-                thumbnail: 'https://via.placeholder.com/320x180?text=Video+1',
-                duration: '3:45'
-            },
-            {
-                title: `Resultado 2 para "${query}"`,
-                author: 'Otro Artista',
-                thumbnail: 'https://via.placeholder.com/320x180?text=Video+2',
-                duration: '4:20'
-            }
-        ];
-
-        const resultsHTML = mockResults.map(result => `
-            <div class="video-result">
-                <div class="thumbnail-container">
-                    <img src="${result.thumbnail}" alt="${result.title}" class="thumbnail">
-                    <span class="duration">${result.duration}</span>
-                </div>
-                <div class="video-details">
-                    <h3 class="video-title">${result.title}</h3>
-                    <p class="video-author">${result.author}</p>
-                    <button class="search-result-add-button" onclick="integration.handleAddToPlaylist('${result.title}')">
-                        <i class="fas fa-plus"></i>
-                        Añadir
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-        this.domElements.searchResults.innerHTML = resultsHTML;
-    }
-
-    // Limpiar resultados de búsqueda
     clearSearchResults() {
         if (this.domElements.searchResults) {
             this.domElements.searchResults.innerHTML = `
@@ -1217,72 +599,147 @@ setupSearch() {
             `;
         }
     }
-    // Manejar añadir a playlist
-    handleAddToPlaylist(title) {
-        console.log('➕ Añadiendo a playlist:', title);
-        
-        // Integración con sistema existente
-        if (window.PlaylistManager && window.PlaylistManager.addVideoToManualPlaylist) {
-            // Usar sistema real
-            window.PlaylistManager.addVideoToManualPlaylist({
-                title: title,
-                videoId: 'mock_' + Date.now()
-            });
-        } else {
-            // Fallback
-            this.showMessage(`"${title}" añadido a la playlist`);
-        }
-    }
 
-    // Cargar contenido de biblioteca
-    loadLibraryContent() {
-        console.log('📚 Cargando biblioteca...');
-        
-        // Integración con sistema existente
-        if (window.PlaylistGridManager && window.PlaylistGridManager.renderPlaylistsGrid) {
-            setTimeout(() => {
-                window.PlaylistGridManager.renderPlaylistsGrid();
-            }, 100);
-            return;
-        }
+    renderMockSearchResults(query) {
+        const mockResults = Array.from({length: 6}, (_, i) => ({
+            title: `Resultado ${i + 1} para "${query}"`,
+            author: `Artista ${i + 1}`,
+            thumbnail: `https://via.placeholder.com/180x135?text=Video+${i + 1}`,
+            duration: `${2 + i}:${30 + (i * 10)}`
+        }));
 
-        // Fallback - mostrar mensaje
-        if (this.domElements.playlistsGrid) {
-            this.domElements.playlistsGrid.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-music"></i>
-                    <p>Conecta tu cuenta de Google para ver tus playlists</p>
+        const resultsHTML = mockResults.map(result => `
+            <div class="video-result">
+                <div class="thumbnail-container">
+                    <img src="${result.thumbnail}" alt="${result.title}" class="thumbnail" loading="lazy">
+                    <span class="duration">${result.duration}</span>
                 </div>
-            `;
+                <div class="video-details">
+                    <h3 class="video-title">${result.title}</h3>
+                    <p class="video-author">${result.author}</p>
+                    <button class="search-result-add-button">
+                        <i class="fas fa-plus"></i>
+                        Añadir
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        this.domElements.searchResults.innerHTML = resultsHTML;
+    }
+
+    // ===== MANEJO DE VISTA =====
+    handleViewChange(fromView, toView) {
+        switch (toView) {
+            case 'search':
+                if (this.domElements.searchInput) {
+                    setTimeout(() => this.domElements.searchInput.focus(), 100);
+                }
+                break;
+                
+            case 'playing':
+                this.restorePlaylistExpansions();
+                this.loadPlayingContent();
+                break;
+                
+            case 'library':
+                this.loadLibraryContent();
+                break;
+                
+            case 'home':
+                this.loadHomeContent();
+                break;
         }
     }
 
-    // Actualizar información del track actual
+    loadPlayingContent() {
+        setTimeout(() => {
+            if (window.UIManager && typeof window.UIManager.updatePlaylistsUI === 'function') {
+                window.UIManager.updatePlaylistsUI();
+            }
+        }, 50);
+    }
+
+    loadLibraryContent() {
+        setTimeout(() => {
+            if (window.PlaylistGridManager && typeof window.PlaylistGridManager.renderPlaylistsGrid === 'function') {
+                window.PlaylistGridManager.renderPlaylistsGrid();
+            }
+        }, 100);
+    }
+
+    loadHomeContent() {
+        // Actualizar overview en home
+        this.updateHomeOverview();
+    }
+
+    updateHomeOverview() {
+        const overview = document.getElementById('playlistOverview');
+        if (!overview) return;
+
+        const playlistCount = window.PlaylistState?.playlistsData?.length || 0;
+        const totalVideos = window.PlaylistManager?.getFlattenedPlaylist()?.length || 0;
+        
+        overview.innerHTML = `
+            <div class="overview-section">
+                <h3 class="overview-title">
+                    <i class="fas fa-list-ul"></i>
+                    Tus Playlists
+                </h3>
+                <div class="overview-content">
+                    <p>${playlistCount} playlists cargadas</p>
+                    <p>${totalVideos} videos en total</p>
+                </div>
+            </div>
+            <div class="overview-section">
+                <h3 class="overview-title">
+                    <i class="fas fa-music"></i>
+                    Reproducción
+                </h3>
+                <div class="overview-content">
+                    <p>Estado: ${this.isPlaying ? 'Reproduciendo' : 'Detenido'}</p>
+                    <p>Video actual: ${this.currentTrack?.title || 'Ninguno'}</p>
+                </div>
+            </div>
+        `;
+    }
+
+    // ===== EXPANSIONES DE PLAYLIST =====
+    savePlaylistExpansions() {
+        this.expandedPlaylists.clear();
+        const expandedElements = document.querySelectorAll('.playlist-group-mobile.expanded');
+        expandedElements.forEach(element => {
+            const playlistId = element.dataset.playlistId;
+            if (playlistId) {
+                this.expandedPlaylists.add(playlistId);
+            }
+        });
+        console.log('💾 Expansiones guardadas:', Array.from(this.expandedPlaylists));
+    }
+
+    restorePlaylistExpansions() {
+        console.log('📂 Restaurando expansiones:', Array.from(this.expandedPlaylists));
+        if (window.PlaylistState && window.PlaylistState.playlistsData) {
+            window.PlaylistState.playlistsData.forEach(playlist => {
+                if (this.expandedPlaylists.has(playlist.id)) {
+                    playlist.isExpanded = true;
+                }
+            });
+        }
+    }
+
+    // ===== TRACK INFO =====
     updateCurrentTrack(trackInfo) {
         console.log('🎵 Actualizando track:', trackInfo);
         
         this.currentTrack = trackInfo;
-
-        // Actualizar mini player
         this.updateMiniPlayer(trackInfo);
-        
-        // Actualizar vista playing
         this.updatePlayingView(trackInfo);
-        
-        // Disparar evento
-        this.dispatchEvent('trackChanged', trackInfo);
         this.updateBottomPlayer(trackInfo);
+        
+        this.dispatchEvent('trackChanged', trackInfo);
     }
-updateBottomPlayer(trackInfo) {
-    const playerTitle = document.getElementById('playerTitle');
-    const playerArtist = document.getElementById('playerArtist'); 
-    const playerThumbnail = document.getElementById('playerThumbnail');
-    
-    if (playerTitle) playerTitle.textContent = trackInfo.title || 'Selecciona una canción';
-    if (playerArtist) playerArtist.textContent = trackInfo.artist || 'YT CrossMix';
-    if (playerThumbnail && trackInfo.thumbnail) playerThumbnail.src = trackInfo.thumbnail;
-}
-    // Actualizar mini player
+
     updateMiniPlayer(trackInfo) {
         if (!this.domElements.miniPlayer || !trackInfo) return;
 
@@ -1295,7 +752,6 @@ updateBottomPlayer(trackInfo) {
         if (imageEl && trackInfo.thumbnail) imageEl.src = trackInfo.thumbnail;
     }
 
-    // Actualizar vista playing
     updatePlayingView(trackInfo) {
         const titleEl = document.getElementById('nowPlayingTitle');
         const artistEl = document.getElementById('nowPlayingArtist');
@@ -1304,285 +760,673 @@ updateBottomPlayer(trackInfo) {
         if (artistEl) artistEl.textContent = trackInfo.artist || 'YT CrossMix';
     }
 
-    // Manejar resize
-    handleResize() {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+    updateBottomPlayer(trackInfo) {
+        const playerTitle = document.getElementById('playerTitle');
+        const playerArtist = document.getElementById('playerArtist'); 
+        const playerThumbnail = document.getElementById('playerThumbnail');
         
-        console.log(`📐 Resize: ${width}x${height}`);
-        
-        // Actualizar CSS custom properties si es necesario
-        document.documentElement.style.setProperty('--viewport-width', width + 'px');
-        document.documentElement.style.setProperty('--viewport-height', height + 'px');
-        
-        // Ajustes específicos para landscape en mobile
-        if (width > height && width < 1024) {
-            document.body.classList.add('landscape-mobile');
-        } else {
-            document.body.classList.remove('landscape-mobile');
-        }
-        
-        // Disparar evento
-        this.dispatchEvent('resize', { width, height });
+        if (playerTitle) playerTitle.textContent = trackInfo.title || 'Selecciona una canción';
+        if (playerArtist) playerArtist.textContent = trackInfo.artist || 'YT CrossMix';
+        if (playerThumbnail && trackInfo.thumbnail) playerThumbnail.src = trackInfo.thumbnail;
     }
 
-    // Mostrar mensaje flotante
-    showMessage(message, duration = 4000) {
-        console.log('💬 Mensaje:', message);
+    // ===== RESIZE HANDLING =====
+    handleResize() {
+        const wasDesktop = this.isDesktop;
+        this.detectDeviceType();
         
-        // Usar la función existente si está disponible
-        if (typeof mostrarMensajeFlotante === 'function') {
-            mostrarMensajeFlotante(message);
-            return;
+        // Si cambió el tipo de dispositivo, reconfigurar interfaz
+        if (wasDesktop !== this.isDesktop) {
+            this.setupDeviceInterface();
         }
         
-        // Crear elemento de mensaje
+        this.dispatchEvent('resize', { width: window.innerWidth, height: window.innerHeight });
+    }
+
+    // ===== EVENTOS Y LISTENERS =====
+    setupEventListeners() {
+        // Resize
+        window.addEventListener('resize', this.debounce(() => {
+            this.handleResize();
+        }, 250));
+
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.handleResize(), 100);
+        });
+
+        // Estados de conexión
+        window.addEventListener('online', () => this.showMessage('Conexión restaurada'));
+        window.addEventListener('offline', () => this.showMessage('Sin conexión'));
+
+        // Prevenir zoom en mobile
+        this.preventMobileZoom();
+    }
+
+    preventMobileZoom() {
+        if (!this.isMobile) return;
+        
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+    }
+
+    // ===== ERROR HANDLING =====
+    setupErrorHandling() {
+        window.addEventListener('error', (e) => {
+            console.error('Error global:', e.error);
+            if (e.error && !e.error.message?.includes('Extension')) {
+                this.showError('Error en la aplicación');
+            }
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Promise rechazada:', e.reason);
+            e.preventDefault();
+        });
+    }
+
+    // ===== UTILIDADES =====
+    waitForDOM() {
+        return new Promise((resolve) => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve, { once: true });
+            } else {
+                resolve();
+            }
+        });
+    }
+
+    showMessage(message, duration = 4000) {
         const messageEl = document.createElement('div');
-        messageEl.className = 'floating-message';
         messageEl.textContent = message;
+        messageEl.className = 'floating-message';
         
-        // Encontrar contenedor o usar body
-        let container = this.domElements.floatingMessages || document.body;
-        container.appendChild(messageEl);
+        document.body.appendChild(messageEl);
         
-        // Aplicar estilos de posición
         Object.assign(messageEl.style, {
             position: 'fixed',
             bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))',
             left: '50%',
             transform: 'translateX(-50%) translateY(100px) scale(0.8)',
             zIndex: '10000',
+            background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '500',
+            maxWidth: 'calc(100vw - 32px)',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(20px)',
             opacity: '0',
             transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
         });
-        
-        // Animación de entrada
+
         requestAnimationFrame(() => {
-            Object.assign(messageEl.style, {
-                transform: 'translateX(-50%) translateY(0) scale(1)',
-                opacity: '1'
-            });
+            messageEl.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+            messageEl.style.opacity = '1';
         });
-        
-        // Animación de salida
+
         setTimeout(() => {
-            Object.assign(messageEl.style, {
-                transform: 'translateX(-50%) translateY(-20px) scale(0.9)',
-                opacity: '0'
-            });
-            setTimeout(() => {
-                if (messageEl.parentNode) {
-                    messageEl.remove();
-                }
-            }, 400);
+            messageEl.style.opacity = '0';
+            setTimeout(() => messageEl.remove(), 400);
         }, duration);
     }
 
-    // Mostrar error
     showError(message) {
-        console.error('❌ Error:', message);
         this.showMessage('❌ ' + message, 6000);
     }
 
-    // Mostrar loading
-    showLoading(show = true) {
-        let spinner = document.getElementById('loadingSpinner');
-        
-        if (show && !spinner) {
-            spinner = document.createElement('div');
-            spinner.id = 'loadingSpinner';
-            spinner.className = 'loading-spinner';
-            spinner.innerHTML = '<div class="spinner"></div>';
-            document.body.appendChild(spinner);
-        }
-        
-        if (spinner) {
-            spinner.classList.toggle('hidden', !show);
-        }
-    }
-
-    // Utilidades
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    dispatchEvent(eventName, detail = null) {
+        const event = new CustomEvent(eventName, { detail, bubbles: true });
+        document.dispatchEvent(event);
     }
 
     debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+        return (...args) => {
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            timeout = setTimeout(() => func(...args), wait);
         };
     }
 
-    // Disparar evento personalizado
-    dispatchEvent(eventName, detail = null) {
-        const event = new CustomEvent(eventName, { 
-            detail,
-            bubbles: true,
-            cancelable: true
-        });
-        document.dispatchEvent(event);
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Obtener información de diagnóstico
-    getDiagnostics() {
-        return {
+    // ===== MÉTODOS PÚBLICOS =====
+    debug() {
+        console.log('=== YT CROSSMIX INTEGRATION DEBUG V3 ===');
+        console.log('Estado:', {
             isInitialized: this.isInitialized,
             currentView: this.currentView,
             isPlaying: this.isPlaying,
-            currentTrack: this.currentTrack,
-            domElements: Object.fromEntries(
+            isDesktop: this.isDesktop,
+            elementsFound: Object.fromEntries(
                 Object.entries(this.domElements).map(([key, el]) => [key, !!el])
-            ),
-            contentViewsCount: this.domElements.contentViews ? this.domElements.contentViews.length : 0,
-            viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                ratio: window.devicePixelRatio
-            },
-            browser: {
-                userAgent: navigator.userAgent,
-                language: navigator.language,
-                online: navigator.onLine,
-                cookieEnabled: navigator.cookieEnabled,
-                platform: navigator.platform
-            },
-            support: {
-                serviceWorker: 'serviceWorker' in navigator,
-                localStorage: this.checkLocalStorage(),
-                webAudio: 'AudioContext' in window || 'webkitAudioContext' in window,
-                fullscreen: 'requestFullscreen' in document.documentElement
-            }
-        };
+            )
+        });
+        console.log('=======================================');
     }
 
-    // Verificar localStorage
-    checkLocalStorage() {
-        try {
-            localStorage.setItem('test', 'test');
-            localStorage.removeItem('test');
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    // Método para debugging
-    debug() {
-        console.log('=== YT CROSSMIX INTEGRATION DEBUG ===');
-        console.table(this.getDiagnostics());
-        console.log('=====================================');
-    }
-
-    // Método de reset
     reset() {
-        console.log('🔄 Reseteando integración...');
-        
         this.currentView = 'home';
         this.isPlaying = false;
         this.currentTrack = null;
-        
-        // Limpiar interfaces
         this.switchView('home');
         this.updatePlayButtonState();
-        this.clearSearchResults();
-        
         this.showMessage('Aplicación reiniciada');
     }
+}
 
-    // Integración con módulos existentes
-    connectWithExistingModules() {
-        // Conectar con app principal si existe
-        if (window.YTCrossMixApp) {
-            console.log('🔗 Conectando con YTCrossMixApp...');
-            
-            // Override funciones si es necesario
-            const originalReset = window.YTCrossMixApp.reset;
-            if (typeof originalReset === 'function') {
-                window.YTCrossMixApp.reset = () => {
-                    originalReset.call(window.YTCrossMixApp);
-                    this.reset();
-                };
-            }
-        }
+// ===== CORRECCIÓN 2: CSS CRÍTICOS PARA MOBILE =====
 
-        // Conectar con gestores existentes
-        ['PlaylistManager', 'SearchManager', 'PlaybackController'].forEach(manager => {
-            if (window[manager]) {
-                console.log(`🔗 ${manager} detectado`);
-            }
-        });
+const criticalCSS = `
+/* CRITICAL MOBILE FIXES */
+:root {
+    --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-header-height: 64px;
+    --mobile-mini-player-height: 64px;
+    --mobile-bottom-nav-height: 80px;
+    --primary-bg: #0f0f0f;
+    --secondary-bg: #1a1a1a;
+    --accent-color: #ff6b35;
+    --text-primary: #ffffff;
+    --text-secondary: #aaaaaa;
+    --border-color: #373737;
+}
 
-        // Escuchar eventos del sistema existente
-        document.addEventListener('playerStateChanged', (e) => {
-            if (e.detail && e.detail.state === 1) { // PLAYING
-                this.isPlaying = true;
-                this.updatePlayButtonState();
-                
-                // Actualizar track info si está disponible
-                if (e.detail.videoId) {
-                    // Intentar obtener info del video
-                    this.syncTrackInfo(e.detail);
-                }
-            } else {
-                this.isPlaying = false;
-                this.updatePlayButtonState();
-            }
-        });
+/* LAYOUT FIXES */
+.app-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--primary-bg);
+    overflow-x: hidden;
+}
 
-        document.addEventListener('playlistsUpdated', () => {
-            if (this.currentView === 'library') {
-                this.loadLibraryContent();
-            }
-        });
-    }
+.mobile-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: calc(var(--mobile-mini-player-height) + var(--mobile-bottom-nav-height) + var(--mobile-safe-area-bottom));
+}
 
-    // Sincronizar información del track
-    syncTrackInfo(playerDetail) {
-        // Intentar obtener información del video actual
-        if (window.PlaylistState && window.PlaylistState.currentPlayingInfo) {
-            const currentInfo = window.PlaylistState.currentPlayingInfo;
-            const flatList = window.PlaylistManager ? window.PlaylistManager.getFlattenedPlaylist() : [];
-            const currentVideo = flatList.find(v => v.videoId === currentInfo.videoId);
-            
-            if (currentVideo) {
-                this.updateCurrentTrack({
-                    title: currentVideo.title,
-                    artist: currentVideo.channelTitle || 'Desconocido',
-                    thumbnail: currentVideo.thumbnail
-                });
-            }
-        }
+/* CONTENT VIEWS FIXES */
+.content-view {
+    display: none;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+.content-view.active {
+    display: flex !important;
+    flex-direction: column;
+}
+
+/* MOBILE HEADER FIXES */
+.mobile-header {
+    height: var(--mobile-header-height);
+    background: var(--secondary-bg);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    flex-shrink: 0;
+}
+
+.mobile-search {
+    flex: 1;
+    margin: 0 16px;
+}
+
+.mobile-search-input {
+    width: 100%;
+    height: 36px;
+    background: #272727;
+    border: none;
+    border-radius: 18px;
+    padding: 0 16px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+/* BOTTOM NAV FIXES */
+.bottom-nav {
+    position: fixed;
+    bottom: var(--mobile-safe-area-bottom);
+    left: 0;
+    right: 0;
+    height: var(--mobile-bottom-nav-height);
+    background: var(--secondary-bg);
+    display: flex;
+    z-index: 999;
+}
+
+.nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: #717171;
+    cursor: pointer;
+    padding: 8px;
+    min-height: 44px;
+}
+
+.nav-tab.active {
+    color: var(--accent-color);
+}
+
+/* MINI PLAYER FIXES */
+.mini-player {
+    position: fixed;
+    bottom: calc(var(--mobile-bottom-nav-height) + var(--mobile-safe-area-bottom));
+    left: 0;
+    right: 0;
+    height: var(--mobile-mini-player-height);
+    background: var(--secondary-bg);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    z-index: 998;
+}
+
+.mini-player-track {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
+.mini-track-image {
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    margin-right: 12px;
+    object-fit: cover;
+}
+
+.mini-track-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mini-track-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* CONTENT FIXES */
+.content-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* SEARCH RESULTS GRID */
+.search-results {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+}
+
+@media (min-width: 480px) {
+    .search-results {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
+
+/* VIDEO RESULT CARDS */
+.video-result {
+    background: var(--secondary-bg);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.video-result:hover {
+    transform: translateY(-2px);
+}
+
+.thumbnail-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    overflow: hidden;
+}
+
+.thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.duration {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 2px;
+}
+
+.video-details {
+    padding: 8px;
+}
+
+.video-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.video-author {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.search-result-add-button {
+    width: 100%;
+    height: 32px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+/* PLACEHOLDER STATES */
+.search-placeholder {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 0;
+    color: var(--text-secondary);
+}
+
+.search-placeholder i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+/* SPINNER */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 50%;
+    border-top: 2px solid var(--accent-color);
+    animation: spin 1s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* RESPONSIVE DESKTOP */
+@media (min-width: 1024px) {
+    .mobile-header,
+    .bottom-nav,
+    .mini-player {
+        display: none !important;
+    }
+    
+    .desktop-sidebar {
+        display: block !important;
+    }
+    
+    .bottom-player {
+        display: flex !important;
+    }
+    
+    .mobile-main {
+        margin-bottom: 80px;
+    }
+}
+
+/* UTILITY CLASSES */
+.hidden { display: none !important; }
+.is-mobile .mobile-only { display: block; }
+.is-desktop .desktop-only { display: block; }
+.is-mobile .desktop-only { display: none; }
+.is-desktop .mobile-only { display: none; }
+`;
+
+// ===== CORRECCIÓN 3: INICIALIZACIÓN AUTOMÁTICA =====
+
+// Crear e inyectar CSS críticos
+const styleSheet = document.createElement('style');
+styleSheet.textContent = criticalCSS;
+document.head.appendChild(styleSheet);
 
 // Crear instancia global
 const integration = new YTCrossMixIntegration();
 
-// Auto-inicializar cuando el DOM esté listo
+// Auto-inicializar
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        console.log('🚀 Iniciando sistema de integración corregido...');
+        
         await integration.initialize();
+        
+        // Conectar con módulos existentes
         integration.connectWithExistingModules();
         
         // Hacer disponible globalmente
         window.YTCrossMixIntegration = integration;
-        window.integration = integration; // Alias corto
+        window.integration = integration;
         
-        console.log('✅ YT CrossMix Integration listo');
+        // Funciones globales de compatibilidad
+        window.switchView = (view) => integration.switchView(view);
+        window.updateMiniPlayer = (data) => integration.updateCurrentTrack(data);
+        window.debugIntegration = () => integration.debug();
+        window.resetIntegration = () => integration.reset();
+        
+        console.log('✅ Sistema de integración V3 listo y funcionando');
+        
+        // Mostrar mensaje de éxito
+        setTimeout(() => {
+            integration.showMessage('🎉 YT CrossMix listo para usar');
+        }, 1000);
         
     } catch (error) {
-        console.error('💥 Error inicializando integración:', error);
+        console.error('💥 Error crítico en integración:', error);
+        document.body.innerHTML = `
+            <div style="
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+                background: #0f0f0f; color: white; display: flex; 
+                align-items: center; justify-content: center; 
+                flex-direction: column; font-family: Arial; text-align: center;
+                padding: 20px;
+            ">
+                <h1 style="color: #ff6b35; margin-bottom: 20px;">⚠️ Error de Inicialización</h1>
+                <p>Ha ocurrido un error al cargar YT CrossMix.</p>
+                <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
+                    Intenta recargar la página. Si el problema persiste, verifica la consola.
+                </p>
+                <button onclick="location.reload()" style="
+                    margin-top: 20px; padding: 12px 24px; 
+                    background: #ff6b35; color: white; border: none; 
+                    border-radius: 6px; cursor: pointer; font-size: 14px;
+                ">
+                    🔄 Recargar Página
+                </button>
+            </div>
+        `;
     }
 });
 
-// Funciones globales para compatibilidad
-window.switchView = (view) => integration.switchView(view);
-window.updateMiniPlayer = (data) => integration.updateCurrentTrack(data);
+// ===== CORRECCIÓN 4: CONECTAR CON SISTEMA EXISTENTE =====
 
-// Exportar para uso en módulos
+YTCrossMixIntegration.prototype.connectWithExistingModules = function() {
+    // Esperar a que los módulos principales estén disponibles
+    const checkModules = () => {
+        const modules = [
+            'PlaylistManager', 'SearchManager', 'PlaybackController', 
+            'UIManager', 'YouTubeAPIManager', 'PlaylistState', 'AppState'
+        ];
+        
+        const available = modules.filter(name => window[name]);
+        const missing = modules.filter(name => !window[name]);
+        
+        console.log('📦 Módulos disponibles:', available);
+        if (missing.length > 0) {
+            console.warn('⚠️ Módulos faltantes:', missing);
+        }
+        
+        this.setupModuleListeners();
+    };
+    
+    // Verificar inmediatamente y después de un delay
+    checkModules();
+    setTimeout(checkModules, 2000);
+};
+
+YTCrossMixIntegration.prototype.setupModuleListeners = function() {
+    // Listener para cambios de estado del reproductor
+    document.addEventListener('playerStateChanged', (e) => {
+        if (e.detail && e.detail.state === 1) { // PLAYING
+            this.isPlaying = true;
+            this.updatePlayButtonState();
+            
+            if (e.detail.videoId && window.PlaylistState) {
+                this.syncTrackInfo(e.detail);
+            }
+        } else {
+            this.isPlaying = false;
+            this.updatePlayButtonState();
+        }
+    });
+
+    // Listener para playlists actualizadas
+    document.addEventListener('playlistsUpdated', () => {
+        if (this.currentView === 'library') {
+            this.loadLibraryContent();
+        } else if (this.currentView === 'home') {
+            this.updateHomeOverview();
+        }
+    });
+
+    // Listener para cuando los reproductores estén listos
+    window.addEventListener('playersReady', () => {
+        console.log('🎵 Reproductores listos - habilitando controles');
+        this.updateControlsState();
+    });
+
+    // Listener para errores de autenticación
+    document.addEventListener('authError', (e) => {
+        this.showError('Error de autenticación: ' + e.detail.message);
+    });
+
+    // Listener para login/logout
+    document.addEventListener('userLoggedOut', () => {
+        this.showMessage('Sesión cerrada');
+        if (this.currentView === 'library') {
+            this.loadLibraryContent();
+        }
+    });
+
+    document.addEventListener('playlistsFetched', (e) => {
+        this.showMessage(`${e.detail.length} playlists cargadas`);
+        if (this.currentView === 'library') {
+            setTimeout(() => this.loadLibraryContent(), 500);
+        }
+    });
+};
+
+YTCrossMixIntegration.prototype.syncTrackInfo = function(playerDetail) {
+    if (!window.PlaylistState || !window.PlaylistManager) return;
+    
+    const currentInfo = window.PlaylistState.currentPlayingInfo;
+    const flatList = window.PlaylistManager.getFlattenedPlaylist();
+    const currentVideo = flatList.find(v => v.videoId === currentInfo.videoId);
+    
+    if (currentVideo) {
+        this.updateCurrentTrack({
+            title: currentVideo.title,
+            artist: currentVideo.channelTitle || 'Desconocido',
+            thumbnail: currentVideo.thumbnail
+        });
+    }
+};
+
+YTCrossMixIntegration.prototype.updateControlsState = function() {
+    const hasPlaylists = window.PlaylistState?.playlistsData?.length > 0;
+    const flatList = window.PlaylistManager?.getFlattenedPlaylist() || [];
+    
+    // Habilitar/deshabilitar controles
+    [this.domElements.playButton, this.domElements.miniPlayBtn].forEach(btn => {
+        if (btn) btn.disabled = flatList.length === 0;
+    });
+    
+    console.log(`🎮 Controles actualizados: ${flatList.length} videos disponibles`);
+};
+
+// ===== CORRECCIÓN 5: FIXES PARA EL APP.JS =====
+
+// Patch para el app principal si existe
+if (window.YTCrossMixApp) {
+    const originalReset = window.YTCrossMixApp.reset;
+    window.YTCrossMixApp.reset = function() {
+        if (typeof originalReset === 'function') {
+            originalReset.call(this);
+        }
+        if (window.integration) {
+            window.integration.reset();
+        }
+    };
+    
+    const originalDebug = window.YTCrossMixApp.debug;
+    window.YTCrossMixApp.debug = function() {
+        if (typeof originalDebug === 'function') {
+            originalDebug.call(this);
+        }
+        if (window.integration) {
+            window.integration.debug();
+        }
+    };
+}
+
+// Export para uso en módulos
 export { YTCrossMixIntegration, integration };
