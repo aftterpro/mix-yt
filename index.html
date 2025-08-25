@@ -486,369 +486,45 @@
     <script  type="module" defer src="./integration-fix.js"></script>
     
     <!-- Módulos principales -->
-    <script type="module">
-        import './app.js';
-        import { PlaylistGridManager } from './playlistGridManager.js';
+<script type="module">
+    import './app.js';
+    
+    // Configuración básica
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM cargado, módulos principales iniciándose...');
         
-        console.log('Módulos cargados, inicializando aplicación...');
-
-        // Variables globales para la nueva UI móvil
-        let authManager = null;
-
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                console.log('DOM cargado, inicializando UI móvil...');
-                
-                // Inicializar autenticación
-                try {
-                    const authModule = await import('./auth.js');
-                    authManager = authModule.authManager;
-                    await authManager.initialize();
-                    window.authManager = authManager;
-                    console.log('Autenticación inicializada');
-                } catch (error) {
-                    console.warn('Auth module no disponible:', error);
-                }
-                
-                // Integrar con el sistema existente
-                connectWithExistingSystem();
-                
-                console.log('UI móvil inicializada correctamente');
-                
-            } catch (error) {
-                console.error('Error inicializando UI móvil:', error);
-            }
-        });
-
-        // Conectar con el sistema existente
-        function connectWithExistingSystem() {
-            // Escuchar cambios en el estado de reproducción
-            document.addEventListener('playerStateChanged', (event) => {
-                updateMiniPlayer(event.detail);
-            });
-
-            // Escuchar cuando se cargan playlists
-            document.addEventListener('playlistsFetched', (event) => {
-                if (window.currentView === 'library') {
-                    setTimeout(() => loadLibraryContent(), 500);
-                }
-            });
-
-            // Escuchar cuando el app principal está listo
-            window.addEventListener('playersReady', () => {
-                console.log('Players listos, habilitando controles móviles');
-                updateUIControls();
-            });
-
-            // Funciones globales para compatibilidad
-            window.switchView = switchView;
-            window.currentView = () => window.currentView;
-        }
-
-        // Actualizar controles de UI
-        function updateUIControls() {
-            const miniPlayBtn = document.getElementById('miniPlayBtn');
-            const hasPlaylists = window.playlistState?.playlistsData?.length > 0;
-            
-            if (miniPlayBtn) {
-                miniPlayBtn.disabled = !hasPlaylists;
-            }
-        }
-
-        // Actualizar mini player
-        function updateMiniPlayer(data) {
-            const miniTitle = document.getElementById('miniTrackTitle');
-            const miniArtist = document.getElementById('miniTrackArtist');
-            const miniImage = document.getElementById('miniTrackImage');
-            const miniPlayBtn = document.getElementById('miniPlayBtn');
-            
-            if (data.title && miniTitle) {
-                miniTitle.textContent = data.title;
-            }
-            if (data.channelTitle && miniArtist) {
-                miniArtist.textContent = data.channelTitle;
-            }
-            if (data.thumbnail && miniImage) {
-                miniImage.src = data.thumbnail;
-            }
-            
-            // Sincronizar estado de play/pause
-            const mainPlayBtn = document.getElementById('botonPlay');
-            if (miniPlayBtn && mainPlayBtn) {
-                const isPlaying = mainPlayBtn.innerHTML.includes('pause');
-                miniPlayBtn.innerHTML = isPlaying ? 
-                    '<i class="fas fa-pause"></i>' : 
-                    '<i class="fas fa-play"></i>';
-            }
-        }
-
-        // Funcionalidad de tabs
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const parent = tab.closest('.content-tabs');
-                if (parent) {
-                    parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                }
-            });
-        });
-
-        // Función para switching
-        function switchView(view) {
+        // Variables globales mínimas para compatibilidad
+        window.currentView = 'home';
+        
+        // Funciones de debugging rápido
+        window.debugApp = () => {
             if (window.integration) {
-                window.integration.switchView(view);
-            } else {
-                // Fallback básico
-                document.querySelectorAll('.content-view').forEach(v => v.classList.remove('active'));
-                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-                
-                const targetView = document.getElementById(`${view}View`);
-                const targetTab = document.querySelector(`[data-view="${view}"]`);
-                
-                if (targetView) targetView.classList.add('active');
-                if (targetTab) targetTab.classList.add('active');
-                
-                window.currentView = view;
-            }
-        }
-
-        // Cargar contenido de biblioteca
-        function loadLibraryContent() {
-            if (typeof PlaylistGridManager !== 'undefined') {
-                setTimeout(() => {
-                    PlaylistGridManager.renderPlaylistsGrid();
-                }, 100);
-            }
-        }
-
-        // Detectar viewport para mostrar/ocultar sidebar
-        function handleViewportChange() {
-            const sidebar = document.getElementById('sidebar');
-            const isDesktop = window.innerWidth >= 1024;
-            
-            if (sidebar) {
-                sidebar.style.display = isDesktop ? 'block' : 'none';
-            }
-        }
-
-        window.addEventListener('resize', handleViewportChange);
-        handleViewportChange(); // Ejecutar al cargar
-
-        // Configurar búsqueda mejorada
-        function setupEnhancedSearch() {
-            const searchInput = document.getElementById('searchInput');
-            if (!searchInput) return;
-            
-            let searchTimeout = null;
-            
-            searchInput.addEventListener('input', (e) => {
-                const query = e.target.value.trim();
-                
-                // Limpiar timeout anterior
-                if (searchTimeout) {
-                    clearTimeout(searchTimeout);
-                }
-                
-                // Cambiar a vista de búsqueda automáticamente si hay query
-                if (query.length > 0 && window.currentView !== 'search') {
-                    switchView('search');
-                }
-                
-                // Debounce de búsqueda
-                searchTimeout = setTimeout(() => {
-                    if (query.length > 2) {
-                        performSearch(query);
-                    } else if (query.length === 0) {
-                        clearSearchResults();
-                    }
-                }, 300);
-            });
-        }
-
-        // Realizar búsqueda
-        function performSearch(query) {
-            if (window.SearchManager && typeof window.SearchManager.performSearch === 'function') {
-                window.SearchManager.performSearch(query);
-            } else {
-                console.log('SearchManager no disponible, búsqueda:', query);
-            }
-        }
-
-        // Limpiar resultados de búsqueda
-        function clearSearchResults() {
-            const searchResults = document.getElementById('searchResults');
-            if (searchResults) {
-                searchResults.innerHTML = `
-                    <div class="search-placeholder">
-                        <i class="fas fa-search"></i>
-                        <p>Busca música, artistas o playlists</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Configurar búsqueda cuando el DOM esté listo
-        setTimeout(() => {
-            setupEnhancedSearch();
-        }, 500);
-
-        // Exportar funciones globales necesarias
-        window.switchView = switchView;
-        window.updateMiniPlayer = updateMiniPlayer;
-        
-        // Función para switching desde el reproductor principal
-        window.switchToNowPlaying = function() {
-            if (window.playlistState?.currentPlayingInfo?.videoId) {
-                switchView('playing');
+                window.integration.debug();
+            } else if (window.YTCrossMixApp) {
+                window.YTCrossMixApp.debug();
             }
         };
 
-        // Integración con botones de autenticación
-        setTimeout(() => {
-            const authToggleBtn = document.getElementById('authToggleBtn');
-            const googleSignInButton = document.getElementById('googleSignInButton');
-            const googleSignOutButton = document.getElementById('googleSignOutButton');
-            
-            // Sincronizar botones de auth
-            if (authToggleBtn && googleSignInButton) {
-                authToggleBtn.addEventListener('click', () => {
-                    googleSignInButton.click();
-                });
+        window.resetApp = () => {
+            if (window.integration) {
+                window.integration.reset();
+            } else {
+                location.reload();
             }
-            
-            // Observar cambios en los botones principales
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                        const isSignInHidden = googleSignInButton?.classList.contains('hidden');
-                        const isSignOutHidden = googleSignOutButton?.classList.contains('hidden');
-                        
-                        if (authToggleBtn) {
-                            if (isSignInHidden && !isSignOutHidden) {
-                                // Usuario logueado
-                                authToggleBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Cerrar sesión';
-                                authToggleBtn.onclick = () => googleSignOutButton.click();
-                            } else {
-                                // Usuario no logueado
-                                authToggleBtn.innerHTML = '<i class="fab fa-google"></i> Conectar';
-                                authToggleBtn.onclick = () => googleSignInButton.click();
-                            }
-                        }
-                    }
-                });
-            });
-            
-            if (googleSignInButton) {
-                observer.observe(googleSignInButton, { attributes: true });
-            }
-            if (googleSignOutButton) {
-                observer.observe(googleSignOutButton, { attributes: true });
-            }
-        }, 1000);
+        };
+    });
 
-        // Manejar estados de la aplicación
-        document.addEventListener('playlistsUpdated', () => {
-            updateUIControls();
-        });
-
-        document.addEventListener('userLoggedOut', () => {
-            if (window.currentView === 'library') {
-                // Mostrar mensaje de biblioteca vacía
-                const playlistsGrid = document.getElementById('playlistsGrid');
-                if (playlistsGrid) {
-                    playlistsGrid.innerHTML = `
-                        <div class="search-placeholder">
-                            <i class="fas fa-music"></i>
-                            <p>Conecta tu cuenta de Google para ver tus playlists</p>
-                        </div>
-                    `;
-                }
-            }
-        });
-
-        // Service Worker registration para PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(console.error);
-        }
-        // Fix para eventos de click en mobile
-    document.addEventListener('DOMContentLoaded', function() {
-    // Asegurar que los botones funcionen en mobile
-    const ensureClickable = (selector, handler) => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(el => {
-            if (el) {
-                // Remover listeners existentes
-                el.onclick = null;
-                
-                // Añadir nuevo listener
-                el.addEventListener('click', handler);
-                el.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    handler(e);
-                });
-                
-                // Asegurar que sea clickeable
-                el.style.cursor = 'pointer';
-                el.style.userSelect = 'none';
-                el.style.webkitUserSelect = 'none';
-                el.style.webkitTouchCallout = 'none';
-            }
-        });
+    // Fix para viewport en mobile
+    const setViewportHeight = () => {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
     };
-    
-    // Fix para botones principales
-    setTimeout(() => {
-        ensureClickable('#botonPlay', (e) => {
-            console.log('Play button clicked via fix');
-            if (window.integration) {
-                window.integration.handlePlayPause();
-            }
-        });
-        
-        ensureClickable('#botonNext', (e) => {
-            console.log('Next button clicked via fix');
-            if (window.integration) {
-                window.integration.handleNext();
-            }
-        });
-        
-        ensureClickable('.mini-control-btn', (e) => {
-            e.stopPropagation();
-            const isPlay = e.target.closest('#miniPlayBtn');
-            const isNext = e.target.closest('#miniNextBtn');
-            
-            if (isPlay && window.integration) {
-                window.integration.handlePlayPause();
-            } else if (isNext && window.integration) {
-                window.integration.handleNext();
-            }
-        });
-        
-        console.log('✅ Mobile click fixes aplicados');
-    }, 1000);
-});
 
-// Función para debug rápido
-window.debugIntegration = function() {
-    if (window.integration) {
-        window.integration.debug();
-    } else {
-        console.log('Integration no disponible');
-    }
-};
-
-// Fix para viewport en mobile
-const setViewportHeight = () => {
-    const vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-};
-
-window.addEventListener('resize', setViewportHeight);
-window.addEventListener('orientationchange', () => {
-    setTimeout(setViewportHeight, 100);
-});
-setViewportHeight();
-    </script>    
+    window.addEventListener('resize', setViewportHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setViewportHeight, 100);
+    });
+    setViewportHeight();
+</script>
 </body>
 </html>
