@@ -431,7 +431,7 @@
     <div id="floatingMessageContainer" class="floating-messages"></div>
     <div id="errorContainer" class="error-container hidden"></div>
 
-    <!-- Scripts -->
+<!-- Scripts -->
     <script>
         // Remover loading inicial cuando todo esté listo
         window.addEventListener('load', function() {
@@ -463,68 +463,88 @@
 
         // Variables globales para compatibilidad
         window.currentView = 'home';
-        
-        // Funciones de fallback para debugging
-        window.debugApp = function() {
-            if (window.integration) {
-                window.integration.debug();
-            } else {
-                console.log('Integration no disponible');
-            }
-        };
-
-        window.resetApp = function() {
-            if (window.integration) {
-                window.integration.reset();
-            } else {
-                location.reload();
-            }
-        };
     </script>
     
-    <!-- Sistema de integración corregido -->
-    <script  type="module" defer src="./integration-fix.js"></script>
+    <!-- Sistema de integración PRIMERO -->
+    <script type="module" defer src="./integration-fix.js"></script>
     
-    <!-- Módulos principales -->
-<script type="module">
-    import './app.js';
-    
-    // Configuración básica
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM cargado, módulos principales iniciándose...');
+    <!-- Módulos principales DESPUÉS -->
+    <script type="module">
+        // ORDEN CORRECTO: Importar DESPUÉS de integration-fix.js
+        console.log('📦 Cargando módulos principales...');
         
-        // Variables globales mínimas para compatibilidad
-        window.currentView = 'home';
+        // Importar en orden de dependencias
+        import './config.js';
+        import './utils.js';
+        import './ui.js';
+        import './youtubeAPI.js';
+        import './auth.js';
+        import './searchManager.js';
+        import './sponsorblock.js';
+        import './playlistManager.js';
+        import './playbackController.js';
+        import './playlistGridManager.js';
+        import './app.js';  // App principal AL FINAL
         
-        // Funciones de debugging rápido
-        window.debugApp = () => {
-            if (window.integration) {
-                window.integration.debug();
-            } else if (window.YTCrossMixApp) {
-                window.YTCrossMixApp.debug();
+        console.log('✅ Todos los módulos importados');
+
+        // Configuración básica DESPUÉS de cargar módulos
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 DOM cargado, inicializando...');
+            
+            try {
+                // Esperar un poco para asegurar que integration-fix esté listo
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Verificar que integration esté disponible
+                if (window.integration) {
+                    console.log('✅ Sistema de integración disponible');
+                } else {
+                    console.warn('⚠️ Sistema de integración no disponible');
+                }
+                
+                // Funciones globales para debugging
+                window.debugApp = () => {
+                    if (window.integration) {
+                        window.integration.debug();
+                    } else if (window.YTCrossMixApp) {
+                        window.YTCrossMixApp.debug();
+                    } else {
+                        console.log('No hay sistemas de debug disponibles');
+                    }
+                };
+
+                window.resetApp = () => {
+                    if (window.integration) {
+                        window.integration.reset();
+                    } else {
+                        location.reload();
+                    }
+                };
+                
+                console.log('🎉 Inicialización completada');
+                
+            } catch (error) {
+                console.error('💥 Error en inicialización:', error);
             }
+        });
+
+        // Fix para viewport en mobile
+        const setViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
         };
 
-        window.resetApp = () => {
-            if (window.integration) {
-                window.integration.reset();
-            } else {
-                location.reload();
-            }
-        };
-    });
-
-    // Fix para viewport en mobile
-    const setViewportHeight = () => {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-    };
-
-    window.addEventListener('resize', setViewportHeight);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(setViewportHeight, 100);
-    });
-    setViewportHeight();
-</script>
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
+        });
+        setViewportHeight();
+        
+        // Service Worker registration para PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(console.error);
+        }
+    </script>
 </body>
 </html>
