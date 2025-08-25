@@ -22,14 +22,8 @@ setupGlobalReferences() {
     window.playlistState = PlaylistState;
     window.searchState = SearchState;
     window.sponsorBlockState = SponsorBlockState;
-    
-    // Mantener clases existentes
-    if (typeof Utils !== 'undefined') window.Utils = Utils;
-    if (typeof UIManager !== 'undefined') window.UIManager = UIManager;
-    
-    // ELIMINAR referencias al sidebar
-    // ELIMINAR: window.sidebar, window.toggleMobileMenu, etc.
-    
+    window.switchToView = this.switchToView.bind(this);
+    window.updateMiniPlayer = this.updateMiniPlayer.bind(this);
     // AÑADIR funciones para mobile navigation
     window.switchToView = this.switchToView.bind(this);
     window.updateMiniPlayer = this.updateMiniPlayer.bind(this);
