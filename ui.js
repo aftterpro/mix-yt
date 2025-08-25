@@ -1060,5 +1060,4 @@ export class UIManager {
     }
 }
 
-// ===== EXPORT MEJORADO =====
-export { UIManager };
+// ===== SOLO UN EXPORT AL FINAL - SIN DUPLICADOS =====
