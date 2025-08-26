@@ -1,7 +1,7 @@
 // app-bootstrap.js - NUEVO ARCHIVO PRINCIPAL DE INICIALIZACIÓN - CORREGIDO
 // Este archivo reemplaza la lógica de inicialización dispersa
 
-import { stateManager, AppState, PlaylistState } from './state.js';
+import { stateManager, AppState, PlaylistState } from './config.js';
 import { domManager, safeGetElement } from './dom.js';
 import { errorBoundary, wrapFunction, handleCriticalError } from './errors.js';
 import { mostrarMensajeFlotante } from './messages.js';
