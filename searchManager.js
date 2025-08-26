@@ -1,6 +1,6 @@
 //  Manejo de Búsqueda
 import { SearchState, PlaylistState } from './config.js';
-import { mostrarMensajeFlotante } from './ui.js';
+import { mostrarMensajeFlotante } from './messages.js';
 import { PlaylistManager } from './playlistManager.js';
 import { UIManager } from './ui.js';
 import { Utils } from './utils.js';
@@ -250,6 +250,7 @@ static handleSearchResultAddClick(event, videoData) {
         }, delay);
     }
 }
+
 
 
 
