@@ -1281,59 +1281,5 @@ document.head.appendChild(styleSheet);
 
 // Crear instancia global
 const integration = new YTCrossMixIntegration();
-
-// Auto-inicializar
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        console.log('🚀 Iniciando sistema de integración V4...');
-        
-        await integration.initialize();
-        
-        // Conectar con módulos existentes
-        integration.connectWithExistingModules();
-        
-        // Hacer disponible globalmente
-        window.YTCrossMixIntegration = integration;
-        window.integration = integration;
-        
-        // Funciones globales de compatibilidad
-        window.switchView = (view) => integration.switchView(view);
-        window.updateMiniPlayer = (data) => integration.updateCurrentTrack(data);
-        window.debugIntegration = () => integration.debug();
-        window.resetIntegration = () => integration.reset();
-        
-        console.log('✅ Sistema de integración V4 listo y funcionando');
-        
-        setTimeout(() => {
-            integration.showMessage('🎉 YT CrossMix listo para usar');
-        }, 1000);
-        
-    } catch (error) {
-        console.error('💥 Error crítico en integración:', error);
-        document.body.innerHTML = `
-            <div style="
-                position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-                background: #0f0f0f; color: white; display: flex; 
-                align-items: center; justify-content: center; 
-                flex-direction: column; font-family: Arial; text-align: center;
-                padding: 20px;
-            ">
-                <h1 style="color: #ff6b35; margin-bottom: 20px;">⚠️ Error de Inicialización</h1>
-                <p>Ha ocurrido un error al cargar YT CrossMix.</p>
-                <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
-                    Intenta recargar la página. Si el problema persiste, verifica la consola.
-                </p>
-                <button onclick="location.reload()" style="
-                    margin-top: 20px; padding: 12px 24px; 
-                    background: #ff6b35; color: white; border: none; 
-                    border-radius: 6px; cursor: pointer; font-size: 14px;
-                ">
-                    🔄 Recargar Página
-                </button>
-            </div>
-        `;
-    }
-});
-
 // Export para uso en módulos
 export { YTCrossMixIntegration, integration };
