@@ -12,13 +12,13 @@ class MainApp {
         this.authInitialized = false;
     }
 
-    async initialize() {
-        if (this.initialized) return;
-        
-        console.log('🚀 Inicializando MainApp...');
-        
-        // Esperar a que bootstrap termine
-        await bootstrap.initialize();
+async initialize() {
+    if (this.initialized) return;
+    
+    console.log('🚀 Inicializando MainApp como sistema principal...');
+    
+    // Inicializar bootstrap directamente
+    await this.initializeBootstrap();
         
         // Configurar funcionalidades principales
         this.setupSearch();
@@ -29,7 +29,27 @@ class MainApp {
         this.initialized = true;
         console.log('✅ MainApp inicializado');
     }
-
+// ===== INICIALIZACIÓN DE BOOTSTRAP =====
+async initializeBootstrap() {
+    try {
+        console.log('🚀 Iniciando sistemas core...');
+        
+        // Importar y configurar bootstrap
+        const { bootstrap } = await import('./app-bootstrap.js');
+        await bootstrap.initialize();
+        
+        // Importar y configurar integration
+        const { integration } = await import('./integration-fix.js');
+        if (integration && !integration.isInitialized) {
+            await integration.initialize();
+        }
+        
+        console.log('✅ Sistemas core inicializados');
+    } catch (error) {
+        console.error('💥 Error inicializando sistemas core:', error);
+        throw error;
+    }
+}
     // ===== CONFIGURACIÓN DE BÚSQUEDA =====
     setupSearch() {
         console.log('🔍 Configurando búsqueda...');
@@ -533,12 +553,13 @@ class MainApp {
 // Crear instancia global
 const mainApp = new MainApp();
 
-// Inicializar cuando el DOM esté listo
+// Auto-inicializar cuando DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    // Esperar un poco para que bootstrap termine
-    setTimeout(() => {
-        mainApp.initialize().catch(console.error);
-    }, 1000);
+    console.log('🏁 DOM listo - Iniciando MainApp...');
+    mainApp.initialize().catch(error => {
+        console.error('💥 Error crítico en MainApp:', error);
+        // Mostrar error al usuario (similar al que está en app-bootstrap.js)
+    });
 });
 
 // Exportar globalmente
