@@ -1,7 +1,6 @@
 // main-app.js - IMPLEMENTACIÓN COMPLETA DE FUNCIONALIDADES
 // Este archivo conecta todas las funcionalidades principales
 
-import { bootstrap } from './app-bootstrap.js';
 import { AppState, PlaylistState, SearchState } from './config.js';
 import { mostrarMensajeFlotante } from './messages.js';
 
