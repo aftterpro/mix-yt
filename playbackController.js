@@ -3,8 +3,8 @@ import { AppState, CONFIG } from './config.js';
 import { PlaylistState } from './config.js';
 import { PlaylistManager } from './playlistManager.js';
 import { UIManager } from './ui.js';
-import { mostrarMensajeFlotante } from './ui.js';
 import { SponsorBlockManager } from './sponsorblock.js';
+import { mostrarMensajeFlotante } from './messages.js';
 
 export class PlaybackController {
     // Iniciar monitoreo de reproductores
@@ -480,3 +480,4 @@ export class PlaybackController {
         }
     }
 }
+
