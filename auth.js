@@ -1,7 +1,7 @@
 // Módulo de Autenticación de Google y API de YouTube (Versión Modular Corregida)
 import { PlaylistManager } from './playlistManager.js';
 import { Utils } from './utils.js';
-import { mostrarMensajeFlotante } from './ui.js';
+import { mostrarMensajeFlotante } from './messages.js';
 
 class GoogleAuthManager {
     constructor() {
