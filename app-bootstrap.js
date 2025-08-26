@@ -691,48 +691,6 @@ class YTCrossMixBootstrap {
 // Crear instancia única
 export const bootstrap = new YTCrossMixBootstrap();
 
-// Auto-inicializar cuando DOM esté listo
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        console.log('🏁 DOM listo - Iniciando Bootstrap...');
-        await bootstrap.initialize();
-    } catch (error) {
-        console.error('💥 Error crítico en bootstrap:', error);
-        
-        // Mostrar error al usuario
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: #0f0f0f; color: white; display: flex;
-            align-items: center; justify-content: center;
-            flex-direction: column; font-family: Arial; text-align: center;
-            z-index: 10000; padding: 20px;
-        `;
-        errorDiv.innerHTML = `
-            <h1 style="color: #ff6b35; margin-bottom: 20px;">⚠️ Error de Inicialización</h1>
-            <p>YT CrossMix no pudo inicializarse correctamente.</p>
-            <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
-                Error: ${error.message}
-            </p>
-            <button onclick="location.reload()" style="
-                margin-top: 20px; padding: 12px 24px;
-                background: #ff6b35; color: white; border: none;
-                border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">
-                🔄 Recargar Página
-            </button>
-            <button onclick="localStorage.clear(); location.reload()" style="
-                margin-top: 10px; padding: 12px 24px;
-                background: #444; color: white; border: none;
-                border-radius: 6px; cursor: pointer; font-size: 14px;
-            ">
-                🗑️ Limpiar Datos y Recargar
-            </button>
-        `;
-        document.body.appendChild(errorDiv);
-    }
-});
-
 // Hacer disponible globalmente
 window.bootstrap = bootstrap;
 window.YTCrossMixBootstrap = YTCrossMixBootstrap;
