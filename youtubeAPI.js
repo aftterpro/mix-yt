@@ -1,144 +1,147 @@
-//  Manejo del API de YouTube
-import { AppState, CONFIG } from './config.js';
-import { mostrarMensajeFlotante } from './ui.js';
-import { PlaybackController } from './playbackController.js';
-import { SponsorBlockManager } from './sponsorblock.js';
+//  Manejo del API de YouTube - CORREGIDO
+import { AppState } from './config.js';
+import { mostrarMensajeFlotante } from './messages.js';
 
 export class YouTubeAPIManager {
-static loadYouTubeAPI() {
-    if (AppState.youtubeAPIReady) {
-        console.log('API de YouTube ya está lista, inicializando reproductores...');
-        YouTubeAPIManager.initializePlayers();
-        return;
-    }
-    
-    // Verificar si YT ya está disponible
-    if (typeof YT !== 'undefined' && YT.Player) {
-        console.log('YT ya está disponible, inicializando directamente...');
+    static loadYouTubeAPI() {
+        if (AppState.youtubeAPIReady) {
+            console.log('API de YouTube ya está lista, inicializando reproductores...');
+            YouTubeAPIManager.initializePlayers();
+            return;
+        }
+        
+        // Verificar si YT ya está disponible
+        if (typeof YT !== 'undefined' && YT.Player) {
+            console.log('YT ya está disponible, inicializando directamente...');
+            AppState.youtubeAPIReady = true;
+            YouTubeAPIManager.initializePlayers();
+            return;
+        }
+        
+        console.log('Cargando script de YouTube API...');
         AppState.youtubeAPIReady = true;
-        YouTubeAPIManager.initializePlayers();
-        return;
+        
+        // Configurar callback global ANTES de cargar el script
+        window.onYouTubeIframeAPIReady = function() {
+            console.log('YouTube API lista, inicializando reproductores...');
+            YouTubeAPIManager.initializePlayers();
+        };
+        
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        script.onload = function() {
+            console.log('Script de YouTube cargado');
+            // Backup: si el callback no se ejecuta en 2 segundos, forzar inicialización
+            setTimeout(() => {
+                if (!AppState.playersInitialized) {
+                    console.log('Forzando inicialización de reproductores...');
+                    YouTubeAPIManager.initializePlayers();
+                }
+            }, 2000);
+        };
+        document.head.appendChild(script);
     }
-    
-    console.log('Cargando script de YouTube API...');
-    AppState.youtubeAPIReady = true;
-    
-    // Configurar callback global ANTES de cargar el script
-    window.onYouTubeIframeAPIReady = function() {
-        console.log('YouTube API lista, inicializando reproductores...');
-        YouTubeAPIManager.initializePlayers();
-    };
-    
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    script.onload = function() {
-        console.log('Script de YouTube cargado');
-        // Backup: si el callback no se ejecuta en 2 segundos, forzar inicialización
-        setTimeout(() => {
+
+    static initializePlayers() {
+        // Verificar que los elementos existen
+        const player1Element = document.getElementById('player1');
+        const player2Element = document.getElementById('player2');
+        
+        if (!player1Element || !player2Element) {
+            console.error('Elementos player1 o player2 no encontrados en el DOM');
+            setTimeout(() => YouTubeAPIManager.initializePlayers(), 500);
+            return;
+        }
+        
+        if (AppState.player1 && AppState.player2) {
+            console.log('Reproductores ya inicializados');
+            return;
+        }
+
+        console.log('Inicializando reproductores YouTube...');
+        console.log('Elemento player1:', player1Element);
+        console.log('Elemento player2:', player2Element);
+
+        try {
+            AppState.player1 = new YT.Player('player1', {
+                height: '315',
+                width: '560',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 1,
+                    'modestbranding': 0,
+                    'rel': 0,
+                    'showinfo': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin,
+                    'autoplay': 0,
+                    'mute': 0
+                },
+                events: {
+                    'onReady': YouTubeAPIManager.onPlayerReady,
+                    'onStateChange': YouTubeAPIManager.onPlayerStateChange,
+                    'onError': YouTubeAPIManager.onPlayerError
+                }
+            });
+
+            AppState.player2 = new YT.Player('player2', {
+                height: '315',
+                width: '560',
+                playerVars: {
+                    'playsinline': 1,
+                    'controls': 1,
+                    'modestbranding': 0,
+                    'rel': 0,
+                    'showinfo': 1,
+                    'enablejsapi': 1,
+                    'origin': window.location.origin,
+                    'autoplay': 0,
+                    'mute': 0
+                },
+                events: {
+                    'onReady': YouTubeAPIManager.onPlayerReady,
+                    'onStateChange': YouTubeAPIManager.onPlayerStateChange,
+                    'onError': YouTubeAPIManager.onPlayerError
+                }
+            });
+            
+            console.log('Reproductores creados exitosamente');
+            
+        } catch (error) {
+            console.error('Error creando reproductores:', error);
+        }
+    }
+
+    static onPlayerReady(event) {
+        console.log('onPlayerReady ejecutado para:', event.target.h.id);
+        
+        // Verificar si AMBOS están listos
+        if (AppState.player1 && typeof AppState.player1.getPlayerState === 'function' &&
+            AppState.player2 && typeof AppState.player2.getPlayerState === 'function') {
             if (!AppState.playersInitialized) {
-                console.log('Forzando inicialización de reproductores...');
-                YouTubeAPIManager.initializePlayers();
+                AppState.playersInitialized = true;
+                console.log("🎉 AMBOS reproductores listos y funcionando!");
+                // Notificar al controlador principal
+                window.dispatchEvent(new CustomEvent('playersReady'));
             }
-        }, 2000);
-    };
-    document.head.appendChild(script);
-}
-
-static initializePlayers() {
-    // Verificar que los elementos existen
-    const player1Element = document.getElementById('player1');
-    const player2Element = document.getElementById('player2');
-    
-    if (!player1Element || !player2Element) {
-        console.error('Elementos player1 o player2 no encontrados en el DOM');
-        setTimeout(() => YouTubeAPIManager.initializePlayers(), 500);
-        return;
-    }
-    
-    if (AppState.player1 && AppState.player2) {
-        console.log('Reproductores ya inicializados');
-        return;
-    }
-
-    console.log('Inicializando reproductores YouTube...');
-    console.log('Elemento player1:', player1Element);
-    console.log('Elemento player2:', player2Element);
-
-    try {
-        AppState.player1 = new YT.Player('player1', {
-            height: '315',
-            width: '560',
-            playerVars: {
-                'playsinline': 1,
-                'controls': 1,
-                'modestbranding': 0,
-                'rel': 0,
-                'showinfo': 1,
-                'enablejsapi': 1,
-                'origin': window.location.origin,
-                'autoplay': 0,
-                'mute': 0
-            },
-            events: {
-                'onReady': YouTubeAPIManager.onPlayerReady,
-                'onStateChange': YouTubeAPIManager.onPlayerStateChange,
-                'onError': YouTubeAPIManager.onPlayerError
-            }
-        });
-
-        AppState.player2 = new YT.Player('player2', {
-            height: '315',
-            width: '560',
-            playerVars: {
-                'playsinline': 1,
-                'controls': 1,
-                'modestbranding': 0,
-                'rel': 0,
-                'showinfo': 1,
-                'enablejsapi': 1,
-                'origin': window.location.origin,
-                'autoplay': 0,
-                'mute': 0
-            },
-            events: {
-                'onReady': YouTubeAPIManager.onPlayerReady,
-                'onStateChange': YouTubeAPIManager.onPlayerStateChange,
-                'onError': YouTubeAPIManager.onPlayerError
-            }
-        });
-        
-        console.log('Reproductores creados exitosamente');
-        
-    } catch (error) {
-        console.error('Error creando reproductores:', error);
-    }
-}
-
-static onPlayerReady(event) {
-    console.log('onPlayerReady ejecutado para:', event.target.h.id);
-    
-    // Verificar si AMBOS están listos
-    if (AppState.player1 && typeof AppState.player1.getPlayerState === 'function' &&
-        AppState.player2 && typeof AppState.player2.getPlayerState === 'function') {
-        if (!AppState.playersInitialized) {
-            AppState.playersInitialized = true;
-            console.log("🎉 AMBOS reproductores listos y funcionando!");
-            // Notificar al controlador principal
-            window.dispatchEvent(new CustomEvent('playersReady'));
+        } else {
+            console.log('Esperando a que ambos reproductores estén listos...');
         }
-    } else {
-        console.log('Esperando a que ambos reproductores estén listos...');
-    }
 
-    // Iniciar monitor solo UNA VEZ cuando los players estén listos
-    if (AppState.playersInitialized && !AppState.monitorInterval) {
-        console.log('Iniciando monitor de reproductores...');
-        if (typeof PlaybackController !== 'undefined' && PlaybackController.startMonitoring) {
-            PlaybackController.startMonitoring();
+        // Iniciar monitor solo UNA VEZ cuando los players estén listos
+        if (AppState.playersInitialized && !AppState.monitorInterval) {
+            console.log('Iniciando monitor de reproductores...');
+            // Lazy load del PlaybackController para evitar dependencias circulares
+            import('./playbackController.js').then(module => {
+                if (module.PlaybackController && module.PlaybackController.startMonitoring) {
+                    module.PlaybackController.startMonitoring();
+                }
+            }).catch(error => {
+                console.warn('Error cargando PlaybackController:', error);
+            });
         }
     }
-}
 
     static onPlayerError(event) {
         console.error("Error del reproductor:", event.data, "Player:", event.target === AppState.player1 ? '1' : '2');
@@ -163,7 +166,16 @@ static onPlayerReady(event) {
         // Intentar saltar al siguiente si el error impide la reproducción
         if ([2, 5, 100, 101, 150].includes(event.data)) {
             console.log("Intentando saltar al siguiente video debido a error...");
-            setTimeout(() => PlaybackController.playNextVideo(), 500);
+            // Lazy load del PlaybackController
+            setTimeout(() => {
+                import('./playbackController.js').then(module => {
+                    if (module.PlaybackController && module.PlaybackController.playNextVideo) {
+                        module.PlaybackController.playNextVideo();
+                    }
+                }).catch(error => {
+                    console.warn('Error cargando PlaybackController para skip:', error);
+                });
+            }, 500);
         }
     }
 
@@ -191,7 +203,14 @@ static onPlayerReady(event) {
 
             // Llamar a checkAndSkipSegment con forceCheck=true al entrar en estado PLAYING
             if (videoId) {
-                SponsorBlockManager.checkAndSkipSegment(event.target, true);
+                // Lazy load del SponsorBlockManager
+                import('./sponsorblock.js').then(module => {
+                    if (module.SponsorBlockManager && module.SponsorBlockManager.checkAndSkipSegment) {
+                        module.SponsorBlockManager.checkAndSkipSegment(event.target, true);
+                    }
+                }).catch(error => {
+                    console.warn('Error cargando SponsorBlockManager:', error);
+                });
             }
 
         } else if (playerState === YT.PlayerState.PAUSED) {
@@ -235,7 +254,3 @@ static onPlayerReady(event) {
 window.onYouTubeIframeAPIReady = function() {
     YouTubeAPIManager.initializePlayers();
 };
-
-
-
-
