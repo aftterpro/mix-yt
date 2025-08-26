@@ -1443,21 +1443,8 @@
     <!-- Elements for compatibility -->
     <div id="floatingMessageContainer" class="floating-messages"></div>
 <!-- Scripts -->
+<script type="module" src="./app-bootstrap.js"></script>
 <script>
-    // Variables globales para compatibilidad
-    window.currentView = 'home';
-    window.appState = {
-        player1: null,
-        player2: null,
-        currentPlayer: 1,
-        playersInitialized: false,
-        reproduccionIniciada: false
-    };
-    window.playlistState = {
-        playlistsData: [],
-        currentPlayingInfo: { videoId: null, flattenedIndex: -1 }
-    };
-
     // Funciones básicas que funcionan inmediatamente
     function switchView(newView) {
         console.log(`📱 Cambiando vista: ${window.currentView} → ${newView}`);
