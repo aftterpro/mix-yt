@@ -4,6 +4,8 @@
 import { AppState, PlaylistState, SearchState } from './config.js';
 import { mostrarMensajeFlotante } from './messages.js';
 
+// Hacer disponible globalmente para otros módulos
+window.mostrarMensajeFlotante = mostrarMensajeFlotante;
 class MainApp {
     constructor() {
         this.initialized = false;
@@ -324,26 +326,20 @@ setupMobileViewport() {
     }
 
     // ===== CONFIGURACIÓN DE AUTENTICACIÓN =====
-    setupAuthentication() {
-        console.log('🔐 Configurando autenticación...');
-        
-        const signInBtn = document.getElementById('googleSignInButton');
-        const signOutBtn = document.getElementById('googleSignOutButton');
+setupAuthentication() {
+    console.log('🔐 Configurando autenticación...');
+    
+    // Crear authManager básico si no existe
+    if (!window.authManager) {
+        this.createBasicAuthManager();
+    }
+    
+    const signInBtn = document.getElementById('googleSignInButton');
+    const signOutBtn = document.getElementById('googleSignOutButton');
 
-        if (signInBtn && !signInBtn.dataset.authConfigured) {
-            signInBtn.dataset.authConfigured = 'true';
-            signInBtn.addEventListener('click', () => this.handleGoogleAuth());
-        }
-
-        if (signOutBtn && !signOutBtn.dataset.authConfigured) {
-            signOutBtn.dataset.authConfigured = 'true';
-            signOutBtn.addEventListener('click', () => this.handleGoogleSignOut());
-        }
-
-        // Verificar estado de autenticación guardado
-        this.checkSavedAuth();
-        
-        console.log('✅ Autenticación configurada');
+    if (signInBtn && !signInBtn.dataset.authConfigured) {
+        signInBtn.dataset.authConfigured = 'true';
+        signInBtn.addEventListener('click', () => this.handleGoogleAuth());
     }
 
     async handleGoogleAuth() {
