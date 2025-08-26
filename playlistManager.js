@@ -1,6 +1,6 @@
 // Manejo de Playlists (Actualizado con YouTube Library)
 import { PlaylistState, CONFIG } from './config.js';
-import { mostrarMensajeFlotante } from './ui.js';
+import { mostrarMensajeFlotante } from './messages.js';
 import { UIManager } from './ui.js';
 import { Utils } from './utils.js';
 
@@ -435,3 +435,4 @@ export class PlaylistManager {
         return stats;
     }
 }
+
