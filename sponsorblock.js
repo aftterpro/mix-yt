@@ -1,6 +1,6 @@
 //  Manejo de SponsorBlock
-import { SponsorBlockState, CONFIG, AppState } from './config.js';
 import { PlaybackController } from './playbackController.js';
+import { SponsorBlockState, CONFIG, AppState } from './state.js';
 
 export class SponsorBlockManager {
     // Verificar y saltar segmentos
@@ -195,3 +195,4 @@ export class SponsorBlockManager {
         return stats;
     }
 }
+
