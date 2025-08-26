@@ -98,9 +98,11 @@ class YTCrossMixIntegration {
             const element = document.querySelector(selector);
             this.domElements[key] = element;
             
-            if (!element && ['searchInput', 'miniPlayer', 'bottomNav'].includes(key)) {
-                console.warn(`⚠️ Elemento crítico no encontrado: ${key} (${selector})`);
-            }
+            if (!element && ['searchInput'].includes(key)) {
+    console.warn(`⚠️ Elemento crítico no encontrado: ${key} (${selector})`);
+} else if (!element && ['miniPlayer', 'bottomNav', 'mobileHeader'].includes(key)) {
+    console.log(`ℹ️ Elemento mobile no encontrado: ${key} - se creará si es necesario`);
+}
         });
         
         // ContentViews como NodeList
