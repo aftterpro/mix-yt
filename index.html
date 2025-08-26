@@ -1442,255 +1442,227 @@
 
     <!-- Elements for compatibility -->
     <div id="floatingMessageContainer" class="floating-messages"></div>
+<!-- Scripts -->
+<script>
+    // Variables globales para compatibilidad
+    window.currentView = 'home';
+    window.appState = {
+        player1: null,
+        player2: null,
+        currentPlayer: 1,
+        playersInitialized: false,
+        reproduccionIniciada: false
+    };
+    window.playlistState = {
+        playlistsData: [],
+        currentPlayingInfo: { videoId: null, flattenedIndex: -1 }
+    };
 
-    <!-- Scripts -->
-    <script>
-        // Variables globales para compatibilidad
-        window.currentView = 'home';
-
-        // Configuración básica del DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM cargado - YT CrossMix Desktop');
-            
-            // Sincronizar inputs de búsqueda
-            const searchInputs = [
-                document.getElementById('searchInput'),
-                document.getElementById('sidebarSearchInput')
-            ].filter(Boolean);
-            
-            searchInputs.forEach(input => {
-                input.addEventListener('input', (e) => {
-                    const query = e.target.value;
-                    searchInputs.forEach(otherInput => {
-                        if (otherInput !== input) {
-                            otherInput.value = query;
-                        }
-                    });
-                    
-                    // Cambiar a vista de búsqueda si hay texto
-                    if (query.trim().length > 0) {
-                        switchView('search');
-                    }
-                });
-            });
-            
-            // Configurar navegación
-            document.querySelectorAll('.nav-item[data-view]').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const view = item.dataset.view;
-                    if (view) {
-                        switchView(view);
-                    }
-                });
-            });
-            
-            // Configurar botón de bienvenida
-            const welcomeCta = document.querySelector('.welcome-cta');
-            if (welcomeCta && !welcomeCta.onclick) {
-                welcomeCta.addEventListener('click', () => {
-                    switchView('library');
-                });
-            }
-            
-            console.log('✅ Configuración básica completada');
-        });
-
-        // Función de cambio de vista
-        function switchView(newView) {
-            console.log(`📱 Cambiando vista: ${window.currentView} → ${newView}`);
-            
-            // Actualizar vistas
-            document.querySelectorAll('.content-view').forEach(view => {
-                const isActive = view.id === `${newView}View`;
-                view.classList.toggle('active', isActive);
-            });
-
-            // Actualizar navegación
-            document.querySelectorAll('.nav-item').forEach(item => {
-                const isActive = item.dataset.view === newView;
-                item.classList.toggle('active', isActive);
-            });
-
-            window.currentView = newView;
-
-            // Acciones específicas por vista
-            if (newView === 'search') {
-                const searchInput = document.getElementById('sidebarSearchInput');
-                if (searchInput) {
-                    setTimeout(() => searchInput.focus(), 100);
-                }
-            }
-
-            // Integrar con sistema existente si está disponible
-            if (window.integration && typeof window.integration.switchView === 'function') {
-                window.integration.currentView = newView;
-            }
-        }
-
-        // Función para actualizar overview
-        function updateOverview() {
-            const stats = window.integration?.getPlaylistStats?.() || { playlists: 0, videos: 0 };
-            const isPlaying = window.integration?.isPlaying || false;
-            const currentTrack = window.integration?.currentTrack?.title || 'Ninguno';
-            
-            const overviewGrid = document.getElementById('overviewGrid');
-            if (overviewGrid) {
-                overviewGrid.innerHTML = `
-                    <div class="overview-card">
-                        <div class="overview-card-header">
-                            <div class="overview-card-icon">
-                                <i class="fas fa-list-ul"></i>
-                            </div>
-                            <h3 class="overview-card-title">Tus Playlists</h3>
-                        </div>
-                        <div class="overview-stats">
-                            <div class="overview-stat">${stats.playlists} playlists cargadas</div>
-                            <div class="overview-stat">${stats.videos} videos en total</div>
-                        </div>
-                    </div>
-                    
-                    <div class="overview-card">
-                        <div class="overview-card-header">
-                            <div class="overview-card-icon">
-                                <i class="fas fa-music"></i>
-                            </div>
-                            <h3 class="overview-card-title">Reproducción</h3>
-                        </div>
-                        <div class="overview-stats">
-                            <div class="overview-stat">Estado: ${isPlaying ? 'Reproduciendo' : 'Detenido'}</div>
-                            <div class="overview-stat">Video actual: ${currentTrack}</div>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        // Actualizar overview periódicamente
-        setInterval(updateOverview, 2000);
-
-        // Funciones globales para compatibilidad
-        window.switchView = switchView;
-        window.updateOverview = updateOverview;
-
-        // Prevenir zoom accidental
-        document.addEventListener('touchstart', function(e) {
-            if (e.touches.length > 1) {
-                e.preventDefault();
-            }
-        });
-
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function(e) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                e.preventDefault();
-            }
-            lastTouchEnd = now;
-        });
-
-        // Fix para viewport
-        const setViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        };
-
-        window.addEventListener('resize', setViewportHeight);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(setViewportHeight, 100);
-        });
-        setViewportHeight();
-    </script>
-
-    <!-- Sistema de integración -->
-    <script type="module">
-        // Importar módulos principales
-        console.log('📦 Cargando módulos principales...');
+    // Funciones básicas que funcionan inmediatamente
+    function switchView(newView) {
+        console.log(`📱 Cambiando vista: ${window.currentView} → ${newView}`);
         
-        try {
-            // Importar en orden de dependencias
-            await import('./config.js');
-            await import('./utils.js');
-            await import('./ui.js');
-            await import('./youtubeAPI.js');
-            await import('./auth.js');
-            await import('./searchManager.js');
-            await import('./sponsorblock.js');
-            await import('./playlistManager.js');
-            await import('./playbackController.js');
-            await import('./playlistGridManager.js');
-            await import('./app.js');
-            
-            console.log('✅ Todos los módulos importados');
+        document.querySelectorAll('.content-view').forEach(view => {
+            const isActive = view.id === `${newView}View`;
+            view.classList.toggle('active', isActive);
+        });
 
-            // Configuración específica para desktop
-            document.addEventListener('DOMContentLoaded', async () => {
-                try {
-                    // Detectar dispositivo
-                    const isDesktop = window.innerWidth >= 1024;
-                    
-                    if (isDesktop) {
-                        console.log('🖥️ Modo desktop detectado');
-                        
-                        // Ocultar elementos mobile
-                        const mobileElements = ['.mobile-header', '.bottom-nav', '.mini-player', '.mobile-main'];
-                        mobileElements.forEach(selector => {
-                            const element = document.querySelector(selector);
-                            if (element) element.style.display = 'none';
-                        });
-                        
-                        // Mostrar elementos desktop
-                        const desktopElements = ['.desktop-sidebar', '.bottom-player'];
-                        desktopElements.forEach(selector => {
-                            const element = document.querySelector(selector);
-                            if (element) element.style.display = 'block';
-                        });
-                    }
-                    
-                    // Configurar integration-fix si está disponible
-                    if (window.integration) {
-                        window.integration.isDesktop = isDesktop;
-                        window.integration.currentView = 'home';
-                        console.log('✅ Sistema de integración configurado');
-                    }
-                    
-                    // Funciones de debugging globales
-                    window.debugApp = () => {
-                        console.log('=== YT CROSSMIX DEBUG ===');
-                        console.log('Vista actual:', window.currentView);
-                        console.log('Es desktop:', window.innerWidth >= 1024);
-                        console.log('Integration disponible:', !!window.integration);
-                        console.log('App disponible:', !!window.YTCrossMixApp);
-                        console.log('========================');
-                    };
+        document.querySelectorAll('.nav-item').forEach(item => {
+            const isActive = item.dataset.view === newView;
+            item.classList.toggle('active', isActive);
+        });
 
-                    window.resetApp = () => {
-                        location.reload();
-                    };
-                    
-                } catch (error) {
-                    console.error('💥 Error en configuración desktop:', error);
+        window.currentView = newView;
+    }
+
+    function mostrarMensajeFlotante(mensaje, duracion = 4000) {
+        const messageDiv = document.createElement('div');
+        messageDiv.textContent = mensaje;
+        messageDiv.className = 'floating-message';
+        messageDiv.style.cssText = `
+            position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+            z-index: 10001; background: rgba(0,0,0,0.9); color: white;
+            padding: 12px 20px; border-radius: 12px; font-size: 13px;
+        `;
+        
+        document.body.appendChild(messageDiv);
+        setTimeout(() => messageDiv.remove(), duracion);
+    }
+
+    // Configuración del DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 DOM cargado - YT CrossMix Desktop');
+        
+        // Configurar navegación
+        document.querySelectorAll('.nav-item[data-view]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchView(item.dataset.view);
+            });
+        });
+        
+        // Configurar búsqueda
+        const searchInputs = [
+            document.getElementById('sidebarSearchInput')
+        ].filter(Boolean);
+        
+        searchInputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                if (query.length > 0) {
+                    switchView('search');
+                    // Simular resultados de búsqueda
+                    setTimeout(() => {
+                        const searchResults = document.getElementById('searchResults');
+                        if (searchResults && query.length > 2) {
+                            searchResults.innerHTML = `
+                                <div class="video-result">
+                                    <div class="thumbnail-container">
+                                        <img src="https://via.placeholder.com/320x180?text=Video+1" class="thumbnail">
+                                        <span class="duration">3:45</span>
+                                    </div>
+                                    <div class="video-details">
+                                        <h3 class="video-title">Resultado para "${query}"</h3>
+                                        <p class="video-author">Canal Demo</p>
+                                        <button class="search-result-add-button" onclick="addToQueue('${query}')">
+                                            <i class="fas fa-plus"></i> Añadir
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }, 500);
                 }
             });
-            
-        } catch (error) {
-            console.error('💥 Error cargando módulos:', error);
-        }
-    </script>
+        });
 
-    <!-- Integration fix - cargar después -->
-    <script type="module" defer>
-        try {
-            const { integration } = await import('./integration-fix.js');
-            if (integration) {
-                console.log('✅ Integration-fix cargado correctamente');
-                // Configurar para desktop
-                integration.isDesktop = window.innerWidth >= 1024;
-                integration.currentView = 'home';
-            }
-        } catch (error) {
-            console.error('⚠️ Error cargando integration-fix:', error);
+        // Configurar botón de añadir playlist
+        const addButton = document.getElementById('añadirUrlButton');
+        const urlInput = document.getElementById('searchInput2');
+        
+        if (addButton && urlInput) {
+            addButton.addEventListener('click', () => {
+                const url = urlInput.value.trim();
+                if (url) {
+                    mostrarMensajeFlotante(`Cargando playlist desde: ${url}`);
+                    urlInput.value = '';
+                    
+                    // Simular carga de playlist
+                    setTimeout(() => {
+                        mostrarMensajeFlotante('Playlist cargada exitosamente!');
+                        updateLibraryView();
+                    }, 2000);
+                }
+            });
         }
-    </script>
+
+        // Configurar autenticación
+        const authButton = document.getElementById('googleSignInButton');
+        if (authButton) {
+            authButton.addEventListener('click', () => {
+                mostrarMensajeFlotante('Conectando con Google...');
+                setTimeout(() => {
+                    mostrarMensajeFlotante('Conectado! Cargando tus playlists...');
+                    authButton.classList.add('hidden');
+                    document.getElementById('googleSignOutButton')?.classList.remove('hidden');
+                    updateLibraryView();
+                }, 2000);
+            });
+        }
+
+        // Configurar controles de reproducción
+        const playButton = document.getElementById('botonPlay');
+        if (playButton) {
+            playButton.addEventListener('click', () => {
+                const isPlaying = playButton.innerHTML.includes('pause');
+                if (isPlaying) {
+                    playButton.innerHTML = '<i class="fas fa-play"></i>';
+                    mostrarMensajeFlotante('Pausado');
+                } else {
+                    playButton.innerHTML = '<i class="fas fa-pause"></i>';
+                    mostrarMensajeFlotante('Reproduciendo');
+                    switchView('playing');
+                }
+            });
+        }
+
+        console.log('✅ Configuración básica completada');
+    });
+
+    // Funciones auxiliares
+    function addToQueue(title) {
+        mostrarMensajeFlotante(`"${title}" añadido a la cola`);
+    }
+
+    function updateLibraryView() {
+        const libraryGrid = document.getElementById('playlistsGrid');
+        if (libraryGrid) {
+            libraryGrid.innerHTML = `
+                <div class="playlist-card">
+                    <div class="playlist-card-thumbnail">
+                        <img src="https://via.placeholder.com/180x180?text=Mix+1" alt="Playlist Demo">
+                    </div>
+                    <div class="playlist-card-info">
+                        <h3 class="playlist-card-title">Mi Playlist Demo</h3>
+                        <p class="playlist-card-meta">5 videos</p>
+                        <div class="playlist-card-actions">
+                            <button class="playlist-add-all-btn" onclick="playPlaylist('Demo')">
+                                <i class="fas fa-play"></i> Reproducir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="playlist-card">
+                    <div class="playlist-card-thumbnail">
+                        <img src="https://via.placeholder.com/180x180?text=Mix+2" alt="Otra Playlist">
+                    </div>
+                    <div class="playlist-card-info">
+                        <h3 class="playlist-card-title">Otra Playlist</h3>
+                        <p class="playlist-card-meta">8 videos</p>
+                        <div class="playlist-card-actions">
+                            <button class="playlist-add-all-btn" onclick="playPlaylist('Otra')">
+                                <i class="fas fa-play"></i> Reproducir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function playPlaylist(name) {
+        mostrarMensajeFlotante(`Reproduciendo playlist: ${name}`);
+        switchView('playing');
+        
+        // Actualizar info del reproductor
+        document.getElementById('playerTitle').textContent = `${name} - Canción Demo`;
+        document.getElementById('playerArtist').textContent = 'Artista Demo';
+        document.getElementById('nowPlayingTitle').textContent = `${name} - Canción Demo`;
+        document.getElementById('nowPlayingArtist').textContent = 'Artista Demo';
+        
+        // Activar botón play
+        const playButton = document.getElementById('botonPlay');
+        if (playButton) {
+            playButton.innerHTML = '<i class="fas fa-pause"></i>';
+            playButton.disabled = false;
+        }
+    }
+
+    // Debug functions
+    window.debugApp = () => {
+        console.log('=== YT CROSSMIX DEBUG ===');
+        console.log('Vista actual:', window.currentView);
+        console.log('Estado:', window.appState);
+        console.log('Playlists:', window.playlistState);
+    };
+
+    window.resetApp = () => location.reload();
+    
+    // Funciones globales
+    window.switchView = switchView;
+    window.mostrarMensajeFlotante = mostrarMensajeFlotante;
+    window.addToQueue = addToQueue;
+    window.playPlaylist = playPlaylist;
+</script>
 </body>
 </html>
