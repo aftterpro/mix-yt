@@ -1,6 +1,5 @@
-//  Manejo de SponsorBlock
-import { PlaybackController } from './playbackController.js';
-import { SponsorBlockState, CONFIG, AppState } from './state.js';
+//  Manejo de SponsorBlock - CORREGIDO
+import { SponsorBlockState, CONFIG, AppState } from './config.js';
 
 export class SponsorBlockManager {
     // Verificar y saltar segmentos
@@ -74,7 +73,15 @@ export class SponsorBlockManager {
                     !AppState.hasOutroCrossfadeStarted) {
                     console.log(`SPONSORBLOCK OUTRO: Disparando playNextVideo basado en outro.`);
                     AppState.hasOutroCrossfadeStarted = true;
-                    PlaybackController.playNextVideo();
+                    
+                    // Lazy load del PlaybackController
+                    import('./playbackController.js').then(module => {
+                        if (module.PlaybackController && module.PlaybackController.playNextVideo) {
+                            module.PlaybackController.playNextVideo();
+                        }
+                    }).catch(error => {
+                        console.warn('Error cargando PlaybackController para outro:', error);
+                    });
                 } else {
                     console.log(`SPONSORBLOCK OUTRO: Tiempo restante en outro (${timeRemainingInSegment.toFixed(1)}s) fuera de la ventana de crossfade.`);
                 }
@@ -103,7 +110,7 @@ export class SponsorBlockManager {
         console.log(`SB Fetch: Iniciando obtención para ${videoId}. Marcando estado 'fetching'.`);
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `/api/segments/${videoId}`;
+        const apiUrl = `/.netlify/functions/sponsorblock/segments/${videoId}`;
         console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
 
         try {
@@ -195,4 +202,3 @@ export class SponsorBlockManager {
         return stats;
     }
 }
-
