@@ -1,4 +1,4 @@
-// app-bootstrap.js - NUEVO ARCHIVO PRINCIPAL DE INICIALIZACIÓN
+// app-bootstrap.js - NUEVO ARCHIVO PRINCIPAL DE INICIALIZACIÓN - CORREGIDO
 // Este archivo reemplaza la lógica de inicialización dispersa
 
 import { stateManager, AppState, PlaylistState } from './state.js';
@@ -53,9 +53,14 @@ class YTCrossMixBootstrap {
         }
     }
     
-    // Ejecutar paso de inicialización
+    // Ejecutar paso de inicialización - CORREGIDO
     async executeStep(stepName) {
-        const step = wrapFunction(this[stepName], { 
+        const stepMethod = this[stepName];
+        if (typeof stepMethod !== 'function') {
+            throw new Error(`Step method ${stepName} no existe`);
+        }
+        
+        const step = wrapFunction(stepMethod.bind(this), { 
             name: stepName,
             retries: 1,
             fallback: (error) => {
@@ -69,10 +74,10 @@ class YTCrossMixBootstrap {
             }
         });
         
-        await step.call(this);
+        await step();
     }
     
-    // Paso 1: Configurar foundation
+    // Paso 1: Configurar foundation - CORREGIDO
     async setupFoundation() {
         console.log('🏗️ Configurando foundation...');
         
@@ -91,7 +96,7 @@ class YTCrossMixBootstrap {
         console.log('✅ Foundation configurado');
     }
     
-    // Paso 2: Cargar módulos core
+    // Paso 2: Cargar módulos core - CORREGIDO
     async loadCoreModules() {
         console.log('📦 Cargando módulos core...');
         
@@ -126,7 +131,7 @@ class YTCrossMixBootstrap {
         console.log('✅ Módulos core cargados');
     }
     
-    // Paso 3: Configurar DOM
+    // Paso 3: Configurar DOM - CORREGIDO
     async setupDOM() {
         console.log('🏠 Configurando DOM...');
         
@@ -172,7 +177,7 @@ class YTCrossMixBootstrap {
         console.log('✅ DOM configurado');
     }
     
-    // Paso 4: Inicializar YouTube
+    // Paso 4: Inicializar YouTube - CORREGIDO
     async initializeYouTube() {
         console.log('🎥 Inicializando YouTube...');
         
@@ -196,7 +201,7 @@ class YTCrossMixBootstrap {
         console.log('✅ YouTube inicializado');
     }
     
-    // Paso 5: Configurar sistema de eventos
+    // Paso 5: Configurar sistema de eventos - CORREGIDO
     async setupEventSystem() {
         console.log('🔗 Configurando eventos...');
         
@@ -215,7 +220,7 @@ class YTCrossMixBootstrap {
         console.log('✅ Sistema de eventos configurado');
     }
     
-    // Paso 6: Iniciar aplicación
+    // Paso 6: Iniciar aplicación - CORREGIDO
     async startApplication() {
         console.log('🎵 Iniciando aplicación...');
         
@@ -622,6 +627,65 @@ class YTCrossMixBootstrap {
             initSteps: this.initializationSteps
         };
     }
+
+    // Setup navigation básica
+    async setupNavigation() {
+        const navItems = document.querySelectorAll('[data-view]');
+        navItems.forEach(item => {
+            domManager.safeAddEventListener(item, 'click', (e) => {
+                e.preventDefault();
+                const view = item.dataset.view;
+                if (view && window.integration?.switchView) {
+                    window.integration.switchView(view);
+                }
+            });
+        });
+    }
+
+    // Setup controles básicos
+    async setupPlaybackControls() {
+        // Play button
+        const playButton = await safeGetElement('#botonPlay');
+        if (playButton) {
+            domManager.safeAddEventListener(playButton, 'click', wrapFunction(() => {
+                // Lógica de play/pause será manejada por los módulos
+                console.log('🎵 Play button clicked');
+            }, { name: 'playButton' }));
+        }
+        
+        // Next button  
+        const nextButton = await safeGetElement('#botonNext');
+        if (nextButton) {
+            domManager.safeAddEventListener(nextButton, 'click', wrapFunction(() => {
+                console.log('⏭️ Next button clicked');
+            }, { name: 'nextButton' }));
+        }
+    }
+
+    // Setup búsqueda básica
+    async setupSearch() {
+        const searchInputs = await Promise.all([
+            safeGetElement('#searchInput'),
+            safeGetElement('#sidebarSearchInput')
+        ].filter(Boolean));
+        
+        searchInputs.forEach(input => {
+            if (!input) return;
+            
+            let searchTimeout;
+            domManager.safeAddEventListener(input, 'input', wrapFunction((e) => {
+                const query = e.target.value.trim();
+                
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (query.length > 2) {
+                        console.log('🔍 Búsqueda:', query);
+                        // La búsqueda será manejada por SearchManager
+                    }
+                }, 300);
+            }, { name: 'search' }));
+        });
+    }
 }
 
 // Crear instancia única
@@ -668,65 +732,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.appendChild(errorDiv);
     }
 });
-
-// Setup navigation básica
-async function setupNavigation() {
-    const navItems = document.querySelectorAll('[data-view]');
-    navItems.forEach(item => {
-        domManager.safeAddEventListener(item, 'click', (e) => {
-            e.preventDefault();
-            const view = item.dataset.view;
-            if (view && window.integration?.switchView) {
-                window.integration.switchView(view);
-            }
-        });
-    });
-}
-
-// Setup controles básicos
-async function setupPlaybackControls() {
-    // Play button
-    const playButton = await safeGetElement('#botonPlay');
-    if (playButton) {
-        domManager.safeAddEventListener(playButton, 'click', wrapFunction(() => {
-            // Lógica de play/pause será manejada por los módulos
-            console.log('🎵 Play button clicked');
-        }, { name: 'playButton' }));
-    }
-    
-    // Next button  
-    const nextButton = await safeGetElement('#botonNext');
-    if (nextButton) {
-        domManager.safeAddEventListener(nextButton, 'click', wrapFunction(() => {
-            console.log('⏭️ Next button clicked');
-        }, { name: 'nextButton' }));
-    }
-}
-
-// Setup búsqueda básica
-async function setupSearch() {
-    const searchInputs = await Promise.all([
-        safeGetElement('#searchInput'),
-        safeGetElement('#sidebarSearchInput')
-    ].filter(Boolean));
-    
-    searchInputs.forEach(input => {
-        if (!input) return;
-        
-        let searchTimeout;
-        domManager.safeAddEventListener(input, 'input', wrapFunction((e) => {
-            const query = e.target.value.trim();
-            
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (query.length > 2) {
-                    console.log('🔍 Búsqueda:', query);
-                    // La búsqueda será manejada por SearchManager
-                }
-            }, 300);
-        }, { name: 'search' }));
-    });
-}
 
 // Hacer disponible globalmente
 window.bootstrap = bootstrap;
