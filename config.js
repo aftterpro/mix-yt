@@ -1,6 +1,4 @@
-// state.js - NUEVO ARCHIVO UNIFICADO DE ESTADOS
-// Reemplaza config.js y unifica todos los estados
-
+// config.js - Configuración y Estados Unificados - CORREGIDO
 export const CONFIG = {
     CROSSFADE_DURATION: 15, // Duración del crossfade en segundos
     YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library',
