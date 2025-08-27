@@ -285,7 +285,7 @@ setupMobileViewport() {
                     <div class="video-details">
                         <h3 class="video-title" title="${video.title}">${video.title}</h3>
                         <p class="video-author">${video.uploaderName || 'Desconocido'}</p>
-                        <button class="search-result-add-button" onclick="mainApp.addToQueue('${videoId}', '${video.title.replace(/'/g, "\\'")}', '${video.thumbnail}', ${video.duration || 0})">
+                            <button class="search-result-add-button" data-video-id="${videoId}" data-title="${video.title}" data-thumbnail="${video.thumbnail}" data-duration="${video.duration || 0}">
                             <i class="fas fa-plus"></i>
                             Añadir
                         </button>
