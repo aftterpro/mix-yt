@@ -941,6 +941,6 @@ export class UIManager {
     }
 }
 
-// ===== SOLO UN EXPORT AL FINAL - SIN DUPLICADOS =====
+export default UIManager;
 
 
