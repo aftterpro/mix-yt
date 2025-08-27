@@ -324,7 +324,28 @@ setupMobileViewport() {
             }
         }
     }
-
+// main-app.js - AGREGAR DESPUÉS DE LÍNEA 100:
+createBasicAuthManager() {
+    console.log('🔐 Creando AuthManager básico...');
+    
+    window.authManager = {
+        isUserAuthenticated: () => {
+            const token = localStorage.getItem('google_token');
+            return !!token;
+        },
+        handleAuthClick: () => {
+            console.log('🔐 Auth click - importando módulo completo...');
+            import('./auth.js').then(module => {
+                if (module.authManager) {
+                    module.authManager.handleAuthClick();
+                }
+            }).catch(error => {
+                console.error('Error cargando auth:', error);
+                this.simulateAuth();
+            });
+        }
+    };
+}
     // ===== CONFIGURACIÓN DE AUTENTICACIÓN =====
 setupAuthentication() {
     console.log('🔐 Configurando autenticación...');
