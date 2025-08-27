@@ -221,14 +221,14 @@ export class UIManager {
         // Determinar thumbnail seguro
         const thumbnail = playlist.thumbnailUrl || 
                          (playlist.videos[0]?.thumbnail) ||
-                         'https://via.placeholder.com/180x180?text=♪';
+                         '';
         
         card.innerHTML = `
             <div class="playlist-card-image">
                 <img src="${thumbnail}" 
                      alt="${Utils.escapeHtml(playlist.name)}" 
                      loading="lazy" 
-                     onerror="this.src='https://via.placeholder.com/180x180?text=♪'">
+                     onerror="this.src=''">
                 <div class="playlist-card-overlay">
                     <button class="playlist-play-btn" title="Reproducir playlist">
                         <i class="fas fa-play"></i>
@@ -683,7 +683,7 @@ export class UIManager {
             queuePlaylist = {
                 id: 'queue',
                 name: 'Cola de Reproducción',
-                thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
+                thumbnailUrl: '',
                 videos: [],
                 isExpanded: true
             };
@@ -749,7 +749,7 @@ export class UIManager {
             queuePlaylist = {
                 id: 'queue',
                 name: 'Cola de Reproducción',
-                thumbnailUrl: 'https://via.placeholder.com/50?text=▶',
+                thumbnailUrl: '',
                 videos: [],
                 isExpanded: true
             };
@@ -942,6 +942,7 @@ export class UIManager {
 }
 
 export default UIManager;
+
 
 
 
