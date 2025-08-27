@@ -74,7 +74,6 @@ class StateManager {
         window.sponsorBlockState = this.states.sponsorBlock;
         
         // Referencias nuevas
-        window.AppState = this.states.app;
         window.PlaylistState = this.states.playlist;
         window.SearchState = this.states.search;
         window.SponsorBlockState = this.states.sponsorBlock;
