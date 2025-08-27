@@ -1,7 +1,6 @@
 // Manejo de Playlists (Actualizado con YouTube Library)
 import { PlaylistState, CONFIG } from './config.js';
 import { mostrarMensajeFlotante } from './messages.js';
-import { UIManager } from './ui.js';
 import { Utils } from './utils.js';
 
 export class PlaylistManager {
@@ -61,7 +60,17 @@ export class PlaylistManager {
                 PlaylistState.currentPlayingInfo.videoId = null;
                 PlaylistState.currentPlayingInfo.playlistId = null;
                 PlaylistState.currentPlayingInfo.flattenedIndex = -1;
-                UIManager.updatePlaylistsUI();
+                if (window.UIManager) {
+    window.UIManager.updatePlaylistsUI();
+} else {
+    // Lazy load UI manager
+    import('./ui.js').then(module => {
+        if (module.UIManager) {
+            window.UIManager = module.UIManager;
+            module.UIManager.updatePlaylistsUI();
+        }
+    });
+}
             }
         }
     }
@@ -435,4 +444,5 @@ export class PlaylistManager {
         return stats;
     }
 }
+
 
