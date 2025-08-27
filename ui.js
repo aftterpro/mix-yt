@@ -316,14 +316,14 @@ export class UIManager {
         headerDiv.className = 'playlist-group-header-mobile';
         
         const thumbnail = playlist.thumbnailUrl || 
-                         'https://via.placeholder.com/40x40?text=♪';
+                         '';
         
         headerDiv.innerHTML = `
             <img src="${thumbnail}" 
                  alt="${Utils.escapeHtml(playlist.name)}" 
                  class="playlist-group-thumb-mobile" 
                  loading="lazy" 
-                 onerror="this.src='https://via.placeholder.com/40x40?text=♪'">
+                 onerror="this.src=''">
             <div class="playlist-info-mobile">
                 <span class="playlist-name-mobile">${Utils.escapeHtml(playlist.name)}</span>
                 <span class="playlist-count-mobile">
@@ -375,14 +375,14 @@ export class UIManager {
         }
         
         const thumbnail = video.thumbnail || 
-                         'https://via.placeholder.com/48x36?text=♪';
+                         '';
         
         item.innerHTML = `
             <img src="${thumbnail}" 
                  alt="${Utils.escapeHtml(video.title)}" 
                  class="playlist-item-thumb-mobile" 
                  loading="lazy"
-                 onerror="this.src='https://via.placeholder.com/48x36?text=♪'">
+                 onerror="this.src=''">
             <div class="playlist-item-info-mobile">
                 <h4 class="playlist-item-title-mobile" title="${Utils.escapeHtml(video.title)}">
                     ${Utils.escapeHtml(video.title)}
@@ -516,7 +516,7 @@ export class UIManager {
         const modal = document.createElement('div');
         modal.className = 'mobile-context-modal';
         
-        const thumbnail = video.thumbnail || 'https://via.placeholder.com/56x42?text=♪';
+        const thumbnail = video.thumbnail || '';
         
         modal.innerHTML = `
             <div class="mobile-context-backdrop"></div>
@@ -525,7 +525,7 @@ export class UIManager {
                     <img src="${thumbnail}" 
                          alt="${Utils.escapeHtml(video.title)}" 
                          class="context-video-thumb"
-                         onerror="this.src='https://via.placeholder.com/56x42?text=♪'">
+                         onerror="this.src=''">
                     <div class="context-video-info">
                         <h4>${Utils.escapeHtml(video.title)}</h4>
                         <p>${Utils.formatDuration(video.duration)}</p>
@@ -942,6 +942,7 @@ export class UIManager {
 }
 
 export default UIManager;
+
 
 
 
