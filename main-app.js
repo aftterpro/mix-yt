@@ -1,4 +1,4 @@
-// main-app.js - IMPLEMENTACIÓN COMPLETA DE FUNCIONALIDADES
+// main-app.js - IMPLEMENTACIÓN COMPLETA DE FUNCIONALIDADES - CORREGIDO
 // Este archivo conecta todas las funcionalidades principales
 
 import { AppState, PlaylistState, SearchState } from './config.js';
@@ -6,6 +6,7 @@ import { mostrarMensajeFlotante } from './messages.js';
 
 // Hacer disponible globalmente para otros módulos
 window.mostrarMensajeFlotante = mostrarMensajeFlotante;
+
 class MainApp {
     constructor() {
         this.initialized = false;
@@ -13,162 +14,168 @@ class MainApp {
         this.authInitialized = false;
     }
 
-async initialize() {
-    if (this.initialized) return;
-    
-    console.log('🚀 Inicializando MainApp como sistema principal...');
-    
-    // Inicializar bootstrap y sistemas core
-    await this.initializeBootstrap();
-    
-    // Configurar funcionalidades principales
-    this.setupSearch();
-    this.setupAuthentication();
-    this.setupPlaybackHandlers();
-    this.setupUI();
-    
-    this.initialized = true;
-    console.log('✅ MainApp completamente inicializado');
-    
-    // Mostrar mensaje de éxito
-    setTimeout(() => {
-        if (window.mostrarMensajeFlotante) {
-            window.mostrarMensajeFlotante('🎉 YT CrossMix listo para usar', 3000, 'success');
-        }
-    }, 1000);
-}
-// ===== INICIALIZACIÓN DE BOOTSTRAP =====
-async initializeBootstrap() {
-    try {
-        console.log('🚀 Iniciando sistemas core...');
+    async initialize() {
+        if (this.initialized) return;
         
-        // 1. Verificar estado del DOM
-        if (document.readyState === 'loading') {
-            console.log('⏳ Esperando a que DOM esté completamente listo...');
-            await new Promise(resolve => {
-                document.addEventListener('DOMContentLoaded', resolve, { once: true });
-            });
-        }
+        console.log('🚀 Inicializando MainApp como sistema principal...');
         
-        // 2. Configurar viewport móvil inmediatamente
-        this.setupMobileViewport();
+        // Inicializar bootstrap y sistemas core
+        await this.initializeBootstrap();
         
-        // 3. Importar y configurar sistemas core
-        console.log('📦 Cargando bootstrap...');
-        const { bootstrap } = await import('./app-bootstrap.js');
+        // Configurar funcionalidades principales
+        this.setupSearch();
+        this.setupAuthentication();
+        this.setupPlaybackHandlers();
+        this.setupUI();
         
-        // 4. Inicializar bootstrap SIN auto-inicialización
-        console.log('🔧 Inicializando bootstrap...');
-        await bootstrap.initialize();
+        this.initialized = true;
+        console.log('✅ MainApp completamente inicializado');
         
-        // 5. Importar y configurar integration después de bootstrap
-        console.log('📱 Cargando sistema de integración...');
-        const { integration } = await import('./integration-fix.js');
-        
-        // 6. Inicializar integration si no está ya inicializado
-        if (integration && !integration.isInitialized) {
-            console.log('🔧 Inicializando integración...');
-            await integration.initialize();
-        }
-        
-        // 7. Configurar referencias globales unificadas
-        this.setupGlobalReferences(bootstrap, integration);
-        
-        // 8. Verificar que todo esté funcionando
-        this.performSystemCheck();
-        
-        console.log('✅ Sistemas core inicializados correctamente');
-        
-    } catch (error) {
-        console.error('💥 Error inicializando sistemas core:', error);
-        this.showCriticalError(error);
-        throw error;
+        // Mostrar mensaje de éxito
+        setTimeout(() => {
+            if (window.mostrarMensajeFlotante) {
+                window.mostrarMensajeFlotante('🎉 YT CrossMix listo para usar', 3000, 'success');
+            }
+        }, 1000);
     }
-}
+
+    // ===== INICIALIZACIÓN DE BOOTSTRAP =====
+    async initializeBootstrap() {
+        try {
+            console.log('🚀 Iniciando sistemas core...');
+            
+            // 1. Verificar estado del DOM
+            if (document.readyState === 'loading') {
+                console.log('⏳ Esperando a que DOM esté completamente listo...');
+                await new Promise(resolve => {
+                    document.addEventListener('DOMContentLoaded', resolve, { once: true });
+                });
+            }
+            
+            // 2. Configurar viewport móvil inmediatamente
+            this.setupMobileViewport();
+            
+            // 3. Importar y configurar sistemas core
+            console.log('📦 Cargando bootstrap...');
+            const { bootstrap } = await import('./app-bootstrap.js');
+            
+            // 4. Inicializar bootstrap SIN auto-inicialización
+            console.log('🔧 Inicializando bootstrap...');
+            await bootstrap.initialize();
+            
+            // 5. Importar y configurar integration después de bootstrap
+            console.log('📱 Cargando sistema de integración...');
+            const { integration } = await import('./integration-fix.js');
+            
+            // 6. Inicializar integration si no está ya inicializado
+            if (integration && !integration.isInitialized) {
+                console.log('🔧 Inicializando integración...');
+                await integration.initialize();
+            }
+            
+            // 7. Configurar referencias globales unificadas
+            this.setupGlobalReferences(bootstrap, integration);
+            
+            // 8. Verificar que todo esté funcionando
+            this.performSystemCheck();
+            
+            console.log('✅ Sistemas core inicializados correctamente');
+            
+        } catch (error) {
+            console.error('💥 Error inicializando sistemas core:', error);
+            this.showCriticalError(error);
+            throw error;
+        }
+    }
+    
     // ===== HELPERS PARA INICIALIZACIÓN =====
-setupMobileViewport() {
-    const setViewportHeight = () => {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-    };
-    
-    setViewportHeight();
-    window.addEventListener('resize', setViewportHeight);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(setViewportHeight, 100);
-    });
-    
-    console.log('📱 Viewport móvil configurado');
-}
-    setupGlobalReferences(bootstrap, integration) {
-    // Referencias para debugging
-    window.mainApp = this;
-    window.bootstrap = bootstrap;
-    window.integration = integration;
-    
-    // Funciones globales de conveniencia
-    window.debugApp = () => {
-        console.log('=== YT CROSSMIX DEBUG ===');
-        console.log('MainApp:', this.debug());
-        if (bootstrap) bootstrap.debug?.();
-        if (integration) integration.debug?.();
-        console.log('========================');
-    };
-    
-    window.resetApp = () => {
-        if (confirm('¿Seguro que quieres reiniciar la aplicación?')) {
-            location.reload();
-        }
-    };
-    
-    console.log('🌍 Referencias globales configuradas');
-}
-    performSystemCheck() {
-    const checks = {
-        bootstrap: !!window.bootstrap,
-        integration: !!window.integration,
-        youtubeAPI: !!(window.AppState && window.AppState.playersInitialized),
-        dom: document.readyState === 'complete' || document.readyState === 'interactive',
-        playlists: !!(window.PlaylistState && Array.isArray(window.PlaylistState.playlistsData))
-    };
-    
-    const passed = Object.values(checks).filter(Boolean).length;
-    const total = Object.keys(checks).length;
-    
-    console.log(`🔍 System Check: ${passed}/${total} sistemas OK`);
-    console.log('Detalles:', checks);
-    
-    if (passed < 3) {
-        console.warn('⚠️ Algunos sistemas críticos no están funcionando');
+    setupMobileViewport() {
+        const setViewportHeight = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        
+        setViewportHeight();
+        window.addEventListener('resize', setViewportHeight);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setViewportHeight, 100);
+        });
+        
+        console.log('📱 Viewport móvil configurado');
     }
-    
-    return checks;
-}
+
+    setupGlobalReferences(bootstrap, integration) {
+        // Referencias para debugging
+        window.mainApp = this;
+        window.bootstrap = bootstrap;
+        window.integration = integration;
+        
+        // Funciones globales de conveniencia
+        window.debugApp = () => {
+            console.log('=== YT CROSSMIX DEBUG ===');
+            console.log('MainApp:', this.debug());
+            if (bootstrap) bootstrap.debug?.();
+            if (integration) integration.debug?.();
+            console.log('========================');
+        };
+        
+        window.resetApp = () => {
+            if (confirm('¿Seguro que quieres reiniciar la aplicación?')) {
+                location.reload();
+            }
+        };
+        
+        console.log('🌍 Referencias globales configuradas');
+    }
+
+    performSystemCheck() {
+        const checks = {
+            bootstrap: !!window.bootstrap,
+            integration: !!window.integration,
+            youtubeAPI: !!(window.AppState && window.AppState.playersInitialized),
+            dom: document.readyState === 'complete' || document.readyState === 'interactive',
+            playlists: !!(window.PlaylistState && Array.isArray(window.PlaylistState.playlistsData))
+        };
+        
+        const passed = Object.values(checks).filter(Boolean).length;
+        const total = Object.keys(checks).length;
+        
+        console.log(`🔍 System Check: ${passed}/${total} sistemas OK`);
+        console.log('Detalles:', checks);
+        
+        if (passed < 3) {
+            console.warn('⚠️ Algunos sistemas críticos no están funcionando');
+        }
+        
+        return checks;
+    }
+
     showCriticalError(error) {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: #0f0f0f; color: white; display: flex;
-        align-items: center; justify-content: center;
-        flex-direction: column; font-family: Arial; text-align: center;
-        z-index: 10000; padding: 20px;
-    `;
-    errorDiv.innerHTML = `
-        <h1 style="color: #ff6b35; margin-bottom: 20px;">⚠️ Error de Inicialización</h1>
-        <p>YT CrossMix no pudo inicializarse correctamente.</p>
-        <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
-            Error: ${error.message}
-        </p>
-        <button onclick="location.reload()" style="
-            margin-top: 20px; padding: 12px 24px;
-            background: #ff6b35; color: white; border: none;
-            border-radius: 6px; cursor: pointer; font-size: 14px;
-        ">
-            🔄 Recargar Página
-        </button>
-    `;
-    document.body.appendChild(errorDiv);
-}
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #0f0f0f; color: white; display: flex;
+            align-items: center; justify-content: center;
+            flex-direction: column; font-family: Arial; text-align: center;
+            z-index: 10000; padding: 20px;
+        `;
+        errorDiv.innerHTML = `
+            <h1 style="color: #ff6b35; margin-bottom: 20px;">⚠️ Error de Inicialización</h1>
+            <p>YT CrossMix no pudo inicializarse correctamente.</p>
+            <p style="font-size: 14px; opacity: 0.7; margin-top: 10px;">
+                Error: ${error.message}
+            </p>
+            <button onclick="location.reload()" style="
+                margin-top: 20px; padding: 12px 24px;
+                background: #ff6b35; color: white; border: none;
+                border-radius: 6px; cursor: pointer; font-size: 14px;
+            ">
+                🔄 Recargar Página
+            </button>
+        `;
+        document.body.appendChild(errorDiv);
+    }
+
     // ===== CONFIGURACIÓN DE BÚSQUEDA =====
     setupSearch() {
         console.log('🔍 Configurando búsqueda...');
@@ -285,7 +292,7 @@ setupMobileViewport() {
                     <div class="video-details">
                         <h3 class="video-title" title="${video.title}">${video.title}</h3>
                         <p class="video-author">${video.uploaderName || 'Desconocido'}</p>
-                            <button class="search-result-add-button" data-video-id="${videoId}" data-title="${video.title}" data-thumbnail="${video.thumbnail}" data-duration="${video.duration || 0}">
+                        <button class="search-result-add-button" data-video-id="${videoId}" data-title="${video.title}" data-thumbnail="${video.thumbnail}" data-duration="${video.duration || 0}">
                             <i class="fas fa-plus"></i>
                             Añadir
                         </button>
@@ -295,7 +302,44 @@ setupMobileViewport() {
         }).filter(Boolean).join('');
 
         searchResults.innerHTML = resultsHTML;
+        
+        // Configurar event listeners para botones de añadir
+        this.setupSearchResultListeners();
+        
         console.log(`✅ Mostrados ${data.items.length} resultados de búsqueda`);
+    }
+
+    setupSearchResultListeners() {
+        const searchResults = document.getElementById('searchResults');
+        if (!searchResults) return;
+
+        // Event delegation para botones de añadir
+        searchResults.addEventListener('click', (e) => {
+            const button = e.target.closest('.search-result-add-button');
+            if (!button) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const videoData = {
+                videoId: button.dataset.videoId,
+                title: button.dataset.title,
+                thumbnail: button.dataset.thumbnail,
+                duration: parseInt(button.dataset.duration, 10) || 0
+            };
+
+            this.addToQueue(videoData.videoId, videoData.title, videoData.thumbnail, videoData.duration);
+
+            // Feedback visual
+            const originalContent = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-check"></i> Añadido';
+            button.style.background = '#4caf50';
+            
+            setTimeout(() => {
+                button.innerHTML = originalContent;
+                button.style.background = '';
+            }, 2000);
+        });
     }
 
     clearSearchResults() {
@@ -324,43 +368,62 @@ setupMobileViewport() {
             }
         }
     }
-// main-app.js - AGREGAR DESPUÉS DE LÍNEA 100:
-createBasicAuthManager() {
-    console.log('🔐 Creando AuthManager básico...');
-    
-    window.authManager = {
-        isUserAuthenticated: () => {
-            const token = localStorage.getItem('google_token');
-            return !!token;
-        },
-        handleAuthClick: () => {
-            console.log('🔐 Auth click - importando módulo completo...');
-            import('./auth.js').then(module => {
-                if (module.authManager) {
-                    module.authManager.handleAuthClick();
-                }
-            }).catch(error => {
-                console.error('Error cargando auth:', error);
-                this.simulateAuth();
-            });
-        }
-    };
-}
-    // ===== CONFIGURACIÓN DE AUTENTICACIÓN =====
-setupAuthentication() {
-    console.log('🔐 Configurando autenticación...');
-    
-    // Crear authManager básico si no existe
-    if (!window.authManager) {
-        this.createBasicAuthManager();
-    }
-    
-    const signInBtn = document.getElementById('googleSignInButton');
-    const signOutBtn = document.getElementById('googleSignOutButton');
 
-    if (signInBtn && !signInBtn.dataset.authConfigured) {
-        signInBtn.dataset.authConfigured = 'true';
-        signInBtn.addEventListener('click', () => this.handleGoogleAuth());
+    // ===== CONFIGURACIÓN DE AUTENTICACIÓN - CORREGIDO =====
+    setupAuthentication() {
+        console.log('🔐 Configurando autenticación...');
+        
+        // Crear authManager básico si no existe
+        if (!window.authManager) {
+            this.createBasicAuthManager();
+        }
+        
+        const signInBtn = document.getElementById('googleSignInButton');
+        const signOutBtn = document.getElementById('googleSignOutButton');
+
+        if (signInBtn && !signInBtn.dataset.authConfigured) {
+            signInBtn.dataset.authConfigured = 'true';
+            signInBtn.addEventListener('click', () => this.handleGoogleAuth());
+        }
+
+        if (signOutBtn && !signOutBtn.dataset.authConfigured) {
+            signOutBtn.dataset.authConfigured = 'true';
+            signOutBtn.addEventListener('click', () => this.handleGoogleSignOut());
+        }
+
+        // Verificar autenticación guardada
+        this.checkSavedAuth();
+    }
+
+    createBasicAuthManager() {
+        console.log('🔐 Creando AuthManager básico...');
+        
+        window.authManager = {
+            isUserAuthenticated: () => {
+                const token = localStorage.getItem('google_token');
+                return !!token;
+            },
+            handleAuthClick: () => {
+                console.log('🔐 Auth click - importando módulo completo...');
+                import('./auth.js').then(module => {
+                    if (module.authManager) {
+                        module.authManager.handleAuthClick();
+                    }
+                }).catch(error => {
+                    console.error('Error cargando auth:', error);
+                    this.simulateAuth();
+                });
+            },
+            handleSignOutClick: () => {
+                import('./auth.js').then(module => {
+                    if (module.authManager) {
+                        module.authManager.handleSignOutClick();
+                    }
+                }).catch(() => {
+                    this.handleBasicSignOut();
+                });
+            }
+        };
     }
 
     async handleGoogleAuth() {
@@ -384,6 +447,23 @@ setupAuthentication() {
         }
     }
 
+    handleGoogleSignOut() {
+        console.log('🔐 Cerrando sesión...');
+        
+        if (window.authManager && typeof window.authManager.handleSignOutClick === 'function') {
+            window.authManager.handleSignOutClick();
+        } else {
+            this.handleBasicSignOut();
+        }
+    }
+
+    handleBasicSignOut() {
+        localStorage.removeItem('google_token');
+        this.updateAuthUI(false);
+        this.clearPlaylists();
+        mostrarMensajeFlotante('Sesión cerrada', 2000, 'info');
+    }
+
     simulateAuth() {
         // Simulación para desarrollo/testing
         setTimeout(() => {
@@ -391,19 +471,6 @@ setupAuthentication() {
             this.loadDemoPlaylists();
             mostrarMensajeFlotante('¡Conectado! (Modo demo)', 3000, 'success');
         }, 2000);
-    }
-
-    handleGoogleSignOut() {
-        console.log('🔐 Cerrando sesión...');
-        
-        if (window.authManager && typeof window.authManager.handleSignOutClick === 'function') {
-            window.authManager.handleSignOutClick();
-        } else {
-            // Fallback
-            this.updateAuthUI(false);
-            this.clearPlaylists();
-            mostrarMensajeFlotante('Sesión cerrada', 2000, 'info');
-        }
     }
 
     updateAuthUI(isAuthenticated) {
@@ -512,7 +579,7 @@ setupAuthentication() {
         // Añadir video
         const videoObject = {
             videoId: videoId,
-            title: title,
+            title: title || "Título no disponible",
             thumbnail: thumbnail || 'https://via.placeholder.com/120x90?text=♪',
             duration: duration || 0,
             channelTitle: 'YouTube'
