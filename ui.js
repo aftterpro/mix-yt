@@ -1,10 +1,8 @@
 // Manejo de Interface de Usuario - CONSOLIDADO Y CORREGIDO
-import { PlaylistManager } from './playlistManager.js';
 // Importar dependencias necesarias
+import { mostrarMensajeFlotante } from './messages.js';
 import { PlaylistState, CONFIG } from './config.js';
 import { Utils } from './utils.js';
-import { mostrarMensajeFlotante, showLoadingSpinner, hideLoadingSpinner } from './messages.js';
-
 // ===== FUNCIONES DE LOADING MEJORADAS =====
 
 export function showLoadMoreSpinner(container) {
@@ -944,4 +942,5 @@ export class UIManager {
 }
 
 // ===== SOLO UN EXPORT AL FINAL - SIN DUPLICADOS =====
+
 
