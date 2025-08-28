@@ -620,6 +620,60 @@
 
     <!-- ✅ SCRIPTS DEL SISTEMA UNIFICADO -->
     <script>
+        // ===== FUNCIONES DE DEBUG FALTANTES =====
+        function toggleUnifiedDebug() {
+            const debugPanel = document.getElementById('unifiedDebugPanel');
+            const stateDebug = document.getElementById('unifiedStateDebug');
+            
+            if (debugPanel) {
+                debugPanel.classList.toggle('show');
+                updateDebugPanels();
+            }
+            
+            if (stateDebug) {
+                stateDebug.classList.toggle('show');
+                updateDebugPanels();
+            }
+            
+            console.log('🔧 Debug panels toggled');
+        }
+
+        function updateDebugPanels() {
+            // Update main debug panel
+            const debugContent = document.getElementById('debugContent');
+            if (debugContent && window.ytCrossMixUnified) {
+                const health = window.ytCrossMixUnified.performHealthCheck?.() || {};
+                debugContent.innerHTML = `
+                    <div><strong>Core Status:</strong> ${window.ytCrossMixUnified.initialized ? '✅ Ready' : '⏳ Loading'}</div>
+                    <div><strong>Modules:</strong> ${window.ytCrossMixUnified.modules?.size || 0}/6 loaded</div>
+                    <div><strong>YouTube API:</strong> ${window.unifiedYouTubeManager?.apiReady ? '✅' : '❌'}</div>
+                    <div><strong>Players:</strong> ${window.unifiedYouTubeManager?.playersReady ? '✅' : '❌'}</div>
+                    <div><strong>State Manager:</strong> ${window.unifiedStateManager ? '✅' : '❌'}</div>
+                    <div><strong>Loading Manager:</strong> ${window.unifiedLoadingManager ? '✅' : '❌'}</div>
+                    <div><strong>Message Manager:</strong> ${window.unifiedMessageManager ? '✅' : '❌'}</div>
+                    <div style="margin-top: 10px;"><strong>Health:</strong> ${JSON.stringify(health, null, 2)}</div>
+                `;
+            }
+
+            // Update state debug panel
+            const stateDebugContent = document.getElementById('stateDebugContent');
+            if (stateDebugContent && window.unifiedStateManager) {
+                const state = window.unifiedStateManager.state;
+                let stateHTML = '';
+                
+                Object.keys(state).forEach(section => {
+                    stateHTML += `
+                        <div class="state-section">
+                            <div class="state-key">${section.toUpperCase()}:</div>
+                            <pre class="state-value">${JSON.stringify(state[section], null, 2)}</pre>
+                        </div>
+                    `;
+                });
+                
+                stateDebugContent.innerHTML = stateHTML;
+            }
+        }
+
         // ===== FUNCIONES DE ESTADO UNIFICADO =====
         function updateUnifiedIndicators() {
             // Actualizar indicador en sidebar
@@ -689,6 +743,7 @@
                 // Configurar debug automático en desarrollo
                 if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
                     document.getElementById('unifiedDebugToggle').style.display = 'block';
+                    document.getElementById('unifiedControls').style.display = 'flex';
                     console.log('🔧 Modo desarrollo detectado - Debug habilitado');
                 }
                 
@@ -696,7 +751,9 @@
                 if (window.ytCrossMixUnified?.initialized) {
                     setInterval(() => {
                         const debugPanel = document.getElementById('unifiedDebugPanel');
-                        if (debugPanel && debugPanel.classList.contains('show')) {
+                        const stateDebug = document.getElementById('unifiedStateDebug');
+                        if ((debugPanel && debugPanel.classList.contains('show')) || 
+                            (stateDebug && stateDebug.classList.contains('show'))) {
                             updateDebugPanels();
                         }
                     }, 2000);
@@ -866,6 +923,7 @@
         window.unifiedHelpers = {
             toggleDebug: toggleUnifiedDebug,
             updateIndicators: updateUnifiedIndicators,
+            updateDebugPanels: updateDebugPanels,
             getHealth: () => window.ytCrossMixUnified?.performHealthCheck(),
             getState: () => window.unifiedStateManager?.state,
             showStatus: (message, type = 'info') => {
@@ -912,4 +970,4 @@
         }, 10000);
     </script>
 </body>
-</html> 
+</html>
