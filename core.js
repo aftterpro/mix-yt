@@ -861,4 +861,312 @@ class YTCrossMixCore {
         
         window.showMessage = (msg, type, duration) => this.showMessage(msg, type, duration);
         window.switchView = (view) => this.switchView(view);
-        window.debugApp = () => this.stateManager.debug
+        window.debugApp = () => this.stateManager.debug();
+        window.resetApp = () => this.reset();
+        
+        console.log('🌐 Funciones globales configuradas');
+    }
+    
+    setupGlobalEvents() {
+        // Online/Offline status
+        window.addEventListener('online', () => {
+            console.log('🌐 Conexión restaurada');
+            this.showMessage('Conexión restaurada', 'success', 2000);
+        });
+        
+        window.addEventListener('offline', () => {
+            console.log('🌐 Sin conexión');
+            this.showMessage('Sin conexión a internet', 'warning', 3000);
+        });
+        
+        // Cleanup al cerrar
+        window.addEventListener('beforeunload', () => {
+            this.cleanup();
+        });
+    }
+    
+    // ===== SISTEMA DE MENSAJES UNIFICADO =====
+    
+    showMessage(message, type = 'info', duration = 3000) {
+        if (!message) return;
+        
+        console.log(`💬 Mensaje [${type}]:`, message);
+        
+        const messageEl = document.createElement('div');
+        messageEl.textContent = message;
+        messageEl.className = 'floating-message';
+        
+        const colors = {
+            info: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
+            success: 'linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.9))',
+            error: 'linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(211, 47, 47, 0.9))',
+            warning: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(245, 124, 0, 0.9))'
+        };
+        
+        Object.assign(messageEl.style, {
+            position: 'fixed',
+            bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))',
+            left: '50%',
+            transform: 'translateX(-50%) translateY(100px) scale(0.8)',
+            zIndex: '10001',
+            background: colors[type] || colors.info,
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '500',
+            maxWidth: 'calc(100vw - 32px)',
+            wordWrap: 'break-word',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            opacity: '0',
+            transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+            pointerEvents: 'none'
+        });
+        
+        document.body.appendChild(messageEl);
+        
+        // Animación de entrada
+        requestAnimationFrame(() => {
+            messageEl.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+            messageEl.style.opacity = '1';
+        });
+        
+        // Auto-remove
+        setTimeout(() => {
+            messageEl.style.opacity = '0';
+            setTimeout(() => messageEl.remove(), 400);
+        }, duration);
+        
+        // Click para cerrar
+        messageEl.addEventListener('click', () => {
+            messageEl.style.opacity = '0';
+            setTimeout(() => messageEl.remove(), 200);
+        });
+    }
+    
+    // ===== HEALTH CHECK Y DIAGNÓSTICO =====
+    
+    performHealthCheck() {
+        const health = {
+            core: this.initialized,
+            dom: document.readyState === 'complete',
+            youtube: this.stateManager.get('app.playersInitialized'),
+            modules: this.modules.size,
+            state: !!this.stateManager.state,
+            ui: {
+                currentView: this.stateManager.get('ui.currentView'),
+                isDesktop: this.stateManager.get('ui.isDesktop')
+            }
+        };
+        
+        console.log('🔍 Health Check:', health);
+        
+        const issues = [];
+        if (!health.core) issues.push('Core no inicializado');
+        if (!health.youtube) issues.push('YouTube no listo');
+        if (health.modules < 2) issues.push('Módulos insuficientes');
+        
+        if (issues.length > 0) {
+            console.warn('⚠️ Issues detectados:', issues);
+        } else {
+            console.log('✅ Health Check: Todo OK');
+        }
+        
+        return health;
+    }
+    
+    // ===== MANEJO DE ERRORES =====
+    
+    handleCriticalError(error) {
+        console.error('💀 Error crítico en Core:', error);
+        
+        this.showMessage('Error crítico en la aplicación', 'error', 8000);
+        
+        // Intentar recuperación básica
+        try {
+            this.cleanup();
+            this.stateManager.reset();
+        } catch (recoveryError) {
+            console.error('💥 Falló la recuperación:', recoveryError);
+            this.showCriticalErrorView(error, recoveryError);
+        }
+    }
+    
+    showCriticalErrorView(error, recoveryError = null) {
+        document.body.innerHTML = `
+            <div style="
+                display: flex; align-items: center; justify-content: center;
+                min-height: 100vh; background: #0f0f0f; color: white;
+                font-family: 'Roboto', sans-serif; text-align: center; padding: 20px;
+            ">
+                <div>
+                    <h1>💀 YT CrossMix - Error Crítico</h1>
+                    <p>La aplicación encontró un error irrecuperable.</p>
+                    <details style="margin: 20px 0; text-align: left;">
+                        <summary>Detalles del error</summary>
+                        <pre style="background: #333; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 12px;">
+Error Principal: ${error.message}
+Stack: ${error.stack}
+${recoveryError ? `
+Error de Recuperación: ${recoveryError.message}` : ''}
+                        </pre>
+                    </details>
+                    <button onclick="location.reload()" style="
+                        background: #ff6b35; color: white; border: none;
+                        padding: 12px 24px; border-radius: 6px; cursor: pointer;
+                        font-size: 16px; margin: 10px;
+                    ">Recargar Página</button>
+                    <button onclick="localStorage.clear(); location.reload()" style="
+                        background: #666; color: white; border: none;
+                        padding: 12px 24px; border-radius: 6px; cursor: pointer;
+                        font-size: 16px; margin: 10px;
+                    ">Limpiar y Recargar</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ===== CLEANUP Y RESET =====
+    
+    cleanup() {
+        console.log('🧹 Limpiando Core...');
+        
+        const state = this.stateManager.state.app;
+        
+        // Limpiar intervalos
+        if (state.monitorInterval) {
+            clearInterval(state.monitorInterval);
+            state.monitorInterval = null;
+        }
+        
+        if (state.crossfadeInterval) {
+            clearInterval(state.crossfadeInterval);
+            state.crossfadeInterval = null;
+        }
+        
+        // Pausar reproductores
+        try {
+            if (state.player1?.pauseVideo) state.player1.pauseVideo();
+            if (state.player2?.pauseVideo) state.player2.pauseVideo();
+        } catch (error) {
+            console.warn('Error pausando reproductores:', error);
+        }
+        
+        console.log('✅ Cleanup completado');
+    }
+    
+    reset() {
+        if (confirm('¿Seguro que quieres reiniciar la aplicación?')) {
+            console.log('🔄 Reiniciando Core...');
+            
+            try {
+                this.cleanup();
+                this.stateManager.reset();
+                this.switchView('home');
+                this.updatePlayButton(false);
+                
+                this.showMessage('Aplicación reiniciada correctamente', 'success');
+                
+            } catch (error) {
+                console.error('Error en reset:', error);
+                this.showMessage('Error reiniciando aplicación', 'error');
+            }
+        }
+    }
+    
+    // ===== FINALIZACIÓN =====
+    
+    dispatchReady() {
+        console.log('🎉 YT CrossMix Core completamente listo');
+        
+        window.dispatchEvent(new CustomEvent('ytcrossmix:ready', {
+            detail: { 
+                timestamp: Date.now(),
+                core: this,
+                state: this.stateManager.state
+            }
+        }));
+        
+        this.showMessage('🎵 YT CrossMix listo para usar', 'success');
+    }
+    
+    // ===== UTILIDADES =====
+    
+    debounce(func, delay) {
+        let timeoutId;
+        return (...args) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func(...args), delay);
+        };
+    }
+    
+    getDebugInfo() {
+        return {
+            initialized: this.initialized,
+            modules: Array.from(this.modules.keys()),
+            state: this.stateManager.state,
+            health: this.performHealthCheck()
+        };
+    }
+}
+
+// ===== 3. INICIALIZACIÓN AUTOMÁTICA =====
+
+let coreInstance = null;
+
+async function initializeYTCrossMix() {
+    if (coreInstance) {
+        console.warn('⚠️ YT CrossMix ya inicializado');
+        return coreInstance;
+    }
+    
+    console.log('🚀 Iniciando YT CrossMix Core Sistema Unificado...');
+    
+    try {
+        coreInstance = new YTCrossMixCore();
+        await coreInstance.initialize();
+        
+        console.log('✅ YT CrossMix inicializado exitosamente');
+        return coreInstance;
+        
+    } catch (error) {
+        console.error('💥 Error fatal iniciando YT CrossMix:', error);
+        
+        // Mostrar error básico
+        document.body.innerHTML = `
+            <div style="
+                display: flex; align-items: center; justify-content: center;
+                min-height: 100vh; background: #0f0f0f; color: white;
+                font-family: 'Roboto', sans-serif; text-align: center; padding: 20px;
+            ">
+                <div>
+                    <h1>❌ Error de Inicialización</h1>
+                    <p>YT CrossMix no pudo cargar correctamente.</p>
+                    <code style="background: #333; padding: 10px; border-radius: 4px; display: block; margin: 20px 0;">
+                        ${error.message}
+                    </code>
+                    <button onclick="location.reload()" style="
+                        background: #ff6b35; color: white; border: none;
+                        padding: 12px 24px; border-radius: 6px; cursor: pointer;
+                        font-size: 16px; margin-top: 20px;
+                    ">Recargar Página</button>
+                </div>
+            </div>
+        `;
+        
+        throw error;
+    }
+}
+
+// ===== AUTO-INICIALIZACIÓN =====
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeYTCrossMix);
+} else {
+    initializeYTCrossMix();
+}
+
+// ===== EXPORTS =====
+export { YTCrossMixCore, UnifiedStateManager, initializeYTCrossMix };
