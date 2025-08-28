@@ -406,3 +406,47 @@ html {
         scroll-behavior: auto !important;
     }
 }
+/* Agregar al final de styles-youtube-music.css */
+
+/* ===== ESTILOS UNIFICADOS ===== */
+.unified-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+}
+
+.spinner-inline {
+    position: relative;
+    padding: 20px;
+}
+
+.spinner-small .spinner-animation {
+    width: 24px !important;
+    height: 24px !important;
+    border-width: 2px !important;
+}
+
+.spinner-large .spinner-animation {
+    width: 60px !important;
+    height: 60px !important;
+    border-width: 4px !important;
+}
+
+.unified-message {
+    will-change: transform, opacity;
+    user-select: none;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
