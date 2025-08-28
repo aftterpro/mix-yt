@@ -1,40 +1,153 @@
-//  Manejo de Búsqueda
-import { SearchState, PlaylistState } from './config.js';
-import { mostrarMensajeFlotante } from './messages.js';
-import { PlaylistManager } from './playlistManager.js';
-import { UIManager } from './ui.js';
-import { Utils } from './utils.js';
+// ===== 2. SEARCHMANAGER.JS - MODIFICADO PARA SISTEMA UNIFICADO =====
+// searchManager.js - Versión adaptada al sistema unificado
 
 export class SearchManager {
 
-static initialize() {
-    const searchResultsElement = document.getElementById('searchResults');
-    
-    if (searchResultsElement) {
-        SearchState.resultsContainer = searchResultsElement;
-        SearchState.resultsDiv = searchResultsElement;
+    static initialize() {
+        const searchResultsElement = document.getElementById('searchResults');
         
-        SearchState.resultsContainer.addEventListener('scroll', SearchManager.handleScroll);
-    } else {
-        console.error("Error: Elemento 'searchResults' no encontrado en el DOM.");
+        if (searchResultsElement) {
+            // ✅ Usar estado unificado
+            const state = window.unifiedStateManager?.state;
+            if (state) {
+                state.search.resultsContainer = searchResultsElement;
+                state.search.resultsDiv = searchResultsElement;
+                
+                searchResultsElement.addEventListener('scroll', SearchManager.handleScroll);
+                console.log('🔍 Search Manager inicializado con estado unificado');
+            }
+        } else {
+            console.error("Error: Elemento 'searchResults' no encontrado en el DOM.");
+        }
     }
-}
-    // Realizar búsqueda
+
     static async performSearch(query, nextPage = null) {
-        if (!SearchState.resultsDiv) return;
+        const state = window.unifiedStateManager?.state;
+        if (!state?.search?.resultsDiv) return;
+
+        const searchState = state.search;
 
         if (!nextPage) {
             console.log(`Iniciando NUEVA búsqueda para: ${query}`);
-            SearchState.currentSearchQuery = query;
-            SearchState.nextPageContext = null;
-            SearchState.resultsDiv.innerHTML = '<p>Buscando...</p>';
+            searchState.currentSearchQuery = query;
+            searchState.nextPageContext = null;
+            searchState.resultsDiv.innerHTML = '<p>Buscando...</p>';
         } else {
-            console.log(`Cargando MÁS resultados para: ${SearchState.currentSearchQuery} (Página: ${nextPage})`);
+            console.log(`Cargando MÁS resultados para: ${searchState.currentSearchQuery}`);
             SearchManager.showLoadMoreSpinner();
         }
 
-        SearchState.isLoadingMore = true;
+        searchState.isLoadingMore = true;
 
+        try {
+            let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(searchState.currentSearchQuery)}`;
+            if (nextPage) {
+                apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`;
+            }
+            
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                let errorDetails = `Error: ${response.status} ${response.statusText}`;
+                try {
+                    const errorBody = await response.json();
+                    errorDetails = errorBody.error || errorDetails;
+                } catch (e) {
+                    try {
+                        errorDetails = await response.text();
+                    } catch (e2) { /* Ignorar */ }
+                }
+                throw new Error(errorDetails);
+            }
+
+            const data = await response.json();
+            SearchManager.displaySearchResults(data, !!nextPage);
+
+        } catch (error) {
+            console.error("Error fetching search results:", error);
+            const displayError = error.message || "Error desconocido al buscar.";
+            
+            if (!nextPage) {
+                searchState.resultsDiv.innerHTML = `<p>${displayError}</p>`;
+            } else {
+                // ✅ Usar sistema de mensajes unificado
+                window.unifiedMessageManager?.show(displayError, 'error');
+                SearchManager.hideLoadMoreSpinner();
+            }
+            searchState.isLoadingMore = false;
+        }
+    }
+
+    static displaySearchResults(results, append = false) {
+        const state = window.unifiedStateManager?.state;
+        if (!state?.search?.resultsDiv) return;
+        
+        const searchState = state.search;
+        
+        if (!append) {
+            searchState.resultsDiv.innerHTML = '';
+        }
+        
+        if (!results || !results.items || !Array.isArray(results.items)) {
+            if (!append && (!results || results.items?.length === 0)) {
+                searchState.resultsDiv.innerHTML = "<p>No se encontraron resultados.</p>";
+            }
+            searchState.nextPageContext = results?.nextpage || null;
+            searchState.isLoadingMore = false;
+            SearchManager.hideLoadMoreSpinner();
+            return;
+        }
+
+        searchState.nextPageContext = results.nextpage || null;
+
+        results.items.forEach(video => {
+            const videoId = video.videoId || video.url?.split('v=')[1];
+            if (!videoId) return;
+
+            if (append && searchState.resultsDiv.querySelector(`.video-result[data-video-id="${videoId}"]`)) {
+                return;
+            }
+
+            const videoDiv = SearchManager.createVideoResultElement(video, videoId);
+            searchState.resultsDiv.appendChild(videoDiv);
+        });
+
+        if (append) {
+            SearchManager.hideLoadMoreSpinner();
+        }
+        searchState.isLoadingMore = false;
+    }
+
+    static createVideoResultElement(video, videoId) {
+        const videoDiv = document.createElement('div');
+        videoDiv.classList.add('video-result');
+        videoDiv.dataset.videoId = videoId;
+
+        const thumbnailContainer = document.createElement('div');
+        thumbnailContainer.classList.add('thumbnail-container');
+        
+        const thumbnail = document.createElement('img');
+        thumbnail.src = video.thumbnail;
+        thumbnail.alt = video.title;
+        thumbnail.classList.add('thumbnail');
+        thumbnail.loading = "lazy";
+        thumbnailContainer.appendChild(thumbnail);
+        
+        if (video.duration && video.duration > 0) {
+            const durationSpan = document.createElement('span');
+            durationSpan.textContent = SearchManager.formatDuration(video.duration);
+            durationSpan.classList.add('duration');
+            thumbnailContainer.appendChild(durationSpan);
+        }
+        
+        videoDiv.appendChild(thumbnailContainer);
+
+        const detailsDiv = document.createElement('div');
+        detailsDiv.classList.add('video-details');
+        
+        const title = document.createElement('h3');
+        title.textContent = video.title;
+        tit
         try {
             let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(SearchState.currentSearchQuery)}`;
             if (nextPage) {
@@ -250,6 +363,7 @@ static handleSearchResultAddClick(event, videoData) {
         }, delay);
     }
 }
+
 
 
 
