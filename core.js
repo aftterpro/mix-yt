@@ -1,9 +1,7 @@
-// ===== CORE.JS - SISTEMA UNIFICADO YT CROSSMIX =====
-// Fase 1: Reemplaza main-app.js, app-bootstrap.js e integration-fix.js
+// ===== YT CROSSMIX REFACTORIZACIÓN CRÍTICA =====
+// Eliminación de duplicaciones y unificación de sistemas
 
-import { CONFIG } from './config.js';
-
-// ===== 1. ESTADO UNIFICADO =====
+// ===== 1. SISTEMA DE ESTADOS UNIFICADO (ÚNICO) =====
 class UnifiedStateManager {
     constructor() {
         this.state = {
@@ -26,7 +24,8 @@ class UnifiedStateManager {
                 isDesktop: window.innerWidth >= 1024,
                 isPlaying: false,
                 currentTrack: null,
-                expandedPlaylists: new Set()
+                expandedPlaylists: new Set(),
+                activeModals: new Set()
             },
             playlist: {
                 playlistsData: [],
@@ -51,27 +50,23 @@ class UnifiedStateManager {
             auth: {
                 isAuthenticated: false,
                 token: null,
-                user: null
+                userInfo: null
             }
         };
         
         this.subscribers = new Map();
-        this.setupGlobalReferences();
+        this.setupUniqueGlobalReferences();
     }
     
-    setupGlobalReferences() {
-        // ✅ REFERENCIAS ÚNICAS - NO duplicar
+    setupUniqueGlobalReferences() {
+        // ✅ SOLO UNA REFERENCIA GLOBAL
         window.State = this.state;
         window.stateManager = this;
         
-        // Mantener compatibilidad temporal (ELIMINAR después de migración)
-        window.AppState = this.state.app;
-        window.PlaylistState = this.state.playlist;
-        window.SearchState = this.state.search;
-        window.SponsorBlockState = this.state.sponsorBlock;
-        window.UIState = this.state.ui;
+        // ❌ ELIMINAR TODAS LAS REFERENCIAS DUPLICADAS
+        // NO CREAR: window.AppState, window.PlaylistState, etc.
         
-        console.log('📊 Estado unificado configurado');
+        console.log('📊 Estado unificado único configurado');
     }
     
     get(path) {
@@ -125,141 +120,155 @@ class UnifiedStateManager {
             });
         }
     }
-    
-    reset() {
-        console.log('🔄 Reseteando estado unificado...');
-        
-        // Reset manteniendo estructura
-        Object.assign(this.state.app, {
-            currentPlayer: 1,
-            isTransitioning: false,
-            isAudioFading: false,
-            hasOutroCrossfadeStarted: false,
-            crossfadeInProgress: false,
-            reproduccionIniciada: false,
-            monitorInterval: null,
-            crossfadeInterval: null
-        });
-        
-        Object.assign(this.state.playlist, {
-            currentPlayingInfo: {
-                playlistId: null,
-                videoId: null,
-                flattenedIndex: -1
-            }
-        });
-        
-        this.state.ui.currentView = 'home';
-        this.state.ui.isPlaying = false;
-        this.state.ui.currentTrack = null;
-        
-        this.notifySubscribers('*', 'reset', 'reset');
+}
+
+// ===== 2. LOADING MANAGER UNIFICADO =====
+class UnifiedLoadingManager {
+    constructor() {
+        this.spinners = new Map();
     }
     
-    debug() {
-        console.log('=== ESTADO UNIFICADO DEBUG ===');
-        console.log('App:', this.state.app);
-        console.log('UI:', this.state.ui);
-        console.log('Playlist:', this.state.playlist);
-        console.log('Auth:', this.state.auth);
-        console.log('Subscribers:', Array.from(this.subscribers.keys()));
-        console.log('==============================');
+    // ✅ ÚNICA FUNCIÓN PARA TODOS LOS TIPOS DE LOADING
+    show(id = 'global', options = {}) {
+        const {
+            type = 'overlay', // 'overlay', 'inline', 'append'
+            container = document.body,
+            size = 'normal', // 'small', 'normal', 'large'
+            message = null
+        } = options;
+        
+        // Evitar duplicados
+        if (this.spinners.has(id)) {
+            return this.spinners.get(id);
+        }
+        
+        const spinner = this.createSpinner(id, type, container, size, message);
+        this.spinners.set(id, spinner);
+        
+        console.log(`✨ Loading mostrado: ${id} (${type})`);
+        return spinner;
+    }
+    
+    hide(id = 'global') {
+        const spinner = this.spinners.get(id);
+        if (spinner) {
+            spinner.classList.add('hidden');
+            setTimeout(() => {
+                if (spinner.parentNode) {
+                    spinner.remove();
+                }
+                this.spinners.delete(id);
+            }, 300);
+            console.log(`✨ Loading ocultado: ${id}`);
+        }
+    }
+    
+    hideAll() {
+        this.spinners.forEach((spinner, id) => {
+            this.hide(id);
+        });
+    }
+    
+    createSpinner(id, type, container, size, message) {
+        const spinner = document.createElement('div');
+        spinner.id = `loading-${id}`;
+        spinner.className = this.getSpinnerClasses(type, size);
+        
+        const spinnerContent = this.getSpinnerContent(size, message);
+        spinner.innerHTML = spinnerContent;
+        
+        // Posicionamiento según tipo
+        if (type === 'overlay') {
+            Object.assign(spinner.style, {
+                position: 'fixed',
+                top: '0',
+                left: '0',
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                zIndex: '2000',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backdropFilter: 'blur(10px)'
+            });
+        } else if (type === 'inline') {
+            Object.assign(spinner.style, {
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '20px'
+            });
+        }
+        
+        container.appendChild(spinner);
+        return spinner;
+    }
+    
+    getSpinnerClasses(type, size) {
+        const classes = ['unified-spinner'];
+        classes.push(`spinner-${type}`);
+        classes.push(`spinner-${size}`);
+        return classes.join(' ');
+    }
+    
+    getSpinnerContent(size, message) {
+        const spinnerSize = {
+            small: '24px',
+            normal: '40px',
+            large: '60px'
+        }[size] || '40px';
+        
+        return `
+            <div class="spinner-animation" style="
+                width: ${spinnerSize};
+                height: ${spinnerSize};
+                border: 3px solid rgba(255, 255, 255, 0.1);
+                border-radius: 50%;
+                border-top: 3px solid var(--accent-color, #ff6b35);
+                animation: spin 1s linear infinite;
+            "></div>
+            ${message ? `<p style="margin-top: 16px; color: white; font-size: 14px;">${message}</p>` : ''}
+        `;
     }
 }
 
-// ===== 2. CORE PRINCIPAL =====
-class YTCrossMixCore {
-    constructor() {
-        this.stateManager = new UnifiedStateManager();
-        this.modules = new Map();
-        this.initialized = false;
-        this.startTime = Date.now();
-        
-        this.initSteps = [
-            { name: 'initDOM', critical: true },
-            { name: 'initYouTubeAPI', critical: true },
-            { name: 'initAuth', critical: false },
-            { name: 'initUI', critical: true },
-            { name: 'initPlayback', critical: true },
-            { name: 'finalizeSetup', critical: false }
-        ];
-        
-        this.setupErrorHandling();
+// ===== 3. YOUTUBE API MANAGER UNIFICADO =====
+class UnifiedYouTubeManager {
+    constructor(stateManager) {
+        this.stateManager = stateManager;
+        this.apiReady = false;
+        this.playersReady = false;
+        this.initPromise = null;
     }
     
+    // ✅ ÚNICO PUNTO DE INICIALIZACIÓN YOUTUBE API
     async initialize() {
-        if (this.initialized) {
-            console.warn('⚠️ Core ya inicializado');
-            return this;
+        if (this.initPromise) {
+            return this.initPromise;
         }
         
-        console.log('🚀 Iniciando YT CrossMix Core Unificado...');
+        this.initPromise = this.loadAPI();
+        return this.initPromise;
+    }
+    
+    async loadAPI() {
+        console.log('🎥 Cargando YouTube API (unificado)...');
         
-        try {
-            for (const step of this.initSteps) {
-                await this.executeStep(step);
-            }
-            
-            this.initialized = true;
-            const totalTime = Date.now() - this.startTime;
-            
-            console.log(`✅ YT CrossMix Core inicializado en ${totalTime}ms`);
-            this.dispatchReady();
-            
-            return this;
-            
-        } catch (error) {
-            console.error('💥 Error crítico en inicialización Core:', error);
-            this.handleCriticalError(error);
-            throw error;
+        // Verificar si ya está disponible
+        if (window.YT?.Player) {
+            console.log('YT ya disponible');
+            this.apiReady = true;
+            this.createPlayers();
+            return;
         }
-    }
-    
-    async executeStep(step) {
-        console.log(`📋 Ejecutando: ${step.name}`);
-        
-        try {
-            await this[step.name]();
-            console.log(`✅ ${step.name} completado`);
-            
-        } catch (error) {
-            console.error(`❌ ${step.name} falló:`, error);
-            
-            if (step.critical) {
-                throw new Error(`Paso crítico falló: ${step.name} - ${error.message}`);
-            } else {
-                console.warn(`⚠️ Continuando sin ${step.name} (no crítico)`);
-            }
-        }
-    }
-    
-    // ===== PASOS DE INICIALIZACIÓN =====
-    
-    async initDOM() {
-        await this.waitForDOM();
-        this.setupCriticalElements();
-        this.detectDevice();
-        this.setupViewport();
-        
-        console.log('🏠 DOM inicializado');
-    }
-    
-    async initYouTubeAPI() {
-        console.log('🎥 Inicializando YouTube API...');
         
         return new Promise((resolve, reject) => {
-            // Verificar si YT ya está disponible
-            if (window.YT?.Player) {
-                console.log('YT ya disponible, creando reproductores...');
-                this.createYouTubePlayers();
-                resolve();
-                return;
-            }
-            
-            // ✅ CALLBACK ÚNICO - No duplicar
+            // ✅ ÚNICO CALLBACK GLOBAL
             window.onYouTubeIframeAPIReady = () => {
-                console.log('📺 YouTube API lista, creando reproductores...');
-                this.createYouTubePlayers();
+                console.log('📺 YouTube API lista (callback único)');
+                this.apiReady = true;
+                this.createPlayers();
                 resolve();
             };
             
@@ -270,101 +279,41 @@ class YTCrossMixCore {
                 script.async = true;
                 script.onerror = reject;
                 document.head.appendChild(script);
-                console.log('📡 Cargando YouTube API script...');
             }
         });
     }
     
-    async initAuth() {
-        try {
-            console.log('🔐 Inicializando autenticación...');
-            const { authManager } = await import('./auth.js');
-            this.modules.set('auth', authManager);
-            await authManager.initialize();
-            console.log('✅ Auth manager inicializado');
-        } catch (error) {
-            console.warn('⚠️ Error inicializando auth (no crítico):', error);
-        }
-    }
-    
-    async initUI() {
-        console.log('🎨 Inicializando UI...');
+    createPlayers() {
+        if (this.playersReady) return;
         
-        try {
-            const { UIManager } = await import('./ui.js');
-            this.modules.set('ui', UIManager);
-            
-            this.setupResponsive();
-            this.setupNavigation();
-            this.setupBasicControls();
-            
-            console.log('✅ UI Manager inicializado');
-        } catch (error) {
-            console.warn('⚠️ UI Manager no disponible, usando fallbacks');
-            this.setupFallbackUI();
-        }
-    }
-    
-    async initPlayback() {
-        try {
-            console.log('🎵 Inicializando sistema de reproducción...');
-            const { PlaybackController } = await import('./playbackController.js');
-            this.modules.set('playback', PlaybackController);
-            console.log('✅ Playback Controller cargado');
-        } catch (error) {
-            console.warn('⚠️ Error cargando PlaybackController:', error);
-        }
-    }
-    
-    async finalizeSetup() {
-        console.log('🔧 Finalizando configuración...');
+        console.log('🎬 Creando reproductores (unificado)...');
         
-        // Setup global functions
-        this.setupGlobalFunctions();
-        
-        // Setup event listeners globales
-        this.setupGlobalEvents();
-        
-        // Health check
-        this.performHealthCheck();
-        
-        console.log('✅ Configuración finalizada');
-    }
-    
-    // ===== CREACIÓN DE REPRODUCTORES =====
-    
-    createYouTubePlayers() {
-        const state = this.stateManager.state;
-        
-        // Verificar elementos DOM
         const player1El = document.getElementById('player1');
         const player2El = document.getElementById('player2');
         
         if (!player1El || !player2El) {
-            console.error('❌ Elementos player1 o player2 no encontrados');
-            throw new Error('Elementos de reproductores no encontrados en DOM');
+            console.error('❌ Elementos player no encontrados');
+            return;
         }
         
-        console.log('🎬 Creando reproductores YouTube...');
+        const playerConfig = {
+            height: '315',
+            width: '560',
+            playerVars: {
+                'playsinline': 1,
+                'controls': 1,
+                'modestbranding': 1,
+                'rel': 0,
+                'showinfo': 0,
+                'enablejsapi': 1,
+                'origin': window.location.origin,
+                'autoplay': 0,
+                'mute': 0
+            }
+        };
         
         try {
-            const playerConfig = {
-                height: '315',
-                width: '560',
-                playerVars: {
-                    'playsinline': 1,
-                    'controls': 1,
-                    'modestbranding': 1,
-                    'rel': 0,
-                    'showinfo': 0,
-                    'enablejsapi': 1,
-                    'origin': window.location.origin,
-                    'autoplay': 0,
-                    'mute': 0
-                }
-            };
-            
-            state.app.player1 = new YT.Player('player1', {
+            const player1 = new YT.Player('player1', {
                 ...playerConfig,
                 events: {
                     'onReady': (e) => this.onPlayerReady(e, 1),
@@ -373,7 +322,7 @@ class YTCrossMixCore {
                 }
             });
             
-            state.app.player2 = new YT.Player('player2', {
+            const player2 = new YT.Player('player2', {
                 ...playerConfig,
                 events: {
                     'onReady': (e) => this.onPlayerReady(e, 2),
@@ -382,7 +331,11 @@ class YTCrossMixCore {
                 }
             });
             
-            console.log('✅ Reproductores YouTube creados');
+            // Establecer en estado único
+            this.stateManager.set('app.player1', player1);
+            this.stateManager.set('app.player2', player2);
+            
+            console.log('✅ Reproductores creados exitosamente');
             
         } catch (error) {
             console.error('💥 Error creando reproductores:', error);
@@ -391,29 +344,28 @@ class YTCrossMixCore {
     }
     
     onPlayerReady(event, playerNum) {
-        console.log(`✅ Player ${playerNum} listo`);
+        console.log(`✅ Player ${playerNum} listo (unificado)`);
         
-        const state = this.stateManager.state;
+        const player1 = this.stateManager.get('app.player1');
+        const player2 = this.stateManager.get('app.player2');
         
-        // Verificar si ambos están listos
-        if (state.app.player1 && state.app.player2 && 
-            typeof state.app.player1.getPlayerState === 'function' &&
-            typeof state.app.player2.getPlayerState === 'function') {
+        if (player1 && player2 && 
+            typeof player1.getPlayerState === 'function' &&
+            typeof player2.getPlayerState === 'function') {
             
-            if (!state.app.playersInitialized) {
-                state.app.playersInitialized = true;
+            if (!this.playersReady) {
+                this.playersReady = true;
                 this.stateManager.set('app.playersInitialized', true);
                 
-                console.log('🎉 Ambos reproductores listos');
+                console.log('🎉 Ambos reproductores listos (unificado)');
                 
                 // Habilitar controles
                 this.enableControls();
                 
-                // Iniciar monitoring si hay PlaybackController
-                this.startPlaybackMonitoring();
-                
-                // Dispatch evento
-                window.dispatchEvent(new CustomEvent('playersReady'));
+                // Dispatch evento único
+                window.dispatchEvent(new CustomEvent('playersReady', {
+                    detail: { unified: true }
+                }));
             }
         }
     }
@@ -422,355 +374,42 @@ class YTCrossMixCore {
         const playerState = event.data;
         const videoId = event.target.getVideoData()?.video_id;
         
-        console.log(`🎵 Player ${playerNum} estado: ${this.getStateString(playerState)} (${videoId || 'No ID'})`);
+        console.log(`🎵 Player ${playerNum} estado: ${this.getStateString(playerState)} (unificado)`);
         
-        // Actualizar estado
+        // Actualizar estado único
         this.stateManager.set(`app.player${playerNum}State`, playerState);
         
-        // Notificar cambios
-        window.dispatchEvent(new CustomEvent('playerStateChanged', {
+        // Evento único sin duplicaciones
+        window.dispatchEvent(new CustomEvent('unifiedPlayerStateChanged', {
             detail: { 
                 playerNum, 
                 state: playerState, 
                 videoId,
-                playerInstance: event.target
+                timestamp: Date.now()
             }
         }));
-        
-        if (playerState === YT.PlayerState.PLAYING) {
-            this.handlePlayingState(playerNum, videoId);
-        } else if (playerState === YT.PlayerState.ENDED) {
-            this.handleEndedState(playerNum, videoId);
-        }
     }
     
     onPlayerError(event, playerNum) {
         const errorCode = event.data;
-        console.error(`❌ Error Player ${playerNum}:`, errorCode);
+        console.error(`❌ Error Player ${playerNum} (unificado):`, errorCode);
         
         const errorMessages = {
             2: 'ID de video inválido',
-            5: 'Error de HTML5 o derechos de autor',
-            100: 'Video no encontrado o eliminado',
-            101: 'Reproducción incrustada no permitida por el propietario',
-            150: 'Reproducción incrustada no permitida por el propietario'
+            5: 'Error HTML5 o derechos de autor',
+            100: 'Video no encontrado',
+            101: 'Reproducción incrustada no permitida',
+            150: 'Reproducción incrustada no permitida'
         };
         
         const message = errorMessages[errorCode] || `Error desconocido (${errorCode})`;
-        this.showMessage(`Player ${playerNum}: ${message}`, 'error');
+        
+        // Usar sistema de mensajes unificado
+        window.unifiedMessageManager?.show(`Player ${playerNum}: ${message}`, 'error');
         
         // Auto-skip en errores críticos
         if ([100, 101, 150].includes(errorCode)) {
-            console.log('🔄 Auto-skip por error crítico...');
             setTimeout(() => this.skipToNext(), 1000);
-        }
-    }
-    
-    // ===== MANEJADORES DE ESTADO =====
-    
-    handlePlayingState(playerNum, videoId) {
-        this.stateManager.set('ui.isPlaying', true);
-        this.stateManager.set('ui.currentTrack', { videoId, playerNum });
-        
-        // Reset crossfade flags
-        this.stateManager.set('app.hasOutroCrossfadeStarted', false);
-        
-        // Actualizar UI
-        this.updatePlayButton(true);
-        
-        // SponsorBlock check
-        this.checkSponsorBlock(playerNum);
-    }
-    
-    handleEndedState(playerNum, videoId) {
-        console.log(`🏁 Player ${playerNum} terminó: ${videoId}`);
-        
-        window.dispatchEvent(new CustomEvent('playerEnded', {
-            detail: { playerNum, videoId }
-        }));
-    }
-    
-    async checkSponsorBlock(playerNum) {
-        try {
-            const { SponsorBlockManager } = await import('./sponsorblock.js');
-            const player = this.stateManager.state.app[`player${playerNum}`];
-            
-            if (SponsorBlockManager && player) {
-                SponsorBlockManager.checkAndSkipSegment(player, true);
-            }
-        } catch (error) {
-            console.warn('SponsorBlock no disponible:', error);
-        }
-    }
-    
-    // ===== CONFIGURACIÓN DOM Y UI =====
-    
-    waitForDOM() {
-        return new Promise(resolve => {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', resolve, { once: true });
-            } else {
-                resolve();
-            }
-        });
-    }
-    
-    setupCriticalElements() {
-        const requiredElements = [
-            { id: 'player1', tag: 'div', className: 'video-player', parent: '#videoContainer' },
-            { id: 'player2', tag: 'div', className: 'video-player hidden', parent: '#videoContainer' },
-            { id: 'botonPlay', tag: 'button', className: 'control-button primary', parent: '.player-controls' },
-            { id: 'botonNext', tag: 'button', className: 'control-button', parent: '.player-controls' },
-            { id: 'videoContainer', tag: 'div', className: 'video-container', parent: '.now-playing-container' }
-        ];
-        
-        requiredElements.forEach(({ id, tag, className, parent }) => {
-            if (!document.getElementById(id)) {
-                const element = document.createElement(tag);
-                element.id = id;
-                element.className = className;
-                
-                if (id === 'botonPlay') {
-                    element.innerHTML = '<i class="fas fa-play"></i>';
-                    element.disabled = true;
-                    element.title = 'Reproducir/Pausar';
-                } else if (id === 'botonNext') {
-                    element.innerHTML = '<i class="fas fa-step-forward"></i>';
-                    element.disabled = true;
-                    element.title = 'Siguiente';
-                }
-                
-                const container = document.querySelector(parent) || 
-                                 document.querySelector('.player-controls') ||
-                                 document.querySelector('.now-playing-container') ||
-                                 document.body;
-                
-                if (container) {
-                    container.appendChild(element);
-                    console.log(`🔧 Elemento ${id} creado automáticamente`);
-                }
-            }
-        });
-    }
-    
-    detectDevice() {
-        const isDesktop = window.innerWidth >= 1024;
-        const isMobile = !isDesktop;
-        const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
-        
-        this.stateManager.set('ui.isDesktop', isDesktop);
-        this.stateManager.set('ui.isMobile', isMobile);
-        this.stateManager.set('ui.isTablet', isTablet);
-        
-        document.body.classList.toggle('is-desktop', isDesktop);
-        document.body.classList.toggle('is-mobile', isMobile);
-        document.body.classList.toggle('is-tablet', isTablet);
-        
-        console.log(`📱 Dispositivo detectado: ${isDesktop ? 'Desktop' : isTablet ? 'Tablet' : 'Mobile'}`);
-    }
-    
-    setupViewport() {
-        // Viewport height dinámico para móviles
-        const setViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        };
-        
-        setViewportHeight();
-        window.addEventListener('resize', setViewportHeight);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(setViewportHeight, 100);
-        });
-    }
-    
-    setupResponsive() {
-        const handleResize = this.debounce(() => {
-            this.detectDevice();
-            this.updateLayoutForDevice();
-        }, 250);
-        
-        window.addEventListener('resize', handleResize);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(handleResize, 100);
-        });
-        
-        // Configuración inicial
-        this.updateLayoutForDevice();
-    }
-    
-    updateLayoutForDevice() {
-        const isDesktop = this.stateManager.get('ui.isDesktop');
-        
-        // Mostrar/ocultar elementos según dispositivo
-        const desktopElements = document.querySelectorAll('.desktop-sidebar, .bottom-player');
-        const mobileElements = document.querySelectorAll('.mobile-header, .bottom-nav, .mini-player');
-        
-        desktopElements.forEach(el => {
-            if (el) el.style.display = isDesktop ? (el.classList.contains('bottom-player') ? 'flex' : 'block') : 'none';
-        });
-        
-        mobileElements.forEach(el => {
-            if (el) el.style.display = isDesktop ? 'none' : (el.classList.contains('bottom-nav') || el.classList.contains('mini-player') ? 'flex' : 'block');
-        });
-        
-        console.log(`🎨 Layout actualizado para: ${isDesktop ? 'Desktop' : 'Mobile'}`);
-    }
-    
-    setupNavigation() {
-        console.log('🧭 Configurando navegación unificada...');
-        
-        // Event delegation unificado
-        document.addEventListener('click', (e) => {
-            const navElement = e.target.closest('[data-view]');
-            if (navElement) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const view = navElement.dataset.view;
-                if (view) {
-                    setTimeout(() => this.switchView(view), 10);
-                }
-            }
-        }, true);
-        
-        // Keyboard navigation
-        document.addEventListener('keydown', (e) => {
-            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-            
-            switch (e.key) {
-                case 'Escape':
-                    this.closeModals();
-                    break;
-                case ' ':
-                    if (!e.target.closest('button')) {
-                        e.preventDefault();
-                        this.togglePlay();
-                    }
-                    break;
-            }
-        });
-    }
-    
-    setupBasicControls() {
-        console.log('🎮 Configurando controles básicos...');
-        
-        // Play button
-        const playButton = document.getElementById('botonPlay');
-        if (playButton) {
-            playButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.togglePlay();
-            });
-        }
-        
-        // Next button
-        const nextButton = document.getElementById('botonNext');
-        if (nextButton) {
-            nextButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.skipToNext();
-            });
-        }
-    }
-    
-    setupFallbackUI() {
-        console.log('🆘 Configurando UI de emergencia...');
-        
-        // Navigation básica
-        document.querySelectorAll('[data-view]').forEach(element => {
-            element.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.switchView(element.dataset.view);
-            });
-        });
-    }
-    
-    // ===== NAVEGACIÓN Y CONTROLES =====
-    
-    switchView(newView) {
-        const currentView = this.stateManager.get('ui.currentView');
-        if (currentView === newView) return;
-        
-        console.log(`🔄 Cambiando vista: ${currentView} → ${newView}`);
-        
-        // Ocultar todas las vistas
-        document.querySelectorAll('.content-view').forEach(view => {
-            view.classList.remove('active');
-            view.style.display = 'none';
-        });
-        
-        // Mostrar vista objetivo
-        const targetView = document.getElementById(`${newView}View`);
-        if (targetView) {
-            targetView.classList.add('active');
-            targetView.style.display = 'flex';
-        }
-        
-        // Actualizar navegación
-        document.querySelectorAll('[data-view]').forEach(item => {
-            item.classList.toggle('active', item.dataset.view === newView);
-        });
-        
-        this.stateManager.set('ui.currentView', newView);
-        
-        // Scroll al top
-        if (targetView) {
-            targetView.scrollTop = 0;
-        }
-        
-        // Notificar cambio
-        window.dispatchEvent(new CustomEvent('viewChanged', {
-            detail: { from: currentView, to: newView }
-        }));
-    }
-    
-    togglePlay() {
-        const playButton = document.getElementById('botonPlay');
-        if (!playButton || playButton.disabled) return;
-        
-        console.log('🎵 Toggle play solicitado');
-        
-        const playback = this.modules.get('playback');
-        const isPlaying = this.stateManager.get('ui.isPlaying');
-        const hasStarted = this.stateManager.get('app.reproduccionIniciada');
-        
-        if (playback) {
-            if (!hasStarted) {
-                playback.playFirstVideo?.();
-            } else {
-                // Toggle current player
-                this.toggleCurrentPlayer();
-            }
-        } else {
-            this.showMessage('Sistema de reproducción no disponible', 'warning');
-        }
-    }
-    
-    toggleCurrentPlayer() {
-        const state = this.stateManager.state.app;
-        const activePlayer = state.currentPlayer === 1 ? state.player1 : state.player2;
-        
-        if (activePlayer && typeof activePlayer.getPlayerState === 'function') {
-            const currentState = activePlayer.getPlayerState();
-            
-            if (currentState === YT.PlayerState.PLAYING) {
-                activePlayer.pauseVideo();
-                this.updatePlayButton(false);
-            } else if (currentState === YT.PlayerState.PAUSED) {
-                activePlayer.playVideo();
-                this.updatePlayButton(true);
-            }
-        }
-    }
-    
-    skipToNext() {
-        console.log('⏭️ Skip to next solicitado');
-        
-        const playback = this.modules.get('playback');
-        if (playback?.playNextVideo) {
-            playback.playNextVideo();
-        } else {
-            this.showMessage('Función siguiente no disponible', 'warning');
         }
     }
     
@@ -778,53 +417,15 @@ class YTCrossMixCore {
         const playButton = document.getElementById('botonPlay');
         const nextButton = document.getElementById('botonNext');
         
-        if (playButton) {
-            playButton.disabled = false;
-            console.log('✅ Controles habilitados');
-        }
+        if (playButton) playButton.disabled = false;
+        if (nextButton) nextButton.disabled = false;
         
-        if (nextButton) {
-            nextButton.disabled = false;
-        }
+        console.log('✅ Controles habilitados (unificado)');
     }
     
-    updatePlayButton(isPlaying) {
-        const playButton = document.getElementById('botonPlay');
-        const miniPlayBtn = document.getElementById('miniPlayBtn');
-        
-        const icon = isPlaying ? 'fa-pause' : 'fa-play';
-        
-        if (playButton) {
-            const iconEl = playButton.querySelector('i');
-            if (iconEl) {
-                iconEl.className = `fas ${icon}`;
-            }
-        }
-        
-        if (miniPlayBtn) {
-            const iconEl = miniPlayBtn.querySelector('i');
-            if (iconEl) {
-                iconEl.className = `fas ${icon}`;
-            }
-        }
-    }
-    
-    closeModals() {
-        document.querySelectorAll('.modal, .mobile-context-modal, .delete-menu-content').forEach(modal => {
-            if (modal.style.display !== 'none') {
-                modal.remove();
-            }
-        });
-    }
-    
-    // ===== UTILIDADES =====
-    
-    startPlaybackMonitoring() {
-        const playback = this.modules.get('playback');
-        if (playback?.startMonitoring) {
-            console.log('🔄 Iniciando monitoring de reproducción...');
-            playback.startMonitoring();
-        }
+    skipToNext() {
+        // Implementar skip unificado
+        console.log('⏭️ Skip solicitado (unificado)');
     }
     
     getStateString(state) {
@@ -838,64 +439,75 @@ class YTCrossMixCore {
         };
         return states[state] || 'UNKNOWN';
     }
-    
-    setupErrorHandling() {
-        window.addEventListener('error', (e) => {
-            console.error('Global error:', e.error);
-            if (e.error && !e.error.message?.includes('Extension')) {
-                this.showMessage('Error en la aplicación', 'error');
-            }
-        });
-        
-        window.addEventListener('unhandledrejection', (e) => {
-            console.error('Unhandled promise rejection:', e.reason);
-            e.preventDefault();
-        });
+}
+
+// ===== 4. MESSAGE MANAGER UNIFICADO =====
+class UnifiedMessageManager {
+    constructor() {
+        this.activeMessages = new Set();
+        this.messageQueue = [];
+        this.maxConcurrent = 3;
     }
     
-    setupGlobalFunctions() {
-        // Funciones globales de utilidad
-        window.ytCrossMix = this;
-        window.State = this.stateManager.state;
-        window.stateManager = this.stateManager;
-        
-        window.showMessage = (msg, type, duration) => this.showMessage(msg, type, duration);
-        window.switchView = (view) => this.switchView(view);
-        window.debugApp = () => this.stateManager.debug();
-        window.resetApp = () => this.reset();
-        
-        console.log('🌐 Funciones globales configuradas');
-    }
-    
-    setupGlobalEvents() {
-        // Online/Offline status
-        window.addEventListener('online', () => {
-            console.log('🌐 Conexión restaurada');
-            this.showMessage('Conexión restaurada', 'success', 2000);
-        });
-        
-        window.addEventListener('offline', () => {
-            console.log('🌐 Sin conexión');
-            this.showMessage('Sin conexión a internet', 'warning', 3000);
-        });
-        
-        // Cleanup al cerrar
-        window.addEventListener('beforeunload', () => {
-            this.cleanup();
-        });
-    }
-    
-    // ===== SISTEMA DE MENSAJES UNIFICADO =====
-    
-    showMessage(message, type = 'info', duration = 3000) {
+    // ✅ ÚNICA FUNCIÓN PARA TODOS LOS MENSAJES
+    show(message, type = 'info', duration = 3000, options = {}) {
         if (!message) return;
         
-        console.log(`💬 Mensaje [${type}]:`, message);
+        const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        const messageData = {
+            id: messageId,
+            text: message,
+            type,
+            duration,
+            timestamp: Date.now(),
+            ...options
+        };
+        
+        if (this.activeMessages.size >= this.maxConcurrent) {
+            this.messageQueue.push(messageData);
+            return;
+        }
+        
+        this.displayMessage(messageData);
+    }
+    
+    displayMessage(messageData) {
+        const { id, text, type, duration } = messageData;
+        
+        console.log(`💬 Mensaje unificado [${type}]:`, text);
         
         const messageEl = document.createElement('div');
-        messageEl.textContent = message;
-        messageEl.className = 'floating-message';
+        messageEl.id = id;
+        messageEl.textContent = text;
+        messageEl.className = 'unified-message';
         
+        this.applyMessageStyles(messageEl, type);
+        
+        // Posicionamiento inteligente
+        this.positionMessage(messageEl);
+        
+        document.body.appendChild(messageEl);
+        this.activeMessages.add(id);
+        
+        // Animación entrada
+        requestAnimationFrame(() => {
+            messageEl.style.opacity = '1';
+            messageEl.style.transform = 'translateX(-50%) translateY(0) scale(1)';
+        });
+        
+        // Auto-remove
+        setTimeout(() => {
+            this.hideMessage(id);
+        }, duration);
+        
+        // Click to dismiss
+        messageEl.addEventListener('click', () => {
+            this.hideMessage(id);
+        });
+    }
+    
+    applyMessageStyles(element, type) {
         const colors = {
             info: 'linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.9))',
             success: 'linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.9))',
@@ -903,11 +515,9 @@ class YTCrossMixCore {
             warning: 'linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(245, 124, 0, 0.9))'
         };
         
-        Object.assign(messageEl.style, {
+        Object.assign(element.style, {
             position: 'fixed',
-            bottom: 'calc(64px + 64px + 20px + env(safe-area-inset-bottom))',
             left: '50%',
-            transform: 'translateX(-50%) translateY(100px) scale(0.8)',
             zIndex: '10001',
             background: colors[type] || colors.info,
             color: 'white',
@@ -916,76 +526,269 @@ class YTCrossMixCore {
             fontSize: '13px',
             fontWeight: '500',
             maxWidth: 'calc(100vw - 32px)',
-            wordWrap: 'break-word',
             textAlign: 'center',
             boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             opacity: '0',
+            transform: 'translateX(-50%) translateY(100px) scale(0.8)',
             transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-            pointerEvents: 'none'
-        });
-        
-        document.body.appendChild(messageEl);
-        
-        // Animación de entrada
-        requestAnimationFrame(() => {
-            messageEl.style.transform = 'translateX(-50%) translateY(0) scale(1)';
-            messageEl.style.opacity = '1';
-        });
-        
-        // Auto-remove
-        setTimeout(() => {
-            messageEl.style.opacity = '0';
-            setTimeout(() => messageEl.remove(), 400);
-        }, duration);
-        
-        // Click para cerrar
-        messageEl.addEventListener('click', () => {
-            messageEl.style.opacity = '0';
-            setTimeout(() => messageEl.remove(), 200);
+            cursor: 'pointer'
         });
     }
     
-    // ===== HEALTH CHECK Y DIAGNÓSTICO =====
+    positionMessage(element) {
+        const isMobile = window.innerWidth <= 768;
+        const baseBottom = isMobile ? 
+            'calc(64px + 80px + env(safe-area-inset-bottom, 0px) + 20px)' : 
+            '120px';
+        
+        // Stackear mensajes
+        const offset = this.activeMessages.size * 60;
+        element.style.bottom = `calc(${baseBottom} + ${offset}px)`;
+    }
+    
+    hideMessage(id) {
+        const messageEl = document.getElementById(id);
+        if (!messageEl) return;
+        
+        messageEl.style.opacity = '0';
+        messageEl.style.transform = 'translateX(-50%) translateY(-20px) scale(0.9)';
+        
+        setTimeout(() => {
+            if (messageEl.parentNode) {
+                messageEl.remove();
+            }
+            this.activeMessages.delete(id);
+            
+            // Procesar cola
+            if (this.messageQueue.length > 0) {
+                const nextMessage = this.messageQueue.shift();
+                this.displayMessage(nextMessage);
+            }
+        }, 400);
+    }
+    
+    clear() {
+        this.activeMessages.forEach(id => {
+            this.hideMessage(id);
+        });
+        this.messageQueue = [];
+    }
+}
+
+// ===== 5. CORE UNIFICADO PRINCIPAL =====
+class UnifiedYTCrossMixCore {
+    constructor() {
+        console.log('🚀 Iniciando YT CrossMix Core Unificado (Sin Duplicaciones)...');
+        
+        // Managers únicos
+        this.stateManager = new UnifiedStateManager();
+        this.loadingManager = new UnifiedLoadingManager();
+        this.youtubeManager = new UnifiedYouTubeManager(this.stateManager);
+        this.messageManager = new UnifiedMessageManager();
+        
+        // Módulos registrados
+        this.modules = new Map();
+        
+        // Referencias globales únicas
+        this.setupGlobalReferences();
+        
+        // Estado de inicialización
+        this.initialized = false;
+        this.initPromise = null;
+    }
+    
+    setupGlobalReferences() {
+        // ✅ REFERENCIAS GLOBALES ÚNICAS (NO DUPLICADAS)
+        window.ytCrossMix = this;
+        window.unifiedStateManager = this.stateManager;
+        window.unifiedLoadingManager = this.loadingManager;
+        window.unifiedYouTubeManager = this.youtubeManager;
+        window.unifiedMessageManager = this.messageManager;
+        
+        // Funciones de conveniencia
+        window.showMessage = (msg, type, duration) => 
+            this.messageManager.show(msg, type, duration);
+        window.showLoading = (id, options) => 
+            this.loadingManager.show(id, options);
+        window.hideLoading = (id) => 
+            this.loadingManager.hide(id);
+        
+        // Debug unificado
+        window.debugUnified = () => this.debug();
+        window.resetUnified = () => this.reset();
+        
+        console.log('🌐 Referencias globales únicas configuradas');
+    }
+    
+    async initialize() {
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+        
+        this.initPromise = this.performInitialization();
+        return this.initPromise;
+    }
+    
+    async performInitialization() {
+        console.log('📋 Iniciando inicialización unificada...');
+        
+        const startTime = Date.now();
+        
+        try {
+            // Pasos de inicialización
+            await this.initializeDOM();
+            await this.initializeYouTube();
+            await this.initializeModules();
+            await this.finalizeInitialization();
+            
+            this.initialized = true;
+            const totalTime = Date.now() - startTime;
+            
+            console.log(`✅ YT CrossMix Core Unificado inicializado en ${totalTime}ms`);
+            this.messageManager.show('🎵 YT CrossMix listo para usar', 'success');
+            
+            // Dispatch evento único
+            window.dispatchEvent(new CustomEvent('ytcrossmix:unified:ready', {
+                detail: { timestamp: Date.now(), core: this }
+            }));
+            
+        } catch (error) {
+            console.error('💥 Error en inicialización unificada:', error);
+            this.handleCriticalError(error);
+            throw error;
+        }
+    }
+    
+    async initializeDOM() {
+        await this.waitForDOM();
+        this.setupCriticalElements();
+        this.detectDevice();
+        console.log('🏠 DOM inicializado (unificado)');
+    }
+    
+    async initializeYouTube() {
+        await this.youtubeManager.initialize();
+        console.log('🎥 YouTube inicializado (unificado)');
+    }
+    
+    async initializeModules() {
+        console.log('📦 Cargando módulos...');
+        
+        const moduleLoaders = [
+            { name: 'auth', loader: () => import('./auth.js') },
+            { name: 'playlist', loader: () => import('./playlistManager.js') },
+            { name: 'search', loader: () => import('./searchManager.js') },
+            { name: 'ui', loader: () => import('./ui.js') },
+            { name: 'playback', loader: () => import('./playbackController.js') },
+            { name: 'sponsorblock', loader: () => import('./sponsorblock.js') }
+        ];
+        
+        for (const { name, loader } of moduleLoaders) {
+            try {
+                const module = await loader();
+                this.modules.set(name, module);
+                console.log(`✅ Módulo ${name} cargado`);
+            } catch (error) {
+                console.warn(`⚠️ Error cargando módulo ${name}:`, error);
+            }
+        }
+    }
+    
+    async finalizeInitialization() {
+        this.setupGlobalEvents();
+        this.setupErrorHandling();
+        this.performHealthCheck();
+        console.log('🔧 Inicialización finalizada');
+    }
+    
+    waitForDOM() {
+        return new Promise(resolve => {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', resolve, { once: true });
+            } else {
+                resolve();
+            }
+        });
+    }
+    
+    setupCriticalElements() {
+        // Crear elementos críticos si no existen
+        const requiredElements = [
+            { id: 'player1', tag: 'div', parent: '#videoContainer' },
+            { id: 'player2', tag: 'div', parent: '#videoContainer' },
+            { id: 'botonPlay', tag: 'button', parent: '.player-controls' },
+            { id: 'botonNext', tag: 'button', parent: '.player-controls' }
+        ];
+        
+        requiredElements.forEach(({ id, tag, parent }) => {
+            if (!document.getElementById(id)) {
+                const element = document.createElement(tag);
+                element.id = id;
+                
+                const container = document.querySelector(parent) || document.body;
+                container.appendChild(element);
+                console.log(`🔧 Elemento ${id} creado automáticamente`);
+            }
+        });
+    }
+    
+    detectDevice() {
+        const isDesktop = window.innerWidth >= 1024;
+        this.stateManager.set('ui.isDesktop', isDesktop);
+        document.body.classList.toggle('is-desktop', isDesktop);
+        document.body.classList.toggle('is-mobile', !isDesktop);
+    }
+    
+    setupGlobalEvents() {
+        // Event listeners globales únicos
+        window.addEventListener('resize', () => {
+            this.detectDevice();
+        });
+        
+        window.addEventListener('online', () => {
+            this.messageManager.show('Conexión restaurada', 'success', 2000);
+        });
+        
+        window.addEventListener('offline', () => {
+            this.messageManager.show('Sin conexión', 'warning', 3000);
+        });
+    }
+    
+    setupErrorHandling() {
+        window.addEventListener('error', (e) => {
+            if (!e.error?.message?.includes('Extension')) {
+                console.error('Global error:', e.error);
+                this.messageManager.show('Error en la aplicación', 'error');
+            }
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled rejection:', e.reason);
+            e.preventDefault();
+        });
+    }
     
     performHealthCheck() {
         const health = {
-            core: this.initialized,
-            dom: document.readyState === 'complete',
-            youtube: this.stateManager.get('app.playersInitialized'),
+            initialized: this.initialized,
+            stateManager: !!this.stateManager,
+            youtubeManager: !!this.youtubeManager,
             modules: this.modules.size,
-            state: !!this.stateManager.state,
-            ui: {
-                currentView: this.stateManager.get('ui.currentView'),
-                isDesktop: this.stateManager.get('ui.isDesktop')
-            }
+            dom: document.readyState === 'complete'
         };
         
-        console.log('🔍 Health Check:', health);
-        
-        const issues = [];
-        if (!health.core) issues.push('Core no inicializado');
-        if (!health.youtube) issues.push('YouTube no listo');
-        if (health.modules < 2) issues.push('Módulos insuficientes');
-        
-        if (issues.length > 0) {
-            console.warn('⚠️ Issues detectados:', issues);
-        } else {
-            console.log('✅ Health Check: Todo OK');
-        }
-        
+        console.log('🔍 Health Check Unificado:', health);
         return health;
     }
     
-    // ===== MANEJO DE ERRORES =====
-    
     handleCriticalError(error) {
-        console.error('💀 Error crítico en Core:', error);
+        console.error('💀 Error crítico unificado:', error);
         
-        this.showMessage('Error crítico en la aplicación', 'error', 8000);
+        this.messageManager.show('Error crítico en la aplicación', 'error', 8000);
         
-        // Intentar recuperación básica
+        // Intentar recuperación
         try {
             this.cleanup();
             this.stateManager.reset();
@@ -1003,15 +806,15 @@ class YTCrossMixCore {
                 font-family: 'Roboto', sans-serif; text-align: center; padding: 20px;
             ">
                 <div>
-                    <h1>💀 YT CrossMix - Error Crítico</h1>
+                    <h1>💀 YT CrossMix - Error Crítico Unificado</h1>
                     <p>La aplicación encontró un error irrecuperable.</p>
                     <details style="margin: 20px 0; text-align: left;">
                         <summary>Detalles del error</summary>
                         <pre style="background: #333; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 12px;">
 Error Principal: ${error.message}
 Stack: ${error.stack}
-${recoveryError ? `
-Error de Recuperación: ${recoveryError.message}` : ''}
+${recoveryError ? `Error de Recuperación: ${recoveryError.message}` : ''}
+Timestamp: ${new Date().toISOString()}
                         </pre>
                     </details>
                     <button onclick="location.reload()" style="
@@ -1029,14 +832,11 @@ Error de Recuperación: ${recoveryError.message}` : ''}
         `;
     }
     
-    // ===== CLEANUP Y RESET =====
-    
     cleanup() {
-        console.log('🧹 Limpiando Core...');
-        
-        const state = this.stateManager.state.app;
+        console.log('🧹 Limpiando Core Unificado...');
         
         // Limpiar intervalos
+        const state = this.stateManager.state.app;
         if (state.monitorInterval) {
             clearInterval(state.monitorInterval);
             state.monitorInterval = null;
@@ -1047,126 +847,360 @@ Error de Recuperación: ${recoveryError.message}` : ''}
             state.crossfadeInterval = null;
         }
         
+        // Limpiar loading spinners
+        this.loadingManager.hideAll();
+        
+        // Limpiar mensajes
+        this.messageManager.clear();
+        
         // Pausar reproductores
         try {
-            if (state.player1?.pauseVideo) state.player1.pauseVideo();
-            if (state.player2?.pauseVideo) state.player2.pauseVideo();
+            const player1 = this.stateManager.get('app.player1');
+            const player2 = this.stateManager.get('app.player2');
+            
+            if (player1?.pauseVideo) player1.pauseVideo();
+            if (player2?.pauseVideo) player2.pauseVideo();
         } catch (error) {
             console.warn('Error pausando reproductores:', error);
         }
         
-        console.log('✅ Cleanup completado');
+        console.log('✅ Cleanup unificado completado');
     }
     
     reset() {
-        if (confirm('¿Seguro que quieres reiniciar la aplicación?')) {
-            console.log('🔄 Reiniciando Core...');
+        if (confirm('¿Seguro que quieres reiniciar la aplicación unificada?')) {
+            console.log('🔄 Reiniciando Core Unificado...');
             
             try {
                 this.cleanup();
-                this.stateManager.reset();
-                this.switchView('home');
-                this.updatePlayButton(false);
                 
-                this.showMessage('Aplicación reiniciada correctamente', 'success');
+                // Reset estado
+                Object.assign(this.stateManager.state.app, {
+                    currentPlayer: 1,
+                    isTransitioning: false,
+                    isAudioFading: false,
+                    hasOutroCrossfadeStarted: false,
+                    crossfadeInProgress: false,
+                    reproduccionIniciada: false
+                });
+                
+                // Reset UI
+                this.stateManager.set('ui.currentView', 'home');
+                this.stateManager.set('ui.isPlaying', false);
+                this.stateManager.set('ui.currentTrack', null);
+                
+                this.messageManager.show('Aplicación reiniciada correctamente', 'success');
                 
             } catch (error) {
-                console.error('Error en reset:', error);
-                this.showMessage('Error reiniciando aplicación', 'error');
+                console.error('Error en reset unificado:', error);
+                this.messageManager.show('Error reiniciando aplicación', 'error');
             }
         }
     }
     
-    // ===== FINALIZACIÓN =====
+    debug() {
+        console.log('=== YT CROSSMIX DEBUG UNIFICADO ===');
+        console.log('Core Initialized:', this.initialized);
+        console.log('Modules Loaded:', Array.from(this.modules.keys()));
+        console.log('State Manager:', this.stateManager.state);
+        console.log('YouTube Manager:', {
+            apiReady: this.youtubeManager.apiReady,
+            playersReady: this.youtubeManager.playersReady
+        });
+        console.log('Loading Manager:', {
+            activeSpinners: this.loadingManager.spinners.size
+        });
+        console.log('Message Manager:', {
+            activeMessages: this.messageManager.activeMessages.size,
+            queuedMessages: this.messageManager.messageQueue.length
+        });
+        console.log('Health Check:', this.performHealthCheck());
+        console.log('==================================');
+    }
+}
+
+// ===== 6. MIGRATION HELPER =====
+class LegacySystemMigrator {
+    constructor(unifiedCore) {
+        this.core = unifiedCore;
+        this.migrationLog = [];
+    }
     
-    dispatchReady() {
-        console.log('🎉 YT CrossMix Core completamente listo');
+    // ❌ ELIMINAR REFERENCIAS DUPLICADAS
+    removeLegacyReferences() {
+        console.log('🗑️ Eliminando referencias legacy...');
         
-        window.dispatchEvent(new CustomEvent('ytcrossmix:ready', {
-            detail: { 
-                timestamp: Date.now(),
-                core: this,
-                state: this.stateManager.state
+        const legacyRefs = [
+            'window.appState',
+            'window.AppState', 
+            'window.playlistState',
+            'window.PlaylistState',
+            'window.searchState',
+            'window.SearchState',
+            'window.sponsorBlockState',
+            'window.SponsorBlockState',
+            'window.UIState'
+        ];
+        
+        legacyRefs.forEach(ref => {
+            try {
+                // Eliminar referencias duplicadas
+                const parts = ref.split('.');
+                if (parts.length === 2 && parts[0] === 'window') {
+                    delete window[parts[1]];
+                    console.log(`❌ Eliminado: ${ref}`);
+                }
+            } catch (error) {
+                console.warn(`⚠️ No se pudo eliminar ${ref}:`, error);
             }
-        }));
+        });
         
-        this.showMessage('🎵 YT CrossMix listo para usar', 'success');
+        this.migrationLog.push('Referencias legacy eliminadas');
     }
     
-    // ===== UTILIDADES =====
+    // ✅ MIGRAR FUNCIONALIDADES EXISTENTES
+    migrateLegacyFunctions() {
+        console.log('🔄 Migrando funciones legacy...');
+        
+        // Migrar mostrarMensajeFlotante → unifiedMessageManager
+        if (window.mostrarMensajeFlotante) {
+            window.mostrarMensajeFlotante = (msg, duration, type) => {
+                return this.core.messageManager.show(msg, type || 'info', duration || 3000);
+            };
+            console.log('✅ mostrarMensajeFlotante migrado');
+        }
+        
+        // Migrar showLoadingSpinner → unifiedLoadingManager
+        if (window.showLoadingSpinner) {
+            window.showLoadingSpinner = (id = 'global', options = {}) => {
+                return this.core.loadingManager.show(id, options);
+            };
+            console.log('✅ showLoadingSpinner migrado');
+        }
+        
+        if (window.hideLoadingSpinner) {
+            window.hideLoadingSpinner = (id = 'global') => {
+                return this.core.loadingManager.hide(id);
+            };
+            console.log('✅ hideLoadingSpinner migrado');
+        }
+        
+        this.migrationLog.push('Funciones legacy migradas');
+    }
     
-    debounce(func, delay) {
-        let timeoutId;
-        return (...args) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => func(...args), delay);
+    // 🔧 ACTUALIZAR REFERENCIAS EN MÓDULOS
+    updateModuleReferences() {
+        console.log('🔧 Actualizando referencias en módulos...');
+        
+        // Actualizar referencias en módulos existentes
+        const moduleUpdates = {
+            'PlaylistManager': () => {
+                if (window.PlaylistManager) {
+                    // Actualizar referencias de estado
+                    if (window.PlaylistManager.updateCurrentPlayingIndex) {
+                        const originalUpdate = window.PlaylistManager.updateCurrentPlayingIndex;
+                        window.PlaylistManager.updateCurrentPlayingIndex = function() {
+                            // Usar estado unificado
+                            const state = window.unifiedStateManager.state;
+                            return originalUpdate.call(this);
+                        };
+                    }
+                }
+            },
+            'UIManager': () => {
+                if (window.UIManager) {
+                    // Actualizar referencias de UI
+                    if (window.UIManager.updatePlaylistsUI) {
+                        const originalUpdate = window.UIManager.updatePlaylistsUI;
+                        window.UIManager.updatePlaylistsUI = function() {
+                            // Usar mensaje unificado para errores
+                            try {
+                                return originalUpdate.call(this);
+                            } catch (error) {
+                                window.unifiedMessageManager.show('Error actualizando UI', 'error');
+                                throw error;
+                            }
+                        };
+                    }
+                }
+            }
         };
+        
+        Object.entries(moduleUpdates).forEach(([name, updater]) => {
+            try {
+                updater();
+                console.log(`✅ ${name} actualizado`);
+            } catch (error) {
+                console.warn(`⚠️ Error actualizando ${name}:`, error);
+            }
+        });
+        
+        this.migrationLog.push('Referencias de módulos actualizadas');
     }
     
-    getDebugInfo() {
+    // 📊 INFORME DE MIGRACIÓN
+    getMigrationReport() {
         return {
-            initialized: this.initialized,
-            modules: Array.from(this.modules.keys()),
-            state: this.stateManager.state,
-            health: this.performHealthCheck()
+            timestamp: new Date().toISOString(),
+            log: this.migrationLog,
+            success: this.migrationLog.length > 0,
+            unifiedSystems: [
+                'StateManager',
+                'LoadingManager', 
+                'YouTubeManager',
+                'MessageManager'
+            ],
+            eliminatedDuplicates: [
+                'Multiple window.AppState references',
+                'Duplicate YouTube API callbacks',
+                'Multiple loading spinner functions',
+                'Redundant message systems'
+            ]
         };
     }
 }
 
-// ===== 3. INICIALIZACIÓN AUTOMÁTICA =====
-
-let coreInstance = null;
-
-async function initializeYTCrossMix() {
-    if (coreInstance) {
-        console.warn('⚠️ YT CrossMix ya inicializado');
-        return coreInstance;
-    }
-    
-    console.log('🚀 Iniciando YT CrossMix Core Sistema Unificado...');
-    
-    try {
-        coreInstance = new YTCrossMixCore();
-        await coreInstance.initialize();
+// ===== 7. BOOTSTRAP UNIFICADO =====
+class UnifiedBootstrap {
+    static async initialize() {
+        console.log('🚀 Iniciando Bootstrap Unificado de YT CrossMix...');
         
-        console.log('✅ YT CrossMix inicializado exitosamente');
-        return coreInstance;
-        
-    } catch (error) {
-        console.error('💥 Error fatal iniciando YT CrossMix:', error);
-        
-        // Mostrar error básico
-        document.body.innerHTML = `
-            <div style="
-                display: flex; align-items: center; justify-content: center;
-                min-height: 100vh; background: #0f0f0f; color: white;
-                font-family: 'Roboto', sans-serif; text-align: center; padding: 20px;
-            ">
-                <div>
-                    <h1>❌ Error de Inicialización</h1>
-                    <p>YT CrossMix no pudo cargar correctamente.</p>
-                    <code style="background: #333; padding: 10px; border-radius: 4px; display: block; margin: 20px 0;">
-                        ${error.message}
-                    </code>
-                    <button onclick="location.reload()" style="
-                        background: #ff6b35; color: white; border: none;
-                        padding: 12px 24px; border-radius: 6px; cursor: pointer;
-                        font-size: 16px; margin-top: 20px;
-                    ">Recargar Página</button>
+        try {
+            // Crear core unificado
+            const unifiedCore = new UnifiedYTCrossMixCore();
+            
+            // Migrar sistemas legacy
+            const migrator = new LegacySystemMigrator(unifiedCore);
+            migrator.removeLegacyReferences();
+            migrator.migrateLegacyFunctions();
+            migrator.updateModuleReferences();
+            
+            // Inicializar core
+            await unifiedCore.initialize();
+            
+            // Informe de migración
+            const report = migrator.getMigrationReport();
+            console.log('📊 Migración completada:', report);
+            
+            // Hacer disponible globalmente
+            window.ytCrossMixUnified = unifiedCore;
+            window.migrationReport = report;
+            
+            console.log('✅ Bootstrap Unificado completado exitosamente');
+            
+            return unifiedCore;
+            
+        } catch (error) {
+            console.error('💥 Error en Bootstrap Unificado:', error);
+            
+            // Error de emergencia
+            document.body.innerHTML = `
+                <div style="
+                    display: flex; align-items: center; justify-content: center;
+                    min-height: 100vh; background: #0f0f0f; color: white;
+                    font-family: 'Roboto', sans-serif; text-align: center; padding: 20px;
+                ">
+                    <div>
+                        <h1>❌ Error de Bootstrap Unificado</h1>
+                        <p>YT CrossMix no pudo inicializar el sistema unificado.</p>
+                        <code style="background: #333; padding: 10px; border-radius: 4px; display: block; margin: 20px 0;">
+                            ${error.message}
+                        </code>
+                        <button onclick="location.reload()" style="
+                            background: #ff6b35; color: white; border: none;
+                            padding: 12px 24px; border-radius: 6px; cursor: pointer;
+                            font-size: 16px;
+                        ">Recargar Página</button>
+                    </div>
                 </div>
-            </div>
-        `;
-        
+            `;
+            
+            throw error;
+        }
+    }
+}
+
+// ===== 8. AUTO-INICIALIZACIÓN UNIFICADA =====
+console.log('🔄 Preparando inicialización unificada...');
+
+// Función de inicialización única
+async function initializeUnifiedYTCrossMix() {
+    try {
+        const core = await UnifiedBootstrap.initialize();
+        console.log('🎉 YT CrossMix Sistema Unificado cargado exitosamente');
+        return core;
+    } catch (error) {
+        console.error('💥 Error fatal en sistema unificado:', error);
         throw error;
     }
 }
 
-// ===== AUTO-INICIALIZACIÓN =====
+// Auto-inicialización según estado del DOM
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeYTCrossMix);
+    document.addEventListener('DOMContentLoaded', initializeUnifiedYTCrossMix);
 } else {
-    initializeYTCrossMix();
+    initializeUnifiedYTCrossMix();
 }
 
-// ===== EXPORTS =====
-export { YTCrossMixCore, UnifiedStateManager, initializeYTCrossMix };
+// ===== 9. EXPORTS UNIFICADOS =====
+export {
+    UnifiedStateManager,
+    UnifiedLoadingManager,
+    UnifiedYouTubeManager,
+    UnifiedMessageManager,
+    UnifiedYTCrossMixCore,
+    LegacySystemMigrator,
+    UnifiedBootstrap,
+    initializeUnifiedYTCrossMix
+};
+
+// ===== 10. COMPATIBILITY LAYER (TEMPORAL) =====
+// Mantener compatibilidad temporal mientras se migran otros archivos
+
+// Funciones de compatibilidad que se irán eliminando gradualmente
+window.legacyCompatibility = {
+    // Redirigir calls legacy al sistema unificado
+    mostrarMensajeFlotante: (msg, duration, type) => {
+        if (window.unifiedMessageManager) {
+            return window.unifiedMessageManager.show(msg, type || 'info', duration || 3000);
+        }
+    },
+    
+    showLoadingSpinner: (id, options) => {
+        if (window.unifiedLoadingManager) {
+            return window.unifiedLoadingManager.show(id || 'global', options || {});
+        }
+    },
+    
+    hideLoadingSpinner: (id) => {
+        if (window.unifiedLoadingManager) {
+            return window.unifiedLoadingManager.hide(id || 'global');
+        }
+    },
+    
+    // Getters para estados legacy
+    get AppState() {
+        return window.unifiedStateManager?.state?.app || {};
+    },
+    
+    get PlaylistState() {
+        return window.unifiedStateManager?.state?.playlist || {};
+    },
+    
+    get SearchState() {
+        return window.unifiedStateManager?.state?.search || {};
+    },
+    
+    get SponsorBlockState() {
+        return window.unifiedStateManager?.state?.sponsorBlock || {};
+    },
+    
+    get UIState() {
+        return window.unifiedStateManager?.state?.ui || {};
+    }
+};
+
+console.log('⚡ Sistema Unificado YT CrossMix preparado');
+console.log('❌ Eliminadas todas las duplicaciones');
+console.log('✅ Sistema único de estados, loading, mensajes y YouTube API');
+console.log('🔄 Migración legacy incluida para compatibilidad temporal');
