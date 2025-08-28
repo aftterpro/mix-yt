@@ -3,38 +3,7 @@
 import { PlaylistState, CONFIG } from './config.js';
 import { Utils } from './utils.js';
 import { mostrarMensajeFlotante } from './messages.js';
-// ===== FUNCIONES DE LOADING MEJORADAS =====
 
-export function showLoadMoreSpinner(container) {
-    if (!container) {
-        console.warn('⚠️ Container no proporcionado para load more spinner');
-        return;
-    }
-    
-    let spinner = container.querySelector('#loadMoreSpinner');
-    if (!spinner) {
-        spinner = document.createElement('div');
-        spinner.id = 'loadMoreSpinner';
-        spinner.className = 'loading-spinner-small';
-        spinner.innerHTML = '<div class="spinner"></div>';
-        container.appendChild(spinner);
-    }
-    spinner.classList.remove('hidden');
-    spinner.style.display = 'flex';
-}
-
-export function hideLoadMoreSpinner(container) {
-    const spinner = container ? 
-        container.querySelector('#loadMoreSpinner') : 
-        document.getElementById('loadMoreSpinner');
-    
-    if (spinner) {
-        spinner.classList.add('hidden');
-        setTimeout(() => {
-            spinner.style.display = 'none';
-        }, 300);
-    }
-}
 // ===== UI MANAGER PRINCIPAL MEJORADO =====
 
 export class UIManager {
@@ -942,6 +911,7 @@ export class UIManager {
 }
 
 export default UIManager;
+
 
 
 
