@@ -1,33 +1,42 @@
-// Manejo de Playlists (Actualizado con YouTube Library)
-import { PlaylistState, CONFIG } from './config.js';
-import { mostrarMensajeFlotante } from './messages.js';
-import { Utils } from './utils.js';
+// ===== 1. PLAYLISTMANAGER.JS - MODIFICADO PARA SISTEMA UNIFICADO =====
+// playlistManager.js - Versión adaptada al sistema unificado
 
 export class PlaylistManager {
-    // Obtener la lista aplanada para reproducción
+    
+    // ✅ Usar estado unificado en lugar de imports duplicados
     static getFlattenedPlaylist() {
+        const playlistsData = window.unifiedStateManager?.state?.playlist?.playlistsData || [];
         let flatList = [];
-        PlaylistState.playlistsData.forEach(playlist => {
-            playlist.videos.forEach(video => {
-                flatList.push({ ...video, sourcePlaylistId: playlist.id });
-            });
+        
+        playlistsData.forEach(playlist => {
+            if (playlist.videos && Array.isArray(playlist.videos)) {
+                playlist.videos.forEach(video => {
+                    flatList.push({ 
+                        ...video, 
+                        sourcePlaylistId: playlist.id 
+                    });
+                });
+            }
         });
+        
         return flatList;
     }
 
-    // Actualizar índice basado en video actual
     static updateCurrentPlayingIndex() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
         let playingVideoId = null;
         let activePlayerNum = null;
 
-        // Determinar qué player está sonando
+        // ✅ Usar estado unificado
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+
         try {
-            if (window.appState?.player1 && window.appState.player1.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = window.appState.player1.getVideoData()?.video_id;
+            if (state.app.player1 && state.app.player1.getPlayerState() === YT.PlayerState.PLAYING) {
+                playingVideoId = state.app.player1.getVideoData()?.video_id;
                 activePlayerNum = 1;
-            } else if (window.appState?.player2 && window.appState.player2.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = window.appState.player2.getVideoData()?.video_id;
+            } else if (state.app.player2 && state.app.player2.getPlayerState() === YT.PlayerState.PLAYING) {
+                playingVideoId = state.app.player2.getVideoData()?.video_id;
                 activePlayerNum = 2;
             }
         } catch (e) {
@@ -35,316 +44,213 @@ export class PlaylistManager {
         }
         
         if (playingVideoId) {
-            if (PlaylistState.currentPlayingInfo.videoId !== playingVideoId || PlaylistState.currentPlayingInfo.flattenedIndex < 0) {
+            const currentInfo = state.playlist.currentPlayingInfo;
+            if (currentInfo.videoId !== playingVideoId || currentInfo.flattenedIndex < 0) {
                 const newFlatIndex = flatList.findIndex(v => v.videoId === playingVideoId);
                 if (newFlatIndex !== -1) {
                     const currentVideoObject = flatList[newFlatIndex];
-                    PlaylistState.currentPlayingInfo.videoId = playingVideoId;
-                    PlaylistState.currentPlayingInfo.playlistId = currentVideoObject.sourcePlaylistId;
-                    PlaylistState.currentPlayingInfo.flattenedIndex = newFlatIndex;
+                    
+                    // ✅ Usar setState unificado
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', playingVideoId);
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', currentVideoObject.sourcePlaylistId);
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', newFlatIndex);
+                    
                     console.log(`Índice aplanado actualizado a: ${newFlatIndex} (Video: ${playingVideoId})`);
-                    UIManager.updatePlaylistsUI();
-                } else {
-                    console.warn(`Video ${playingVideoId} sonando, pero no encontrado en la lista aplanada actualizada.`);
-                    PlaylistState.currentPlayingInfo.flattenedIndex = -1;
+                    
+                    // ✅ Usar UI unificada
+                    if (window.UIManager?.updatePlaylistsUI) {
+                        window.UIManager.updatePlaylistsUI();
+                    }
                 }
             }
 
-            if (activePlayerNum && window.appState?.currentPlayer !== activePlayerNum) {
+            if (activePlayerNum && state.app.currentPlayer !== activePlayerNum) {
                 console.log(`Sincronizando currentPlayer a ${activePlayerNum}`);
-                window.appState.currentPlayer = activePlayerNum;
+                window.unifiedStateManager.set('app.currentPlayer', activePlayerNum);
             }
         } else {
-            if (PlaylistState.currentPlayingInfo.flattenedIndex !== -1) {
-                console.log("Reproducción detenida o sin iniciar, reseteando índice aplanado.");
-                PlaylistState.currentPlayingInfo.videoId = null;
-                PlaylistState.currentPlayingInfo.playlistId = null;
-                PlaylistState.currentPlayingInfo.flattenedIndex = -1;
-                if (window.UIManager) {
-    window.UIManager.updatePlaylistsUI();
-} else {
-    // Lazy load UI manager
-    import('./ui.js').then(module => {
-        if (module.UIManager) {
-            window.UIManager = module.UIManager;
-            module.UIManager.updatePlaylistsUI();
-        }
-    });
-}
+            const currentInfo = state.playlist.currentPlayingInfo;
+            if (currentInfo.flattenedIndex !== -1) {
+                console.log("Reproducción detenida, reseteando índice.");
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', null);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', null);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', -1);
+                
+                if (window.UIManager?.updatePlaylistsUI) {
+                    window.UIManager.updatePlaylistsUI();
+                }
             }
         }
     }
 
-    // Manejar carga de Playlist desde URL
     static async handlePlaylistLoaded(playlistInfo) {
         console.log('Datos de playlist recibidos:', playlistInfo);
 
         if (!playlistInfo || !playlistInfo.relatedStreams || !Array.isArray(playlistInfo.relatedStreams)) {
-            const failedPlaylistId = playlistInfo?.id || playlistInfo?.url?.split('list=')[1] || 'desconocida';
-            mostrarMensajeFlotante(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`);
+            const failedPlaylistId = playlistInfo?.id || 'desconocida';
+            // ✅ Usar sistema de mensajes unificado
+            window.unifiedMessageManager?.show(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`, 'error');
             console.error("Respuesta inválida de getPlaylistInfo:", playlistInfo);
             return;
         }
 
-        const playlistId = playlistInfo.id || playlistInfo.url?.split('list=')[1] || `playlist_${Date.now()}`;
+        const playlistId = playlistInfo.id || `playlist_${Date.now()}`;
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
 
-        if (PlaylistState.playlistsData.some(p => p.id === playlistId)) {
-            mostrarMensajeFlotante(`La playlist "${playlistInfo.name || playlistId}" ya está cargada.`);
+        if (state.playlist.playlistsData.some(p => p.id === playlistId)) {
+            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" ya está cargada.`, 'warning');
             return;
         }
 
         const loadedVideos = playlistInfo.relatedStreams.map(video => ({
             videoId: video.url?.split('v=')[1],
             title: video.title || "Título Desconocido",
-            thumbnail: video.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-            duration: Utils.parseDuration(video.duration) || 0,
+            thumbnail: video.thumbnail || '',
+            duration: PlaylistManager.parseDuration(video.duration) || 0,
         })).filter(v => v.videoId);
 
         if (loadedVideos.length === 0) {
-            mostrarMensajeFlotante(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`);
+            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`, 'warning');
             return;
         }
 
         const newPlaylist = {
             id: playlistId,
             name: playlistInfo.name || "Playlist Sin Nombre",
-            thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || 'https://via.placeholder.com/50?text=?',
+            thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || '',
             videos: loadedVideos,
             isExpanded: true
         };
 
-        // Lógica de ordenamiento
-        const manualPlaylistIndex = PlaylistState.playlistsData.findIndex(p => p.id === 'manual');
-        if (manualPlaylistIndex !== -1) {
-            PlaylistState.playlistsData.splice(manualPlaylistIndex + 1, 0, newPlaylist);
+        // ✅ Usar estado unificado
+        const playlistsData = [...state.playlist.playlistsData];
+        const manualIndex = playlistsData.findIndex(p => p.id === 'manual');
+        if (manualIndex !== -1) {
+            playlistsData.splice(manualIndex + 1, 0, newPlaylist);
         } else {
-            PlaylistState.playlistsData.push(newPlaylist);
+            playlistsData.push(newPlaylist);
         }
+        
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
 
-        mostrarMensajeFlotante(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos).`);
-        UIManager.updatePlaylistsUI();
+        window.unifiedMessageManager?.show(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos).`, 'success');
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
         PlaylistManager.checkAndEnablePlayButton();
     }
 
-    // Añadir video a playlist manual
     static addVideoToManualPlaylist(videoData) {
-        const manualPlaylistId = 'manual';
-        let manualPlaylist = PlaylistState.playlistsData.find(p => p.id === manualPlaylistId);
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+
+        const playlistsData = [...state.playlist.playlistsData];
+        let manualPlaylist = playlistsData.find(p => p.id === 'manual');
 
         if (!manualPlaylist) {
             manualPlaylist = {
-                id: manualPlaylistId,
+                id: 'manual',
                 name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: 'https://mix-yt.netlify.app/electronic.ico',
+                thumbnailUrl: '/electronic.ico',
                 videos: [],
                 isExpanded: true
             };
-            PlaylistState.playlistsData.unshift(manualPlaylist);
+            playlistsData.unshift(manualPlaylist);
             console.log("Playlist 'manual' creada y añadida al inicio.");
         }
 
         const isDuplicate = manualPlaylist.videos.some(video => video.videoId === videoData.videoId);
         if (isDuplicate) {
-            mostrarMensajeFlotante(`"${videoData.title}" ya está en "${manualPlaylist.name}".`);
+            window.unifiedMessageManager?.show(`"${videoData.title}" ya está en "${manualPlaylist.name}".`, 'warning');
             return;
         }
 
         const videoObject = {
             videoId: videoData.videoId,
             title: videoData.title || "Título no disponible",
-            thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
+            thumbnail: videoData.thumbnail || '',
             duration: videoData.duration || 0,
+            channelTitle: videoData.channelTitle || 'Desconocido'
         };
 
         manualPlaylist.videos.push(videoObject);
-        console.log(`Video añadido a playlist '${manualPlaylistId}': ${videoObject.title}`);
+        console.log(`Video añadido a playlist 'manual': ${videoObject.title}`);
         
-        UIManager.updatePlaylistsUI();
+        // ✅ Actualizar estado unificado
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
         PlaylistManager.checkAndEnablePlayButton();
+
+        return videoObject;
     }
 
-    // Añadir video a playlist específica
-    static addVideoToSpecificPlaylist(videoData, targetPlaylistId) {
-        const targetPlaylist = PlaylistState.playlistsData.find(p => p.id === targetPlaylistId);
-        if (!targetPlaylist) {
-            console.error(`Error: Playlist destino ${targetPlaylistId} no encontrada.`);
-            mostrarMensajeFlotante("Error: No se encontró la playlist destino.");
-            return;
-        }
-
-        const isDuplicate = targetPlaylist.videos.some(video => video.videoId === videoData.videoId);
-        if (isDuplicate) {
-            mostrarMensajeFlotante(`"${videoData.title}" ya está en "${targetPlaylist.name}".`);
-            return;
-        }
-
-        const videoObject = {
-            videoId: videoData.videoId,
-            title: videoData.title || "Título no disponible",
-            thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75?text=NoThumb',
-            duration: videoData.duration || 0,
-        };
-
-        let targetIndex = targetPlaylist.videos.length;
-
-        if (PlaylistState.currentPlayingInfo.playlistId === targetPlaylistId && PlaylistState.currentPlayingInfo.flattenedIndex >= 0) {
-            const currentVideoLocalIndex = targetPlaylist.videos.findIndex(v => v.videoId === PlaylistState.currentPlayingInfo.videoId);
-            if (currentVideoLocalIndex !== -1) {
-                targetIndex = currentVideoLocalIndex + 1;
-                console.log(`Insertando después del video actual (índice local ${currentVideoLocalIndex}) en ${targetPlaylistId}.`);
-            }
-        }
-
-        targetPlaylist.videos.splice(targetIndex, 0, videoObject);
-        mostrarMensajeFlotante(`Video añadido a "${targetPlaylist.name}": ${videoObject.title}`);
-        
-        UIManager.updatePlaylistsUI();
-        PlaylistManager.updateCurrentPlayingIndex();
-        PlaylistManager.checkAndEnablePlayButton();
-    }
-
-    // Eliminar video de playlist
     static deleteVideo(playlistId, videoId) {
-        const playlistIndex = PlaylistState.playlistsData.findIndex(p => p.id === playlistId);
-        if (playlistIndex === -1) return;
+        const state = window.unifiedStateManager?.state;
+        if (!state) return false;
 
-        const videoIndex = PlaylistState.playlistsData[playlistIndex].videos.findIndex(v => v.videoId === videoId);
-        if (videoIndex === -1) return;
+        const playlistsData = [...state.playlist.playlistsData];
+        const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
+        if (playlistIndex === -1) return false;
 
-        const deletedVideoTitle = PlaylistState.playlistsData[playlistIndex].videos[videoIndex].title;
-        PlaylistState.playlistsData[playlistIndex].videos.splice(videoIndex, 1);
+        const videoIndex = playlistsData[playlistIndex].videos.findIndex(v => v.videoId === videoId);
+        if (videoIndex === -1) return false;
+
+        const deletedVideo = playlistsData[playlistIndex].videos[videoIndex];
+        playlistsData[playlistIndex].videos.splice(videoIndex, 1);
         
-        if (PlaylistState.playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
-            PlaylistState.playlistsData.splice(playlistIndex, 1);
+        if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
+            playlistsData.splice(playlistIndex, 1);
         }
 
-        UIManager.updateSinglePlaylistUI(playlistId);
+        // ✅ Actualizar estado unificado
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+
+        console.log(`Video eliminado: ${deletedVideo.title}`);
+        window.unifiedMessageManager?.show('Video eliminado', 'success', 2000);
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
         PlaylistManager.updateCurrentPlayingIndex();
+
+        return true;
     }
 
-    // Mover video entre playlists
-    static moveVideo(videoId, sourcePlaylistId, targetPlaylistId, targetIndex) {
-        if (!videoId || !sourcePlaylistId || !targetPlaylistId) {
-            console.error("moveVideo: Argumentos inválidos.");
-            return;
-        }
-
-        const sourcePlaylistIndex = PlaylistState.playlistsData.findIndex(p => p.id === sourcePlaylistId);
-        if (sourcePlaylistIndex === -1) {
-            console.error(`moveVideo: Playlist origen ${sourcePlaylistId} no encontrada.`);
-            return;
-        }
-        const sourcePlaylist = PlaylistState.playlistsData[sourcePlaylistIndex];
-
-        const videoIndexInSource = sourcePlaylist.videos.findIndex(v => v.videoId === videoId);
-        if (videoIndexInSource === -1) {
-            console.error(`moveVideo: Video ${videoId} no encontrado en playlist origen ${sourcePlaylistId}.`);
-            return;
-        }
-
-        const targetPlaylistIndex = PlaylistState.playlistsData.findIndex(p => p.id === targetPlaylistId);
-        if (targetPlaylistIndex === -1) {
-            console.error(`moveVideo: Playlist destino ${targetPlaylistId} no encontrada.`);
-            return;
-        }
-        const targetPlaylist = PlaylistState.playlistsData[targetPlaylistIndex];
-
-        // Quitar el video de la playlist origen
-        const [movedVideoData] = sourcePlaylist.videos.splice(videoIndexInSource, 1);
-
-        // Asegurar que targetIndex esté dentro de los límites
-        targetIndex = Math.max(0, Math.min(targetIndex, targetPlaylist.videos.length));
-
-        // Insertar el video en la playlist destino
-        targetPlaylist.videos.splice(targetIndex, 0, movedVideoData);
-
-        console.log(`Video ${videoId} movido de ${sourcePlaylistId} a ${targetPlaylistId} en índice ${targetIndex}.`);
-
-        if (sourcePlaylistId === targetPlaylistId) {
-            UIManager.updateSinglePlaylistUI(sourcePlaylistId);
-        } else {
-            UIManager.updateSinglePlaylistUI(sourcePlaylistId);
-            UIManager.updateSinglePlaylistUI(targetPlaylistId);
-        }
-
-        PlaylistManager.updateCurrentPlayingIndex();
-    }
-    
-    // Habilitar botón Play si hay videos
     static checkAndEnablePlayButton() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
-        if (flatList.length > 0 && window.appState?.playersInitialized) {
-            document.getElementById('botonPlay').disabled = false;
-        }
-    }
-
-    // Procesar playlists de la biblioteca de YouTube
-    static addYouTubeLibraryPlaylists(youtubePlaylists) {
-        if (!youtubePlaylists || youtubePlaylists.length === 0) {
-            mostrarMensajeFlotante("No se encontraron playlists en tu biblioteca de YouTube.");
-            return;
-        }
-
-        const formattedPlaylists = youtubePlaylists.map(playlist => {
-            if (!playlist.snippet?.title || playlist.contentDetails?.itemCount === 0) {
-                return null;
+        const playersReady = window.unifiedStateManager?.state?.app?.playersInitialized;
+        
+        if (flatList.length > 0 && playersReady) {
+            const playButton = document.getElementById('botonPlay');
+            if (playButton) {
+                playButton.disabled = false;
             }
-            return {
-                id: playlist.id,
-                name: playlist.snippet.title,
-                thumbnailUrl: playlist.snippet.thumbnails?.high?.url || 
-                             playlist.snippet.thumbnails?.medium?.url ||
-                             playlist.snippet.thumbnails?.default?.url ||
-                             'https://via.placeholder.com/120x90?text=Playlist',
-                videos: [],
-                isExpanded: false,
-                source: CONFIG.YOUTUBE_LIBRARY_SOURCE_ID,
-                isLoaded: false,
-                videoCount: playlist.contentDetails?.itemCount || 0
-            };
-        }).filter(p => p !== null);
-
-        // Insertar después de la playlist manual
-        const manualPlaylistIndex = PlaylistState.playlistsData.findIndex(p => p.id === 'manual');
-        if (manualPlaylistIndex !== -1) {
-            PlaylistState.playlistsData.splice(manualPlaylistIndex + 1, 0, ...formattedPlaylists);
-        } else {
-            PlaylistState.playlistsData.unshift(...formattedPlaylists);
-        }
-        
-        mostrarMensajeFlotante(`${formattedPlaylists.length} playlists de tu biblioteca han sido añadidas.`);
-        UIManager.updatePlaylistsUI();
-    }
-
-    // Eliminar playlists de la biblioteca de YouTube
-    static clearYouTubeLibraryPlaylists() {
-        const initialCount = PlaylistState.playlistsData.length;
-        PlaylistState.playlistsData = PlaylistState.playlistsData.filter(p => p.source !== CONFIG.YOUTUBE_LIBRARY_SOURCE_ID);
-        const removedCount = initialCount - PlaylistState.playlistsData.length;
-        
-        if (removedCount > 0) {
-            console.log(`Se eliminaron ${removedCount} playlists de la biblioteca de YouTube.`);
-            UIManager.updatePlaylistsUI();
-            mostrarMensajeFlotante(`Se eliminaron ${removedCount} playlists de la biblioteca.`);
+            console.log('✅ Botón Play habilitado');
         }
     }
 
-    // Alternar expansión de playlist
     static async togglePlaylistExpansion(playlistId) {
-        const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+
+        const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
         if (!playlist) return;
 
-        // Lógica para carga bajo demanda de playlists de YouTube
-        if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded && !playlist.isExpanded) {
-            console.log(`Cargando videos de la biblioteca para: ${playlist.name}`);
-            mostrarMensajeFlotante(`Cargando "${playlist.name}"...`);
+        // Lógica para YouTube Library
+        if (playlist.source === 'youtube_library' && !playlist.isLoaded && !playlist.isExpanded) {
+            console.log(`Cargando videos de YouTube para: ${playlist.name}`);
+            window.unifiedMessageManager?.show(`Cargando "${playlist.name}"...`, 'info');
             
             try {
-                // Importar authManager dinámicamente para evitar dependencias circulares
                 const { authManager } = await import('./auth.js');
                 
                 if (!authManager.isUserAuthenticated()) {
-                    mostrarMensajeFlotante("Error: No hay sesión de Google activa.");
+                    window.unifiedMessageManager?.show("Error: No hay sesión de Google activa.", 'error');
                     return;
                 }
 
@@ -355,94 +261,78 @@ export class PlaylistManager {
                     playlist.isLoaded = true;
                     playlist.isExpanded = true;
                     
-                    console.log(`Cargados ${videos.length} videos para "${playlist.name}"`);
-                    mostrarMensajeFlotante(`"${playlist.name}" cargada (${videos.length} videos).`);
+                    // ✅ Actualizar estado unificado
+                    const playlistsData = [...state.playlist.playlistsData];
+                    const index = playlistsData.findIndex(p => p.id === playlistId);
+                    if (index !== -1) {
+                        playlistsData[index] = playlist;
+                        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+                    }
                     
-                    UIManager.updatePlaylistsUI();
+                    console.log(`Cargados ${videos.length} videos para "${playlist.name}"`);
+                    window.unifiedMessageManager?.show(`"${playlist.name}" cargada (${videos.length} videos).`, 'success');
+                    
+                    if (window.UIManager?.updatePlaylistsUI) {
+                        window.UIManager.updatePlaylistsUI();
+                    }
                     PlaylistManager.checkAndEnablePlayButton();
                 } else {
-                    mostrarMensajeFlotante(`No se pudieron cargar los videos de "${playlist.name}".`);
+                    window.unifiedMessageManager?.show(`No se pudieron cargar los videos de "${playlist.name}".`, 'error');
                 }
                 
             } catch (error) {
                 console.error(`Error cargando playlist ${playlist.name}:`, error);
-                mostrarMensajeFlotante(`Error cargando "${playlist.name}". Intenta de nuevo.`);
+                window.unifiedMessageManager?.show(`Error cargando "${playlist.name}". Intenta de nuevo.`, 'error');
             }
             
             return;
         }
 
-        // Toggle normal de expansión
+        // Toggle normal
         playlist.isExpanded = !playlist.isExpanded;
-        UIManager.updatePlaylistsUI();
-    }
-
-    // Refrescar una playlist específica de YouTube
-    static async refreshYouTubePlaylist(playlistId) {
-        const playlist = PlaylistState.playlistsData.find(p => p.id === playlistId);
-        if (!playlist || playlist.source !== CONFIG.YOUTUBE_LIBRARY_SOURCE_ID) {
-            console.error(`Playlist ${playlistId} no encontrada o no es de YouTube.`);
-            return;
+        
+        // ✅ Actualizar estado unificado
+        const playlistsData = [...state.playlist.playlistsData];
+        const index = playlistsData.findIndex(p => p.id === playlistId);
+        if (index !== -1) {
+            playlistsData[index] = playlist;
+            window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
         }
-
-        try {
-            const { authManager } = await import('./auth.js');
-            
-            if (!authManager.isUserAuthenticated()) {
-                mostrarMensajeFlotante("Error: No hay sesión de Google activa.");
-                return;
-            }
-
-            mostrarMensajeFlotante(`Actualizando "${playlist.name}"...`);
-
-            const videos = await authManager.getPlaylistVideos(playlist.id);
-            
-            if (videos) {
-                const oldCount = playlist.videos.length;
-                playlist.videos = videos;
-                playlist.isLoaded = true;
-                
-                console.log(`Playlist "${playlist.name}" actualizada: ${oldCount} -> ${videos.length} videos`);
-                mostrarMensajeFlotante(`"${playlist.name}" actualizada (${videos.length} videos).`);
-                
-                UIManager.updatePlaylistsUI();
-                PlaylistManager.updateCurrentPlayingIndex();
-                PlaylistManager.checkAndEnablePlayButton();
-            } else {
-                mostrarMensajeFlotante(`Error actualizando "${playlist.name}".`);
-            }
-            
-        } catch (error) {
-            console.error(`Error refrescando playlist ${playlist.name}:`, error);
-            mostrarMensajeFlotante(`Error actualizando "${playlist.name}".`);
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
         }
     }
 
-    // Obtener estadísticas de playlists
-    static getPlaylistStats() {
-        const stats = {
-            totalPlaylists: PlaylistState.playlistsData.length,
-            totalVideos: 0,
-            youtubeLibraryPlaylists: 0,
-            manualPlaylists: 0,
-            loadedPlaylists: 0
-        };
+    // ✅ Utility method moved here from Utils
+    static parseDuration(durationInput) {
+        if (typeof durationInput === 'number') {
+            return Math.floor(durationInput);
+        }
+        if (typeof durationInput !== 'string') return 0;
 
-        PlaylistState.playlistsData.forEach(playlist => {
-            stats.totalVideos += playlist.videos.length;
-            
-            if (playlist.source === CONFIG.YOUTUBE_LIBRARY_SOURCE_ID) {
-                stats.youtubeLibraryPlaylists++;
-                if (playlist.isLoaded) {
-                    stats.loadedPlaylists++;
-                }
-            } else {
-                stats.manualPlaylists++;
-            }
-        });
+        // PT0H0M0S format
+        const isoMatch = durationInput.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+        if (isoMatch) {
+            const hours = parseInt(isoMatch[1] || '0', 10);
+            const minutes = parseInt(isoMatch[2] || '0', 10);
+            const seconds = parseFloat(isoMatch[3] || '0');
+            return Math.floor(hours * 3600 + minutes * 60 + seconds);
+        }
 
-        return stats;
+        // MM:SS or HH:MM:SS format
+        const timeParts = durationInput.split(':').map(part => parseInt(part, 10));
+        if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
+            return timeParts[0] * 60 + timeParts[1];
+        } else if (timeParts.length === 3 && !isNaN(timeParts[0]) && !isNaN(timeParts[1]) && !isNaN(timeParts[2])) {
+            return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+        }
+
+        const directNumber = parseInt(durationInput, 10);
+        if (!isNaN(directNumber)) {
+            return directNumber;
+        }
+
+        return 0;
     }
 }
-
-
