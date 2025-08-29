@@ -477,29 +477,34 @@
                     </div>
                 </div>
 
-                <!-- Vista Reproduciendo -->
-                <div class="content-view" id="playingView">
-                    <div class="now-playing-container">
-                        <div class="video-container" id="videoContainer">
-                            <div id="player1" class="video-player"></div>
-                            <div id="player2" class="video-player hidden"></div>
-                        </div>
-                        <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
-                        <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix - Sistema Unificado</p>
-                    </div>
-                    
-                    <!-- Lista de reproducción -->
-                    <div class="queue-section">
-                        <h3 class="queue-title">Cola de reproducción</h3>
-                        <div id="playlistContainer" class="playlist-container-desktop" data-requires-unified>
-                            <div class="search-placeholder">
-                                <i class="fas fa-music"></i>
-                                <p>No hay videos en la cola de reproducción</p>
-                                <p>Añade música desde la búsqueda o biblioteca</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<!-- Vista Reproduciendo -->
+<div class="content-view" id="playingView">
+    <div class="now-playing-container">
+        <div class="video-container" id="videoContainer">
+            <div id="player1" class="video-player"></div>
+            <div id="player2" class="video-player hidden"></div>
+        </div>
+        <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
+        <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix - Sistema Unificado</p>
+    </div>
+    
+    <!-- Cola de reproducción SOLO aparece cuando se presiona el botón cola -->
+    <div class="queue-section hidden" id="queueSection">
+        <div class="queue-header">
+            <h3 class="queue-title">Cola de reproducción</h3>
+            <button class="queue-close-btn" id="queueCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="playlistContainer" class="playlist-container-desktop">
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
+            </div>
+        </div>
+    </div>
+</div>
             </div>
         </div>
     </div>
