@@ -52,24 +52,437 @@ export class UIManager {
         }
     }
 
-    static renderPlaylistCards(container, playlistsData) {
-        console.log('📱 Renderizando cards con estado unificado...', playlistsData.length);
-        
-        // ✅ FIX: Limpiar correctamente el contenedor
-        container.innerHTML = '';
-        
-        const grid = document.createElement('div');
-        grid.className = 'playlists-grid-mobile';
-        
-        playlistsData.forEach((playlist, index) => {
-            const card = UIManager.createPlaylistCard(playlist, index);
-            grid.appendChild(card);
-        });
-        
-        container.appendChild(grid);
-        console.log(`✅ ${playlistsData.length} cards renderizados`);
+static renderPlaylistCards(container, playlistsData) {
+    console.log('📱 Renderizando biblioteca como cuadrícula...', playlistsData.length);
+    
+    // Limpiar contenedor
+    container.innerHTML = '';
+    
+    // Crear grid
+    const grid = document.createElement('div');
+    grid.className = 'library-grid';
+    
+    playlistsData.forEach((playlist, index) => {
+        const card = UIManager.createExpandablePlaylistCard(playlist, index);
+        grid.appendChild(card);
+    });
+    
+    container.appendChild(grid);
+    console.log('✅ Biblioteca renderizada como cuadrícula');
+}
+    // Nuevo método para crear cards expandibles:
+static createExpandablePlaylistCard(playlist, index) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card-expandable';
+    card.dataset.playlistId = playlist.id;
+    
+    const videoCount = playlist.videos ? playlist.videos.length : 
+                      (playlist.itemCount || playlist.videoCount || 0);
+    
+    let thumbnailUrl = playlist.thumbnailUrl || playlist.thumbnail;
+    if (!thumbnailUrl && playlist.videos && playlist.videos[0]) {
+        thumbnailUrl = playlist.videos[0].thumbnail;
     }
+    thumbnailUrl = thumbnailUrl || 'https://via.placeholder.com/320x180/333333/ffffff?text=Playlist';
+    
+    card.innerHTML = \`
+        <div class="playlist-card-header" data-playlist-id="\${playlist.id}">
+            <div class="playlist-card-image">
+                <img src="\${thumbnailUrl}" alt="\${playlist.name}" loading="lazy" 
+                     onerror="this.src='https://via.placeholder.com/320x180/333333/ffffff?text=Error'">
+                <div class="playlist-card-overlay">
+                    <button class="playlist-expand-btn">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="playlist-card-info">
+                <h3 class="playlist-card-title">\${UIManager.escapeHtml(playlist.name)}</h3>
+                <p class="playlist-card-meta">\${videoCount} videos</p>
+                <div class="playlist-card-actions">
+                    <button class="playlist-action-btn primary" data-action="add-all" data-playlist-id="\${playlist.id}">
+                        <i class="fas fa-plus"></i>
+                        Añadir Todo
+                    </button>
+                    <button class="playlist-action-btn secondary" data-action="play-all" data-playlist-id="\${playlist.id}">
+                        <i class="fas fa-play"></i>
+                        Reproducir
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="playlist-videos-container">
+            <div class="playlist-videos-loading" style="padding: 20px; text-align: center; color: var(--text-muted);">
+                <i class="fas fa-spinner fa-spin"></i> Cargando videos...
+            </div>
+        </div>
+    \`;
+    
+    // Animación escalonada
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+        card.style.transition = 'all 0.4s ease';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+    }, index * 100);
+    
+    return card;
+}
 
+// Método para renderizar videos dentro de una playlist:
+static renderPlaylistVideos(container, videos) {
+    console.log('🎵 Renderizando videos de playlist:', videos.length);
+    
+    container.innerHTML = '';
+    
+    if (!videos || videos.length === 0) {
+        container.innerHTML = \`
+            <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                <i class="fas fa-music"></i>
+                <p>No hay videos en esta playlist</p>
+            </div>
+        \`;
+        return;
+    }
+    
+    videos.forEach((video, index) => {
+        const videoItem = UIManager.createPlaylistVideoItem(video, index + 1);
+        container.appendChild(videoItem);
+    });
+}
+
+// Crear item de video individual
+static createPlaylistVideoItem(video, index) {
+    const item = document.createElement('div');
+    item.className = 'playlist-video-item';
+    item.dataset.videoId = video.videoId;
+    
+    let thumbnailUrl = video.thumbnail;
+    if (!thumbnailUrl) {
+        thumbnailUrl = \`https://img.youtube.com/vi/\${video.videoId}/default.jpg\`;
+    }
+    
+    const duration = UIManager.formatDuration(video.duration);
+    
+    item.innerHTML = \`
+        <div class="video-index">\${index}</div>
+        <img src="\${thumbnailUrl}" class="video-thumbnail" alt="\${video.title}"
+             onerror="this.src='https://via.placeholder.com/60x45/333333/ffffff?text=V'">
+        <div class="video-info">
+            <div class="video-title">\${UIManager.escapeHtml(video.title)}</div>
+            <div class="video-meta">
+                <span>\${video.channelTitle || 'YouTube'}</span>
+                \${duration ? \`<span>\${duration}</span>\` : ''}
+            </div>
+        </div>
+        <div class="video-actions">
+            <button class="video-action-btn primary" data-action="add-video" data-video-id="\${video.videoId}" title="Añadir a cola">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="video-action-btn" data-action="play-now" data-video-id="\${video.videoId}" title="Reproducir ahora">
+                <i class="fas fa-play"></i>
+            </button>
+        </div>
+    \`;
+    
+    return item;
+}
+
+// Mejorar el handleDocumentClick para manejar los nuevos elementos
+static handleDocumentClick(e) {
+    try {
+        // Playlist card header clicks (expandir/contraer)
+        const playlistHeader = e.target.closest('.playlist-card-header');
+        if (playlistHeader && !e.target.closest('.playlist-card-actions')) {
+            const playlistId = playlistHeader.dataset.playlistId;
+            const card = playlistHeader.closest('.playlist-card-expandable');
+            
+            if (card) {
+                UIManager.handlePlaylistExpand(playlistId, card);
+            }
+            return;
+        }
+        
+        // Playlist actions
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const action = actionBtn.dataset.action;
+            const playlistId = actionBtn.dataset.playlistId;
+            const videoId = actionBtn.dataset.videoId;
+            
+            switch (action) {
+                case 'add-all':
+                    UIManager.handlePlaylistAddAll(playlistId);
+                    break;
+                case 'play-all':
+                    UIManager.handlePlaylistPlayAll(playlistId);
+                    break;
+                case 'add-video':
+                    UIManager.handleVideoAdd(videoId);
+                    break;
+                case 'play-now':
+                    UIManager.handleVideoPlayNow(videoId);
+                    break;
+            }
+            return;
+        }
+        
+        // Botón de cola
+        const queueButton = e.target.closest('#queueButton');
+        if (queueButton) {
+            e.preventDefault();
+            UIManager.toggleQueue();
+            return;
+        }
+        
+        // Cerrar cola
+        const queueCloseBtn = e.target.closest('#queueCloseBtn');
+        if (queueCloseBtn) {
+            e.preventDefault();
+            UIManager.hideQueue();
+            return;
+        }
+        
+        // Click fuera de la cola para cerrarla
+        const queueSection = e.target.closest('.queue-section');
+        if (e.target.classList.contains('queue-section') && !e.target.closest('.queue-modal')) {
+            UIManager.hideQueue();
+            return;
+        }
+        
+    } catch (error) {
+        console.error('💥 Error en handleDocumentClick:', error);
+    }
+}
+
+// Nuevos métodos para manejar la funcionalidad
+static async handlePlaylistExpand(playlistId, cardElement) {
+    console.log('🔽 Expandiendo playlist:', playlistId);
+    
+    const isExpanded = cardElement.classList.contains('expanded');
+    
+    if (isExpanded) {
+        // Contraer
+        cardElement.classList.remove('expanded');
+        const expandBtn = cardElement.querySelector('.playlist-expand-btn i');
+        if (expandBtn) {
+            expandBtn.className = 'fas fa-chevron-down';
+        }
+        return;
+    }
+    
+    // Expandir
+    cardElement.classList.add('expanded');
+    const expandBtn = cardElement.querySelector('.playlist-expand-btn i');
+    if (expandBtn) {
+        expandBtn.className = 'fas fa-chevron-up';
+    }
+    
+    const videosContainer = cardElement.querySelector('.playlist-videos-container');
+    if (!videosContainer) return;
+    
+    const state = window.unifiedStateManager?.state;
+    if (!state) return;
+    
+    const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
+    if (!playlist) return;
+    
+    // Si ya tiene videos, mostrarlos
+    if (playlist.videos && playlist.videos.length > 0) {
+        UIManager.renderPlaylistVideos(videosContainer, playlist.videos);
+        return;
+    }
+    
+    // Si es de YouTube Library y no está cargado, cargarlo
+    if (playlist.source === 'youtube_library' && !playlist.isLoaded) {
+        try {
+            videosContainer.innerHTML = \`
+                <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin"></i> Cargando videos...
+                </div>
+            \`;
+            
+            // Cargar videos usando auth manager
+            if (window.authManager?.getPlaylistVideos) {
+                const videos = await window.authManager.getPlaylistVideos(playlistId);
+                
+                // Actualizar playlist en estado
+                const playlistsData = [...state.playlist.playlistsData];
+                const index = playlistsData.findIndex(p => p.id === playlistId);
+                if (index !== -1) {
+                    playlistsData[index].videos = videos;
+                    playlistsData[index].isLoaded = true;
+                    window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+                }
+                
+                UIManager.renderPlaylistVideos(videosContainer, videos);
+                
+                window.unifiedMessageManager?.show(\`Videos cargados: \${videos.length}\`, 'success', 2000);
+            }
+        } catch (error) {
+            console.error('Error cargando videos:', error);
+            videosContainer.innerHTML = \`
+                <div style="padding: 20px; text-align: center; color: var(--text-error);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error cargando videos</p>
+                </div>
+            \`;
+        }
+    }
+}
+
+static handlePlaylistPlayAll(playlistId) {
+    console.log('▶️ Reproducir toda la playlist:', playlistId);
+    
+    // Añadir todos los videos y luego reproducir
+    UIManager.handlePlaylistAddAll(playlistId);
+    
+    setTimeout(() => {
+        if (window.PlaybackController?.playFirstVideo) {
+            window.PlaybackController.playFirstVideo();
+        }
+    }, 1000);
+}
+
+static handleVideoAdd(videoId) {
+    console.log('➕ Añadir video individual:', videoId);
+    
+    const state = window.unifiedStateManager?.state;
+    if (!state) return;
+    
+    // Buscar el video en las playlists
+    let foundVideo = null;
+    for (const playlist of state.playlist.playlistsData) {
+        if (playlist.videos) {
+            foundVideo = playlist.videos.find(v => v.videoId === videoId);
+            if (foundVideo) break;
+        }
+    }
+    
+    if (foundVideo && window.PlaylistManager?.addVideoToManualPlaylist) {
+        window.PlaylistManager.addVideoToManualPlaylist(foundVideo);
+        window.unifiedMessageManager?.show(\`"\${foundVideo.title}" añadido a la cola\`, 'success', 2000);
+    }
+}
+
+static handleVideoPlayNow(videoId) {
+    console.log('▶️ Reproducir video ahora:', videoId);
+    
+    // Añadir el video y reproducir inmediatamente
+    UIManager.handleVideoAdd(videoId);
+    
+    setTimeout(() => {
+        if (window.PlaybackController?.playFirstVideo) {
+            window.PlaybackController.playFirstVideo();
+        }
+    }, 500);
+}
+
+static toggleQueue() {
+    const queueSection = document.getElementById('queueSection');
+    if (!queueSection) return;
+    
+    if (queueSection.classList.contains('hidden')) {
+        UIManager.showQueue();
+    } else {
+        UIManager.hideQueue();
+    }
+}
+
+static showQueue() {
+    console.log('📋 Mostrando cola de reproducción');
+    
+    const queueSection = document.getElementById('queueSection');
+    if (!queueSection) return;
+    
+    // Actualizar contenido de la cola
+    UIManager.updateQueueContent();
+    
+    queueSection.classList.remove('hidden');
+    
+    // Enfocar para accesibilidad
+    const closeBtn = queueSection.querySelector('#queueCloseBtn');
+    if (closeBtn) {
+        closeBtn.focus();
+    }
+}
+
+static hideQueue() {
+    console.log('📋 Ocultando cola de reproducción');
+    
+    const queueSection = document.getElementById('queueSection');
+    if (!queueSection) return;
+    
+    queueSection.classList.add('hidden');
+}
+
+static updateQueueContent() {
+    const playlistContainer = document.getElementById('playlistContainer');
+    if (!playlistContainer) return;
+    
+    const state = window.unifiedStateManager?.state;
+    if (!state) return;
+    
+    // Buscar playlist manual (cola de reproducción)
+    const manualPlaylist = state.playlist.playlistsData.find(p => p.id === 'manual');
+    
+    if (!manualPlaylist || !manualPlaylist.videos || manualPlaylist.videos.length === 0) {
+        // Cola vacía
+        playlistContainer.innerHTML = \`
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
+            </div>
+        \`;
+    } else {
+        // Renderizar videos de la cola
+        playlistContainer.innerHTML = '';
+        
+        manualPlaylist.videos.forEach((video, index) => {
+            const videoItem = UIManager.createQueueVideoItem(video, index);
+            playlistContainer.appendChild(videoItem);
+        });
+    }
+}
+
+static createQueueVideoItem(video, index) {
+    const item = document.createElement('div');
+    item.className = 'playlist-video-item queue-video-item';
+    item.dataset.videoId = video.videoId;
+    
+    let thumbnailUrl = video.thumbnail;
+    if (!thumbnailUrl) {
+        thumbnailUrl = \`https://img.youtube.com/vi/\${video.videoId}/default.jpg\`;
+    }
+    
+    const duration = UIManager.formatDuration(video.duration);
+    
+    item.innerHTML = \`
+        <div class="video-index">\${index + 1}</div>
+        <img src="\${thumbnailUrl}" class="video-thumbnail" alt="\${video.title}"
+             onerror="this.src='https://via.placeholder.com/60x45/333333/ffffff?text=V'">
+        <div class="video-info">
+            <div class="video-title">\${UIManager.escapeHtml(video.title)}</div>
+            <div class="video-meta">
+                <span>\${video.channelTitle || 'YouTube'}</span>
+                \${duration ? \`<span>\${duration}</span>\` : ''}
+            </div>
+        </div>
+        <div class="video-actions">
+            <button class="video-action-btn" data-action="remove-from-queue" data-video-id="\${video.videoId}" title="Eliminar de la cola">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    \`;
+    
+    return item;
+}
+`;
     static renderPlaylistList(container, playlistsData, playingVideoId) {
         console.log('📝 Renderizando lista con estado unificado...', playlistsData.length);
         
@@ -1099,4 +1512,5 @@ if (typeof window !== 'undefined') {
 }
 
 console.log('✅ UIManager cargado con sistema unificado - VERSION CORREGIDA');
+
 
