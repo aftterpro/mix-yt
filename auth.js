@@ -2,7 +2,55 @@
 // auth.js - Solo modificaciones críticas
 
 export class GoogleAuthManager {
-    // Agregar este método a la clase GoogleAuthManager
+  
+async getPlaylistVideos(playlistId) {
+    if (!this.isAuthenticated || !this.gapiReady) {
+        console.error('No autenticado o GAPI no está listo');
+        throw new Error('No autenticado');
+    }
+
+    console.log(`📹 Obteniendo videos de playlist: ${playlistId}`);
+    
+    try {
+        let allVideos = [];
+        let nextPageToken = null;
+        
+        do {
+            const response = await gapi.client.youtube.playlistItems.list({
+                'part': ['snippet', 'contentDetails'],
+                'playlistId': playlistId,
+                'maxResults': 50,
+                'pageToken': nextPageToken
+            });
+            
+            if (response.result && response.result.items) {
+                const videos = response.result.items
+                    .filter(item => item.snippet.title !== 'Private video' && item.snippet.title !== 'Deleted video')
+                    .map(item => ({
+                        videoId: item.snippet.resourceId.videoId,
+                        title: item.snippet.title,
+                        thumbnail: item.snippet.thumbnails?.medium?.url || 
+                                  item.snippet.thumbnails?.default?.url || '',
+                        channelTitle: item.snippet.channelTitle,
+                        duration: 0, // Se podría obtener con una llamada adicional a la API
+                        publishedAt: item.snippet.publishedAt
+                    }));
+                
+                allVideos = allVideos.concat(videos);
+            }
+            
+            nextPageToken = response.result?.nextPageToken;
+        } while (nextPageToken);
+        
+        console.log(`✅ ${allVideos.length} videos obtenidos de playlist ${playlistId}`);
+        return allVideos;
+        
+    } catch (error) {
+        console.error(`❌ Error obteniendo videos de playlist ${playlistId}:`, error);
+        throw error;
+    }
+}
+
 async initialize() {
     console.log('🔐 Inicializando AuthManager...');
     
