@@ -2,6 +2,117 @@
 // auth.js - Solo modificaciones críticas
 
 export class GoogleAuthManager {
+    // Agregar este método a la clase GoogleAuthManager
+async initialize() {
+    console.log('🔐 Inicializando AuthManager...');
+    
+    if (this.isInitializing) {
+        return this.initPromise;
+    }
+    
+    this.isInitializing = true;
+    this.initPromise = this.performInitialization();
+    return this.initPromise;
+}
+
+async performInitialization() {
+    try {
+        // Esperar a GAPI
+        await this.waitForGAPI();
+        
+        // Inicializar GAPI
+        await new Promise((resolve, reject) => {
+            gapi.load('client', {
+                callback: resolve,
+                onerror: reject
+            });
+        });
+        
+        await gapi.client.init({
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+        });
+        
+        this.gapiReady = true;
+        
+        // Configurar GIS
+        if (window.google?.accounts) {
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: (tokenResponse) => {
+                    this.tokenResponseCallback(tokenResponse);
+                }
+            });
+            this.gisReady = true;
+        }
+        
+        // Setup botones
+        this.setupButtonListeners();
+        
+        // Verificar token existente
+        const savedToken = localStorage.getItem('google_token');
+        if (savedToken) {
+            try {
+                const tokenData = JSON.parse(savedToken);
+                const now = Date.now();
+                const tokenAge = now - tokenData.timestamp;
+                
+                // Token válido por 1 hora
+                if (tokenAge < 3600000) {
+                    gapi.client.setToken(tokenData);
+                    this.isAuthenticated = true;
+                    this.updateUI(true);
+                    
+                    // Auto-load playlists
+                    setTimeout(() => {
+                        this.getPlaylists();
+                    }, 1000);
+                } else {
+                    localStorage.removeItem('google_token');
+                }
+            } catch (e) {
+                localStorage.removeItem('google_token');
+            }
+        }
+        
+        console.log('✅ AuthManager inicializado');
+        
+    } catch (error) {
+        console.error('❌ Error inicializando AuthManager:', error);
+        this.isInitializing = false;
+        throw error;
+    }
+}
+
+waitForGAPI() {
+    return new Promise((resolve, reject) => {
+        const checkGAPI = () => {
+            if (window.gapi) {
+                resolve();
+            } else {
+                setTimeout(checkGAPI, 100);
+            }
+        };
+        checkGAPI();
+        
+        // Timeout después de 10 segundos
+        setTimeout(() => {
+            reject(new Error('Timeout esperando GAPI'));
+        }, 10000);
+    });
+}
+
+// Agregar método para manejo de clicks
+handleAuthClick() {
+    if (!this.gapiReady || !this.gisReady) {
+        console.error('APIs no están listas');
+        return;
+    }
+    
+    if (this.tokenClient) {
+        this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+ }
     constructor() {
         // Configuración igual...
         this.CLIENT_ID = "228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com";
