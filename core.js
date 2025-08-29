@@ -742,25 +742,26 @@ class UnifiedModuleLoader {
                 }
                 break;
                 
-            case 'searchManager':
+    case 'searchManager':
     if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
-    module.SearchManager.initialize();
-    
-    // ✅ CRÍTICO: Hacer SearchManager disponible globalmente
-    window.SearchManager = module.SearchManager;
-    
-    const searchResults = document.getElementById('searchResults');
-    if (!searchResults) {
-        console.error('❌ #searchResults no encontrado');
-        this.createSearchResultsContainer();
+        try {
+            module.SearchManager.initialize();
+            
+            // ✅ CRÍTICO: Hacer disponible globalmente
+            window.SearchManager = module.SearchManager;
+            
+            const searchResults = document.getElementById('searchResults');
+            if (!searchResults) {
+                console.error('❌ #searchResults no encontrado');
+                this.createSearchResultsContainer();
+            }
+            
+            console.log(`🔍 SearchManager inicializado y disponible globalmente`);
+        } catch (error) {
+            console.error('Error inicializando SearchManager:', error);
+        }
     }
-    
-    console.log(`🔍 SearchManager inicializado y disponible globalmente`);
-} catch (error) {
-                        console.error('Error inicializando SearchManager:', error);
-                    }
-                }
-                break;
+    break;
                 
             case 'auth':
                 if (module.authManager) {
@@ -1177,50 +1178,59 @@ class UnifiedYTCrossMixCore {
         return this.initPromise;
     }
     
-    async performInitialization() {
-        console.log('📋 Iniciando inicialización...');
+async performInitialization() {
+    console.log('📋 Iniciando inicialización...');
+    
+    const startTime = Date.now();
+    
+    try {
+        await this.initializeDOM();
+        await this.initializeYouTube();
         
-        const startTime = Date.now();
+        const moduleResults = await this.moduleLoader.loadAll();
+        console.log('📊 Módulos cargados:', moduleResults);
         
-        try {
-            // 1. Inicializar DOM
-            await this.initializeDOM();
-            
-            // 2. Inicializar YouTube
-            await this.initializeYouTube();
-            
-            // 3. Cargar módulos
-            const moduleResults = await this.moduleLoader.loadAll();
-            console.log('📊 Módulos:', moduleResults);
-            
-            // 4. Configurar integraciones
-            await this.setupIntegrations();
-            
-            // 5. Setup eventos globales
-            this.setupGlobalEvents();
-            
-            // 6. Finalizar
-            await this.finalize();
-            
-            this.initialized = true;
-            const totalTime = Date.now() - startTime;
-            
-            console.log(`✅ Sistema inicializado en ${totalTime}ms`);
-            this.messageManager.show('🎵 YT CrossMix listo', 'success');
-            
-            // Dispatch evento
-            window.dispatchEvent(new CustomEvent('ytcrossmix:unified:ready', {
-                detail: { timestamp: Date.now(), core: this, totalTime }
-            }));
-            
-            return { success: true, totalTime, modules: moduleResults };
-            
-        } catch (error) {
-            console.error('💥 Error en inicialización:', error);
-            this.handleCriticalError(error);
-            throw error;
+        // ✅ CRÍTICO: Verificar que los módulos críticos estén disponibles
+        const criticalModules = {
+            'SearchManager': window.SearchManager,
+            'PlaybackController': window.PlaybackController,
+            'UIManager': window.UIManager,
+            'PlaylistManager': window.PlaylistManager
+        };
+        
+        const missingModules = Object.entries(criticalModules)
+            .filter(([name, module]) => !module)
+            .map(([name]) => name);
+        
+        if (missingModules.length > 0) {
+            console.error('❌ Módulos críticos faltantes:', missingModules);
+            this.messageManager.show(`Módulos faltantes: ${missingModules.join(', ')}`, 'error');
+        } else {
+            console.log('✅ Todos los módulos críticos disponibles');
         }
+        
+        await this.setupIntegrations();
+        this.setupGlobalEvents();
+        await this.finalize();
+        
+        this.initialized = true;
+        const totalTime = Date.now() - startTime;
+        
+        console.log(`✅ Sistema inicializado en ${totalTime}ms`);
+        this.messageManager.show('🎵 YT CrossMix listo', 'success');
+        
+        window.dispatchEvent(new CustomEvent('ytcrossmix:unified:ready', {
+            detail: { timestamp: Date.now(), core: this, totalTime, moduleResults }
+        }));
+        
+        return { success: true, totalTime, modules: moduleResults };
+        
+    } catch (error) {
+        console.error('💥 Error en inicialización:', error);
+        this.handleCriticalError(error);
+        throw error;
     }
+}
     
     async initializeDOM() {
         await this.waitForDOM();
@@ -1393,64 +1403,88 @@ class UnifiedYTCrossMixCore {
         });
     }
     
-    setupPlaybackControls() {
-        const playButton = document.getElementById('botonPlay');
-        const nextButton = document.getElementById('botonNext');
-        const miniPlayBtn = document.getElementById('miniPlayBtn');
-        const miniNextBtn = document.getElementById('miniNextBtn');
+setupPlaybackControls() {
+    const playButton = document.getElementById('botonPlay');
+    const nextButton = document.getElementById('botonNext');
+    const miniPlayBtn = document.getElementById('miniPlayBtn');
+    const miniNextBtn = document.getElementById('miniNextBtn');
+    
+    if (playButton) {
+        // ✅ Remover listeners existentes
+        playButton.replaceWith(playButton.cloneNode(true));
+        const newPlayButton = document.getElementById('botonPlay');
         
-        if (playButton) {
-            playButton.addEventListener('click', () => {
-                console.log('▶️ Play clicked');
-                if (window.PlaybackController) {
-                    const state = this.stateManager.state;
-                    if (state.app.reproduccionIniciada) {
-                        const currentPlayer = state.app.currentPlayer === 1 ? state.app.player1 : state.app.player2;
-                        if (currentPlayer) {
-                            const playerState = currentPlayer.getPlayerState();
-                            if (playerState === YT.PlayerState.PLAYING) {
-                                currentPlayer.pauseVideo();
-                            } else {
-                                currentPlayer.playVideo();
-                            }
-                        }
-                    } else {
-                        window.PlaybackController.playFirstVideo();
-                    }
-                }
-            });
-        }
-        
-        if (nextButton) {
-            nextButton.addEventListener('click', () => {
-                console.log('⏭️ Next clicked');
-                if (window.PlaybackController?.playNextVideo) {
-                    window.PlaybackController.playNextVideo();
-                }
-            });
-        }
-        
-        if (miniPlayBtn) {
-            miniPlayBtn.addEventListener('click', () => playButton?.click());
-        }
-        
-        if (miniNextBtn) {
-            miniNextBtn.addEventListener('click', () => nextButton?.click());
-        }
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
-                e.preventDefault();
-                playButton?.click();
+        newPlayButton.addEventListener('click', () => {
+            console.log('▶️ Play button clicked (unified)');
+            
+            if (!window.PlaybackController) {
+                console.error('❌ PlaybackController no disponible');
+                window.unifiedMessageManager?.show('Sistema de reproducción no disponible', 'error');
+                return;
             }
             
-            if (e.code === 'ArrowRight' && e.ctrlKey) {
-                e.preventDefault();
-                nextButton?.click();
+            const state = this.stateManager.state;
+            if (state.app.reproduccionIniciada) {
+                const currentPlayer = state.app.currentPlayer === 1 ? state.app.player1 : state.app.player2;
+                if (currentPlayer) {
+                    const playerState = currentPlayer.getPlayerState();
+                    if (playerState === YT.PlayerState.PLAYING) {
+                        currentPlayer.pauseVideo();
+                    } else {
+                        currentPlayer.playVideo();
+                    }
+                }
+            } else {
+                console.log('🎵 Iniciando primera reproducción...');
+                window.PlaybackController.playFirstVideo();
             }
         });
     }
+    
+    if (nextButton) {
+        nextButton.replaceWith(nextButton.cloneNode(true));
+        const newNextButton = document.getElementById('botonNext');
+        
+        newNextButton.addEventListener('click', () => {
+            console.log('⏭️ Next button clicked (unified)');
+            
+            if (window.PlaybackController?.playNextVideo) {
+                window.PlaybackController.playNextVideo();
+            } else {
+                console.error('❌ PlaybackController.playNextVideo no disponible');
+                window.unifiedMessageManager?.show('Función siguiente no disponible', 'error');
+            }
+        });
+    }
+    
+    if (miniPlayBtn) {
+        miniPlayBtn.addEventListener('click', () => {
+            document.getElementById('botonPlay')?.click();
+        });
+    }
+    
+    if (miniNextBtn) {
+        miniNextBtn.addEventListener('click', () => {
+            document.getElementById('botonNext')?.click();
+        });
+    }
+    
+    // ✅ CRÍTICO: Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+            e.preventDefault();
+            document.getElementById('botonPlay')?.click();
+        }
+        
+        if (e.code === 'ArrowRight' && e.ctrlKey) {
+            e.preventDefault();
+            document.getElementById('botonNext')?.click();
+        }
+    });
+    
+    console.log('✅ Controles de reproducción configurados (mejorados)');
+}
+
     
     handleResize() {
         const isDesktop = window.innerWidth >= 1024;
