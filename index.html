@@ -616,70 +616,64 @@
 
     <!-- ✅ SCRIPTS DEL SISTEMA UNIFICADO -->
     <script>
-        // ===== FUNCIONES DE DEBUG FALTANTES =====
-        function toggleUnifiedDebug() {
-            const debugPanel = document.getElementById('unifiedDebugPanel');
-            const stateDebug = document.getElementById('unifiedStateDebug');
-            
-            if (debugPanel) {
-                debugPanel.classList.toggle('show');
-                updateDebugPanels();
-            }
-            
-            if (stateDebug) {
-                stateDebug.classList.toggle('show');
-                updateDebugPanels();
-            }
-            
-            console.log('🔧 Debug panels toggled');
-        }
-
-        function updateDebugPanels() {
-            // Update main debug panel
-            const debugContent = document.getElementById('debugContent');
-            if (debugContent && window.ytCrossMixUnified) {
+    // ===== FUNCIONES DE DEBUG CORREGIDAS =====
+    function updateDebugPanels() {
+        // Update main debug panel
+        const debugContent = document.getElementById('debugContent');
+        if (debugContent && window.ytCrossMixUnified) {
+            try {
                 const health = window.ytCrossMixUnified.performHealthCheck?.() || {};
                 debugContent.innerHTML = `
                     <div><strong>Core Status:</strong> ${window.ytCrossMixUnified.initialized ? '✅ Ready' : '⏳ Loading'}</div>
-                    <div><strong>Modules:</strong> ${window.ytCrossMixUnified.modules?.size || 0}/6 loaded</div>
+                    <div><strong>Modules:</strong> ${window.ytCrossMixUnified.moduleLoader?.loaded?.size || 0}/8 loaded</div>
                     <div><strong>YouTube API:</strong> ${window.unifiedYouTubeManager?.apiReady ? '✅' : '❌'}</div>
                     <div><strong>Players:</strong> ${window.unifiedYouTubeManager?.playersReady ? '✅' : '❌'}</div>
                     <div><strong>State Manager:</strong> ${window.unifiedStateManager ? '✅' : '❌'}</div>
                     <div><strong>Loading Manager:</strong> ${window.unifiedLoadingManager ? '✅' : '❌'}</div>
                     <div><strong>Message Manager:</strong> ${window.unifiedMessageManager ? '✅' : '❌'}</div>
-                    <div style="margin-top: 10px;"><strong>Health:</strong> ${JSON.stringify(health, null, 2)}</div>
+                    <div><strong>Playlists:</strong> ${window.unifiedStateManager?.state?.playlist?.playlistsData?.length || 0}</div>
+                    <div><strong>Current View:</strong> ${window.unifiedStateManager?.state?.ui?.currentView || 'unknown'}</div>
                 `;
+            } catch (error) {
+                debugContent.innerHTML = `<div>Error: ${error.message}</div>`;
             }
+        }
 
-            // Update state debug panel
-            const stateDebugContent = document.getElementById('stateDebugContent');
-            if (stateDebugContent && window.unifiedStateManager) {
+        // Update state debug panel - CORREGIDO PARA EVITAR 404
+        const stateDebugContent = document.getElementById('stateDebugContent');
+        if (stateDebugContent && window.unifiedStateManager) {
+            try {
                 const state = window.unifiedStateManager.state;
                 let stateHTML = '';
                 
                 Object.keys(state).forEach(section => {
+                    const sectionData = state[section];
                     stateHTML += `
                         <div class="state-section">
                             <div class="state-key">${section.toUpperCase()}:</div>
-                            <pre class="state-value">${JSON.stringify(state[section], null, 2)}</pre>
+                            <div class="state-value">${JSON.stringify(sectionData, null, 2).substring(0, 200)}${JSON.stringify(sectionData, null, 2).length > 200 ? '...' : ''}</div>
                         </div>
                     `;
                 });
                 
                 stateDebugContent.innerHTML = stateHTML;
+            } catch (error) {
+                stateDebugContent.innerHTML = `<div>Error: ${error.message}</div>`;
             }
         }
+    }
 
-        // ===== FUNCIONES DE ESTADO UNIFICADO =====
-        function updateUnifiedIndicators() {
+    // ===== FUNCIONES DE ESTADO UNIFICADO CORREGIDAS =====
+    function updateUnifiedIndicators() {
+        try {
             // Actualizar indicador en sidebar
             const indicator = document.getElementById('unifiedIndicator');
             if (indicator && window.ytCrossMixUnified) {
                 if (window.ytCrossMixUnified.initialized) {
-                    indicator.style.background = '#4caf50'; // Verde
+                    indicator.style.background = '#4caf50';
                     indicator.title = 'Sistema Unificado: Activo';
                 } else {
-                    indicator.style.background = '#ff9800'; // Naranja
+                    indicator.style.background = '#ff9800';
                     indicator.title = 'Sistema Unificado: Inicializando...';
                 }
             }
@@ -691,7 +685,6 @@
                     statusIndicator.textContent = 'Sistema Unificado: Listo';
                     statusIndicator.className = 'unified-status-indicator success show';
                     
-                    // Auto-hide después de 3 segundos
                     setTimeout(() => {
                         statusIndicator.classList.remove('show');
                     }, 3000);
@@ -701,7 +694,7 @@
                 }
             }
             
-            // Actualizar overview cards
+            // Actualizar overview cards - CORREGIDO
             const systemStatus = document.getElementById('unifiedSystemStatus');
             const playersStatus = document.getElementById('unifiedPlayersStatus');
             
@@ -722,140 +715,246 @@
                     el.classList.add('unified-ready');
                 });
                 
-                // Remover clase de loading del body
                 document.body.classList.remove('unified-loading');
-                
                 console.log('✅ Elementos habilitados para sistema unificado');
             }
+        } catch (error) {
+            console.error('Error actualizando indicadores:', error);
         }
+    }
+    
+    // ===== EVENT LISTENERS UNIFICADOS CORREGIDOS =====
+    function setupUnifiedEventListeners() {
+        console.log('🎧 Configurando event listeners unificados...');
         
-        // ===== EVENT LISTENERS UNIFICADOS =====
-        function setupUnifiedEventListeners() {
-            // Listener para cuando el sistema unificado esté listo
-            window.addEventListener('ytcrossmix:unified:ready', function(event) {
-                console.log('🎉 Sistema Unificado listo:', event.detail);
-                updateUnifiedIndicators();
-                
-                // Configurar debug automático en desarrollo
-                if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
-                    document.getElementById('unifiedDebugToggle').style.display = 'block';
-                    document.getElementById('unifiedControls').style.display = 'flex';
-                    console.log('🔧 Modo desarrollo detectado - Debug habilitado');
-                }
-                
-                // Setup interval para actualizar debug panels
-                if (window.ytCrossMixUnified?.initialized) {
-                    setInterval(() => {
-                        const debugPanel = document.getElementById('unifiedDebugPanel');
-                        const stateDebug = document.getElementById('unifiedStateDebug');
-                        if ((debugPanel && debugPanel.classList.contains('show')) || 
-                            (stateDebug && stateDebug.classList.contains('show'))) {
-                            updateDebugPanels();
-                        }
-                    }, 2000);
-                }
-                
-                // Configurar listeners específicos del sistema unificado
-                setupUnifiedSpecificListeners();
-            });
+        // Listener para cuando el sistema unificado esté listo
+        window.addEventListener('ytcrossmix:unified:ready', function(event) {
+            console.log('🎉 Sistema Unificado listo:', event.detail);
+            updateUnifiedIndicators();
             
-            // Listener para errores del sistema unificado
-            window.addEventListener('ytcrossmix:unified:error', function(event) {
-                console.error('💥 Error Sistema Unificado:', event.detail);
+            // Configurar debug automático en desarrollo
+            if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
+                const debugToggle = document.getElementById('unifiedDebugToggle');
+                const debugControls = document.getElementById('unifiedControls');
                 
-                const statusIndicator = document.getElementById('unifiedStatusIndicator');
-                if (statusIndicator) {
-                    statusIndicator.textContent = 'Error en Sistema Unificado';
-                    statusIndicator.className = 'unified-status-indicator error show';
-                }
+                if (debugToggle) debugToggle.style.display = 'block';
+                if (debugControls) debugControls.style.display = 'flex';
                 
-                const indicator = document.getElementById('unifiedIndicator');
-                if (indicator) {
-                    indicator.style.background = '#f44336'; // Rojo
-                    indicator.title = 'Sistema Unificado: Error';
-                }
-            });
+                console.log('🔧 Modo desarrollo detectado - Debug habilitado');
+            }
             
-            // Listener para cambios de estado
-            window.addEventListener('ytcrossmix:state:changed', function(event) {
-                console.log('📊 Estado cambiado:', event.detail);
-                updateDebugPanels();
-            });
-            
-            // Listener global para teclas de debug
-            document.addEventListener('keydown', function(event) {
-                // Ctrl + Shift + D = Toggle Debug
-                if (event.ctrlKey && event.shiftKey && event.key === 'D') {
-                    event.preventDefault();
-                    toggleUnifiedDebug();
-                }
+            // Setup interval para actualizar debug panels - CORREGIDO
+            setInterval(() => {
+                const debugPanel = document.getElementById('unifiedDebugPanel');
+                const stateDebug = document.getElementById('unifiedStateDebug');
                 
-                // Ctrl + Shift + R = Reset Unificado
-                if (event.ctrlKey && event.shiftKey && event.key === 'R') {
-                    event.preventDefault();
-                    if (window.resetUnified) {
+                if ((debugPanel && debugPanel.classList.contains('show')) || 
+                    (stateDebug && stateDebug.classList.contains('show'))) {
+                    updateDebugPanels();
+                }
+            }, 3000); // Reducido a 3 segundos para menos carga
+        });
+        
+        // Listener para errores del sistema unificado
+        window.addEventListener('ytcrossmix:unified:error', function(event) {
+            console.error('💥 Error Sistema Unificado:', event.detail);
+            
+            const statusIndicator = document.getElementById('unifiedStatusIndicator');
+            if (statusIndicator) {
+                statusIndicator.textContent = 'Error en Sistema Unificado';
+                statusIndicator.className = 'unified-status-indicator error show';
+            }
+            
+            const indicator = document.getElementById('unifiedIndicator');
+            if (indicator) {
+                indicator.style.background = '#f44336';
+                indicator.title = 'Sistema Unificado: Error';
+            }
+        });
+        
+        // Listener para cambios de estado - OPTIMIZADO
+        window.addEventListener('ytcrossmix:state:changed', function(event) {
+            const { path, newValue } = event.detail;
+            
+            // Solo log cambios importantes
+            if (path.includes('currentView') || path.includes('playlistsData') || path.includes('isAuthenticated')) {
+                console.log('📊 Estado importante cambiado:', path, newValue);
+                
+                // Actualizar debug solo si está visible
+                const debugPanel = document.getElementById('unifiedDebugPanel');
+                const stateDebug = document.getElementById('unifiedStateDebug');
+                
+                if ((debugPanel && debugPanel.classList.contains('show')) || 
+                    (stateDebug && stateDebug.classList.contains('show'))) {
+                    
+                    // Debounce la actualización
+                    clearTimeout(window.debugUpdateTimeout);
+                    window.debugUpdateTimeout = setTimeout(updateDebugPanels, 500);
+                }
+            }
+        });
+        
+        // Keyboard shortcuts mejorados
+        document.addEventListener('keydown', function(event) {
+            // Solo procesar si no estamos en un input
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            // Ctrl + Shift + D = Toggle Debug
+            if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+                event.preventDefault();
+                toggleUnifiedDebug();
+            }
+            
+            // Ctrl + Shift + R = Reset Unificado
+            if (event.ctrlKey && event.shiftKey && event.key === 'R') {
+                event.preventDefault();
+                if (window.resetUnified) {
+                    if (confirm('¿Reiniciar el sistema unificado?')) {
                         window.resetUnified();
                     }
                 }
-                
-                // Ctrl + Shift + S = State Debug
-                if (event.ctrlKey && event.shiftKey && event.key === 'S') {
-                    event.preventDefault();
-                    if (window.unifiedStateManager) {
-                        window.unifiedStateManager.debug();
-                    }
+            }
+            
+            // Ctrl + Shift + H = Health Check
+            if (event.ctrlKey && event.shiftKey && event.key === 'H') {
+                event.preventDefault();
+                const health = window.ytCrossMixUnified?.performHealthCheck?.();
+                if (health) {
+                    console.log('🏥 Health Check:', health);
+                    window.unifiedMessageManager?.show('Health check ejecutado (ver consola)', 'info');
                 }
-            });
-        }
+            }
+            
+            // Ctrl + Shift + P = Toggle Playlists View
+            if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+                event.preventDefault();
+                if (window.UIManager?.switchView) {
+                    window.UIManager.switchView('library');
+                }
+            }
+            
+            // Ctrl + Shift + S = Toggle Search View
+            if (event.ctrlKey && event.shiftKey && event.key === 'S') {
+                event.preventDefault();
+                if (window.UIManager?.switchView) {
+                    window.UIManager.switchView('search');
+                }
+            }
+        });
         
-        function setupUnifiedSpecificListeners() {
-            // Listener para actualizaciones de playlists
-            document.addEventListener('playlistsFetched', function(event) {
-                console.log('📚 Playlists obtenidas vía sistema unificado');
-                if (window.PlaylistManager && window.PlaylistManager.addYouTubeLibraryPlaylists) {
+        console.log('✅ Event listeners unificados configurados');
+    }
+    
+    // ===== SETUP DE LISTENERS ESPECÍFICOS CORREGIDO =====
+    function setupUnifiedSpecificListeners() {
+        console.log('🔧 Configurando listeners específicos...');
+        
+        // Listener para actualizaciones de playlists - MEJORADO
+        document.addEventListener('playlistsFetched', function(event) {
+            console.log('📚 Playlists obtenidas vía sistema unificado:', event.detail?.length || 0);
+            
+            // Procesar playlists de YouTube
+            if (event.detail && Array.isArray(event.detail)) {
+                const state = window.unifiedStateManager?.state;
+                if (state && window.PlaylistManager?.addYouTubeLibraryPlaylists) {
+                    console.log('🔄 Procesando playlists con PlaylistManager...');
                     window.PlaylistManager.addYouTubeLibraryPlaylists(event.detail);
-                }
-            });
-            
-            // Listener para logout
-            document.addEventListener('userLoggedOut', function() {
-                console.log('👤 Usuario deslogueado vía sistema unificado');
-                if (window.PlaylistManager && window.PlaylistManager.clearYouTubeLibraryPlaylists) {
-                    window.PlaylistManager.clearYouTubeLibraryPlaylists();
-                }
-            });
-            
-            // Listeners para players
-            document.addEventListener('playersReady', function(event) {
-                console.log('🎵 Players listos vía sistema unificado:', event.detail);
-                updateUnifiedIndicators();
-            });
-            
-            document.addEventListener('unifiedPlayerStateChanged', function(event) {
-                console.log('🔄 Estado de player cambiado (unificado):', event.detail);
-                // Manejar cambios de estado específicos del sistema unificado
-            });
-            
-            // Listener para search inputs unificados
-            const searchInputs = document.querySelectorAll('[id$="SearchInput"]');
-            searchInputs.forEach(input => {
-                input.addEventListener('input', debounce(function(e) {
-                    const query = e.target.value.trim();
-                    if (query.length > 2 && window.SearchManager) {
-                        console.log('🔍 Búsqueda unificada:', query);
-                        
-                        // Switch to search view if not already there
-                        if (window.unifiedCore?.switchView) {
-                            window.unifiedCore.switchView('search');
-                        }
-                        
-                        // Perform search
-                        window.SearchManager.performSearch(query);
+                } else {
+                    console.log('🔄 Procesando playlists directamente en estado...');
+                    
+                    // Procesar directamente si PlaylistManager no está disponible
+                    const processedPlaylists = event.detail.map(playlist => ({
+                        id: playlist.id,
+                        name: playlist.snippet?.title || 'Playlist Sin Nombre',
+                        thumbnailUrl: playlist.snippet?.thumbnails?.medium?.url || 
+                                     playlist.snippet?.thumbnails?.default?.url || '',
+                        videos: null, // Se cargarán bajo demanda
+                        isExpanded: false,
+                        source: 'youtube_library',
+                        isLoaded: false,
+                        itemCount: playlist.contentDetails?.itemCount || 0
+                    }));
+                    
+                    if (window.unifiedStateManager) {
+                        window.unifiedStateManager.set('playlist.playlistsData', processedPlaylists);
+                        console.log(`✅ ${processedPlaylists.length} playlists procesadas directamente`);
                     }
-                }, 300));
-            });
-        }
+                }
+                
+                // Forzar actualización de UI después de un delay
+                setTimeout(() => {
+                    console.log('🔄 Forzando actualización de UI...');
+                    if (window.UIManager?.updatePlaylistsUI) {
+                        window.UIManager.updatePlaylistsUI();
+                    }
+                }, 1000);
+            }
+        });
         
+        // Listener para logout
+        document.addEventListener('userLoggedOut', function() {
+            console.log('👤 Usuario deslogueado vía sistema unificado');
+            
+            // Limpiar playlists
+            if (window.unifiedStateManager) {
+                window.unifiedStateManager.set('playlist.playlistsData', []);
+            }
+            
+            // Actualizar UI
+            if (window.UIManager?.updatePlaylistsUI) {
+                setTimeout(() => {
+                    window.UIManager.updatePlaylistsUI();
+                }, 500);
+            }
+        });
+        
+        // Listeners para players
+        document.addEventListener('playersReady', function(event) {
+            console.log('🎵 Players listos vía sistema unificado:', event.detail);
+            updateUnifiedIndicators();
+        });
+        
+        document.addEventListener('unifiedPlayerStateChanged', function(event) {
+            console.log('🔄 Estado de player cambiado (unificado):', event.detail);
+            
+            const { playerNum, state: playerState, videoId } = event.detail;
+            
+            // Actualizar controles de reproducción
+            const playButtons = document.querySelectorAll('#botonPlay, #miniPlayBtn');
+            playButtons.forEach(button => {
+                if (playerState === 1) { // YT.PlayerState.PLAYING
+                    button.innerHTML = '<i class="fas fa-pause"></i>';
+                } else {
+                    button.innerHTML = '<i class="fas fa-play"></i>';
+                }
+            });
+            
+            // Actualizar mini player en móvil
+            if (window.innerWidth <= 768 && videoId) {
+                const state = window.unifiedStateManager?.state;
+                if (state && window.UIManager?.updateMiniPlayer) {
+                    // Buscar información del video
+                    for (const playlist of state.playlist.playlistsData) {
+                        if (playlist.videos) {
+                            const video = playlist.videos.find(v => v.videoId === videoId);
+                            if (video) {
+                                window.UIManager.updateMiniPlayer({
+                                    title: video.title,
+                                    artist: video.channelTitle || 'YouTube',
+                                    thumbnail: video.thumbnail
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        console.log('✅ Listeners específicos configurados');
+    }
         // ===== UTILIDADES =====
         function debounce(func, wait) {
             let timeout;
