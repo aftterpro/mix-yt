@@ -116,48 +116,83 @@ class UnifiedModuleLoader {
     }
     
     async setupModule(moduleName, module) {
-        switch (moduleName) {
-            case 'ui':
-                // Setup UI Manager
-                if (module.UIManager && typeof module.UIManager.initialize === 'function') {
-                    try {
-                        await module.UIManager.initialize();
-                        console.log(`🎨 UIManager inicializado`);
-                    } catch (error) {
-                        console.error('Error inicializando UIManager:', error);
-                    }
+    console.log(`🔧 Configurando módulo: ${moduleName}`);
+    
+    switch (moduleName) {
+        case 'ui':
+            // ✅ CORRECCIÓN: Inicializar UIManager correctamente
+            if (module.UIManager && typeof module.UIManager.initialize === 'function') {
+                try {
+                    await module.UIManager.initialize();
+                    
+                    // ✅ CRÍTICO: Setup de event listeners de búsqueda
+                    this.setupSearchEventListeners();
+                    
+                    // ✅ CRÍTICO: Setup de botones de playlist URL
+                    this.setupPlaylistUrlButton();
+                    
+                    console.log(`🎨 UIManager inicializado correctamente`);
+                } catch (error) {
+                    console.error('Error inicializando UIManager:', error);
                 }
-                break;
-                
-            case 'searchManager':
-                // Setup Search Manager
-                if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
-                    try {
-                        module.SearchManager.initialize();
-                        console.log(`🔍 SearchManager inicializado`);
-                    } catch (error) {
-                        console.error('Error inicializando SearchManager:', error);
+            }
+            break;
+            
+        case 'searchManager':
+            // ✅ CORRECCIÓN: Inicializar SearchManager
+            if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
+                try {
+                    module.SearchManager.initialize();
+                    
+                    // ✅ CRÍTICO: Verificar que el contenedor existe
+                    const searchResults = document.getElementById('searchResults');
+                    if (!searchResults) {
+                        console.error('❌ CRÍTICO: Elemento #searchResults no encontrado');
+                        this.createSearchResultsContainer();
                     }
+                    
+                    console.log(`🔍 SearchManager inicializado correctamente`);
+                } catch (error) {
+                    console.error('Error inicializando SearchManager:', error);
                 }
-                break;
-                
-            case 'auth':
-                // Setup Auth Manager
-                if (module.authManager) {
-                    try {
-                        // Auth se inicializa automáticamente
-                        console.log(`🔐 AuthManager disponible`);
-                    } catch (error) {
-                        console.error('Error con AuthManager:', error);
-                    }
+            }
+            break;
+            
+        case 'auth':
+            // ✅ CORRECCIÓN: Inicializar sistema de autenticación
+            if (module.authManager) {
+                try {
+                    // ✅ CRÍTICO: Cargar APIs de Google primero
+                    await this.loadGoogleAPIs();
+                    
+                    // ✅ CRÍTICO: Inicializar authManager
+                    await module.authManager.initialize();
+                    
+                    // ✅ CRÍTICO: Setup de botones de auth
+                    this.setupAuthButtons(module.authManager);
+                    
+                    console.log(`🔐 AuthManager inicializado correctamente`);
+                } catch (error) {
+                    console.error('Error inicializando AuthManager:', error);
                 }
-                break;
-                
-            default:
-                // Módulos que no requieren setup especial
-                break;
-        }
+            }
+            break;
+            
+        case 'playlistManager':
+            // ✅ CORRECCIÓN: Verificar PlaylistManager
+            if (module.PlaylistManager) {
+                // ✅ Hacer disponible globalmente
+                window.PlaylistManager = module.PlaylistManager;
+                console.log(`📚 PlaylistManager disponible globalmente`);
+            }
+            break;
+            
+        default:
+            // Módulos que no requieren setup especial
+            console.log(`📦 Módulo ${moduleName} cargado (sin setup)`);
+            break;
     }
+                }
     
     isCriticalModule(moduleName) {
         const criticalModules = ['ui', 'messages'];
