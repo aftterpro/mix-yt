@@ -774,7 +774,15 @@ class UnifiedModuleLoader {
                     }
                 }
                 break;
-                
+                case 'playbackController':
+    if (module.PlaybackController) {
+        // ✅ CRÍTICO: Hacer PlaybackController disponible globalmente
+        window.PlaybackController = module.PlaybackController;
+        console.log(`🎮 PlaybackController disponible globalmente`);
+    } else {
+        console.error('❌ PlaybackController no se importó correctamente');
+    }
+    break;
             case 'playlistManager':
                 if (module.PlaylistManager) {
                     window.PlaylistManager = module.PlaylistManager;
