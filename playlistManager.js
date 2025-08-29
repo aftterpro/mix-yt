@@ -2,7 +2,32 @@
 // playlistManager.js - Versión adaptada al sistema unificado
 
 export class PlaylistManager {
+    static initializeManualPlaylist() {
+    const state = window.unifiedStateManager?.state;
+    if (!state) return;
     
+    const playlistsData = [...state.playlist.playlistsData];
+    
+    // Buscar si ya existe la playlist manual
+    const existingManual = playlistsData.find(p => p.id === 'manual');
+    
+    if (!existingManual) {
+        const manualPlaylist = {
+            id: 'manual',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: '/electronic.ico',
+            videos: [], // ✅ COLA VACÍA AL INICIO
+            isExpanded: false,
+            source: 'manual',
+            isLoaded: true
+        };
+        
+        // Añadir al inicio de la lista
+        playlistsData.unshift(manualPlaylist);
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+        console.log('📋 Cola de reproducción inicializada (vacía)');
+    }
+}
     // ✅ Usar estado unificado en lugar de imports duplicados
     static getFlattenedPlaylist() {
         const playlistsData = window.unifiedStateManager?.state?.playlist?.playlistsData || [];
@@ -336,4 +361,5 @@ export class PlaylistManager {
         return 0;
     }
 }
+
 
