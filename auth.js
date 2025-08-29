@@ -216,10 +216,41 @@ handleAuthClick() {
             }
             
             // Disparar evento para PlaylistManager
-            document.dispatchEvent(new CustomEvent('playlistsFetched', { 
-                detail: allPlaylists 
-            }));
-                        
+console.log(`✅ Disparando evento playlistsFetched con ${allPlaylists.length} playlists`);
+
+// Procesar playlists para formato unificado
+const processedPlaylists = allPlaylists.map(playlist => ({
+    id: playlist.id,
+    name: playlist.snippet?.title || 'Playlist Sin Nombre',
+    thumbnailUrl: playlist.snippet?.thumbnails?.medium?.url || 
+                 playlist.snippet?.thumbnails?.default?.url || '',
+    videos: null, // Se cargarán bajo demanda
+    isExpanded: false,
+    source: 'youtube_library',
+    isLoaded: false,
+    itemCount: playlist.contentDetails?.itemCount || 0,
+    originalData: playlist // Para referencia
+}));
+
+// Actualizar estado unificado directamente
+if (window.unifiedStateManager) {
+    console.log('📊 Actualizando estado con playlists procesadas...');
+    window.unifiedStateManager.set('playlist.playlistsData', processedPlaylists);
+}
+
+// Disparar evento
+document.dispatchEvent(new CustomEvent('playlistsFetched', { 
+    detail: processedPlaylists 
+}));
+
+// También disparar evento específico para UI
+document.dispatchEvent(new CustomEvent('playlists-loaded', { 
+    detail: { 
+        playlists: processedPlaylists, 
+        source: 'youtube_library',
+        count: processedPlaylists.length
+    } 
+}));                        
         } catch (err) {
             console.error("Error al obtener playlists de YouTube:", err);
             window.unifiedMessageManager?.show("Error al cargar las playlists de YouTube.", 'error');
