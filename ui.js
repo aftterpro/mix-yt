@@ -634,44 +634,53 @@ export class UIManager {
     }
 
     // ✅ FIX: Inicialización mejorada
-    static async initialize() {
-        console.log('🎨 Inicializando UIManager con sistema unificado...');
+static async initialize() {
+    console.log('🎨 Inicializando UIManager con sistema unificado...');
+    
+    try {
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        try {
-            // Esperar un poco para asegurar que el DOM esté listo
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Setup navigation
-            UIManager.setupNavigation();
-            
-            // Setup player controls
-            UIManager.setupPlayerControls();
-            
-            // Setup search inputs
-            UIManager.setupSearchInputs();
-            
-            // Setup view switching
-            UIManager.setupViewSwitching();
-            
-            // Enable interactivity
-            UIManager.enableInteractivity();
-            
-            // Configurar vista inicial
-            const currentView = window.unifiedStateManager?.state?.ui?.currentView || 'home';
-            UIManager.switchView(currentView);
-            
-            console.log('✅ UIManager inicializado exitosamente');
-            
-            // Trigger initial UI update
+        // Setup navigation
+        UIManager.setupNavigation();
+        
+        // Setup player controls
+        UIManager.setupPlayerControls();
+        
+        // Setup search inputs
+        UIManager.setupSearchInputs();
+        
+        // Setup view switching
+        UIManager.setupViewSwitching();
+        
+        // ✅ CRÍTICO: Agregar listeners específicos para playlists
+        document.addEventListener('playlists-loaded', (event) => {
+            console.log('🎉 Playlists cargadas, actualizando UI:', event.detail.count);
             setTimeout(() => {
                 UIManager.updatePlaylistsUI();
+                // Cambiar a vista biblioteca si es la primera carga
+                if (event.detail.count > 0 && UIManager.getCurrentView() === 'home') {
+                    UIManager.switchView('library');
+                }
             }, 500);
-            
-        } catch (error) {
-            console.error('💥 Error inicializando UIManager:', error);
-            window.unifiedMessageManager?.show('Error inicializando interfaz', 'error');
-        }
+        });
+        
+        // Enable interactivity
+        UIManager.enableInteractivity();
+        
+        const currentView = window.unifiedStateManager?.state?.ui?.currentView || 'home';
+        UIManager.switchView(currentView);
+        
+        console.log('✅ UIManager inicializado exitosamente');
+        
+        setTimeout(() => {
+            UIManager.updatePlaylistsUI();
+        }, 500);
+        
+    } catch (error) {
+        console.error('💥 Error inicializando UIManager:', error);
+        window.unifiedMessageManager?.show('Error inicializando interfaz', 'error');
     }
+}
 
     // Resto de métodos sin cambios...
     static setupPlayerControls() {
@@ -1090,3 +1099,4 @@ if (typeof window !== 'undefined') {
 }
 
 console.log('✅ UIManager cargado con sistema unificado - VERSION CORREGIDA');
+
