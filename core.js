@@ -743,18 +743,20 @@ class UnifiedModuleLoader {
                 break;
                 
             case 'searchManager':
-                if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
-                    try {
-                        module.SearchManager.initialize();
-                        
-                        const searchResults = document.getElementById('searchResults');
-                        if (!searchResults) {
-                            console.error('❌ #searchResults no encontrado');
-                            this.createSearchResultsContainer();
-                        }
-                        
-                        console.log(`🔍 SearchManager inicializado`);
-                    } catch (error) {
+    if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
+    module.SearchManager.initialize();
+    
+    // ✅ CRÍTICO: Hacer SearchManager disponible globalmente
+    window.SearchManager = module.SearchManager;
+    
+    const searchResults = document.getElementById('searchResults');
+    if (!searchResults) {
+        console.error('❌ #searchResults no encontrado');
+        this.createSearchResultsContainer();
+    }
+    
+    console.log(`🔍 SearchManager inicializado y disponible globalmente`);
+} catch (error) {
                         console.error('Error inicializando SearchManager:', error);
                     }
                 }
