@@ -939,6 +939,20 @@
     </script>
 
     <!-- ✅ CARGA DEL SISTEMA UNIFICADO -->
+    <!-- APIs de Google - CRÍTICO PARA AUTENTICACIÓN -->
+<script src="https://apis.google.com/js/api.js" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Callback global para YouTube API -->
+<script>
+window.onYouTubeIframeAPIReady = function() {
+    console.log('📺 YouTube Iframe API Ready');
+    if (window.unifiedYouTubeManager) {
+        window.unifiedYouTubeManager.apiReady = true;
+        window.unifiedYouTubeManager.createPlayers();
+    }
+};
+</script>
     <script type="module" src="./core.js"></script>
       <script type="module" src="./init.js"></script>
     <!-- ✅ FALLBACK PARA DESARROLLO -->
