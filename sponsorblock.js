@@ -115,7 +115,7 @@ export class SponsorBlockManager {
         console.log(`SponsorBlock Fetch: Iniciando obtención para ${videoId}.`);
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `/.netlify/functions/sponsorblock/segments/${videoId}`;
+        const apiUrl = `/api/segments/${videoId}`;
 
         try {
             const response = await fetch(apiUrl, {
@@ -195,3 +195,4 @@ export class SponsorBlockManager {
         }
     }
 }
+
