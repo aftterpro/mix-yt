@@ -2938,3 +2938,1083 @@ button, a, [role="button"], [tabindex]:not([tabindex="-1"]) {
         max-height: 400px;
     }
 }
+/* ===== CSS FIXES COMPLEMENTARIOS PARA UI.JS ===== */
+/* Agregar estos estilos al final de styles-youtube-music.css */
+
+/* ✅ FIX 1: COLA GLOBAL - MODAL MEJORADA */
+.queue-section {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: var(--spacing-lg) !important;
+    backdrop-filter: blur(10px) !important;
+    transition: opacity 0.3s ease !important;
+}
+
+.queue-section.hidden {
+    display: none !important;
+}
+
+.queue-modal {
+    background: var(--secondary-bg);
+    border-radius: var(--border-radius);
+    width: 100%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-elevation-3);
+    animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(50px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    background: var(--secondary-bg);
+}
+
+.queue-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.queue-close-btn {
+    width: 36px;
+    height: 36px;
+    background: var(--tertiary-bg);
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.queue-close-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.playlist-container-desktop {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+    background: var(--primary-bg);
+}
+
+/* ✅ FIX 2: BOTTOM NAV SIEMPRE VISIBLE EN MOBILE */
+@media (max-width: 1023px) {
+    .bottom-nav {
+        display: flex !important;
+        position: fixed !important;
+        bottom: var(--safe-area-bottom, 0px) !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: var(--mobile-bottom-nav-height) !important;
+        background: var(--secondary-bg) !important;
+        border-top: 1px solid var(--border-color) !important;
+        z-index: 99 !important;
+        backdrop-filter: blur(20px) !important;
+    }
+    
+    .mobile-header {
+        display: flex !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+    }
+    
+    /* Asegurar espacio para bottom nav */
+    .main-content {
+        padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom, 0px)) !important;
+    }
+    
+    /* Ajustar mensajes flotantes */
+    .floating-message {
+        bottom: calc(
+            var(--mobile-bottom-nav-height) + 
+            var(--safe-area-bottom, 0px) + 
+            20px
+        ) !important;
+    }
+    
+    /* Si hay mini player, ajustar espacios */
+    body.has-playback .main-content {
+        padding-bottom: calc(
+            var(--mobile-mini-player-height) + 
+            var(--mobile-bottom-nav-height) + 
+            var(--safe-area-bottom, 0px)
+        ) !important;
+    }
+    
+    body.has-playback .floating-message {
+        bottom: calc(
+            var(--mobile-mini-player-height) + 
+            var(--mobile-bottom-nav-height) + 
+            var(--safe-area-bottom, 0px) + 
+            20px
+        ) !important;
+    }
+}
+
+/* ✅ FIX 3: BIBLIOTECA EXPANDIBLE MEJORADA */
+.playlist-card-expandable {
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    transition: all var(--transition-smooth);
+    cursor: pointer;
+    position: relative;
+}
+
+.playlist-card-expandable:hover {
+    border-color: var(--accent-color);
+    box-shadow: var(--shadow-elevation-2);
+    transform: translateY(-2px);
+}
+
+.playlist-card-expandable.expanded {
+    border-color: var(--accent-color);
+    box-shadow: var(--shadow-elevation-3);
+}
+
+.playlist-card-header {
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.playlist-card-header:hover {
+    background: rgba(255, 107, 53, 0.05);
+}
+
+.playlist-videos-container {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    background: var(--primary-bg);
+    border-top: 1px solid var(--border-color);
+}
+
+.playlist-card-expandable.expanded .playlist-videos-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.playlist-videos-content {
+    padding: var(--spacing-md);
+}
+
+.playlist-videos-loading,
+.playlist-videos-placeholder,
+.playlist-videos-error,
+.playlist-videos-empty {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.playlist-videos-loading i {
+    color: var(--accent-color);
+    margin-right: var(--spacing-xs);
+}
+
+.playlist-videos-error {
+    color: #f44336;
+}
+
+.playlist-videos-error .retry-btn {
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius-small);
+    cursor: pointer;
+    font-size: 12px;
+    transition: var(--transition-fast);
+}
+
+.playlist-videos-error .retry-btn:hover {
+    background: var(--accent-hover);
+}
+
+/* ✅ FIX 4: BOTONES CONTEXTUALES */
+.user-actions .control-btn,
+.user-actions .auth-btn {
+    transition: all 0.3s ease;
+}
+
+/* Ocultar botones por defecto, mostrar solo en biblioteca */
+.user-actions .control-btn:not(#queueButton),
+.user-actions .auth-btn {
+    display: none;
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+/* Mostrar botones en vista biblioteca */
+body[data-current-view="library"] .user-actions .control-btn:not(#queueButton),
+body[data-current-view="library"] .user-actions .auth-btn {
+    display: flex !important;
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* El botón de cola siempre visible */
+#queueButton {
+    display: flex !important;
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    position: relative;
+}
+
+/* Badge de contador para botón de cola */
+.queue-count-badge {
+    position: absolute !important;
+    top: -4px !important;
+    right: -4px !important;
+    background: var(--accent-color) !important;
+    color: white !important;
+    border-radius: 10px !important;
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    min-width: 16px !important;
+    text-align: center !important;
+    line-height: 1 !important;
+    animation: badgePulse 0.3s ease !important;
+}
+
+@keyframes badgePulse {
+    0% { transform: scale(0.8); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* ✅ FIX 5: MEJORAS PARA COLA DE REPRODUCCIÓN */
+.queue-video-item.currently-playing {
+    background: rgba(255, 107, 53, 0.1) !important;
+    border-left: 3px solid var(--accent-color) !important;
+}
+
+.playing-indicator {
+    color: var(--accent-color) !important;
+    margin-left: var(--spacing-xs) !important;
+    animation: pulse 1.5s infinite !important;
+}
+
+.empty-queue-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-muted);
+    padding: var(--spacing-xl);
+    min-height: 200px;
+}
+
+.empty-queue-message i {
+    font-size: 48px;
+    margin-bottom: var(--spacing-lg);
+    opacity: 0.5;
+    color: var(--accent-color);
+}
+
+.empty-queue-message p {
+    margin-bottom: var(--spacing-sm);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* ✅ FIX 6: RESPONSIVE FIXES ESPECÍFICOS */
+@media (max-width: 1023px) {
+    /* Asegurar que elementos mobile sean visibles */
+    .mobile-header,
+    .bottom-nav {
+        display: flex !important;
+    }
+    
+    .mini-player {
+        display: none; /* Solo mostrar cuando hay reproducción */
+    }
+    
+    /* Ocultar elementos desktop */
+    .desktop-sidebar,
+    .top-bar,
+    .bottom-player {
+        display: none !important;
+    }
+    
+    /* Ajustar contenedor principal */
+    .app-container {
+        flex-direction: column !important;
+        padding-left: 0 !important;
+    }
+    
+    /* Asegurar que la cola sea accesible */
+    .queue-section {
+        padding: var(--spacing-md) !important;
+    }
+    
+    .queue-modal {
+        max-height: 90vh !important;
+        margin: var(--spacing-md) !important;
+    }
+    
+    /* Ajustar grid de biblioteca en mobile */
+    .library-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-md) !important;
+        padding: var(--spacing-md) !important;
+    }
+}
+
+@media (min-width: 1024px) {
+    /* Asegurar elementos desktop */
+    .desktop-sidebar,
+    .top-bar,
+    .bottom-player {
+        display: flex !important;
+    }
+    
+    /* Ocultar elementos mobile */
+    .mobile-header,
+    .bottom-nav,
+    .mini-player {
+        display: none !important;
+    }
+    
+    /* Ajustar contenedor principal */
+    .app-container {
+        flex-direction: row !important;
+        padding-left: var(--desktop-sidebar-width) !important;
+    }
+    
+    .main-content {
+        padding-bottom: var(--desktop-bottom-player-height) !important;
+    }
+    
+    /* Ajustar mensajes flotantes */
+    .floating-message {
+        bottom: calc(var(--desktop-bottom-player-height) + 20px) !important;
+    }
+}
+
+/* ✅ FIX 7: MEJORAS VISUALES PARA PLAYLIST EXPANDIBLE */
+.playlist-expand-btn {
+    width: 56px !important;
+    height: 56px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    color: var(--primary-bg) !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    transition: all var(--transition-fast) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+}
+
+.playlist-expand-btn:hover {
+    background: white !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4) !important;
+}
+
+.playlist-expand-btn i {
+    transition: transform 0.3s ease !important;
+}
+
+.playlist-card-expandable.expanded .playlist-expand-btn i {
+    transform: rotate(180deg) !important;
+}
+
+/* ✅ FIX 8: MEJORAS PARA VIDEO ITEMS */
+.playlist-video-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    transition: var(--transition-fast);
+    gap: var(--spacing-md);
+    min-height: 60px;
+    cursor: pointer;
+}
+
+.playlist-video-item:last-child {
+    border-bottom: none;
+}
+
+.playlist-video-item:hover {
+    background: var(--hover-bg);
+}
+
+.video-index {
+    width: 28px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.video-thumbnail {
+    width: 64px;
+    height: 48px;
+    border-radius: var(--border-radius-small);
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--tertiary-bg);
+}
+
+.video-info {
+    flex: 1;
+    min-width: 0;
+    margin-right: var(--spacing-md);
+}
+
+.video-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.3;
+}
+
+.video-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.video-channel::after {
+    content: "•";
+    margin-left: var(--spacing-sm);
+    opacity: 0.5;
+}
+
+.video-duration {
+    font-weight: 500;
+}
+
+.video-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all var(--transition-fast);
+}
+
+.playlist-video-item:hover .video-actions {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* En dispositivos táctiles, mostrar acciones siempre */
+@media (hover: none) {
+    .video-actions {
+        opacity: 1 !important;
+        transform: translateX(0) !important;
+    }
+}
+
+.video-action-btn {
+    width: 28px;
+    height: 28px;
+    background: var(--tertiary-bg);
+    border: none;
+    border-radius: var(--border-radius-small);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: var(--transition-fast);
+}
+
+.video-action-btn:hover {
+    background: var(--accent-color);
+    color: white;
+    transform: scale(1.1);
+}
+
+.video-action-btn.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.video-action-btn.primary:hover {
+    background: var(--accent-hover);
+}
+
+/* ✅ FIX 9: MEJORAS PARA SEARCH VIEW PERSISTENTE */
+.search-results {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Los resultados de búsqueda no deben ser reemplazados */
+.search-results .video-result {
+    /* Asegurar que los resultados persistan */
+    position: relative;
+    z-index: 1;
+}
+
+/* ✅ FIX 10: INDICADORES MEJORADOS */
+.unified-indicator {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    background: #666 !important;
+    transition: all 0.3s ease !important;
+    flex-shrink: 0 !important;
+    margin-left: var(--spacing-sm) !important;
+}
+
+.unified-indicator.ready {
+    background: #4caf50 !important;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5) !important;
+}
+
+.unified-indicator.error {
+    background: #f44336 !important;
+    box-shadow: 0 0 8px rgba(244, 67, 54, 0.5) !important;
+}
+
+.unified-indicator.loading {
+    background: #ff9800 !important;
+    animation: pulse 1s infinite !important;
+}
+
+/* ✅ FIX 11: QUEUE COUNTER BADGE MEJORADA */
+#queueButton {
+    position: relative !important;
+}
+
+#queueButton .queue-count-badge {
+    position: absolute !important;
+    top: -6px !important;
+    right: -6px !important;
+    background: linear-gradient(135deg, var(--accent-color), var(--accent-hover)) !important;
+    color: white !important;
+    border-radius: 12px !important;
+    padding: 3px 7px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    min-width: 18px !important;
+    text-align: center !important;
+    line-height: 1 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    animation: badgeAppear 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+}
+
+@keyframes badgeAppear {
+    0% { 
+        opacity: 0; 
+        transform: scale(0.3) translateY(10px); 
+    }
+    60% { 
+        opacity: 1; 
+        transform: scale(1.2) translateY(-2px); 
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1) translateY(0); 
+    }
+}
+
+/* ✅ FIX 12: MEJORAS DE ACCESIBILIDAD */
+/* Focus states mejorados */
+.playlist-card-expandable:focus-within {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+.video-action-btn:focus,
+.playlist-action-btn:focus,
+.queue-close-btn:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+    background: var(--accent-color) !important;
+    color: white !important;
+}
+
+/* ✅ FIX 13: ANIMACIONES MEJORADAS */
+.playlist-card-expandable {
+    animation: cardEnter 0.5s ease forwards;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Stagger animation para múltiples cards */
+.playlist-card-expandable:nth-child(1) { animation-delay: 0.1s; }
+.playlist-card-expandable:nth-child(2) { animation-delay: 0.2s; }
+.playlist-card-expandable:nth-child(3) { animation-delay: 0.3s; }
+.playlist-card-expandable:nth-child(4) { animation-delay: 0.4s; }
+.playlist-card-expandable:nth-child(5) { animation-delay: 0.5s; }
+.playlist-card-expandable:nth-child(6) { animation-delay: 0.6s; }
+
+/* ✅ FIX 14: SCROLLBAR MEJORADA PARA COLA */
+.playlist-container-desktop::-webkit-scrollbar {
+    width: 8px;
+}
+
+.playlist-container-desktop::-webkit-scrollbar-track {
+    background: var(--primary-bg);
+    border-radius: 4px;
+}
+
+.playlist-container-desktop::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+.playlist-container-desktop::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color);
+}
+
+/* ✅ FIX 15: MEJORAS PARA PANTALLAS PEQUEÑAS */
+@media (max-width: 480px) {
+    .queue-section {
+        padding: var(--spacing-sm) !important;
+    }
+    
+    .queue-modal {
+        margin: var(--spacing-sm) !important;
+        max-height: 95vh !important;
+    }
+    
+    .library-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--spacing-sm) !important;
+        padding: var(--spacing-sm) !important;
+    }
+    
+    .playlist-videos-container {
+        max-height: 300px !important;
+    }
+    
+    .playlist-card-expandable.expanded .playlist-videos-container {
+        max-height: 300px !important;
+    }
+}
+
+/* ✅ FIX 16: ESTADOS DE ERROR MEJORADOS */
+.ui-error-boundary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-muted);
+    min-height: 200px;
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-lg);
+}
+
+.ui-error-boundary i {
+    font-size: 48px;
+    color: #f44336;
+    margin-bottom: var(--spacing-lg);
+}
+
+.ui-error-boundary h3 {
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-md);
+    font-size: 18px;
+}
+
+.ui-error-boundary p {
+    margin-bottom: var(--spacing-md);
+    line-height: 1.5;
+}
+
+.ui-error-boundary button {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: var(--transition-fast);
+}
+
+.ui-error-boundary button:hover {
+    background: var(--accent-hover);
+}
+
+/* ✅ FIX 17: TRANSICIONES SUAVES GLOBALES */
+.content-view {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.content-view:not(.active) {
+    opacity: 0 !important;
+    transform: translateY(20px) !important;
+    pointer-events: none !important;
+}
+
+.content-view.active {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    pointer-events: auto !important;
+}
+
+/* ✅ FIX 18: PREVENIR SCROLL HORIZONTAL */
+.app-container,
+.main-content,
+.content-area,
+.content-view {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+}
+
+/* ✅ FIX 19: MEJORAS FINALES */
+/* Asegurar que los elementos críticos siempre sean accesibles */
+#queueButton,
+#botonPlay,
+#botonNext {
+    z-index: 100 !important;
+    position: relative !important;
+}
+
+/* Mejorar contraste en modo oscuro */
+@media (prefers-color-scheme: dark) {
+    .playlist-card-expandable {
+        background: var(--secondary-bg) !important;
+    }
+    
+    .video-action-btn {
+        background: var(--tertiary-bg) !important;
+    }
+}
+
+/* Estados finales de carga */
+.unified-loading .playlist-card-expandable {
+    opacity: 0.7 !important;
+    pointer-events: none !important;
+}
+
+.unified-ready .playlist-card-expandable {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Debug: Mostrar vista actual en el body */
+body::before {
+    content: '';
+    display: none;
+}
+
+body[data-current-view]::before {
+    content: attr(data-current-view);
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    z-index: 9999;
+    display: none; /* Solo visible en debug mode */
+}
+
+/* Mostrar indicador de vista en debug mode */
+body[data-debug="true"]::before {
+    display: block;
+}
+
+/* ✅ FIX 20: CORRECCIÓN PARA BOTÓN COLA CONTADOR */
+/* Asegurar que el contador de cola funcione correctamente */
+#queueButton .queue-count-badge {
+    pointer-events: none !important; /* No interferir con clicks del botón */
+}
+
+/* ✅ FIX 21: MEJORAS RESPONSIVAS FINALES */
+@media (max-width: 1023px) {
+    /* Asegurar que todos los elementos mobile sean correctamente visibles */
+    .mobile-header {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 100 !important;
+        display: flex !important;
+    }
+    
+    .bottom-nav {
+        position: fixed !important;
+        bottom: var(--safe-area-bottom, 0px) !important;
+        display: flex !important;
+        z-index: 99 !important;
+    }
+    
+    /* Ajustar espaciado del contenido */
+    .content-area {
+        padding-top: 0 !important;
+        padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom, 0px)) !important;
+    }
+    
+    /* Cuando hay mini player activo */
+    body.has-playback .content-area {
+        padding-bottom: calc(
+            var(--mobile-mini-player-height) + 
+            var(--mobile-bottom-nav-height) + 
+            var(--safe-area-bottom, 0px)
+        ) !important;
+    }
+    
+    body.has-playback .mini-player {
+        display: flex !important;
+        bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom, 0px)) !important;
+    }
+}
+
+/* ✅ FIX 22: COLA MODAL RESPONSIVA */
+@media (max-width: 768px) {
+    .queue-modal {
+        width: calc(100% - 16px) !important;
+        max-height: 85vh !important;
+        margin: 8px !important;
+    }
+    
+    .queue-header {
+        padding: var(--spacing-md) !important;
+    }
+    
+    .queue-title {
+        font-size: 16px !important;
+    }
+    
+    .playlist-container-desktop {
+        padding: 0 !important;
+    }
+    
+    .playlist-video-item {
+        padding: var(--spacing-sm) var(--spacing-md) !important;
+        min-height: 56px !important;
+    }
+    
+    .video-thumbnail {
+        width: 48px !important;
+        height: 36px !important;
+    }
+    
+    .video-title {
+        font-size: 12px !important;
+        -webkit-line-clamp: 1 !important;
+    }
+    
+    .video-meta {
+        font-size: 10px !important;
+    }
+}
+
+/* ✅ FIX 23: PREVENCIÓN DE BUGS VISUALES */
+/* Evitar que la cola se superponga con elementos fijos */
+.queue-section {
+    isolation: isolate !important;
+}
+
+/* Asegurar que las animaciones no interfieran con la funcionalidad */
+.playlist-card-expandable * {
+    pointer-events: auto;
+}
+
+.playlist-card-expandable.expanding {
+    pointer-events: none;
+}
+
+/* Mejorar performance en dispositivos lentos */
+.playlist-videos-container {
+    will-change: max-height;
+}
+
+.playlist-card-expandable.expanded .playlist-videos-container {
+    will-change: auto;
+}
+
+/* ✅ FIX 24: ESTADOS DE LOADING ESPECÍFICOS */
+.playlist-videos-loading {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: var(--spacing-sm) !important;
+    padding: var(--spacing-lg) !important;
+    color: var(--text-muted) !important;
+}
+
+.playlist-videos-loading i {
+    animation: spin 1s linear infinite !important;
+    color: var(--accent-color) !important;
+}
+
+/* ✅ FIX 25: CORRECCIONES FINALES DE Z-INDEX */
+/* Asegurar jerarquía correcta de elementos superpuestos */
+.queue-section { z-index: 1000 !important; }
+.unified-debug-panel { z-index: 9999 !important; }
+.unified-state-debug { z-index: 10000 !important; }
+.unified-controls { z-index: 9998 !important; }
+.floating-message { z-index: 10001 !important; }
+.loading-spinner { z-index: 2000 !important; }
+
+/* Bottom nav debe estar por encima del mini player */
+.bottom-nav { z-index: 99 !important; }
+.mini-player { z-index: 98 !important; }
+
+/* ✅ FIX 26: CORRECCIÓN DE LAYOUT SHIFT */
+/* Prevenir layout shift durante la carga */
+.library-grid {
+    min-height: 200px;
+}
+
+.search-results {
+    min-height: 150px;
+}
+
+.playlist-container-desktop {
+    min-height: 100px;
+}
+
+/* Placeholder mientras cargan las cards */
+.playlist-card-expandable {
+    min-height: 200px;
+}
+
+/* ✅ FIX 27: MEJORAS DE TOUCH PARA MÓVILES */
+@media (hover: none) {
+    .playlist-card-expandable:active {
+        transform: scale(0.98) !important;
+        transition: transform 0.1s ease !important;
+    }
+    
+    .video-action-btn:active,
+    .playlist-action-btn:active {
+        transform: scale(0.9) !important;
+        transition: transform 0.1s ease !important;
+    }
+    
+    .queue-close-btn:active {
+        transform: scale(0.9) !important;
+    }
+}
+
+/* ✅ FIX 28: CORRECCIÓN DE BODY CLASSES */
+/* Asegurar que las clases del body se actualicen correctamente */
+body.is-mobile .mobile-only { display: block !important; }
+body.is-mobile .desktop-only { display: none !important; }
+body.is-desktop .mobile-only { display: none !important; }
+body.is-desktop .desktop-only { display: block !important; }
+
+/* ✅ FIX 29: FINAL - COMPATIBILIDAD CON SISTEMA UNIFICADO */
+/* Elementos que requieren sistema unificado */
+[data-requires-unified]:not(.unified-ready) {
+    opacity: 0.5 !important;
+    pointer-events: none !important;
+    position: relative !important;
+}
+
+[data-requires-unified]:not(.unified-ready)::after {
+    content: 'Sistema cargando...' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+}
+
+[data-requires-unified].unified-ready {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-requires-unified].unified-ready::after {
+    display: none !important;
+}
+
+/* ✅ FINAL: ASEGURAR QUE TODO FUNCIONE */
+/* Reset de cualquier estilo que pueda interferir */
+.queue-section * {
+    box-sizing: border-box !important;
+}
+
+.library-grid * {
+    box-sizing: border-box !important;
+}
+
+/* Asegurar que los eventos click funcionen */
+.playlist-card-header {
+    cursor: pointer !important;
+    user-select: none !important;
+}
+
+.playlist-action-btn,
+.video-action-btn {
+    cursor: pointer !important;
+    user-select: none !important;
+}
+
+/* END OF FIXES */
