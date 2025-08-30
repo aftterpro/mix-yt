@@ -724,79 +724,94 @@ class UnifiedModuleLoader {
             }
         }
     }
+async setupModule(moduleName, module) {
+    console.log(`🔧 Configurando módulo: ${moduleName}`);
     
-    async setupModule(moduleName, module) {
-        console.log(`🔧 Configurando módulo: ${moduleName}`);
-        
-        switch (moduleName) {
-            case 'ui':
-                if (module.UIManager && typeof module.UIManager.initialize === 'function') {
-                    try {
-                        await module.UIManager.initialize();
-                        this.setupSearchEventListeners();
-                        this.setupPlaylistUrlButton();
-                        console.log(`🎨 UIManager inicializado`);
-                    } catch (error) {
-                        console.error('Error inicializando UIManager:', error);
-                    }
+    switch (moduleName) {
+        case 'ui':
+            if (module.UIManager && typeof module.UIManager.initialize === 'function') {
+                try {
+                    await module.UIManager.initialize();
+                    this.setupSearchEventListeners();
+                    this.setupPlaylistUrlButton();
+                    console.log(`🎨 UIManager inicializado`);
+                } catch (error) {
+                    console.error('Error inicializando UIManager:', error);
                 }
-                break;
-                
-    case 'searchManager':
-    if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
-        try {
-            module.SearchManager.initialize();
-            
-            // ✅ CRÍTICO: Hacer disponible globalmente
-            window.SearchManager = module.SearchManager;
-            
-            const searchResults = document.getElementById('searchResults');
-            if (!searchResults) {
-                console.error('❌ #searchResults no encontrado');
-                this.createSearchResultsContainer();
             }
+            break;
             
-            console.log(`🔍 SearchManager inicializado y disponible globalmente`);
-        } catch (error) {
-            console.error('Error inicializando SearchManager:', error);
-        }
-    }
-    break;
-                
-            case 'auth':
-                if (module.authManager) {
-                    try {
-                        await this.loadGoogleAPIs();
-                        await module.authManager.initialize();
-                        this.setupAuthButtons(module.authManager);
-                        console.log(`🔐 AuthManager inicializado`);
-                    } catch (error) {
-                        console.error('Error inicializando AuthManager:', error);
+        case 'searchManager':
+            if (module.SearchManager && typeof module.SearchManager.initialize === 'function') {
+                try {
+                    module.SearchManager.initialize();
+                    
+                    // ✅ CRÍTICO: Hacer SearchManager disponible globalmente
+                    window.SearchManager = module.SearchManager;
+                    
+                    const searchResults = document.getElementById('searchResults');
+                    if (!searchResults) {
+                        console.error('❌ #searchResults no encontrado');
+                        this.createSearchResultsContainer();
                     }
+                    
+                    console.log(`🔍 SearchManager inicializado y disponible globalmente`);
+                } catch (error) {
+                    console.error('Error inicializando SearchManager:', error);
                 }
-                break;
-                case 'playbackController':
-    if (module.PlaybackController) {
-        // ✅ CRÍTICO: Hacer PlaybackController disponible globalmente
-        window.PlaybackController = module.PlaybackController;
-        console.log(`🎮 PlaybackController disponible globalmente`);
-    } else {
-        console.error('❌ PlaybackController no se importó correctamente');
-    }
-    break;
-            case 'playlistManager':
-                if (module.PlaylistManager) {
-                    window.PlaylistManager = module.PlaylistManager;
-                    console.log(`📚 PlaylistManager disponible`);
+            }
+            break;
+            
+        case 'auth':
+            if (module.authManager) {
+                try {
+                    await this.loadGoogleAPIs();
+                    await module.authManager.initialize();
+                    this.setupAuthButtons(module.authManager);
+                    console.log(`🔐 AuthManager inicializado`);
+                } catch (error) {
+                    console.error('Error inicializando AuthManager:', error);
                 }
-                break;
+            }
+            break;
+            
+        case 'playlistManager':
+            if (module.PlaylistManager) {
+                // ✅ CRÍTICO: Hacer PlaylistManager disponible globalmente
+                window.PlaylistManager = module.PlaylistManager;
                 
-            default:
-                console.log(`📦 Módulo ${moduleName} cargado (sin setup)`);
-                break;
-        }
+                // Inicializar cola vacía
+                if (typeof module.PlaylistManager.initializeManualPlaylist === 'function') {
+                    module.PlaylistManager.initializeManualPlaylist();
+                    console.log(`📋 Cola de reproducción inicializada`);
+                }
+                
+                console.log(`📚 PlaylistManager disponible globalmente`);
+            }
+            break;
+            
+        case 'playbackController':
+            if (module.PlaybackController) {
+                // ✅ CRÍTICO: Hacer PlaybackController disponible globalmente
+                window.PlaybackController = module.PlaybackController;
+                console.log(`🎮 PlaybackController disponible globalmente`);
+            } else {
+                console.error('❌ PlaybackController no se importó correctamente');
+            }
+            break;
+            
+        case 'sponsorblock':
+            if (module.SponsorBlockManager) {
+                window.SponsorBlockManager = module.SponsorBlockManager;
+                console.log(`🚫 SponsorBlockManager disponible globalmente`);
+            }
+            break;
+            
+        default:
+            console.log(`📦 Módulo ${moduleName} cargado (sin setup específico)`);
+            break;
     }
-    
+}
     isCriticalModule(moduleName) {
         const criticalModules = ['ui', 'messages'];
         return criticalModules.includes(moduleName);
@@ -1177,61 +1192,6 @@ class UnifiedYTCrossMixCore {
         this.initPromise = this.performInitialization();
         return this.initPromise;
     }
-    
-async performInitialization() {
-    console.log('📋 Iniciando inicialización...');
-    
-    const startTime = Date.now();
-    
-    try {
-        await this.initializeDOM();
-        await this.initializeYouTube();
-        
-        const moduleResults = await this.moduleLoader.loadAll();
-        console.log('📊 Módulos cargados:', moduleResults);
-        
-        // ✅ CRÍTICO: Verificar que los módulos críticos estén disponibles
-        const criticalModules = {
-            'SearchManager': window.SearchManager,
-            'PlaybackController': window.PlaybackController,
-            'UIManager': window.UIManager,
-            'PlaylistManager': window.PlaylistManager
-        };
-        
-        const missingModules = Object.entries(criticalModules)
-            .filter(([name, module]) => !module)
-            .map(([name]) => name);
-        
-        if (missingModules.length > 0) {
-            console.error('❌ Módulos críticos faltantes:', missingModules);
-            this.messageManager.show(`Módulos faltantes: ${missingModules.join(', ')}`, 'error');
-        } else {
-            console.log('✅ Todos los módulos críticos disponibles');
-        }
-        
-        await this.setupIntegrations();
-        this.setupGlobalEvents();
-        await this.finalize();
-        
-        this.initialized = true;
-        const totalTime = Date.now() - startTime;
-        
-        console.log(`✅ Sistema inicializado en ${totalTime}ms`);
-        this.messageManager.show('🎵 YT CrossMix listo', 'success');
-        
-        window.dispatchEvent(new CustomEvent('ytcrossmix:unified:ready', {
-            detail: { timestamp: Date.now(), core: this, totalTime, moduleResults }
-        }));
-        
-        return { success: true, totalTime, modules: moduleResults };
-        
-    } catch (error) {
-        console.error('💥 Error en inicialización:', error);
-        this.handleCriticalError(error);
-        throw error;
-    }
-}
-    
     async initializeDOM() {
         await this.waitForDOM();
         this.setupCriticalElements();
@@ -1245,53 +1205,101 @@ async performInitialization() {
         console.log('🎥 YouTube inicializado');
     }
     
-    async setupIntegrations() {
-        console.log('🔗 Configurando integraciones...');
+async setupIntegrations() {
+    console.log('🔗 Configurando integraciones...');
+    
+    // UI <-> State integration
+    this.stateManager.subscribe('playlist.playlistsData', (newPlaylists) => {
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
         
-        // UI <-> State
-        this.stateManager.subscribe('playlist.playlistsData', () => {
-            if (window.UIManager?.updatePlaylistsUI) {
-                window.UIManager.updatePlaylistsUI();
+        // Actualizar contador de cola
+        const manualPlaylist = newPlaylists.find(p => p.id === 'manual');
+        if (manualPlaylist) {
+            this.updateQueueCounter(manualPlaylist.videos?.length || 0);
+        }
+    });
+    
+    this.stateManager.subscribe('ui.currentView', (newView) => {
+        console.log(`🔄 Vista cambió a: ${newView}`);
+    });
+    
+    // ✅ CRÍTICO: Setup botón cola
+    const queueButton = document.getElementById('queueButton');
+    if (queueButton) {
+        // Remover listener existente
+        queueButton.replaceWith(queueButton.cloneNode(true));
+        const newQueueButton = document.getElementById('queueButton');
+        
+        newQueueButton.addEventListener('click', () => {
+            console.log('📋 Botón cola presionado');
+            if (window.UIManager?.toggleQueue) {
+                window.UIManager.toggleQueue();
+            } else {
+                console.error('❌ UIManager.toggleQueue no disponible');
             }
         });
-        
-        this.stateManager.subscribe('ui.currentView', (newView) => {
-            console.log(`🔄 Vista: ${newView}`);
-        });
-        
-        // Search integration
-        document.addEventListener('search-started', (e) => {
-            if (window.UIManager?.switchView) {
-                window.UIManager.switchView('search');
-            }
-        });
-        
-        // Playback integration
-        document.addEventListener('unifiedPlayerStateChanged', (e) => {
-            const { playerNum, state: playerState, videoId } = e.detail;
-            this.updatePlaybackControls(playerState);
-            
-            if (window.innerWidth <= 768) {
-                this.updateMobilePlayer(videoId, playerState);
-            }
-        });
-        
-        // Auth integration
-        document.addEventListener('playlistsFetched', (e) => {
-            console.log('📚 Playlists recibidas');
-            if (window.UIManager?.updatePlaylistsUI) {
-                setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
-            }
-        });
-        
-        document.addEventListener('userLoggedOut', () => {
-            console.log('👤 Usuario deslogueado');
-            this.stateManager.set('playlist.playlistsData', []);
-        });
-        
-        console.log('✅ Integraciones configuradas');
+        console.log('✅ Botón de cola configurado');
     }
     
+    // Search integration
+    document.addEventListener('search-started', (e) => {
+        if (window.UIManager?.switchView) {
+            window.UIManager.switchView('search');
+        }
+    });
+    
+    // Playback integration
+    document.addEventListener('unifiedPlayerStateChanged', (e) => {
+        const { playerNum, state: playerState, videoId } = e.detail;
+        this.updatePlaybackControls(playerState);
+        
+        if (window.innerWidth <= 768) {
+            this.updateMobilePlayer(videoId, playerState);
+        }
+        
+        // Actualizar PlaylistManager
+        if (window.PlaylistManager?.updateCurrentPlayingIndex) {
+            window.PlaylistManager.updateCurrentPlayingIndex();
+        }
+    });
+    
+    // Auth integration
+    document.addEventListener('playlistsFetched', (e) => {
+        console.log('📚 Playlists recibidas del auth');
+        
+        if (e.detail && window.PlaylistManager?.processYouTubeLibraryPlaylists) {
+            const newCount = window.PlaylistManager.processYouTubeLibraryPlaylists(e.detail);
+            console.log(`✅ ${newCount} nuevas playlists procesadas`);
+        }
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            setTimeout(() => {
+                window.UIManager.updatePlaylistsUI();
+            }, 500);
+        }
+    });
+    
+    document.addEventListener('userLoggedOut', () => {
+        console.log('👤 Usuario deslogueado');
+        
+        // Limpiar playlists excepto manual
+        const state = this.stateManager.state;
+        const manualPlaylist = state.playlist.playlistsData.find(p => p.id === 'manual');
+        const filteredPlaylists = manualPlaylist ? [manualPlaylist] : [];
+        
+        this.stateManager.set('playlist.playlistsData', filteredPlaylists);
+        
+        if (window.UIManager?.updatePlaylistsUI) {
+            setTimeout(() => {
+                window.UIManager.updatePlaylistsUI();
+            }, 300);
+        }
+    });
+    
+    console.log('✅ Integraciones configuradas');
+}
     updatePlaybackControls(playerState) {
         const playButtons = document.querySelectorAll('#botonPlay, #miniPlayBtn');
         
@@ -1322,61 +1330,62 @@ async performInitialization() {
             }
         }
     }
+ setupGlobalEvents() {
+    console.log('🌐 Configurando eventos globales...');
     
-    setupGlobalEvents() {
-        console.log('🌐 Configurando eventos globales...');
-        
-        // Error handling
-        window.addEventListener('error', (e) => {
-            if (!e.error?.message?.includes('Extension')) {
-                console.error('🚨 Error global:', e.error);
-                this.handleGlobalError(e.error);
-            }
-        });
-        
-        window.addEventListener('unhandledrejection', (e) => {
+    // Error handling mejorado
+    window.addEventListener('error', (e) => {
+        if (!e.error?.message?.includes('Extension') && !e.error?.message?.includes('chrome-extension')) {
+            console.error('🚨 Error global:', e.error);
+            this.handleGlobalError(e.error);
+        }
+    });
+    
+    window.addEventListener('unhandledrejection', (e) => {
+        if (!e.reason?.message?.includes('Extension') && !e.reason?.message?.includes('chrome-extension')) {
             console.error('🚨 Promise rejection:', e.reason);
             this.handlePromiseRejection(e.reason);
-            e.preventDefault();
-        });
-        
-        // Visibility change
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                console.log('👁️ Tab visible - health check');
-                this.performHealthCheck();
-            }
-        });
-        
-        // Online/offline
-        window.addEventListener('online', () => {
-            console.log('🌐 Conexión restaurada');
-            this.messageManager.show('Conexión restaurada', 'success', 2000);
-        });
-        
-        window.addEventListener('offline', () => {
-            console.log('📴 Sin conexión');
-            this.messageManager.show('Sin conexión', 'warning', 3000);
-        });
-        
-        // Resize
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                this.handleResize();
-            }, 250);
-        });
-        
-        // Navigation
-        this.setupGlobalNavigation();
-        
-        // Playback controls
-        this.setupPlaybackControls();
-        
-        console.log('✅ Eventos globales configurados');
-    }
+        }
+        e.preventDefault();
+    });
     
+    // Visibility change para health checks
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            console.log('👁️ Tab visible - ejecutando health check');
+            setTimeout(() => {
+                this.performHealthCheck();
+            }, 1000);
+        }
+    });
+    
+    // Online/offline status
+    window.addEventListener('online', () => {
+        console.log('🌐 Conexión restaurada');
+        this.messageManager.show('Conexión restaurada', 'success', 2000);
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('📴 Sin conexión');
+        this.messageManager.show('Sin conexión a internet', 'warning', 4000);
+    });
+    
+    // Resize handling mejorado
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            this.handleResize();
+        }, 250);
+    });
+    
+    // ✅ Navigation handling (delegación mejorada)
+    this.setupGlobalNavigation();
+    
+    // ✅ Playback controls ya configurados en setupPlaybackControls()
+    
+    console.log('✅ Eventos globales configurados');
+}
     setupGlobalNavigation() {
         const sidebarNavItems = document.querySelectorAll('.sidebar-nav [data-view], .nav-item[data-view]');
         sidebarNavItems.forEach(item => {
@@ -1436,9 +1445,19 @@ setupPlaybackControls() {
                 }
             } else {
                 console.log('🎵 Iniciando primera reproducción...');
+                
+                // Verificar que hay videos en la cola
+                const queueInfo = window.PlaylistManager?.getQueueInfo?.();
+                if (!queueInfo || queueInfo.count === 0) {
+                    window.unifiedMessageManager?.show('La cola está vacía. Añade música primero.', 'warning');
+                    return;
+                }
+                
                 window.PlaybackController.playFirstVideo();
             }
         });
+        
+        console.log('✅ Botón Play configurado');
     }
     
     if (nextButton) {
@@ -1455,23 +1474,37 @@ setupPlaybackControls() {
                 window.unifiedMessageManager?.show('Función siguiente no disponible', 'error');
             }
         });
+        
+        console.log('✅ Botón Next configurado');
     }
     
     if (miniPlayBtn) {
-        miniPlayBtn.addEventListener('click', () => {
+        miniPlayBtn.replaceWith(miniPlayBtn.cloneNode(true));
+        const newMiniPlayBtn = document.getElementById('miniPlayBtn');
+        
+        newMiniPlayBtn.addEventListener('click', () => {
             document.getElementById('botonPlay')?.click();
         });
     }
     
     if (miniNextBtn) {
-        miniNextBtn.addEventListener('click', () => {
+        miniNextBtn.replaceWith(miniNextBtn.cloneNode(true));
+        const newMiniNextBtn = document.getElementById('miniNextBtn');
+        
+        newMiniNextBtn.addEventListener('click', () => {
             document.getElementById('botonNext')?.click();
         });
     }
     
     // ✅ CRÍTICO: Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-        if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+    document.removeEventListener('keydown', this.keyboardShortcutsHandler);
+    this.keyboardShortcutsHandler = (e) => {
+        // Solo procesar si no estamos en un input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        if (e.code === 'Space') {
             e.preventDefault();
             document.getElementById('botonPlay')?.click();
         }
@@ -1480,12 +1513,198 @@ setupPlaybackControls() {
             e.preventDefault();
             document.getElementById('botonNext')?.click();
         }
-    });
+        
+        // Escape para cerrar cola
+        if (e.code === 'Escape') {
+            const queueSection = document.getElementById('queueSection');
+            if (queueSection && !queueSection.classList.contains('hidden')) {
+                window.UIManager?.hideQueue();
+            }
+        }
+    };
+    
+    document.addEventListener('keydown', this.keyboardShortcutsHandler);
     
     console.log('✅ Controles de reproducción configurados (mejorados)');
 }
-
+    // ✅ FIX 4: updateQueueCounter() - nuevo método
+updateQueueCounter(count) {
+    const queueBtn = document.getElementById('queueButton');
+    if (!queueBtn) return;
     
+    // Limpiar badge existente
+    const existingBadge = queueBtn.querySelector('.queue-count-badge');
+    if (existingBadge) {
+        existingBadge.remove();
+    }
+    
+    if (count > 0) {
+        // Crear nuevo badge
+        const badge = document.createElement('span');
+        badge.className = 'queue-count-badge';
+        badge.style.cssText = `
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--accent-color);
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 600;
+            min-width: 16px;
+            text-align: center;
+            line-height: 1;
+        `;
+        badge.textContent = count > 99 ? '99+' : count;
+        
+        queueBtn.style.position = 'relative';
+        queueBtn.appendChild(badge);
+        
+        queueBtn.title = `Cola: ${count} video${count > 1 ? 's' : ''}`;
+    } else {
+        queueBtn.style.position = '';
+        queueBtn.title = 'Cola (vacía)';
+    }
+    
+    console.log(`📊 Contador de cola actualizado: ${count}`);
+}
+    // ✅ FIX 5: performInitialization() con verificaciones críticas
+async performInitialization() {
+    console.log('📋 Iniciando inicialización...');
+    
+    const startTime = Date.now();
+    
+    try {
+        await this.initializeDOM();
+        await this.initializeYouTube();
+        
+        const moduleResults = await this.moduleLoader.loadAll();
+        console.log('📊 Módulos cargados:', moduleResults);
+        
+        // ✅ CRÍTICO: Verificar que los módulos críticos estén disponibles
+        const criticalModules = {
+            'SearchManager': window.SearchManager,
+            'PlaybackController': window.PlaybackController,
+            'UIManager': window.UIManager,
+            'PlaylistManager': window.PlaylistManager
+        };
+        
+        const missingModules = Object.entries(criticalModules)
+            .filter(([name, module]) => !module)
+            .map(([name]) => name);
+        
+        if (missingModules.length > 0) {
+            console.error('❌ Módulos críticos faltantes:', missingModules);
+            this.messageManager.show(`Módulos faltantes: ${missingModules.join(', ')}`, 'error', 8000);
+            
+            // Intentar cargar módulos faltantes
+            for (const moduleName of missingModules) {
+                try {
+                    console.log(`🔄 Reintentando carga de ${moduleName}...`);
+                    await this.moduleLoader.loadModule(moduleName.toLowerCase());
+                } catch (error) {
+                    console.error(`❌ Fallo reintentando ${moduleName}:`, error);
+                }
+            }
+        } else {
+            console.log('✅ Todos los módulos críticos disponibles');
+        }
+        
+        await this.setupIntegrations();
+        this.setupGlobalEvents();
+        await this.finalize();
+        
+        this.initialized = true;
+        const totalTime = Date.now() - startTime;
+        
+        console.log(`✅ Sistema inicializado en ${totalTime}ms`);
+        this.messageManager.show('🎵 YT CrossMix listo', 'success');
+        
+        // ✅ CRÍTICO: Verificar estado final
+        const finalVerification = this.performFinalVerification();
+        if (finalVerification.critical) {
+            console.error('❌ Verificación final falló:', finalVerification.issues);
+            this.messageManager.show('Sistema con problemas críticos', 'error');
+        }
+        
+        window.dispatchEvent(new CustomEvent('ytcrossmix:unified:ready', {
+            detail: { 
+                timestamp: Date.now(), 
+                core: this, 
+                totalTime, 
+                moduleResults,
+                verification: finalVerification
+            }
+        }));
+        
+        return { success: true, totalTime, modules: moduleResults, verification: finalVerification };
+        
+    } catch (error) {
+        console.error('💥 Error en inicialización:', error);
+        this.handleCriticalError(error);
+        throw error;
+    }
+}
+// ✅ FIX 6: performFinalVerification() - nuevo método
+performFinalVerification() {
+    const issues = [];
+    let criticalIssues = 0;
+    
+    // Verificar módulos críticos
+    const criticalModules = ['SearchManager', 'PlaybackController', 'UIManager', 'PlaylistManager'];
+    criticalModules.forEach(module => {
+        if (!window[module]) {
+            issues.push(`${module} no disponible globalmente`);
+            criticalIssues++;
+        }
+    });
+    
+    // Verificar elementos DOM críticos
+    const criticalElements = ['botonPlay', 'botonNext', 'queueButton', 'playlistsGrid'];
+    criticalElements.forEach(id => {
+        if (!document.getElementById(id)) {
+            issues.push(`Elemento ${id} no encontrado en DOM`);
+            if (['botonPlay', 'botonNext'].includes(id)) {
+                criticalIssues++;
+            }
+        }
+    });
+    
+    // Verificar estado unificado
+    const state = this.stateManager?.state;
+    if (!state) {
+        issues.push('Estado unificado no disponible');
+        criticalIssues++;
+    } else {
+        if (!state.playlist) {
+            issues.push('Estado de playlist no inicializado');
+            criticalIssues++;
+        }
+        
+        if (!state.app.playersInitialized) {
+            issues.push('Reproductores YouTube no inicializados');
+            criticalIssues++;
+        }
+    }
+    
+    // Verificar cola de reproducción
+    const queueInfo = window.PlaylistManager?.getQueueInfo?.();
+    if (!queueInfo || !queueInfo.exists) {
+        issues.push('Cola de reproducción no inicializada');
+        criticalIssues++;
+    }
+    
+    console.log(`🔍 Verificación final: ${issues.length} problemas (${criticalIssues} críticos)`);
+    
+    return {
+        success: issues.length === 0,
+        critical: criticalIssues > 0,
+        issues: issues,
+        criticalCount: criticalIssues,
+        timestamp: Date.now()
+    };
+}
     handleResize() {
         const isDesktop = window.innerWidth >= 1024;
         
@@ -1690,87 +1909,173 @@ setupPlaybackControls() {
         
         document.body.appendChild(errorDiv);
     }
+cleanup() {
+    console.log('🧹 Limpiando sistema unificado...');
     
-    cleanup() {
-        console.log('🧹 Limpiando...');
-        
-        const state = this.stateManager.state.app;
-        if (state.monitorInterval) {
-            clearInterval(state.monitorInterval);
-            state.monitorInterval = null;
-        }
-        
-        if (state.crossfadeInterval) {
-            clearInterval(state.crossfadeInterval);
-            state.crossfadeInterval = null;
-        }
-        
-        this.loadingManager.hideAll();
-        this.messageManager.clear();
-        
-        try {
-            const player1 = this.stateManager.get('app.player1');
-            const player2 = this.stateManager.get('app.player2');
-            
-            if (player1?.pauseVideo) player1.pauseVideo();
-            if (player2?.pauseVideo) player2.pauseVideo();
-        } catch (error) {
-            console.warn('Error pausando players:', error);
-        }
-        
-        console.log('✅ Cleanup completado');
+    const state = this.stateManager.state.app;
+    
+    // Limpiar intervalos
+    if (state.monitorInterval) {
+        clearInterval(state.monitorInterval);
+        state.monitorInterval = null;
     }
     
-    reset() {
-        if (confirm('¿Reiniciar la aplicación?')) {
-            console.log('🔄 Reiniciando...');
-            
-            try {
-                this.cleanup();
-                
-                // Reset estado
-                Object.assign(this.stateManager.state.app, {
-                    currentPlayer: 1,
-                    isTransitioning: false,
-                    isAudioFading: false,
-                    hasOutroCrossfadeStarted: false,
-                    crossfadeInProgress: false,
-                    reproduccionIniciada: false
-                });
-                
-                // Reset UI
-                this.stateManager.set('ui.currentView', 'home');
-                this.stateManager.set('ui.isPlaying', false);
-                this.stateManager.set('ui.currentTrack', null);
-                
-                this.messageManager.show('Aplicación reiniciada', 'success');
-                
-            } catch (error) {
-                console.error('Error en reset:', error);
-                this.messageManager.show('Error reiniciando', 'error');
-            }
-        }
+    if (state.crossfadeInterval) {
+        clearInterval(state.crossfadeInterval);
+        state.crossfadeInterval = null;
     }
     
-    debug() {
-        console.log('=== YT CROSSMIX DEBUG UNIFICADO ===');
-        console.log('Core Initialized:', this.initialized);
-        console.log('Modules Loaded:', Array.from(this.moduleLoader.loaded));
-        console.log('State Manager:', this.stateManager.state);
-        console.log('YouTube Manager:', {
-            apiReady: this.youtubeManager.apiReady,
-            playersReady: this.youtubeManager.playersReady
-        });
-        console.log('Loading Manager:', {
-            activeSpinners: this.loadingManager.spinners.size
-        });
-        console.log('Message Manager:', {
-            activeMessages: this.messageManager.activeMessages.size,
-            queuedMessages: this.messageManager.messageQueue.length
-        });
-        console.log('Health Check:', this.performHealthCheck());
-        console.log('==================================');
+    // Limpiar event listeners
+    if (this.keyboardShortcutsHandler) {
+        document.removeEventListener('keydown', this.keyboardShortcutsHandler);
+        this.keyboardShortcutsHandler = null;
     }
+    
+    // Limpiar managers
+    this.loadingManager?.hideAll();
+    this.messageManager?.clear();
+    
+    // Pausar reproductores
+    try {
+        const player1 = this.stateManager.get('app.player1');
+        const player2 = this.stateManager.get('app.player2');
+        
+        if (player1?.pauseVideo) player1.pauseVideo();
+        if (player2?.pauseVideo) player2.pauseVideo();
+    } catch (error) {
+        console.warn('Error pausando reproductores:', error);
+    }
+    
+    console.log('✅ Cleanup completado');
+}
+reset() {
+    if (!confirm('¿Reiniciar YT CrossMix? Esto limpiará la cola de reproducción.')) {
+        return;
+    }
+    
+    console.log('🔄 Reiniciando sistema unificado...');
+    
+    try {
+        this.cleanup();
+        
+        // Reset estados
+        Object.assign(this.stateManager.state.app, {
+            currentPlayer: 1,
+            isTransitioning: false,
+            isAudioFading: false,
+            hasOutroCrossfadeStarted: false,
+            crossfadeInProgress: false,
+            reproduccionIniciada: false
+        });
+        
+        // Reset UI
+        this.stateManager.set('ui.currentView', 'home');
+        this.stateManager.set('ui.isPlaying', false);
+        this.stateManager.set('ui.currentTrack', null);
+        
+        // Reset playlist info
+        this.stateManager.set('playlist.currentPlayingInfo', {
+            playlistId: null,
+            videoId: null,
+            flattenedIndex: -1
+        });
+        
+        // Limpiar y reinicializar cola
+        if (window.PlaylistManager?.clearQueue) {
+            window.PlaylistManager.clearQueue();
+        }
+        
+        if (window.PlaylistManager?.initializeManualPlaylist) {
+            window.PlaylistManager.initializeManualPlaylist();
+        }
+        
+        // Actualizar UI
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+            window.UIManager.switchView('home');
+        }
+        
+        this.messageManager.show('✅ YT CrossMix reiniciado', 'success');
+        
+        console.log('✅ Sistema reiniciado exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error reiniciando:', error);
+        this.messageManager.show('Error reiniciando sistema', 'error');
+    }
+}
+debug() {
+    console.log('=== YT CROSSMIX DEBUG UNIFICADO ===');
+    console.log('Core Initialized:', this.initialized);
+    console.log('Timestamp:', new Date().toLocaleString());
+    
+    // Módulos
+    const modules = {
+        'SearchManager': !!window.SearchManager,
+        'PlaybackController': !!window.PlaybackController,
+        'UIManager': !!window.UIManager,
+        'PlaylistManager': !!window.PlaylistManager,
+        'SponsorBlockManager': !!window.SponsorBlockManager,
+        'authManager': !!window.authManager
+    };
+    console.log('Módulos disponibles:', modules);
+    
+    // Estado
+    if (this.stateManager?.state) {
+        const state = this.stateManager.state;
+        console.log('Playlists totales:', state.playlist?.playlistsData?.length || 0);
+        
+        const queueInfo = window.PlaylistManager?.getQueueInfo?.();
+        console.log('Cola de reproducción:', {
+            existe: queueInfo?.exists || false,
+            videos: queueInfo?.count || 0,
+            indiceActual: queueInfo?.currentIndex || -1
+        });
+        
+        console.log('Vista actual:', state.ui?.currentView || 'unknown');
+        console.log('Reproductores:', {
+            inicializados: state.app?.playersInitialized || false,
+            reproductorActual: state.app?.currentPlayer || 0,
+            reproduccionIniciada: state.app?.reproduccionIniciada || false
+        });
+    }
+    
+    // Managers
+    const managers = {
+        stateManager: !!this.stateManager,
+        loadingManager: !!this.loadingManager,
+        youtubeManager: !!this.youtubeManager,
+        messageManager: !!this.messageManager,
+        moduleLoader: !!this.moduleLoader
+    };
+    console.log('Managers internos:', managers);
+    
+    // Health check
+    const health = this.performHealthCheck();
+    console.log('Health Check:', health);
+    
+    // Elementos DOM críticos
+    const domElements = {
+        botonPlay: !!document.getElementById('botonPlay'),
+        botonNext: !!document.getElementById('botonNext'),
+        queueButton: !!document.getElementById('queueButton'),
+        playlistsGrid: !!document.getElementById('playlistsGrid'),
+        queueSection: !!document.getElementById('queueSection')
+    };
+    console.log('Elementos DOM:', domElements);
+    
+    console.log('==================================');
+    
+    return {
+        initialized: this.initialized,
+        modules,
+        managers,
+        health,
+        domElements,
+        queueInfo: window.PlaylistManager?.getQueueInfo?.() || null,
+        verification: this.performFinalVerification()
+    };
+}
 }
 
 // ===== 8. BOOTSTRAP Y AUTO-INICIALIZACIÓN =====
@@ -2076,7 +2381,47 @@ window.addEventListener('beforeunload', (e) => {
         window.ytCrossMixUnified.cleanup();
     }
 });
+// ✅ REFERENCIAS GLOBALES PARA DEBUG
+if (typeof window !== 'undefined') {
+    // Debug function mejorada
+    window.debugUnified = function() {
+        if (window.ytCrossMixUnified) {
+            return window.ytCrossMixUnified.debug();
+        } else {
+            console.error('❌ Sistema unificado no disponible');
+            return { error: 'Sistema no inicializado' };
+        }
+    };
+    
+    // Reset function mejorada
+    window.resetUnified = function() {
+        if (window.ytCrossMixUnified) {
+            window.ytCrossMixUnified.reset();
+        } else {
+            console.error('❌ Sistema unificado no disponible para reset');
+        }
+    };
+    
+    // Quick status function
+    window.statusUnified = function() {
+        const status = {
+            initialized: !!window.ytCrossMixUnified?.initialized,
+            modules: {
+                search: !!window.SearchManager,
+                playback: !!window.PlaybackController,
+                ui: !!window.UIManager,
+                playlist: !!window.PlaylistManager
+            },
+            queue: window.PlaylistManager?.getQueueInfo?.() || null,
+            players: window.ytCrossMixUnified?.youtubeManager?.playersReady || false
+        };
+        
+        console.log('📊 Estado rápido:', status);
+        return status;
+    };
+}
 
+console.log('✅ CORE.JS FIXES APLICADOS - Botones y módulos corregidos');
 console.log('⚡ YT CrossMix Sistema Unificado Completo - Preparado');
 console.log('📋 Configuración:', CONFIG);
 console.log('🚀 Inicialización automática en progreso...');
