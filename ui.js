@@ -1,9 +1,89 @@
-// ===== UI.JS CORREGIDO - BIBLIOTECA Y COLA DE REPRODUCCIÓN =====
-// Versión completa corregida con cuadrícula expandible y cola modal
+// ===== UI.JS - CORREGIDO E INTEGRADO =====
+// Versión que mantiene funcionalidad de UI específica y delega lógica de negocio al core
 
 export class UIManager {
-      static updatePlaylistsUI() {
-        console.log('🔄 UIManager: Actualizando UI con estado unificado...');
+
+    // ✅ INICIALIZACIÓN MEJORADA CON CORE
+    static async initialize() {
+        console.log('🎨 Inicializando UIManager con sistema unificado...');
+        
+        try {
+            // Esperar a que el core esté disponible
+            if (window.unifiedCore?.initialized) {
+                console.log('✅ Core ya disponible, inicializando UI');
+                UIManager.setupUI();
+            } else {
+                console.log('⏳ Esperando core unificado...');
+                window.addEventListener('ytcrossmix:unified:ready', () => {
+                    console.log('🎉 Core unificado listo, inicializando UI...');
+                    UIManager.setupUI();
+                });
+                
+                // Timeout fallback
+                setTimeout(() => {
+                    if (!window.unifiedCore?.initialized) {
+                        console.warn('⚠️ Timeout esperando core, inicializando UI de todas formas...');
+                        UIManager.setupUIFallback();
+                    }
+                }, 10000);
+            }
+            
+        } catch (error) {
+            console.error('💥 Error inicializando UIManager:', error);
+            UIManager.handleError(error, 'initialize');
+        }
+    }
+
+    static setupUI() {
+        console.log('🔧 Configurando UI con core unificado...');
+        
+        // Setup navigation
+        UIManager.setupNavigation();
+        
+        // Setup search inputs (delegar búsqueda al core)
+        UIManager.setupSearchInputs();
+        
+        // Setup player controls (delegar lógica al core)
+        UIManager.setupPlayerControls();
+        
+        // Setup playlist URL
+        UIManager.setupPlaylistURL();
+        
+        // Setup view switching
+        UIManager.setupViewSwitching();
+        
+        // Event listeners específicos de playlist
+        UIManager.setupPlaylistEventListeners();
+        
+        // Enable interactivity
+        UIManager.enableInteractivity();
+        
+        // Vista inicial
+        const currentView = window.unifiedStateManager?.state?.ui?.currentView || 'home';
+        UIManager.switchView(currentView);
+        
+        // Trigger initial UI update
+        setTimeout(() => {
+            UIManager.updatePlaylistsUI();
+        }, 500);
+        
+        console.log('✅ UIManager configurado exitosamente');
+    }
+
+    static setupUIFallback() {
+        console.log('🔧 Configurando UI en modo fallback...');
+        
+        // Configuración básica sin dependencia del core
+        UIManager.setupNavigation();
+        UIManager.setupPlayerControlsFallback();
+        UIManager.enableInteractivity();
+        
+        console.log('⚠️ UI configurado en modo fallback');
+    }
+
+    // ✅ ACTUALIZACIÓN DE UI - PRINCIPAL (mantener lógica completa)
+    static updatePlaylistsUI() {
+        console.log('🔄 UIManager: Actualizando UI...');
         
         try {
             const state = window.unifiedStateManager?.state;
@@ -17,7 +97,7 @@ export class UIManager {
             // ✅ FIX: NO actualizar búsqueda cuando se añaden videos
             if (currentView === 'search') {
                 console.log('🔍 Vista de búsqueda activa - NO reemplazar resultados');
-                return; // Mantener resultados de búsqueda intactos
+                return;
             }
             
             let playlistContainer = UIManager.getPlaylistContainer(currentView);
@@ -36,13 +116,10 @@ export class UIManager {
                 console.log(`📊 Renderizando ${state.playlist.playlistsData.length} playlists en vista: ${currentView}`);
                 
                 if (currentView === 'library') {
-                    // ✅ BIBLIOTECA: CUADRÍCULA EXPANDIBLE
                     UIManager.renderLibraryGrid(playlistContainer, state.playlist.playlistsData);
                 } else if (currentView === 'playing') {
-                    // Vista playing no muestra playlists, solo info actual
                     UIManager.renderNowPlayingInfo();
                 } else {
-                    // Otras vistas: lista tradicional (excluyendo search)
                     UIManager.renderPlaylistList(playlistContainer, state.playlist.playlistsData);
                 }
             }
@@ -52,22 +129,21 @@ export class UIManager {
             }
             
             UIManager.enableInteractivity();
-            console.log('✅ UI actualizada con estado unificado');
+            console.log('✅ UI actualizada con sistema unificado');
             
         } catch (error) {
             console.error('💥 Error actualizando UI:', error);
-            window.unifiedMessageManager?.show('Error actualizando interfaz', 'error');
+            UIManager.handleError(error, 'updatePlaylistsUI');
         }
     }
 
+    // ✅ RENDERIZADO DE BIBLIOTECA COMO CUADRÍCULA
     static renderLibraryGrid(container, playlistsData) {
         console.log('📚 Renderizando biblioteca como cuadrícula...', playlistsData.length);
         
-        // Limpiar contenedor
         container.innerHTML = '';
         container.className = 'library-container';
         
-        // Crear grid
         const grid = document.createElement('div');
         grid.className = 'library-grid';
         
@@ -87,12 +163,12 @@ export class UIManager {
         container.appendChild(grid);
         console.log(`✅ ${libraryPlaylists.length} playlists renderizadas en cuadrícula`);
     }
+
     static createExpandablePlaylistCard(playlist, index) {
         const card = document.createElement('div');
         card.className = 'playlist-card-expandable';
         card.dataset.playlistId = playlist.id;
         
-        // ✅ FIX: Marcar como expandida si ya lo está en el estado
         if (playlist.isExpanded) {
             card.classList.add('expanded');
         }
@@ -148,7 +224,7 @@ export class UIManager {
             </div>
         `;
         
-        // ✅ FIX: Si está expandida y tiene videos, renderizarlos inmediatamente
+        // Si está expandida y tiene videos, renderizarlos
         if (playlist.isExpanded && playlist.videos && playlist.videos.length > 0) {
             const videosContainer = card.querySelector('.playlist-videos-container');
             UIManager.renderPlaylistVideos(videosContainer, playlist.videos, playlist.id);
@@ -165,6 +241,7 @@ export class UIManager {
         
         return card;
     }
+
     static renderPlaylistVideos(container, videos, playlistId) {
         console.log('🎵 Renderizando videos de playlist:', videos?.length || 0);
         
@@ -190,7 +267,6 @@ export class UIManager {
         console.log(`✅ ${videos.length} videos renderizados`);
     }
 
-    // ✅ NUEVO: CREAR ITEM DE VIDEO INDIVIDUAL
     static createPlaylistVideoItem(video, index, playlistId) {
         const item = document.createElement('div');
         item.className = 'playlist-video-item';
@@ -231,424 +307,6 @@ export class UIManager {
         return item;
     }
 
-    // ✅ MEJORADO: DETECCIÓN DE CONTENEDORES
-    static getPlaylistContainer(currentView) {
-        const containers = {
-            'library': document.getElementById('playlistsGrid'),
-            'playing': document.getElementById('nowPlayingContainer'),
-            'home': document.getElementById('overviewGrid'),
-            'search': document.getElementById('searchResults')
-        };
-        
-        const container = containers[currentView];
-        console.log(`🔍 Contenedor para vista '${currentView}':`, container ? 'encontrado' : 'no encontrado');
-        
-        return container || document.querySelector('.content-view.active') || document.querySelector('.library-container');
-    }
-
-    // ✅ MEJORADO: ESTADOS VACÍOS
-    static renderEmptyState(container, currentView) {
-        console.log('📋 Renderizando estado vacío para vista:', currentView);
-        
-        const emptyStates = {
-            'library': `
-                <div class="search-placeholder">
-                    <i class="fas fa-music"></i>
-                    <p><strong>¡Conecta tu cuenta de Google!</strong></p>
-                    <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
-                    <p><small>Biblioteca vacía - Usa el botón "Conectar" arriba</small></p>
-                </div>
-            `,
-            'playing': `
-                <div class="search-placeholder">
-                    <i class="fas fa-headphones"></i>
-                    <p>No hay reproducción activa</p>
-                    <p>Selecciona música desde la biblioteca o búsqueda</p>
-                </div>
-            `,
-            'search': `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>Busca música, artistas o playlists</p>
-                    <p>Escribe en la barra de búsqueda para empezar</p>
-                </div>
-            `,
-            'home': `
-                <div class="search-placeholder">
-                    <i class="fas fa-home"></i>
-                    <p>Bienvenido a YT CrossMix</p>
-                    <p>Conecta tu cuenta de Google para empezar</p>
-                </div>
-            `
-        };
-        
-        container.innerHTML = emptyStates[currentView] || emptyStates.home;
-    }
-
-    // ✅ NUEVO: RENDERIZAR INFO DE REPRODUCCIÓN ACTUAL
-    static renderNowPlayingInfo() {
-        const state = window.unifiedStateManager?.state;
-        if (!state) return;
-        
-        const titleEl = document.getElementById('nowPlayingTitle');
-        const artistEl = document.getElementById('nowPlayingArtist');
-        
-        const currentInfo = state.playlist.currentPlayingInfo;
-        if (currentInfo?.videoId) {
-            // Buscar info del video actual
-            let currentVideo = null;
-            for (const playlist of state.playlist.playlistsData) {
-                if (playlist.videos) {
-                    currentVideo = playlist.videos.find(v => v.videoId === currentInfo.videoId);
-                    if (currentVideo) break;
-                }
-            }
-            
-            if (currentVideo) {
-                if (titleEl) titleEl.textContent = currentVideo.title;
-                if (artistEl) artistEl.textContent = currentVideo.channelTitle || 'YouTube';
-            }
-        } else {
-            if (titleEl) titleEl.textContent = 'Selecciona una canción';
-            if (artistEl) artistEl.textContent = 'YT CrossMix - Sistema Unificado';
-        }
-    }
-
-    // ✅ MEJORADO: MANEJADOR CENTRALIZADO DE CLICKS
- static handleDocumentClick(e) {
-        try {
-            // ===== COLA DE REPRODUCCIÓN (PRIMERA PRIORIDAD) =====
-            const queueButton = e.target.closest('#queueButton');
-            if (queueButton) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('📋 Click en botón de cola');
-                UIManager.toggleQueue();
-                return;
-            }
-            
-            const queueCloseBtn = e.target.closest('#queueCloseBtn, .queue-close-btn');
-            if (queueCloseBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('❌ Click en cerrar cola');
-                UIManager.hideQueue();
-                return;
-            }
-            
-            // Cerrar cola al hacer click en el overlay
-            if (e.target.classList.contains('queue-section')) {
-                console.log('📋 Click en overlay de cola - cerrando');
-                UIManager.hideQueue();
-                return;
-            }
-            
-            // ===== EXPANSIÓN DE PLAYLIST =====
-            const playlistHeader = e.target.closest('.playlist-card-header');
-            if (playlistHeader && !e.target.closest('.playlist-card-actions')) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const playlistId = playlistHeader.dataset.playlistId;
-                const card = playlistHeader.closest('.playlist-card-expandable');
-                
-                console.log('🔽 Click en header de playlist:', playlistId);
-                
-                if (card) {
-                    UIManager.handlePlaylistExpand(playlistId, card);
-                }
-                return;
-            }
-            
-            // ===== ACCIONES DE PLAYLIST Y VIDEO =====
-            const actionBtn = e.target.closest('[data-action]');
-            if (actionBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const action = actionBtn.dataset.action;
-                const playlistId = actionBtn.dataset.playlistId;
-                const videoId = actionBtn.dataset.videoId;
-                
-                console.log(`🎯 Acción: ${action}`, { playlistId, videoId });
-                
-                switch (action) {
-                    case 'add-all':
-                        UIManager.handlePlaylistAddAll(playlistId);
-                        break;
-                    case 'play-all':
-                        UIManager.handlePlaylistPlayAll(playlistId);
-                        break;
-                    case 'add-video':
-                        UIManager.handleVideoAdd(videoId);
-                        break;
-                    case 'play-now':
-                        UIManager.handleVideoPlayNow(videoId);
-                        break;
-                    case 'remove-from-queue':
-                        UIManager.handleRemoveFromQueue(videoId);
-                        break;
-                }
-                return;
-            }
-            
-        } catch (error) {
-            console.error('💥 Error en handleDocumentClick:', error);
-        }
-    }
-    static async handlePlaylistExpand(playlistId, cardElement) {
-        console.log('🔽 Expandiendo/contrayendo playlist:', playlistId);
-        
-        const state = window.unifiedStateManager?.state;
-        if (!state) return;
-        
-        const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
-        if (!playlist) {
-            console.warn('Playlist no encontrada:', playlistId);
-            return;
-        }
-        
-        const isExpanded = cardElement.classList.contains('expanded');
-        const expandBtn = cardElement.querySelector('.playlist-expand-btn i');
-        const videosContainer = cardElement.querySelector('.playlist-videos-container');
-        
-        if (isExpanded) {
-            // CONTRAER
-            cardElement.classList.remove('expanded');
-            if (expandBtn) {
-                expandBtn.className = 'fas fa-chevron-down';
-            }
-            
-            // ✅ FIX: Actualizar estado de expansión
-            const playlistsData = [...state.playlist.playlistsData];
-            const index = playlistsData.findIndex(p => p.id === playlistId);
-            if (index !== -1) {
-                playlistsData[index] = { ...playlistsData[index], isExpanded: false };
-                window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-            }
-            
-            console.log('📁 Playlist contraída');
-            return;
-        }
-        
-        // EXPANDIR
-        cardElement.classList.add('expanded');
-        if (expandBtn) {
-            expandBtn.className = 'fas fa-chevron-up';
-        }
-        
-        // ✅ FIX: Actualizar estado de expansión
-        const playlistsData = [...state.playlist.playlistsData];
-        const index = playlistsData.findIndex(p => p.id === playlistId);
-        if (index !== -1) {
-            playlistsData[index] = { ...playlistsData[index], isExpanded: true };
-            window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-        }
-        
-        if (!videosContainer) return;
-        
-        // Si ya tiene videos cargados, mostrarlos
-        if (playlist.videos && playlist.videos.length > 0) {
-            console.log('📺 Mostrando videos ya cargados:', playlist.videos.length);
-            UIManager.renderPlaylistVideos(videosContainer, playlist.videos, playlistId);
-            return;
-        }
-        
-        // Si es de YouTube Library y no está cargado, cargarlo
-        if (playlist.source === 'youtube_library' && !playlist.isLoaded) {
-            try {
-                console.log('🔄 Cargando videos de YouTube Library...');
-                
-                videosContainer.querySelector('.playlist-videos-content').innerHTML = `
-                    <div class="playlist-videos-loading" style="padding: 20px; text-align: center; color: #aaa;">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span style="margin-left: 8px;">Cargando videos...</span>
-                    </div>
-                `;
-                
-                // ✅ FIX: Usar PlaylistManager que ya maneja la carga correctamente
-                if (window.PlaylistManager?.togglePlaylistExpansion) {
-                    await window.PlaylistManager.togglePlaylistExpansion(playlistId);
-                    
-                    // Después de cargar, actualizar la vista
-                    setTimeout(() => {
-                        const updatedPlaylist = window.unifiedStateManager.state.playlist.playlistsData.find(p => p.id === playlistId);
-                        if (updatedPlaylist && updatedPlaylist.videos) {
-                            UIManager.renderPlaylistVideos(videosContainer, updatedPlaylist.videos, playlistId);
-                        }
-                    }, 1000);
-                } else {
-                    throw new Error('PlaylistManager.togglePlaylistExpansion no disponible');
-                }
-                
-            } catch (error) {
-                console.error('❌ Error cargando videos:', error);
-                videosContainer.querySelector('.playlist-videos-content').innerHTML = `
-                    <div class="playlist-videos-error" style="padding: 20px; text-align: center; color: #f44336;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Error cargando videos</p>
-                        <button class="retry-btn" onclick="UIManager.handlePlaylistExpand('${playlistId}', this.closest('.playlist-card-expandable'))"
-                                style="margin-top: 8px; padding: 4px 8px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
-                            <i class="fas fa-redo"></i> Reintentar
-                        </button>
-                    </div>
-                `;
-                
-                window.unifiedMessageManager?.show(
-                    `Error cargando "${playlist.name}"`, 
-                    'error', 
-                    4000
-                );
-            }
-        } else {
-            // Playlist sin videos
-            UIManager.renderPlaylistVideos(videosContainer, [], playlistId);
-        }
-    }
-
-    // ✅ ACCIONES DE PLAYLIST
-    static async handlePlaylistAddAll(playlistId) {
-        console.log('➕ Añadir toda la playlist:', playlistId);
-        
-        const state = window.unifiedStateManager?.state;
-        if (!state) return;
-        
-        const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
-        if (!playlist) {
-            console.warn('Playlist no encontrada:', playlistId);
-            return;
-        }
-        
-        // Si es de YouTube Library y no está cargada, cargarla primero
-        if (playlist.source === 'youtube_library' && !playlist.videos) {
-            window.unifiedMessageManager?.show(`Cargando "${playlist.name}"...`, 'info');
-            
-            try {
-                const { authManager } = await import('./auth.js');
-                
-                if (!authManager.isUserAuthenticated()) {
-                    window.unifiedMessageManager?.show("Error: No hay sesión de Google activa.", 'error');
-                    return;
-                }
-
-                const videos = await authManager.getPlaylistVideos(playlistId);
-                
-                // Actualizar el estado con los videos cargados
-                const playlistsData = [...state.playlist.playlistsData];
-                const index = playlistsData.findIndex(p => p.id === playlistId);
-                if (index !== -1) {
-                    playlistsData[index] = {
-                        ...playlistsData[index],
-                        videos: videos,
-                        isLoaded: true
-                    };
-                    window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-                }
-                
-                if (videos && videos.length > 0) {
-                    UIManager.addPlaylistVideos({ ...playlist, videos });
-                } else {
-                    window.unifiedMessageManager?.show('Esta playlist está vacía', 'warning');
-                }
-                
-            } catch (error) {
-                console.error('Error cargando playlist:', error);
-                window.unifiedMessageManager?.show('Error cargando playlist', 'error');
-                return;
-            }
-        } else if (playlist.videos && playlist.videos.length > 0) {
-            UIManager.addPlaylistVideos(playlist);
-        } else {
-            window.unifiedMessageManager?.show('Esta playlist está vacía', 'warning');
-        }
-    }
-    static handlePlaylistPlayAll(playlistId) {
-        console.log('▶️ Reproducir toda la playlist:', playlistId);
-        
-        // Añadir todos los videos y luego reproducir
-        UIManager.handlePlaylistAddAll(playlistId);
-        
-        setTimeout(() => {
-            if (window.PlaybackController?.playFirstVideo) {
-                window.PlaybackController.playFirstVideo();
-            }
-        }, 1500);
-    }
-    static addPlaylistVideos(playlist) {
-        const addedCount = playlist.videos.length;
-        let successCount = 0;
-        
-        // Usar PlaylistManager si está disponible
-        if (window.PlaylistManager?.addVideoToManualPlaylist) {
-            playlist.videos.forEach(video => {
-                try {
-                    window.PlaylistManager.addVideoToManualPlaylist(video);
-                    successCount++;
-                } catch (error) {
-                    console.warn('Error añadiendo video:', video.title, error);
-                }
-            });
-        }
-        
-        if (successCount > 0) {
-            window.unifiedMessageManager?.show(
-                `${successCount} videos añadidos de "${playlist.name}"`, 
-                'success',
-                3000
-            );
-        } else {
-            window.unifiedMessageManager?.show(
-                'No se pudieron añadir los videos', 
-                'error'
-            );
-        }
-    }
-
-    // ✅ ACCIONES DE VIDEO INDIVIDUAL
-   static handleVideoAdd(videoId) {
-        console.log('➕ Añadir video individual:', videoId);
-        
-        const video = UIManager.findVideoById(videoId);
-        if (!video) {
-            console.warn('Video no encontrado:', videoId);
-            return;
-        }
-        
-        if (window.PlaylistManager?.addVideoToManualPlaylist) {
-            try {
-                window.PlaylistManager.addVideoToManualPlaylist(video);
-                window.unifiedMessageManager?.show(`"${video.title}" añadido a la cola`, 'success', 2000);
-            } catch (error) {
-                console.error('Error añadiendo video:', error);
-                window.unifiedMessageManager?.show('Error añadiendo video', 'error');
-            }
-        }
-    }
-
-    static handleVideoPlayNow(videoId) {
-        console.log('▶️ Reproducir video ahora:', videoId);
-        
-        // Añadir el video y reproducir inmediatamente
-        UIManager.handleVideoAdd(videoId);
-        
-        setTimeout(() => {
-            if (window.PlaybackController?.playFirstVideo) {
-                window.PlaybackController.playFirstVideo();
-            }
-        }, 800);
-    }
-
-    static findVideoById(videoId) {
-        const state = window.unifiedStateManager?.state;
-        if (!state) return null;
-        
-        for (const playlist of state.playlist.playlistsData) {
-            if (playlist.videos) {
-                const video = playlist.videos.find(v => v.videoId === videoId);
-                if (video) return video;
-            }
-        }
-
     // ✅ GESTIÓN DE COLA DE REPRODUCCIÓN
     static toggleQueue() {
         const queueSection = document.getElementById('queueSection');
@@ -663,16 +321,17 @@ export class UIManager {
             UIManager.hideQueue();
         }
     }
+
     static showQueue() {
-        console.log('📋 Mostrando cola de reproducción (GLOBAL)');
+        console.log('📋 Mostrando cola de reproducción');
         
         const queueSection = document.getElementById('queueSection');
         if (!queueSection) return;
         
-        // ✅ FIX: Actualizar contenido de la cola ANTES de mostrarla
+        // Actualizar contenido ANTES de mostrar
         UIManager.updateQueueContent();
         
-        // ✅ FIX: Asegurar que la cola sea visible globalmente
+        // Configurar como overlay global
         queueSection.style.position = 'fixed';
         queueSection.style.top = '0';
         queueSection.style.left = '0';
@@ -690,7 +349,7 @@ export class UIManager {
             setTimeout(() => closeBtn.focus(), 100);
         }
         
-        console.log('✅ Cola mostrada globalmente');
+        console.log('✅ Cola mostrada');
     }
     static hideQueue() {
         console.log('📋 Ocultando cola de reproducción');
