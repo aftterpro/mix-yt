@@ -1,4 +1,3 @@
-// ===== SEARCHMANAGER.JS - CORREGIDO PARA USAR PIPED API DIRECTAMENTE =====
 // ===== SEARCHMANAGER.JS - CORREGIDO E INTEGRADO =====
 // Versión que delega al core unificado y mantiene funciones específicas
 
@@ -669,3 +668,4 @@ if (typeof window !== 'undefined') {
 console.log('✅ SearchManager cargado - VERSIÓN INTEGRADA CON CORE UNIFICADO');
 console.log('🔧 SearchDebug disponible: window.SearchDebug.testInstances()');
 console.log('📡 Instancias Piped configuradas para búsqueda directa con fallback');
+
