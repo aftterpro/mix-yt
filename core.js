@@ -1996,3 +1996,490 @@ export {
 };
 
 console.log('✅ Core Unificado cargado - Versión mejorada con funciones del backup')
+// ===== 🐛 CORRECCIONES CRÍTICAS PARA CORE.JS =====
+// Estas correcciones van al final del archivo core.js
+
+// ✅ 1. CORRECCIÓN CRÍTICA - YouTube API Loading
+function setupYouTubeAPIFallback() {
+    console.log('🔧 Configurando fallback para YouTube API...');
+    
+    // Verificar si la API ya está cargada
+    if (window.YT && window.YT.Player) {
+        console.log('✅ YouTube API ya está disponible');
+        if (window.unifiedCore?.youtubeManager) {
+            window.unifiedCore.youtubeManager.apiReady = true;
+            window.unifiedCore.youtubeManager.createPlayers();
+        }
+        return;
+    }
+    
+    // Override global callback con lógica robusta
+    window.onYouTubeIframeAPIReady = function() {
+        console.log('📺 onYouTubeIframeAPIReady ejecutado');
+        
+        if (window.unifiedCore?.youtubeManager) {
+            window.unifiedCore.youtubeManager.apiReady = true;
+            window.unifiedCore.youtubeManager.createPlayers();
+        } else {
+            console.warn('⚠️ unifiedCore no está disponible, reintentando...');
+            setTimeout(() => {
+                if (window.unifiedCore?.youtubeManager) {
+                    window.unifiedCore.youtubeManager.apiReady = true;
+                    window.unifiedCore.youtubeManager.createPlayers();
+                }
+            }, 1000);
+        }
+    };
+    
+    // Verificación periódica por si el callback no se ejecuta
+    const checkYTAPI = setInterval(() => {
+        if (window.YT && window.YT.Player) {
+            console.log('🔧 YouTube API detectada via polling');
+            clearInterval(checkYTAPI);
+            
+            if (window.unifiedCore?.youtubeManager && !window.unifiedCore.youtubeManager.playersReady) {
+                window.unifiedCore.youtubeManager.apiReady = true;
+                window.unifiedCore.youtubeManager.createPlayers();
+            }
+        }
+    }, 1000);
+    
+    // Timeout de seguridad
+    setTimeout(() => {
+        clearInterval(checkYTAPI);
+        if (!window.YT?.Player) {
+            console.error('💥 Timeout: YouTube API no se cargó');
+            if (window.unifiedMessageManager) {
+                window.unifiedMessageManager.show('Error cargando reproductores de YouTube', 'error');
+            }
+        }
+    }, 15000);
+}
+
+// ✅ 2. CORRECCIÓN CRÍTICA - Navigation System
+function setupNavigationFix() {
+    console.log('🧭 Configurando sistema de navegación...');
+    
+    // Event delegation para navegación
+    document.addEventListener('click', function(event) {
+        // Navegación en sidebar
+        const sidebarNavItem = event.target.closest('.sidebar-nav [data-view]');
+        if (sidebarNavItem) {
+            event.preventDefault();
+            const view = sidebarNavItem.dataset.view;
+            console.log('🔄 Navegación sidebar:', view);
+            switchViewFixed(view);
+            return;
+        }
+        
+        // Navegación en bottom nav
+        const bottomNavItem = event.target.closest('.bottom-nav [data-view]');
+        if (bottomNavItem) {
+            event.preventDefault();
+            const view = bottomNavItem.dataset.view;
+            console.log('🔄 Navegación bottom:', view);
+            switchViewFixed(view);
+            return;
+        }
+        
+        // Botón de cola
+        if (event.target.closest('#queueButton')) {
+            event.preventDefault();
+            console.log('📋 Toggle cola');
+            if (window.UIManager?.toggleQueue) {
+                window.UIManager.toggleQueue();
+            }
+            return;
+        }
+        
+        // Botón cerrar cola
+        if (event.target.closest('#queueCloseBtn, .queue-close-btn')) {
+            event.preventDefault();
+            console.log('❌ Cerrar cola');
+            if (window.UIManager?.hideQueue) {
+                window.UIManager.hideQueue();
+            }
+            return;
+        }
+    });
+}
+
+function switchViewFixed(viewName) {
+    console.log('🔄 Cambiando a vista:', viewName);
+    
+    // Actualizar estado unificado
+    if (window.unifiedStateManager) {
+        window.unifiedStateManager.set('ui.currentView', viewName);
+    }
+    
+    // Ocultar todas las vistas
+    const views = document.querySelectorAll('.content-view');
+    views.forEach(view => {
+        view.classList.remove('active');
+    });
+    
+    // Mostrar vista target
+    const targetView = document.getElementById(`${viewName}View`);
+    if (targetView) {
+        targetView.classList.add('active');
+        console.log(`✅ Vista ${viewName} activada`);
+        
+        // Actualizar navegación visual
+        updateNavigationFixed(viewName);
+        
+        // Trigger específico por vista
+        if (viewName === 'library' && window.UIManager?.updatePlaylistsUI) {
+            setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
+        }
+    } else {
+        console.warn(`⚠️ Vista ${viewName}View no encontrada`);
+    }
+}
+
+function updateNavigationFixed(activeView) {
+    // Actualizar sidebar navigation
+    const sidebarItems = document.querySelectorAll('.sidebar-nav [data-view]');
+    sidebarItems.forEach(item => {
+        if (item.dataset.view === activeView) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+    
+    // Actualizar bottom navigation
+    const bottomItems = document.querySelectorAll('.bottom-nav [data-view]');
+    bottomItems.forEach(item => {
+        if (item.dataset.view === activeView) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+// ✅ 3. CORRECCIÓN CRÍTICA - Search System
+function setupSearchFix() {
+    console.log('🔍 Configurando sistema de búsqueda...');
+    
+    const searchInputs = [
+        'sidebarSearchInput',
+        'mobileSearchInput', 
+        'searchInput'
+    ];
+    
+    searchInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            // Remover listeners existentes
+            const newInput = input.cloneNode(true);
+            input.parentNode.replaceChild(newInput, input);
+            
+            // Añadir nuevo listener con debounce
+            let searchTimeout;
+            newInput.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+                
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (query.length > 2) {
+                        console.log('🔍 Ejecutando búsqueda:', query);
+                        performSearchFixed(query);
+                    }
+                }, 500);
+            });
+            
+            // Enter key
+            newInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const query = e.target.value.trim();
+                    if (query.length > 0) {
+                        console.log('🔍 Búsqueda por Enter:', query);
+                        performSearchFixed(query);
+                    }
+                }
+            });
+            
+            console.log(`✅ Input búsqueda configurado: ${inputId}`);
+        }
+    });
+}
+
+async function performSearchFixed(query) {
+    console.log('🔍 performSearchFixed ejecutado:', query);
+    
+    // Cambiar a vista de búsqueda
+    switchViewFixed('search');
+    
+    // Usar SearchManager si está disponible
+    if (window.SearchManager?.performSearch) {
+        console.log('📡 Usando SearchManager...');
+        window.SearchManager.performSearch(query);
+    } else if (window.unifiedCore?.searchManager?.performSearch) {
+        console.log('📡 Usando Core SearchManager...');
+        window.unifiedCore.searchManager.performSearch(query);
+    } else {
+        console.error('❌ No hay sistema de búsqueda disponible');
+        window.unifiedMessageManager?.show('Sistema de búsqueda no disponible', 'error');
+        
+        // Fallback básico
+        const searchResults = document.getElementById('searchResults');
+        if (searchResults) {
+            searchResults.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Sistema de búsqueda no disponible</p>
+                    <p>Verifique la conexión e intente nuevamente</p>
+                </div>
+            `;
+        }
+    }
+}
+
+// ✅ 4. CORRECCIÓN CRÍTICA - Authentication
+function setupAuthFix() {
+    console.log('🔐 Configurando autenticación...');
+    
+    // Verificar botones de auth
+    const signInButton = document.getElementById('googleSignInButton');
+    const signOutButton = document.getElementById('googleSignOutButton');
+    
+    if (signInButton) {
+        // Remover listeners existentes
+        const newSignInButton = signInButton.cloneNode(true);
+        signInButton.parentNode.replaceChild(newSignInButton, signInButton);
+        
+        newSignInButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('🔐 Click en botón de autenticación');
+            
+            if (window.authManager?.handleAuthClick) {
+                window.authManager.handleAuthClick();
+            } else {
+                console.error('❌ authManager no disponible');
+                window.unifiedMessageManager?.show('Sistema de autenticación no disponible', 'error');
+            }
+        });
+        
+        console.log('✅ Botón signin configurado');
+    }
+    
+    if (signOutButton) {
+        const newSignOutButton = signOutButton.cloneNode(true);
+        signOutButton.parentNode.replaceChild(newSignOutButton, signOutButton);
+        
+        newSignOutButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('🔐 Click en cerrar sesión');
+            
+            if (window.authManager?.handleSignOutClick) {
+                window.authManager.handleSignOutClick();
+            }
+        });
+        
+        console.log('✅ Botón signout configurado');
+    }
+    
+    // Verificar disponibilidad de APIs de Google
+    const checkGoogleAPIs = setInterval(() => {
+        if (window.gapi && window.google?.accounts) {
+            console.log('✅ APIs de Google disponibles');
+            clearInterval(checkGoogleAPIs);
+            
+            // Inicializar authManager si está disponible
+            if (window.authManager?.initialize) {
+                window.authManager.initialize();
+            }
+        }
+    }, 1000);
+    
+    setTimeout(() => {
+        clearInterval(checkGoogleAPIs);
+        if (!window.gapi || !window.google?.accounts) {
+            console.error('💥 Timeout: APIs de Google no se cargaron');
+            window.unifiedMessageManager?.show('Error cargando APIs de Google', 'error');
+        }
+    }, 10000);
+}
+
+// ✅ 5. CORRECCIÓN CRÍTICA - Player Controls
+function setupPlayerControlsFix() {
+    console.log('🎮 Configurando controles de reproducción...');
+    
+    const playButton = document.getElementById('botonPlay');
+    const nextButton = document.getElementById('botonNext');
+    
+    if (playButton) {
+        const newPlayButton = playButton.cloneNode(true);
+        playButton.parentNode.replaceChild(newPlayButton, playButton);
+        
+        newPlayButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('▶️ Click en botón play');
+            
+            const state = window.unifiedStateManager?.state;
+            if (!state) {
+                console.error('❌ Estado unificado no disponible');
+                return;
+            }
+            
+            if (!state.app.playersInitialized) {
+                window.unifiedMessageManager?.show("Reproductores no están listos", 'warning');
+                return;
+            }
+            
+            if (!state.app.reproduccionIniciada) {
+                // Primer play
+                const flatList = getFlattenedPlaylistFixed();
+                if (flatList.length > 0) {
+                    console.log('🎵 Iniciando primera reproducción');
+                    if (window.PlaybackController?.playFirstVideo) {
+                        window.PlaybackController.playFirstVideo();
+                    } else if (window.unifiedCore?.playbackController?.playFirstVideo) {
+                        window.unifiedCore.playbackController.playFirstVideo();
+                    }
+                } else {
+                    window.unifiedMessageManager?.show("No hay videos en la cola", 'warning');
+                }
+            } else {
+                // Toggle play/pause
+                const currentPlayer = state.app.currentPlayer === 1 ? state.app.player1 : state.app.player2;
+                if (currentPlayer) {
+                    const playerState = currentPlayer.getPlayerState();
+                    if (playerState === 1) { // YT.PlayerState.PLAYING
+                        currentPlayer.pauseVideo();
+                        newPlayButton.innerHTML = '<i class="fas fa-play"></i>';
+                    } else {
+                        currentPlayer.playVideo();
+                        newPlayButton.innerHTML = '<i class="fas fa-pause"></i>';
+                    }
+                }
+            }
+        });
+        
+        console.log('✅ Botón play configurado');
+    }
+    
+    if (nextButton) {
+        const newNextButton = nextButton.cloneNode(true);
+        nextButton.parentNode.replaceChild(newNextButton, nextButton);
+        
+        newNextButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('⏭️ Click en botón next');
+            
+            if (window.PlaybackController?.playNextVideo) {
+                window.PlaybackController.playNextVideo();
+            } else if (window.unifiedCore?.playbackController?.playNextVideo) {
+                window.unifiedCore.playbackController.playNextVideo();
+            }
+        });
+        
+        console.log('✅ Botón next configurado');
+    }
+}
+
+function getFlattenedPlaylistFixed() {
+    if (window.PlaylistManager?.getFlattenedPlaylist) {
+        return window.PlaylistManager.getFlattenedPlaylist();
+    } else if (window.unifiedCore?.playlistManager?.getFlattenedPlaylist) {
+        return window.unifiedCore.playlistManager.getFlattenedPlaylist();
+    } else {
+        // Fallback básico
+        const state = window.unifiedStateManager?.state;
+        if (!state) return [];
+        
+        const playlistsData = state.playlist.playlistsData || [];
+        let flatList = [];
+        
+        const manualPlaylist = playlistsData.find(p => p.id === 'manual');
+        if (manualPlaylist && manualPlaylist.videos) {
+            manualPlaylist.videos.forEach(video => {
+                flatList.push({ ...video, sourcePlaylistId: 'manual' });
+            });
+        }
+        
+        return flatList;
+    }
+}
+
+// ✅ 6. APLICAR TODAS LAS CORRECCIONES
+function applyAllFixes() {
+    console.log('🔧 Aplicando todas las correcciones críticas...');
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(applyAllFixesNow, 1000);
+        });
+    } else {
+        setTimeout(applyAllFixesNow, 1000);
+    }
+}
+
+function applyAllFixesNow() {
+    console.log('🔧 Ejecutando correcciones ahora...');
+    
+    try {
+        setupYouTubeAPIFallback();
+        setupNavigationFix();
+        setupSearchFix();
+        setupAuthFix();
+        setupPlayerControlsFix();
+        
+        // Vista inicial
+        switchViewFixed('home');
+        
+        console.log('✅ Todas las correcciones aplicadas');
+        
+        // Actualizar indicador de sistema unificado
+        const indicator = document.getElementById('unifiedIndicator');
+        if (indicator) {
+            indicator.style.background = '#4caf50';
+            indicator.title = 'Sistema Unificado: Funcional con correcciones';
+        }
+        
+    } catch (error) {
+        console.error('💥 Error aplicando correcciones:', error);
+    }
+}
+
+// ✅ 7. AUTO-EJECUTAR CORRECCIONES
+applyAllFixes();
+
+// ✅ 8. DEBUG HELPERS MEJORADOS
+window.debugFixed = function() {
+    console.log('🔧 DEBUG SISTEMA CORREGIDO:');
+    console.log('- YouTube API:', window.YT && window.YT.Player ? '✅' : '❌');
+    console.log('- Google APIs:', window.gapi && window.google?.accounts ? '✅' : '❌');
+    console.log('- Unified Core:', window.unifiedCore?.initialized ? '✅' : '❌');
+    console.log('- Auth Manager:', window.authManager ? '✅' : '❌');
+    console.log('- Search Manager:', window.SearchManager ? '✅' : '❌');
+    console.log('- Playlist Manager:', window.PlaylistManager ? '✅' : '❌');
+    console.log('- UI Manager:', window.UIManager ? '✅' : '❌');
+    
+    const state = window.unifiedStateManager?.state;
+    if (state) {
+        console.log('- Players Ready:', state.app.playersInitialized ? '✅' : '❌');
+        console.log('- Playlists:', state.playlist.playlistsData?.length || 0);
+        console.log('- Current View:', state.ui.currentView);
+        console.log('- Authenticated:', state.auth.isAuthenticated ? '✅' : '❌');
+    }
+};
+
+window.testFixed = function() {
+    console.log('🧪 Ejecutando tests...');
+    
+    // Test navegación
+    console.log('Test 1: Navegación');
+    switchViewFixed('library');
+    setTimeout(() => switchViewFixed('search'), 1000);
+    setTimeout(() => switchViewFixed('home'), 2000);
+    
+    // Test búsqueda
+    console.log('Test 2: Búsqueda');
+    setTimeout(() => performSearchFixed('test music'), 3000);
+    
+    console.log('✅ Tests iniciados');
+};
+
+console.log('🔧 Correcciones críticas cargadas y listas');
