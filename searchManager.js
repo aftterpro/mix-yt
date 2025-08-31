@@ -1,204 +1,176 @@
 // ===== SEARCHMANAGER.JS - CORREGIDO PARA USAR PIPED API DIRECTAMENTE =====
-// Versión que usa las instancias de Piped en lugar de Netlify functions
+// ===== SEARCHMANAGER.JS - CORREGIDO E INTEGRADO =====
+// Versión que delega al core unificado y mantiene funciones específicas
 
 export class SearchManager {
 
-    static initialize() {
-        const searchResultsElement = document.getElementById('searchResults');
-        
-        if (searchResultsElement) {
-            // ✅ Usar estado unificado
-            const state = window.unifiedStateManager?.state;
-            if (state) {
-                state.search.resultsContainer = searchResultsElement;
-                state.search.resultsDiv = searchResultsElement;
-                
-                searchResultsElement.addEventListener('scroll', SearchManager.handleScroll);
-                console.log('🔍 Search Manager inicializado con estado unificado y Piped API');
-            }
+    // ✅ DELEGACIÓN PRINCIPAL AL CORE UNIFICADO
+    static async performSearch(query, nextPage = null) {
+        if (window.unifiedCore?.searchManager?.performSearch) {
+            return window.unifiedCore.searchManager.performSearch(query, nextPage);
         } else {
-            console.error("Error: Elemento 'searchResults' no encontrado en el DOM.");
+            console.warn('⚠️ Core unificado no disponible, usando búsqueda directa');
+            return SearchManager.fallbackPerformSearch(query, nextPage);
         }
     }
 
-    // ✅ CORREGIDO: Usar Piped API directamente
-    static async performSearch(query, nextPage = null) {
-        const state = window.unifiedStateManager?.state;
-        if (!state?.search?.resultsDiv) return;
+    static initialize() {
+        if (window.unifiedCore?.searchManager?.initialize) {
+            return window.unifiedCore.searchManager.initialize();
+        } else {
+            console.warn('⚠️ Core unificado no disponible, inicializando búsqueda básica');
+            return SearchManager.fallbackInitialize();
+        }
+    }
 
-        const searchState = state.search;
+    // ✅ FALLBACK DIRECTO PARA BÚSQUEDA (del backup mejorado)
+    static async fallbackPerformSearch(query, nextPage = null) {
+        const searchResultsElement = document.getElementById('searchResults');
+        if (!searchResultsElement) {
+            console.error('❌ Elemento searchResults no encontrado');
+            return;
+        }
 
         if (!nextPage) {
-            console.log(`🔍 Iniciando NUEVA búsqueda para: ${query}`);
-            searchState.currentSearchQuery = query;
-            searchState.nextPageContext = null;
-            searchState.resultsDiv.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i><p>Buscando...</p></div>';
+            console.log(`🔍 Búsqueda fallback para: ${query}`);
+            searchResultsElement.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i><p>Buscando...</p></div>';
         } else {
-            console.log(`📄 Cargando MÁS resultados para: ${searchState.currentSearchQuery}`);
             SearchManager.showLoadMoreSpinner();
         }
 
-        searchState.isLoadingMore = true;
-
-        // ✅ NUEVO: Usar instancias de Piped con fallback
-        const CONFIG = window.CONFIG || {
-            PIPED_INSTANCES: [
-                "https://api.piped.private.coffee",
-                "https://pipedapi.ducks.party",
-                "https://piped-api.kavin.rocks",
-                "https://api.piped.tokhmi.xyz"
-            ]
-        };
+        // ✅ Del backup: Usar múltiples instancias con retry
+        const PIPED_INSTANCES = window.CONFIG?.PIPED_INSTANCES || [
+            "https://api.piped.private.coffee",
+            "https://pipedapi.ducks.party",
+            "https://piped-api.kavin.rocks"
+        ];
 
         let searchResults = null;
         let lastError = null;
 
-        // ✅ NUEVO: Intentar con múltiples instancias
-        for (const instance of CONFIG.PIPED_INSTANCES) {
+        for (const instance of PIPED_INSTANCES) {
             try {
-                console.log(`📡 Intentando búsqueda en: ${instance}`);
+                console.log(`📡 Fallback: Intentando ${instance}`);
                 
-                // Construir URL de búsqueda de Piped
-                let searchUrl = `${instance}/search`;
-                const params = new URLSearchParams({
-                    q: searchState.currentSearchQuery,
-                    filter: 'videos' // Solo videos, no playlists ni canales
-                });
-                
-                // Si hay nextPage, añadirlo
-                if (nextPage) {
-                    params.append('nextpage', nextPage);
-                }
-                
-                searchUrl += '?' + params.toString();
-                
-                console.log(`🌐 URL de búsqueda: ${searchUrl}`);
-                
-                const response = await fetch(searchUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'YTCrossMix/2.0'
-                    },
-                    // ✅ Timeout para evitar cuelgues
-                    signal: AbortSignal.timeout(15000)
-                });
+                const searchUrl = SearchManager.buildSearchUrl(instance, query, nextPage);
+                const response = await SearchManager.fetchWithTimeout(searchUrl, 15000);
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
-                console.log(`✅ Búsqueda exitosa en ${instance}:`, data.items?.length || 0, 'resultados');
+                console.log(`✅ Búsqueda fallback exitosa: ${data.items?.length || 0} resultados`);
                 
                 searchResults = data;
-                break; // Salir del loop si fue exitoso
+                break;
                 
             } catch (error) {
-                console.warn(`⚠️ Fallo en ${instance}:`, error.message);
+                console.warn(`⚠️ Fallback fallo en ${instance}:`, error.message);
                 lastError = error;
-                
-                // Si es timeout o network error, continuar con siguiente instancia
-                if (error.name === 'TimeoutError' || error.name === 'TypeError') {
-                    continue;
-                }
-                
-                // Para otros errores, también continuar
                 continue;
             }
         }
 
-        // ✅ Procesar resultados o mostrar error
         if (searchResults) {
             SearchManager.displaySearchResults(searchResults, !!nextPage);
         } else {
-            console.error("❌ Todas las instancias de Piped fallaron");
-            const errorMessage = `Error de búsqueda: ${lastError?.message || 'Todas las instancias fallaron'}`;
-            
-            if (!nextPage) {
-                searchState.resultsDiv.innerHTML = `
-                    <div class="search-error">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>${errorMessage}</p>
-                        <button onclick="SearchManager.performSearch('${searchState.currentSearchQuery}')" 
-                                class="retry-search-btn">
-                            <i class="fas fa-redo"></i> Reintentar
-                        </button>
-                    </div>
-                `;
-            } else {
-                window.unifiedMessageManager?.show(errorMessage, 'error');
-                SearchManager.hideLoadMoreSpinner();
-            }
-            searchState.isLoadingMore = false;
+            SearchManager.handleSearchError(lastError, !!nextPage, query);
         }
     }
 
-    // ✅ MEJORADO: Display results con mejor manejo de datos de Piped
-    static displaySearchResults(results, append = false) {
-        const state = window.unifiedStateManager?.state;
-        if (!state?.search?.resultsDiv) return;
+    static fallbackInitialize() {
+        const searchResultsElement = document.getElementById('searchResults');
         
-        const searchState = state.search;
+        if (searchResultsElement) {
+            searchResultsElement.addEventListener('scroll', SearchManager.handleScroll);
+            console.log('🔍 Search Manager fallback inicializado');
+        } else {
+            console.error("❌ Elemento 'searchResults' no encontrado");
+        }
+    }
+
+    // ✅ FUNCIONES ESPECÍFICAS (mantener independientes)
+    static buildSearchUrl(instance, query, nextPage = null) {
+        try {
+            const url = new URL(`${instance}/search`);
+            url.searchParams.set('q', query);
+            url.searchParams.set('filter', 'videos');
+            
+            if (nextPage) {
+                url.searchParams.set('nextpage', nextPage);
+            }
+            
+            return url.toString();
+        } catch (error) {
+            console.error('❌ Error construyendo URL:', error);
+            return null;
+        }
+    }
+
+    static async fetchWithTimeout(url, timeout = 15000) {
+        return fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'YTCrossMix/2.0'
+            },
+            signal: AbortSignal.timeout(timeout)
+        });
+    }
+
+    // ✅ Del backup: Display results mejorado
+    static displaySearchResults(results, append = false) {
+        const searchResultsElement = document.getElementById('searchResults');
+        if (!searchResultsElement) return;
         
         if (!append) {
-            searchState.resultsDiv.innerHTML = '';
+            searchResultsElement.innerHTML = '';
         }
         
-        // ✅ CORREGIDO: Manejar estructura de respuesta de Piped
         const items = results.items || results.relatedStreams || [];
         
-        if (!items || !Array.isArray(items) || items.length === 0) {
+        if (!items || items.length === 0) {
             if (!append) {
-                searchState.resultsDiv.innerHTML = `
+                searchResultsElement.innerHTML = `
                     <div class="search-placeholder">
                         <i class="fas fa-search"></i>
-                        <p>No se encontraron resultados para "${searchState.currentSearchQuery}"</p>
-                        <p><small>Intenta con otros términos de búsqueda</small></p>
+                        <p>No se encontraron resultados</p>
+                        <p><small>Intenta con otros términos</small></p>
                     </div>
                 `;
             }
-            searchState.nextPageContext = results?.nextpage || null;
-            searchState.isLoadingMore = false;
             SearchManager.hideLoadMoreSpinner();
             return;
         }
 
-        searchState.nextPageContext = results.nextpage || null;
+        // Guardar contexto para paginación
+        if (window.unifiedStateManager) {
+            window.unifiedStateManager.set('search.nextPageContext', results.nextpage || null);
+            window.unifiedStateManager.set('search.currentSearchQuery', window.unifiedStateManager.get('search.currentSearchQuery') || '');
+        }
 
         items.forEach(video => {
-            // ✅ CORREGIDO: Extraer videoId de diferentes formatos de Piped
-            let videoId = video.videoId || video.id;
-            
-            if (!videoId && video.url) {
-                // Extraer de URL: /watch?v=VIDEO_ID o https://youtube.com/watch?v=VIDEO_ID
-                const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-                videoId = match ? match[1] : null;
-            }
-            
-            if (!videoId) {
-                console.warn('⚠️ Video sin ID válido:', video);
-                return;
-            }
+            const videoId = SearchManager.extractVideoId(video);
+            if (!videoId) return;
 
             // Evitar duplicados en append
-            if (append && searchState.resultsDiv.querySelector(`.video-result[data-video-id="${videoId}"]`)) {
+            if (append && searchResultsElement.querySelector(`.video-result[data-video-id="${videoId}"]`)) {
                 return;
             }
 
             const videoDiv = SearchManager.createVideoResultElement(video, videoId);
-            searchState.resultsDiv.appendChild(videoDiv);
+            searchResultsElement.appendChild(videoDiv);
         });
 
         if (append) {
             SearchManager.hideLoadMoreSpinner();
         }
-        searchState.isLoadingMore = false;
         
         console.log(`✅ ${items.length} resultados mostrados (${append ? 'append' : 'nuevo'})`);
     }
 
-    // ✅ MEJORADO: Create video element con datos de Piped
+    // ✅ Del backup: Create video element mejorado
     static createVideoResultElement(video, videoId) {
         const videoDiv = document.createElement('div');
         videoDiv.classList.add('video-result');
@@ -208,13 +180,12 @@ export class SearchManager {
         thumbnailContainer.classList.add('thumbnail-container');
         
         const thumbnail = document.createElement('img');
-        // ✅ CORREGIDO: Manejar diferentes formatos de thumbnail de Piped
         thumbnail.src = video.thumbnail || video.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
         thumbnail.alt = video.title || 'Video';
         thumbnail.classList.add('thumbnail');
         thumbnail.loading = "lazy";
         
-        // ✅ Error handling para thumbnails
+        // ✅ Error handling robusto
         thumbnail.onerror = function() {
             this.src = `https://img.youtube.com/vi/${videoId}/default.jpg`;
             this.onerror = function() {
@@ -224,7 +195,7 @@ export class SearchManager {
         
         thumbnailContainer.appendChild(thumbnail);
         
-        // ✅ MEJORADO: Formatear duración de Piped
+        // ✅ Mostrar duración si está disponible
         if (video.duration && video.duration > 0) {
             const durationSpan = document.createElement('span');
             durationSpan.textContent = SearchManager.formatDuration(video.duration);
@@ -243,11 +214,11 @@ export class SearchManager {
         detailsDiv.appendChild(title);
         
         const author = document.createElement('p');
-        // ✅ CORREGIDO: Manejar diferentes nombres de autor en Piped
         author.textContent = video.uploaderName || video.channelTitle || video.author || 'Autor Desconocido';
         author.classList.add('video-author');
         detailsDiv.appendChild(author);
 
+        // ✅ Del backup: Botón mejorado con datos completos
         const addButton = document.createElement('button');
         addButton.innerHTML = '<i class="fa-solid fa-arrow-right-to-line"></i><span class="add-text"> Reproducir Después</span>';
         addButton.classList.add('search-result-add-button');
@@ -275,184 +246,85 @@ export class SearchManager {
         return videoDiv;
     }
 
-    // ✅ MEJORADO: Handle add click con mejor feedback
+    // ✅ Del backup: Handle add con lógica inteligente y feedback visual
     static handleSearchResultAddClick(event, videoData) {
         event.preventDefault();
         event.stopPropagation();
 
         console.log("➕ Añadiendo video desde búsqueda:", videoData.title);
         
-        // ✅ Validar datos del video
+        // ✅ Validar datos
         if (!videoData.videoId || !videoData.title) {
             console.error('❌ Datos de video inválidos:', videoData);
             window.unifiedMessageManager?.show('Error: Datos de video inválidos', 'error');
             return;
         }
         
-        // ✅ Usar PlaylistManager
-        if (window.PlaylistManager?.addVideoToManualPlaylist) {
-            try {
-                const result = window.PlaylistManager.addVideoToManualPlaylist(videoData);
-                
-                if (result) {
-                    // Feedback visual en el botón
-                    const button = event.currentTarget;
-                    const originalContent = button.innerHTML;
-                    const originalBg = button.style.background;
-                    
-                    button.innerHTML = '<i class="fas fa-check"></i> Añadido';
-                    button.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
-                    button.disabled = true;
-                    
-                    setTimeout(() => {
-                        button.innerHTML = originalContent;
-                        button.style.background = originalBg;
-                        button.disabled = false;
-                    }, 2500);
-
-                    // ✅ Mensaje de éxito
-                    window.unifiedMessageManager?.show(`♪ "${videoData.title}" añadido a la cola`, 'success', 2000);
-                    
-                    // ✅ FIX CRÍTICO: NO cambiar de vista, mantener resultados de búsqueda
-                    console.log('🔍 Manteniendo vista de búsqueda activa');
-                    
-                } else {
-                    // Ya existe en la cola
-                    window.unifiedMessageManager?.show(`"${videoData.title}" ya está en la cola`, 'warning', 2000);
-                }
-                
-            } catch (error) {
-                console.error('❌ Error añadiendo video:', error);
-                window.unifiedMessageManager?.show('Error añadiendo video a la cola', 'error');
-            }
-        } else {
-            console.error('❌ PlaylistManager no disponible');
-            window.unifiedMessageManager?.show('Sistema de playlists no disponible', 'error');
-        }
-    }
-
-    // ✅ NUEVO: Función auxiliar para construir URL de búsqueda
-    static buildSearchUrl(instance, query, nextPage = null) {
+        // ✅ Del backup: Lógica inteligente de añadir
         try {
-            const url = new URL(`${instance}/search`);
-            url.searchParams.set('q', query);
-            url.searchParams.set('filter', 'videos');
+            let result = null;
             
-            if (nextPage) {
-                url.searchParams.set('nextpage', nextPage);
+            // Intentar usar core unificado primero
+            if (window.unifiedCore?.playlistManager?.addVideoToManualPlaylist) {
+                result = window.unifiedCore.playlistManager.addVideoToManualPlaylist(videoData);
+            } 
+            // Fallback a PlaylistManager tradicional
+            else if (window.PlaylistManager?.addVideoToManualPlaylist) {
+                result = window.PlaylistManager.addVideoToManualPlaylist(videoData);
             }
             
-            return url.toString();
+            if (result) {
+                // ✅ Del backup: Feedback visual en botón
+                SearchManager.provideFeedback(event.currentTarget, videoData.title);
+                
+                window.unifiedMessageManager?.show(`♪ "${videoData.title}" añadido a la cola`, 'success', 2000);
+                
+                // NO cambiar de vista - mantener resultados de búsqueda
+                console.log('🔍 Manteniendo vista de búsqueda activa');
+                
+            } else {
+                window.unifiedMessageManager?.show(`"${videoData.title}" ya está en la cola`, 'warning', 2000);
+            }
+            
         } catch (error) {
-            console.error('❌ Error construyendo URL:', error);
-            return null;
+            console.error('❌ Error añadiendo video:', error);
+            window.unifiedMessageManager?.show('Error añadiendo video a la cola', 'error');
         }
     }
 
-    // ✅ NUEVO: Validar respuesta de Piped
-    static validatePipedResponse(data) {
-        // Verificar estructura básica
-        if (!data || typeof data !== 'object') {
-            return { valid: false, error: 'Respuesta no es un objeto válido' };
-        }
+    // ✅ Del backup: Feedback visual mejorado
+    static provideFeedback(button, title) {
+        const originalContent = button.innerHTML;
+        const originalBg = button.style.background;
         
-        // Verificar que tenga items/relatedStreams
-        const items = data.items || data.relatedStreams || [];
-        if (!Array.isArray(items)) {
-            return { valid: false, error: 'Items no es un array válido' };
-        }
+        button.innerHTML = '<i class="fas fa-check"></i> Añadido';
+        button.style.background = 'linear-gradient(135deg, #4caf50, #45a049)';
+        button.disabled = true;
         
-        // Verificar que los items tengan estructura mínima
-        const validItems = items.filter(item => {
-            return item && (item.videoId || item.id || item.url) && item.title;
-        });
-        
-        if (validItems.length === 0 && items.length > 0) {
-            return { valid: false, error: 'Ningún item tiene estructura válida' };
-        }
-        
-        return { 
-            valid: true, 
-            items: validItems,
-            nextpage: data.nextpage,
-            totalResults: validItems.length
-        };
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.style.background = originalBg;
+            button.disabled = false;
+        }, 2500);
     }
 
-    // ✅ MEJORADO: Handle scroll con mejor detección
-    static handleScroll() {
-        const state = window.unifiedStateManager?.state;
-        if (!state?.search) return;
+    // ✅ UTILIDADES ESPECÍFICAS
+    static extractVideoId(video) {
+        let videoId = video.videoId || video.id;
         
-        const searchState = state.search;
-        
-        if (searchState.isLoadingMore || !searchState.nextPageContext || !searchState.currentSearchQuery) {
-            return;
+        if (!videoId && video.url) {
+            const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+            videoId = match ? match[1] : null;
         }
         
-        const container = searchState.resultsContainer;
-        if (!container) return;
-        
-        const scrollThreshold = 200; // Reducido para carga más temprana
-        const scrollPosition = container.scrollTop + container.clientHeight;
-        const totalHeight = container.scrollHeight;
-        const bottomReached = scrollPosition >= totalHeight - scrollThreshold;
-        
-        if (bottomReached) {
-            console.log("📄 Scroll cerca del final, cargando más resultados...");
-            SearchManager.performSearch(searchState.currentSearchQuery, searchState.nextPageContext);
-        }
+        return videoId;
     }
 
-    static showLoadMoreSpinner() {
-        const state = window.unifiedStateManager?.state;
-        if (!state?.search?.resultsContainer) return;
-
-        // ✅ Crear spinner más elegante
-        const existingSpinner = document.getElementById('search-more-spinner');
-        if (existingSpinner) return;
-
-        const spinner = document.createElement('div');
-        spinner.id = 'search-more-spinner';
-        spinner.className = 'search-load-more-spinner';
-        spinner.innerHTML = `
-            <div class="spinner-content">
-                <i class="fas fa-spinner fa-spin"></i>
-                <span>Cargando más resultados...</span>
-            </div>
-        `;
-        
-        spinner.style.cssText = `
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            color: var(--text-muted);
-            font-size: 14px;
-            gap: 8px;
-        `;
-        
-        state.search.resultsContainer.appendChild(spinner);
-    }
-
-    static hideLoadMoreSpinner() {
-        const spinner = document.getElementById('search-more-spinner');
-        if (spinner) {
-            spinner.remove();
-        }
-    }
-
-    // ✅ MEJORADO: Format duration con mejor manejo
     static formatDuration(duration) {
         if (!duration) return '0:00';
         
-        if (typeof duration === 'string') {
-            // Manejar formato "MM:SS" o "HH:MM:SS"
-            if (duration.includes(':')) {
-                return duration;
-            }
-            // Convertir string a número
-            duration = parseInt(duration, 10);
+        if (typeof duration === 'string' && duration.includes(':')) {
+            return duration;
         }
         
         if (typeof duration === 'number' && duration > 0) {
@@ -478,7 +350,6 @@ export class SearchManager {
         }
         
         if (typeof duration === 'string') {
-            // Formato "MM:SS" o "HH:MM:SS"
             if (duration.includes(':')) {
                 const parts = duration.split(':').map(p => parseInt(p, 10));
                 if (parts.length === 2) {
@@ -488,7 +359,6 @@ export class SearchManager {
                 }
             }
             
-            // Formato numérico como string
             const numDuration = parseInt(duration, 10);
             if (!isNaN(numDuration)) {
                 return numDuration;
@@ -498,23 +368,98 @@ export class SearchManager {
         return 0;
     }
 
-    // ✅ NUEVO: Función de testing para desarrollo
+    // ✅ GESTIÓN DE SCROLL Y PAGINACIÓN
+    static handleScroll() {
+        // Delegar al core si está disponible
+        if (window.unifiedCore?.searchManager?.handleScroll) {
+            return window.unifiedCore.searchManager.handleScroll();
+        }
+        
+        // Fallback básico
+        const state = window.unifiedStateManager?.state?.search;
+        if (!state || state.isLoadingMore || !state.nextPageContext || !state.currentSearchQuery) {
+            return;
+        }
+        
+        const container = document.getElementById('searchResults');
+        if (!container) return;
+        
+        const scrollThreshold = 200;
+        const scrollPosition = container.scrollTop + container.clientHeight;
+        const totalHeight = container.scrollHeight;
+        const bottomReached = scrollPosition >= totalHeight - scrollThreshold;
+        
+        if (bottomReached) {
+            console.log("📄 Scroll cerca del final (fallback)");
+            SearchManager.performSearch(state.currentSearchQuery, state.nextPageContext);
+        }
+    }
+
+    static showLoadMoreSpinner() {
+        const container = document.getElementById('searchResults');
+        if (!container) return;
+
+        const existingSpinner = document.getElementById('search-more-spinner');
+        if (existingSpinner) return;
+
+        const spinner = document.createElement('div');
+        spinner.id = 'search-more-spinner';
+        spinner.innerHTML = `
+            <div style="display: flex; justify-content: center; align-items: center; padding: 20px; gap: 8px; color: #aaa;">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Cargando más resultados...</span>
+            </div>
+        `;
+        
+        container.appendChild(spinner);
+    }
+
+    static hideLoadMoreSpinner() {
+        const spinner = document.getElementById('search-more-spinner');
+        if (spinner) {
+            spinner.remove();
+        }
+    }
+
+    static handleSearchError(error, isLoadMore, query) {
+        console.error("❌ Error en búsqueda:", error);
+        
+        const errorMessage = `Error de búsqueda: ${error?.message || 'Instancias no disponibles'}`;
+        
+        if (!isLoadMore) {
+            const resultsDiv = document.getElementById('searchResults');
+            if (resultsDiv) {
+                resultsDiv.innerHTML = `
+                    <div class="search-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>${errorMessage}</p>
+                        <button onclick="SearchManager.performSearch('${query || ''}')" 
+                                class="retry-search-btn">
+                            <i class="fas fa-redo"></i> Reintentar
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            window.unifiedMessageManager?.show(errorMessage, 'error');
+            SearchManager.hideLoadMoreSpinner();
+        }
+    }
+
+    // ✅ FUNCIONES DE TESTING Y DEBUG
     static async testPipedInstances() {
         console.log('🧪 Testing Piped instances...');
         
-        const CONFIG = window.CONFIG || {
-            PIPED_INSTANCES: [
-                "https://api.piped.private.coffee",
-                "https://pipedapi.ducks.party",
-                "https://piped-api.kavin.rocks",
-                "https://api.piped.tokhmi.xyz"
-            ]
-        };
+        const PIPED_INSTANCES = window.CONFIG?.PIPED_INSTANCES || [
+            "https://api.piped.private.coffee",
+            "https://pipedapi.ducks.party",
+            "https://piped-api.kavin.rocks"
+        ];
         
         const testQuery = 'test music';
         const results = [];
         
-        for (const instance of CONFIG.PIPED_INSTANCES) {
+        for (const instance of PIPED_INSTANCES) {
             try {
                 console.log(`🔍 Testing: ${instance}`);
                 const startTime = Date.now();
@@ -576,20 +521,17 @@ export class SearchManager {
         return results;
     }
 
-    // ✅ NUEVO: Obtener instancia más rápida
     static async getBestPipedInstance() {
-        const CONFIG = window.CONFIG || {
-            PIPED_INSTANCES: [
-                "https://api.piped.private.coffee",
-                "https://pipedapi.ducks.party"
-            ]
-        };
+        const PIPED_INSTANCES = window.CONFIG?.PIPED_INSTANCES || [
+            "https://api.piped.private.coffee",
+            "https://pipedapi.ducks.party"
+        ];
         
-        const promises = CONFIG.PIPED_INSTANCES.map(async (instance) => {
+        const promises = PIPED_INSTANCES.map(async (instance) => {
             try {
                 const startTime = Date.now();
                 const response = await fetch(`${instance}/trending`, {
-                    method: 'HEAD', // Solo verificar conectividad
+                    method: 'HEAD',
                     signal: AbortSignal.timeout(5000)
                 });
                 
@@ -618,7 +560,86 @@ export class SearchManager {
         console.warn('⚠️ No hay instancias de Piped disponibles');
         return null;
     }
+
+    // ✅ UTILIDADES DE ESTADO
+    static getSearchState() {
+        return window.unifiedStateManager?.state?.search || {
+            currentSearchQuery: '',
+            nextPageContext: null,
+            isLoadingMore: false,
+            resultsContainer: null,
+            resultsDiv: null
+        };
+    }
+
+    static clearResults() {
+        const resultsDiv = document.getElementById('searchResults');
+        if (resultsDiv) {
+            resultsDiv.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>Busca música, artistas o playlists</p>
+                    <p><small>Escribe en la barra de búsqueda para empezar</small></p>
+                </div>
+            `;
+        }
+        
+        // Reset state
+        if (window.unifiedStateManager) {
+            window.unifiedStateManager.set('search.currentSearchQuery', '');
+            window.unifiedStateManager.set('search.nextPageContext', null);
+            window.unifiedStateManager.set('search.isLoadingMore', false);
+        }
+    }
+
+    // ✅ MIGRACIÓN Y COMPATIBILIDAD
+    static checkCoreAvailability() {
+        return {
+            coreAvailable: !!window.unifiedCore,
+            coreInitialized: window.unifiedCore?.initialized || false,
+            searchManagerAvailable: !!window.unifiedCore?.searchManager,
+            fallbackRequired: !window.unifiedCore?.initialized
+        };
+    }
+
+    static getDebugInfo() {
+        const coreCheck = SearchManager.checkCoreAvailability();
+        const searchState = SearchManager.getSearchState();
+        
+        return {
+            timestamp: Date.now(),
+            core: coreCheck,
+            state: searchState,
+            resultsElement: !!document.getElementById('searchResults'),
+            config: {
+                pipedInstances: window.CONFIG?.PIPED_INSTANCES?.length || 0
+            }
+        };
+    }
 }
+
+// ✅ SETUP AUTOMÁTICO
+document.addEventListener('DOMContentLoaded', () => {
+    // Verificar disponibilidad del core
+    const coreCheck = setInterval(() => {
+        if (window.unifiedCore?.initialized) {
+            console.log('✅ SearchManager: Core unificado disponible');
+            clearInterval(coreCheck);
+            
+            // El core ya maneja la inicialización
+            console.log('🔍 SearchManager delegando inicialización al core');
+        }
+    }, 100);
+    
+    // Timeout para inicialización fallback
+    setTimeout(() => {
+        clearInterval(coreCheck);
+        if (!window.unifiedCore?.initialized) {
+            console.warn('⚠️ SearchManager: Timeout esperando core, usando inicialización fallback');
+            SearchManager.fallbackInitialize();
+        }
+    }, 10000);
+});
 
 // ✅ REFERENCIAS GLOBALES Y DEBUG
 if (typeof window !== 'undefined') {
@@ -629,16 +650,22 @@ if (typeof window !== 'undefined') {
         testInstances: () => SearchManager.testPipedInstances(),
         getBestInstance: () => SearchManager.getBestPipedInstance(),
         performSearch: (query) => SearchManager.performSearch(query),
-        getState: () => window.unifiedStateManager?.state?.search,
-        clearResults: () => {
-            const resultsDiv = document.getElementById('searchResults');
-            if (resultsDiv) {
-                resultsDiv.innerHTML = '<div class="search-placeholder"><i class="fas fa-search"></i><p>Resultados limpiados</p></div>';
-            }
+        getState: () => SearchManager.getSearchState(),
+        getDebugInfo: () => SearchManager.getDebugInfo(),
+        clearResults: () => SearchManager.clearResults(),
+        checkCore: () => SearchManager.checkCoreAvailability(),
+        testFallback: () => {
+            // Temporary disable core for testing
+            const originalCore = window.unifiedCore;
+            window.unifiedCore = null;
+            SearchManager.performSearch('test music');
+            setTimeout(() => {
+                window.unifiedCore = originalCore;
+            }, 5000);
         }
     };
 }
 
-console.log('✅ SearchManager cargado - VERSIÓN PIPED API DIRECTA');
-console.log('🔧 Instancias Piped configuradas para búsqueda directa');
-console.log('📡 Testing disponible: window.SearchDebug.testInstances()');
+console.log('✅ SearchManager cargado - VERSIÓN INTEGRADA CON CORE UNIFICADO');
+console.log('🔧 SearchDebug disponible: window.SearchDebug.testInstances()');
+console.log('📡 Instancias Piped configuradas para búsqueda directa con fallback');
