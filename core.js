@@ -716,7 +716,7 @@ class UnifiedModuleLoader {
             await this.setupModule(moduleName, module);
             
         } catch (error) {
-            console.error(`💥 Error cargando módulo ${moduleName}:`, error);
+            console.log(`💥 Error cargando módulo ${moduleName}:`, error);
             this.errors.set(moduleName, error);
             
             if (this.isCriticalModule(moduleName)) {
