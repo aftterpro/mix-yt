@@ -1,19 +1,54 @@
-// ===== PLAYLISTMANAGER.JS CORREGIDO - GESTIÓN MEJORADA =====
-// Versión corregida con inicialización de cola vacía y mejor manejo
+// ===== PLAYLISTMANAGER.JS - CORREGIDO E INTEGRADO =====
+// Versión que delega funciones principales al core y mantiene funciones específicas de UI
 
 export class PlaylistManager {
     
-    // ✅ NUEVO: Inicializar cola de reproducción vacía
+    // ✅ DELEGACIÓN PRINCIPAL AL CORE UNIFICADO
     static initializeManualPlaylist() {
+        if (window.unifiedCore?.playlistManager?.initialize) {
+            return window.unifiedCore.playlistManager.initialize();
+        } else {
+            console.warn('⚠️ Core unificado no disponible, inicializando playlist manual básica');
+            return PlaylistManager.fallbackInitializeManual();
+        }
+    }
+
+    static getFlattenedPlaylist() {
+        if (window.unifiedCore?.playlistManager?.getFlattenedPlaylist) {
+            return window.unifiedCore.playlistManager.getFlattenedPlaylist();
+        } else {
+            console.warn('⚠️ Core unificado no disponible, usando fallback para lista plana');
+            return PlaylistManager.fallbackGetFlattenedPlaylist();
+        }
+    }
+
+    static addVideoToManualPlaylist(videoData) {
+        if (window.unifiedCore?.playlistManager?.addVideoToManualPlaylist) {
+            return window.unifiedCore.playlistManager.addVideoToManualPlaylist(videoData);
+        } else {
+            console.warn('⚠️ Core unificado no disponible, usando fallback para añadir video');
+            return PlaylistManager.fallbackAddVideoToManual(videoData);
+        }
+    }
+
+    static updateCurrentPlayingIndex() {
+        if (window.unifiedCore?.playlistManager?.updateCurrentPlayingIndex) {
+            return window.unifiedCore.playlistManager.updateCurrentPlayingIndex();
+        } else {
+            console.warn('⚠️ Core unificado no disponible, usando fallback para actualizar índice');
+            return PlaylistManager.fallbackUpdateCurrentIndex();
+        }
+    }
+
+    // ✅ FALLBACKS PARA COMPATIBILIDAD
+    static fallbackInitializeManual() {
         const state = window.unifiedStateManager?.state;
         if (!state) {
-            console.warn('⚠️ Estado unificado no disponible para inicializar cola');
+            console.error('❌ Estado unificado no disponible');
             return;
         }
         
-        const playlistsData = [...state.playlist.playlistsData];
-        
-        // Buscar si ya existe la playlist manual
+        const playlistsData = state.playlist.playlistsData || [];
         const existingManual = playlistsData.find(p => p.id === 'manual');
         
         if (!existingManual) {
@@ -21,39 +56,27 @@ export class PlaylistManager {
                 id: 'manual',
                 name: 'Cola de Reproducción',
                 thumbnailUrl: '/electronic.ico',
-                videos: [], // ✅ COLA VACÍA AL INICIO
+                videos: [],
                 isExpanded: false,
                 source: 'manual',
                 isLoaded: true,
                 itemCount: 0
             };
             
-            // Añadir al inicio de la lista (para que aparezca primera)
-            playlistsData.unshift(manualPlaylist);
-            window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-            console.log('📋 Cola de reproducción inicializada (vacía)');
-        } else {
-            // Si ya existe, asegurar que tenga la estructura correcta
-            const index = playlistsData.findIndex(p => p.id === 'manual');
-            if (index !== -1) {
-                playlistsData[index] = {
-                    ...playlistsData[index],
-                    videos: playlistsData[index].videos || [], // Asegurar array
-                    isLoaded: true,
-                    source: 'manual'
-                };
-                window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-                console.log('📋 Cola de reproducción ya existía, estructura verificada');
-            }
+            const updatedPlaylists = [manualPlaylist, ...playlistsData];
+            window.unifiedStateManager.set('playlist.playlistsData', updatedPlaylists);
+            console.log('✅ Cola de reproducción inicializada (fallback)');
         }
     }
 
-    // ✅ MEJORADO: Obtener lista plana con mejor gestión
-    static getFlattenedPlaylist() {
-        const playlistsData = window.unifiedStateManager?.state?.playlist?.playlistsData || [];
+    static fallbackGetFlattenedPlaylist() {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return [];
+        
+        const playlistsData = state.playlist.playlistsData || [];
         let flatList = [];
         
-        // Solo incluir playlist manual (cola de reproducción) para el playback
+        // Solo incluir playlist manual para reproducción
         const manualPlaylist = playlistsData.find(p => p.id === 'manual');
         
         if (manualPlaylist && manualPlaylist.videos && Array.isArray(manualPlaylist.videos)) {
@@ -65,102 +88,24 @@ export class PlaylistManager {
             });
         }
         
-        console.log('📊 Lista plana generada:', flatList.length, 'videos de cola');
         return flatList;
     }
 
-    // ✅ MEJORADO: Actualizar índice de reproducción actual
-    static updateCurrentPlayingIndex() {
-        const flatList = PlaylistManager.getFlattenedPlaylist();
-        let playingVideoId = null;
-        let activePlayerNum = null;
-
+    static fallbackAddVideoToManual(videoData) {
         const state = window.unifiedStateManager?.state;
-        if (!state) return;
-
-        try {
-            if (state.app.player1 && state.app.player1.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = state.app.player1.getVideoData()?.video_id;
-                activePlayerNum = 1;
-            } else if (state.app.player2 && state.app.player2.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = state.app.player2.getVideoData()?.video_id;
-                activePlayerNum = 2;
-            }
-        } catch (e) {
-            console.error("Error getting playing video data:", e);
-        }
-        
-        if (playingVideoId) {
-            const currentInfo = state.playlist.currentPlayingInfo;
-            if (currentInfo.videoId !== playingVideoId || currentInfo.flattenedIndex < 0) {
-                const newFlatIndex = flatList.findIndex(v => v.videoId === playingVideoId);
-                if (newFlatIndex !== -1) {
-                    const currentVideoObject = flatList[newFlatIndex];
-                    
-                    // Actualizar estado unificado
-                    window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', playingVideoId);
-                    window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', 'manual');
-                    window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', newFlatIndex);
-                    
-                    console.log(`🎵 Índice actualizado: ${newFlatIndex} (Video: ${playingVideoId})`);
-                    
-                    // Actualizar UI
-                    if (window.UIManager?.updatePlaylistsUI) {
-                        window.UIManager.updatePlaylistsUI();
-                    }
-                    
-                    // Actualizar cola si está visible
-                    const queueSection = document.getElementById('queueSection');
-                    if (queueSection && !queueSection.classList.contains('hidden')) {
-                        if (window.UIManager?.updateQueueContent) {
-                            window.UIManager.updateQueueContent();
-                        }
-                    }
-                }
-            }
-
-            if (activePlayerNum && state.app.currentPlayer !== activePlayerNum) {
-                console.log(`🔄 Sincronizando currentPlayer a ${activePlayerNum}`);
-                window.unifiedStateManager.set('app.currentPlayer', activePlayerNum);
-            }
-        } else {
-            const currentInfo = state.playlist.currentPlayingInfo;
-            if (currentInfo.flattenedIndex !== -1) {
-                console.log("▫️ Reproducción detenida, reseteando índice");
-                window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', null);
-                window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', null);
-                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', -1);
-                
-                if (window.UIManager?.updatePlaylistsUI) {
-                    window.UIManager.updatePlaylistsUI();
-                }
-            }
-        }
-    }
-
-    // ✅ MEJORADO: Añadir video a la cola de reproducción
-    static addVideoToManualPlaylist(videoData) {
-        const state = window.unifiedStateManager?.state;
-        if (!state) {
-            console.warn('⚠️ Estado unificado no disponible');
-            return null;
-        }
+        if (!state) return null;
 
         const playlistsData = [...state.playlist.playlistsData];
         let manualPlaylist = playlistsData.find(p => p.id === 'manual');
 
-        // Si no existe la playlist manual, crearla
         if (!manualPlaylist) {
-            console.log('📋 Creando cola de reproducción...');
-            PlaylistManager.initializeManualPlaylist();
-            
-            // Recargar datos después de crear
-            const updatedData = window.unifiedStateManager.state.playlist.playlistsData;
-            manualPlaylist = updatedData.find(p => p.id === 'manual');
+            PlaylistManager.fallbackInitializeManual();
+            const updatedState = window.unifiedStateManager.state.playlist.playlistsData;
+            manualPlaylist = updatedState.find(p => p.id === 'manual');
         }
 
         if (!manualPlaylist) {
-            console.error('❌ No se pudo crear/encontrar la cola de reproducción');
+            console.error('❌ No se pudo crear cola de reproducción');
             return null;
         }
 
@@ -172,17 +117,16 @@ export class PlaylistManager {
             return null;
         }
 
-        // Preparar objeto de video
         const videoObject = {
             videoId: videoData.videoId,
             title: videoData.title || "Título no disponible",
             thumbnail: videoData.thumbnail || `https://img.youtube.com/vi/${videoData.videoId}/default.jpg`,
             duration: videoData.duration || 0,
-            channelTitle: videoData.channelTitle || videoData.uploaderName || 'Desconocido',
+            channelTitle: videoData.channelTitle || 'Desconocido',
             addedAt: Date.now()
         };
 
-        // Añadir video a la cola
+        // Actualizar playlist
         const updatedPlaylistsData = [...state.playlist.playlistsData];
         const manualIndex = updatedPlaylistsData.findIndex(p => p.id === 'manual');
         
@@ -193,200 +137,75 @@ export class PlaylistManager {
                 itemCount: updatedPlaylistsData[manualIndex].videos.length + 1
             };
             
-            // Actualizar estado
             window.unifiedStateManager.set('playlist.playlistsData', updatedPlaylistsData);
+            console.log(`✅ Video añadido (fallback): "${videoObject.title}"`);
             
-            console.log(`✅ Video añadido a cola: "${videoObject.title}" (Total: ${updatedPlaylistsData[manualIndex].videos.length})`);
-            
-            // Actualizar UI si es necesario
-            if (window.UIManager?.updatePlaylistsUI) {
-                window.UIManager.updatePlaylistsUI();
-            }
-            
-            // Habilitar botón play si hay videos y reproductores listos
+            // Habilitar botón play si es necesario
             PlaylistManager.checkAndEnablePlayButton();
             
             return videoObject;
         }
 
-        console.error('❌ Error actualizando cola de reproducción');
         return null;
     }
 
-    // ✅ MEJORADO: Eliminar video con mejor gestión
-    static deleteVideo(playlistId, videoId) {
-        const state = window.unifiedStateManager?.state;
-        if (!state) return false;
-
-        const playlistsData = [...state.playlist.playlistsData];
-        const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
-        if (playlistIndex === -1) {
-            console.warn('⚠️ Playlist no encontrada:', playlistId);
-            return false;
-        }
-
-        const playlist = playlistsData[playlistIndex];
-        if (!playlist.videos) {
-            console.warn('⚠️ Playlist sin videos:', playlistId);
-            return false;
-        }
-
-        const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
-        if (videoIndex === -1) {
-            console.warn('⚠️ Video no encontrado en playlist:', videoId);
-            return false;
-        }
-
-        const deletedVideo = playlist.videos[videoIndex];
-        
-        // Eliminar video
-        playlistsData[playlistIndex] = {
-            ...playlist,
-            videos: playlist.videos.filter(v => v.videoId !== videoId),
-            itemCount: playlist.videos.length - 1
-        };
-        
-        // Si la playlist queda vacía y no es manual, eliminar playlist completa
-        if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
-            playlistsData.splice(playlistIndex, 1);
-            console.log(`🗑️ Playlist "${playlist.name}" eliminada por quedar vacía`);
-        }
-
-        // Actualizar estado
-        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-
-        console.log(`🗑️ Video eliminado: "${deletedVideo.title}" de "${playlist.name}"`);
-        
-        // Si se eliminó de la cola, verificar reproducción actual
-        if (playlistId === 'manual') {
-            const currentInfo = state.playlist.currentPlayingInfo;
-            if (currentInfo.videoId === videoId) {
-                // El video que se está reproduciendo fue eliminado
-                console.log('⏹️ Video en reproducción eliminado, pasando al siguiente...');
-                
-                setTimeout(() => {
-                    if (window.PlaybackController?.playNextVideo) {
-                        window.PlaybackController.playNextVideo();
-                    }
-                }, 500);
-            }
-        }
-        
-        // Actualizar UI
-        if (window.UIManager?.updatePlaylistsUI) {
-            window.UIManager.updatePlaylistsUI();
-        }
-        
-        // Actualizar índices de reproducción
-        PlaylistManager.updateCurrentPlayingIndex();
-
-        return true;
-    }
-
-    // ✅ MEJORADO: Verificar y habilitar botón play
-    static checkAndEnablePlayButton() {
+    static fallbackUpdateCurrentIndex() {
         const flatList = PlaylistManager.getFlattenedPlaylist();
-        const playersReady = window.unifiedStateManager?.state?.app?.playersInitialized;
-        
-        const playButton = document.getElementById('botonPlay');
-        const nextButton = document.getElementById('botonNext');
-        
-        if (flatList.length > 0 && playersReady) {
-            if (playButton) {
-                playButton.disabled = false;
-                playButton.title = 'Reproducir cola';
-            }
-            if (nextButton) {
-                nextButton.disabled = false;
-            }
-            console.log(`✅ Botones habilitados - Cola: ${flatList.length} videos`);
-        } else {
-            if (playButton) {
-                playButton.disabled = true;
-                playButton.title = flatList.length === 0 ? 'Cola vacía' : 'Reproductores no listos';
-            }
-            if (nextButton) {
-                nextButton.disabled = flatList.length === 0;
-            }
-            console.log(`⏸️ Botones deshabilitados - Cola: ${flatList.length}, Players: ${playersReady}`);
-        }
-    }
-
-    // ✅ MEJORADO: Manejar carga de playlist externa
-    static async handlePlaylistLoaded(playlistInfo) {
-        console.log('📥 Procesando playlist cargada:', playlistInfo.name || playlistInfo.id);
-
-        if (!playlistInfo || !playlistInfo.relatedStreams || !Array.isArray(playlistInfo.relatedStreams)) {
-            const failedPlaylistId = playlistInfo?.id || 'desconocida';
-            window.unifiedMessageManager?.show(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`, 'error');
-            console.error("❌ Respuesta inválida de getPlaylistInfo:", playlistInfo);
-            return;
-        }
-
-        const playlistId = playlistInfo.id || `playlist_${Date.now()}`;
         const state = window.unifiedStateManager?.state;
         if (!state) return;
 
-        // Verificar si ya existe
-        if (state.playlist.playlistsData.some(p => p.id === playlistId)) {
-            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" ya está cargada.`, 'warning');
-            return;
+        let playingVideoId = null;
+        let activePlayerNum = null;
+
+        try {
+            if (state.app.player1 && state.app.player1.getPlayerState() === YT.PlayerState.PLAYING) {
+                playingVideoId = state.app.player1.getVideoData()?.video_id;
+                activePlayerNum = 1;
+            } else if (state.app.player2 && state.app.player2.getPlayerState() === YT.PlayerState.PLAYING) {
+                playingVideoId = state.app.player2.getVideoData()?.video_id;
+                activePlayerNum = 2;
+            }
+        } catch (e) {
+            console.error("Error obteniendo datos de video:", e);
         }
+        
+        if (playingVideoId) {
+            const currentInfo = state.playlist.currentPlayingInfo;
+            if (currentInfo.videoId !== playingVideoId || currentInfo.flattenedIndex < 0) {
+                const newFlatIndex = flatList.findIndex(v => v.videoId === playingVideoId);
+                if (newFlatIndex !== -1) {
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', playingVideoId);
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', 'manual');
+                    window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', newFlatIndex);
+                    
+                    console.log(`🎵 Índice actualizado (fallback): ${newFlatIndex}`);
+                    
+                    if (window.UIManager?.updatePlaylistsUI) {
+                        window.UIManager.updatePlaylistsUI();
+                    }
+                }
+            }
 
-        // Procesar videos
-        const loadedVideos = playlistInfo.relatedStreams
-            .filter(video => video.title && video.title !== 'Private video' && video.title !== 'Deleted video')
-            .map(video => ({
-                videoId: video.url?.split('v=')[1] || video.url?.split('/').pop(),
-                title: video.title || "Título Desconocido",
-                thumbnail: video.thumbnail || `https://img.youtube.com/vi/${video.url?.split('v=')[1]}/default.jpg`,
-                duration: PlaylistManager.parseDuration(video.duration) || 0,
-                channelTitle: video.uploaderName || 'Desconocido',
-                uploaderUrl: video.uploaderUrl || ''
-            }))
-            .filter(v => v.videoId);
-
-        if (loadedVideos.length === 0) {
-            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`, 'warning');
-            return;
-        }
-
-        // Crear nueva playlist
-        const newPlaylist = {
-            id: playlistId,
-            name: playlistInfo.name || "Playlist Sin Nombre",
-            thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || '',
-            videos: loadedVideos,
-            isExpanded: false,
-            source: 'external',
-            isLoaded: true,
-            itemCount: loadedVideos.length,
-            loadedAt: Date.now()
-        };
-
-        // Añadir a la lista (después de manual)
-        const playlistsData = [...state.playlist.playlistsData];
-        const manualIndex = playlistsData.findIndex(p => p.id === 'manual');
-        if (manualIndex !== -1) {
-            playlistsData.splice(manualIndex + 1, 0, newPlaylist);
+            if (activePlayerNum && state.app.currentPlayer !== activePlayerNum) {
+                window.unifiedStateManager.set('app.currentPlayer', activePlayerNum);
+            }
         } else {
-            playlistsData.push(newPlaylist);
+            const currentInfo = state.playlist.currentPlayingInfo;
+            if (currentInfo.flattenedIndex !== -1) {
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', null);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.playlistId', null);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', -1);
+                
+                if (window.UIManager?.updatePlaylistsUI) {
+                    window.UIManager.updatePlaylistsUI();
+                }
+            }
         }
-        
-        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
-
-        console.log(`✅ Playlist "${newPlaylist.name}" añadida con ${loadedVideos.length} videos`);
-        window.unifiedMessageManager?.show(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos).`, 'success');
-        
-        // Actualizar UI
-        if (window.UIManager?.updatePlaylistsUI) {
-            window.UIManager.updatePlaylistsUI();
-        }
-        
-        PlaylistManager.checkAndEnablePlayButton();
     }
 
-    // ✅ MEJORADO: Toggle expansion con mejor manejo de YouTube Library
+    // ✅ FUNCIONES ESPECÍFICAS DE UI Y LÓGICA COMPLEJA (mantener independientes)
+    
+    // ✅ Del backup: Toggle expansion mejorado con carga bajo demanda
     static async togglePlaylistExpansion(playlistId) {
         const state = window.unifiedStateManager?.state;
         if (!state) return;
@@ -401,7 +220,7 @@ export class PlaylistManager {
 
         const playlist = playlistsData[playlistIndex];
 
-        // Lógica para YouTube Library
+        // ✅ Del backup: Lógica para YouTube Library con carga bajo demanda
         if (playlist.source === 'youtube_library' && !playlist.isLoaded && !playlist.isExpanded) {
             console.log(`📡 Cargando videos de YouTube Library: ${playlist.name}`);
             
@@ -463,35 +282,110 @@ export class PlaylistManager {
         }
     }
 
-    // ✅ NUEVO: Procesar playlists de YouTube Library
-    static processYouTubeLibraryPlaylists(playlists) {
-        console.log('📚 Procesando playlists de YouTube Library:', playlists.length);
+    // ✅ Del backup: Eliminar video con gestión de estado mejorada
+    static deleteVideo(playlistId, videoId) {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return false;
+
+        const playlistsData = [...state.playlist.playlistsData];
+        const playlistIndex = playlistsData.findIndex(p => p.id === playlistId);
+        if (playlistIndex === -1) {
+            console.warn('⚠️ Playlist no encontrada:', playlistId);
+            return false;
+        }
+
+        const playlist = playlistsData[playlistIndex];
+        if (!playlist.videos) {
+            console.warn('⚠️ Playlist sin videos:', playlistId);
+            return false;
+        }
+
+        const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
+        if (videoIndex === -1) {
+            console.warn('⚠️ Video no encontrado en playlist:', videoId);
+            return false;
+        }
+
+        const deletedVideo = playlist.videos[videoIndex];
         
+        // Eliminar video
+        playlistsData[playlistIndex] = {
+            ...playlist,
+            videos: playlist.videos.filter(v => v.videoId !== videoId),
+            itemCount: playlist.videos.length - 1
+        };
+        
+        // Si la playlist queda vacía y no es manual, eliminar playlist completa
+        if (playlistsData[playlistIndex].videos.length === 0 && playlistId !== 'manual') {
+            playlistsData.splice(playlistIndex, 1);
+            console.log(`🗑️ Playlist "${playlist.name}" eliminada por quedar vacía`);
+        }
+
+        // Actualizar estado
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+
+        console.log(`🗑️ Video eliminado: "${deletedVideo.title}" de "${playlist.name}"`);
+        
+        // Si se eliminó de la cola, verificar reproducción actual
+        if (playlistId === 'manual') {
+            const currentInfo = state.playlist.currentPlayingInfo;
+            if (currentInfo.videoId === videoId) {
+                console.log('⏹️ Video en reproducción eliminado, pasando al siguiente...');
+                
+                setTimeout(() => {
+                    if (window.PlaybackController?.playNextVideo) {
+                        window.PlaybackController.playNextVideo();
+                    }
+                }, 500);
+            }
+        }
+        
+        // Actualizar UI
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
+        
+        // Actualizar índices de reproducción
+        PlaylistManager.updateCurrentPlayingIndex();
+
+        return true;
+    }
+
+    // ✅ NUEVO: Procesar playlists de YouTube Library
+    static addYouTubeLibraryPlaylists(youtubePlaylists) {
+        if (!youtubePlaylists || youtubePlaylists.length === 0) {
+            window.unifiedMessageManager?.show("No se encontraron playlists en tu biblioteca de YouTube.", 'info');
+            return;
+        }
+
         const state = window.unifiedStateManager?.state;
         if (!state) return;
-        
-        const processedPlaylists = playlists.map(playlist => ({
-            id: playlist.id,
-            name: playlist.snippet?.title || 'Playlist Sin Nombre',
-            thumbnailUrl: playlist.snippet?.thumbnails?.medium?.url || 
-                         playlist.snippet?.thumbnails?.default?.url || '',
-            videos: null, // Se cargarán bajo demanda
-            isExpanded: false,
-            source: 'youtube_library',
-            isLoaded: false,
-            itemCount: playlist.contentDetails?.itemCount || 0,
-            originalData: playlist // Para referencia
-        }));
-        
+
+        // ✅ Del backup: Transformar datos de la API al formato de la app
+        const formattedPlaylists = youtubePlaylists.map(playlist => {
+            if (!playlist.snippet.title || playlist.contentDetails.itemCount === 0) {
+                return null;
+            }
+            return {
+                id: playlist.id,
+                name: playlist.snippet.title,
+                thumbnailUrl: playlist.snippet.thumbnails.high?.url || playlist.snippet.thumbnails.default.url,
+                videos: [],
+                isExpanded: false,
+                source: 'youtube_library',
+                isLoaded: false,
+                itemCount: playlist.contentDetails.itemCount || 0,
+                originalData: playlist
+            };
+        }).filter(p => p !== null);
+
         // Combinar con playlists existentes
         const currentPlaylists = [...state.playlist.playlistsData];
-        
-        // Asegurar que manual esté primero
         const manualPlaylist = currentPlaylists.find(p => p.id === 'manual');
         const otherPlaylists = currentPlaylists.filter(p => p.id !== 'manual');
         
         // Filtrar duplicados por ID
-        const newPlaylists = processedPlaylists.filter(newPl => 
+        const newPlaylists = formattedPlaylists.filter(newPl => 
             !otherPlaylists.some(existing => existing.id === newPl.id)
         );
         
@@ -503,9 +397,10 @@ export class PlaylistManager {
         
         window.unifiedStateManager.set('playlist.playlistsData', finalPlaylists);
         
-        console.log(`✅ ${newPlaylists.length} nuevas playlists de YouTube Library procesadas`);
+        console.log(`✅ ${newPlaylists.length} nuevas playlists de YouTube Library añadidas`);
+        window.unifiedMessageManager?.show(`${newPlaylists.length} playlists de tu biblioteca añadidas.`, 'success');
         
-        // Trigger UI update
+        // Actualizar UI
         if (window.UIManager?.updatePlaylistsUI) {
             setTimeout(() => {
                 window.UIManager.updatePlaylistsUI();
@@ -513,6 +408,136 @@ export class PlaylistManager {
         }
         
         return newPlaylists.length;
+    }
+
+    // ✅ Del backup: Limpiar playlists de YouTube Library
+    static clearYouTubeLibraryPlaylists() {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+
+        const initialCount = state.playlist.playlistsData.length;
+        const filteredPlaylists = state.playlist.playlistsData.filter(p => p.source !== 'youtube_library');
+        const removedCount = initialCount - filteredPlaylists.length;
+        
+        if (removedCount > 0) {
+            window.unifiedStateManager.set('playlist.playlistsData', filteredPlaylists);
+            console.log(`🗑️ ${removedCount} playlists de YouTube Library eliminadas`);
+            
+            if (window.UIManager?.updatePlaylistsUI) {
+                window.UIManager.updatePlaylistsUI();
+            }
+        }
+    }
+
+    // ✅ Del backup: Manejar carga de playlist externa mejorada
+    static async handlePlaylistLoaded(playlistInfo) {
+        console.log('📥 Procesando playlist cargada:', playlistInfo.name || playlistInfo.id);
+
+        if (!playlistInfo || !playlistInfo.relatedStreams || !Array.isArray(playlistInfo.relatedStreams)) {
+            const failedPlaylistId = playlistInfo?.id || 'desconocida';
+            window.unifiedMessageManager?.show(`No se encontraron videos válidos en la playlist ${failedPlaylistId}.`, 'error');
+            console.error("❌ Respuesta inválida de getPlaylistInfo:", playlistInfo);
+            return;
+        }
+
+        const playlistId = playlistInfo.id || `playlist_${Date.now()}`;
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+
+        // Verificar si ya existe
+        if (state.playlist.playlistsData.some(p => p.id === playlistId)) {
+            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" ya está cargada.`, 'warning');
+            return;
+        }
+
+        // ✅ Del backup: Procesar videos con filtrado robusto
+        const loadedVideos = playlistInfo.relatedStreams
+            .filter(video => video.title && video.title !== 'Private video' && video.title !== 'Deleted video')
+            .map(video => ({
+                videoId: video.url?.split('v=')[1] || video.url?.split('/').pop(),
+                title: video.title || "Título Desconocido",
+                thumbnail: video.thumbnail || `https://img.youtube.com/vi/${video.url?.split('v=')[1]}/default.jpg`,
+                duration: PlaylistManager.parseDuration(video.duration) || 0,
+                channelTitle: video.uploaderName || 'Desconocido',
+                uploaderUrl: video.uploaderUrl || ''
+            }))
+            .filter(v => v.videoId);
+
+        if (loadedVideos.length === 0) {
+            window.unifiedMessageManager?.show(`La playlist "${playlistInfo.name || playlistId}" no contiene videos válidos.`, 'warning');
+            return;
+        }
+
+        // Crear nueva playlist
+        const newPlaylist = {
+            id: playlistId,
+            name: playlistInfo.name || "Playlist Sin Nombre",
+            thumbnailUrl: playlistInfo.thumbnailUrl || loadedVideos[0]?.thumbnail || '',
+            videos: loadedVideos,
+            isExpanded: false,
+            source: 'external',
+            isLoaded: true,
+            itemCount: loadedVideos.length,
+            loadedAt: Date.now()
+        };
+
+        // ✅ Del backup: Lógica de ordenamiento
+        const playlistsData = [...state.playlist.playlistsData];
+        const manualIndex = playlistsData.findIndex(p => p.id === 'manual');
+        if (manualIndex !== -1) {
+            playlistsData.splice(manualIndex + 1, 0, newPlaylist);
+        } else {
+            playlistsData.push(newPlaylist);
+        }
+        
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+
+        console.log(`✅ Playlist "${newPlaylist.name}" añadida con ${loadedVideos.length} videos`);
+        window.unifiedMessageManager?.show(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos).`, 'success');
+        
+        // Actualizar UI
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
+        
+        PlaylistManager.checkAndEnablePlayButton();
+    }
+
+    // ✅ UTILIDADES Y FUNCIONES DE ESTADO
+    
+    static checkAndEnablePlayButton() {
+        const flatList = PlaylistManager.getFlattenedPlaylist();
+        const playersReady = window.unifiedStateManager?.state?.app?.playersInitialized;
+        
+        const playButton = document.getElementById('botonPlay');
+        const nextButton = document.getElementById('botonNext');
+        const prevButton = document.getElementById('prevButton');
+        
+        if (flatList.length > 0 && playersReady) {
+            if (playButton) {
+                playButton.disabled = false;
+                playButton.title = 'Reproducir cola';
+            }
+            if (nextButton) {
+                nextButton.disabled = false;
+            }
+            if (prevButton) {
+                prevButton.disabled = false;
+            }
+            console.log(`✅ Botones habilitados - Cola: ${flatList.length} videos`);
+        } else {
+            if (playButton) {
+                playButton.disabled = true;
+                playButton.title = flatList.length === 0 ? 'Cola vacía' : 'Reproductores no listos';
+            }
+            if (nextButton) {
+                nextButton.disabled = flatList.length === 0;
+            }
+            if (prevButton) {
+                prevButton.disabled = true;
+            }
+            console.log(`⏸️ Botones deshabilitados - Cola: ${flatList.length}, Players: ${playersReady}`);
+        }
     }
 
     // ✅ NUEVO: Limpiar cola de reproducción
@@ -606,7 +631,7 @@ export class PlaylistManager {
         }, 0);
     }
 
-    // ✅ UTILITY: Parsear duración (mantenido del original)
+    // ✅ Del backup: Parsear duración mejorado
     static parseDuration(durationInput) {
         if (typeof durationInput === 'number') {
             return Math.floor(durationInput);
@@ -638,16 +663,79 @@ export class PlaylistManager {
         return 0;
     }
 
-    // ✅ NUEVO: Debug y utilidades
+    // ✅ NUEVO: Mover video dentro de la cola (para drag & drop futuro)
+    static moveVideoInQueue(fromIndex, toIndex) {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return false;
+
+        const playlistsData = [...state.playlist.playlistsData];
+        const manualIndex = playlistsData.findIndex(p => p.id === 'manual');
+        
+        if (manualIndex === -1) return false;
+
+        const manualPlaylist = playlistsData[manualIndex];
+        if (!manualPlaylist.videos || fromIndex < 0 || toIndex < 0 || 
+            fromIndex >= manualPlaylist.videos.length || toIndex >= manualPlaylist.videos.length) {
+            return false;
+        }
+
+        // Mover video
+        const videos = [...manualPlaylist.videos];
+        const [movedVideo] = videos.splice(fromIndex, 1);
+        videos.splice(toIndex, 0, movedVideo);
+
+        playlistsData[manualIndex] = {
+            ...manualPlaylist,
+            videos: videos
+        };
+
+        window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+
+        console.log(`🔄 Video movido de posición ${fromIndex} a ${toIndex} en cola`);
+
+        // Actualizar índice de reproducción si es necesario
+        const currentInfo = state.playlist.currentPlayingInfo;
+        if (currentInfo.playlistId === 'manual' && currentInfo.flattenedIndex >= 0) {
+            if (currentInfo.flattenedIndex === fromIndex) {
+                // El video actual fue movido
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', toIndex);
+            } else if (fromIndex < currentInfo.flattenedIndex && toIndex >= currentInfo.flattenedIndex) {
+                // Video movido de antes a después del actual
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', currentInfo.flattenedIndex - 1);
+            } else if (fromIndex > currentInfo.flattenedIndex && toIndex <= currentInfo.flattenedIndex) {
+                // Video movido de después a antes del actual
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', currentInfo.flattenedIndex + 1);
+            }
+        }
+
+        if (window.UIManager?.updatePlaylistsUI) {
+            window.UIManager.updatePlaylistsUI();
+        }
+
+        return true;
+    }
+
+    // ✅ MIGRACIÓN Y COMPATIBILIDAD
+    static checkCoreAvailability() {
+        return {
+            coreAvailable: !!window.unifiedCore,
+            coreInitialized: window.unifiedCore?.initialized || false,
+            playlistManagerAvailable: !!window.unifiedCore?.playlistManager,
+            fallbackRequired: !window.unifiedCore?.initialized
+        };
+    }
+
     static getDebugInfo() {
         const state = window.unifiedStateManager?.state;
         if (!state) return { error: 'Estado no disponible' };
         
         const queueInfo = PlaylistManager.getQueueInfo();
         const flatList = PlaylistManager.getFlattenedPlaylist();
+        const coreCheck = PlaylistManager.checkCoreAvailability();
         
         return {
             timestamp: Date.now(),
+            core: coreCheck,
             totalPlaylists: state.playlist.playlistsData.length,
             queue: queueInfo,
             flatListCount: flatList.length,
@@ -656,33 +744,100 @@ export class PlaylistManager {
             reproductionStarted: state.app.reproduccionIniciada
         };
     }
+
+    // ✅ NUEVO: Obtener playlists por fuente
+    static getPlaylistsBySource(source) {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return [];
+        
+        return state.playlist.playlistsData.filter(p => p.source === source);
+    }
+
+    // ✅ NUEVO: Buscar video en todas las playlists
+    static findVideoInPlaylists(videoId) {
+        const state = window.unifiedStateManager?.state;
+        if (!state) return [];
+        
+        const found = [];
+        state.playlist.playlistsData.forEach(playlist => {
+            if (playlist.videos) {
+                const videoIndex = playlist.videos.findIndex(v => v.videoId === videoId);
+                if (videoIndex !== -1) {
+                    found.push({
+                        playlist: playlist,
+                        video: playlist.videos[videoIndex],
+                        index: videoIndex
+                    });
+                }
+            }
+        });
+        
+        return found;
+    }
 }
 
-// ✅ INICIALIZACIÓN AUTOMÁTICA
+// ✅ SETUP AUTOMÁTICO Y EVENT LISTENERS
 document.addEventListener('DOMContentLoaded', () => {
-    // Esperar a que el sistema unificado esté listo
-    if (window.unifiedStateManager) {
-        PlaylistManager.initializeManualPlaylist();
-    } else {
-        window.addEventListener('ytcrossmix:unified:ready', () => {
-            console.log('🎉 Inicializando PlaylistManager con sistema unificado listo...');
-            PlaylistManager.initializeManualPlaylist();
-        });
-    }
+    // Verificar disponibilidad del core
+    const coreCheck = setInterval(() => {
+        if (window.unifiedCore?.initialized) {
+            console.log('✅ PlaylistManager: Core unificado disponible');
+            clearInterval(coreCheck);
+            
+            // El core ya maneja la inicialización
+            console.log('📋 PlaylistManager delegando inicialización al core');
+        }
+    }, 100);
+    
+    // Timeout para inicialización fallback
+    setTimeout(() => {
+        clearInterval(coreCheck);
+        if (!window.unifiedCore?.initialized) {
+            console.warn('⚠️ PlaylistManager: Timeout esperando core, usando inicialización fallback');
+            PlaylistManager.fallbackInitializeManual();
+        }
+    }, 10000);
 });
 
-// ✅ REFERENCIAS GLOBALES
+// ✅ Event listeners para integración con auth.js
+document.addEventListener('playlistsFetched', (event) => {
+    console.log("📚 Evento 'playlistsFetched' recibido en PlaylistManager");
+    const libraryPlaylists = event.detail;
+    PlaylistManager.addYouTubeLibraryPlaylists(libraryPlaylists);
+});
+
+document.addEventListener('userLoggedOut', () => {
+    console.log("👤 Evento 'userLoggedOut' recibido en PlaylistManager");
+    PlaylistManager.clearYouTubeLibraryPlaylists();
+});
+
+// ✅ REFERENCIAS GLOBALES Y DEBUG
 if (typeof window !== 'undefined') {
     window.PlaylistManager = PlaylistManager;
     
-    // Debug helpers
+    // Debug helpers específicos
     window.PlaylistDebug = {
         getQueue: () => PlaylistManager.getQueueInfo(),
         getFlatList: () => PlaylistManager.getFlattenedPlaylist(),
         clearQueue: () => PlaylistManager.clearQueue(),
         getDebugInfo: () => PlaylistManager.getDebugInfo(),
-        initQueue: () => PlaylistManager.initializeManualPlaylist()
+        initQueue: () => PlaylistManager.initializeManualPlaylist(),
+        checkCore: () => PlaylistManager.checkCoreAvailability(),
+        findVideo: (videoId) => PlaylistManager.findVideoInPlaylists(videoId),
+        getBySource: (source) => PlaylistManager.getPlaylistsBySource(source),
+        testMove: (from, to) => PlaylistManager.moveVideoInQueue(from, to),
+        testFallback: () => {
+            // Temporary disable core for testing
+            const originalCore = window.unifiedCore;
+            window.unifiedCore = null;
+            PlaylistManager.initializeManualPlaylist();
+            setTimeout(() => {
+                window.unifiedCore = originalCore;
+            }, 5000);
+        }
     };
 }
 
-console.log('✅ PlaylistManager cargado - VERSIÓN COLA VACÍA + GESTIÓN MEJORADA');
+console.log('✅ PlaylistManager cargado - VERSIÓN INTEGRADA CON CORE UNIFICADO');
+console.log('🔧 PlaylistDebug disponible: window.PlaylistDebug.getQueue()');
+console.log('📋 Soporte para YouTube Library, cola manual y playlists externas');
