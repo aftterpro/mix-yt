@@ -7,8 +7,7 @@ const CONFIG = {
     MONITOR_INTERVAL: 300, // ms
     PIPED_INSTANCES: [
         "https://api.piped.private.coffee",
-        "https://pipedapi.ducks.party",
-        "https://piped-api.kavin.rocks"
+        "https://pipedapi.ducks.party"
     ],
     YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library',
     SPONSORBLOCK_USER_ID: 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'
