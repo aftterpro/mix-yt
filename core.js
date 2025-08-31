@@ -1,7 +1,7 @@
-// ===== CORE.JS - SISTEMA UNIFICADO MEJORADO =====
-// Combina las mejores funciones del backup con la arquitectura actual
+// ===== CORE.JS - VERSIÓN OPTIMIZADA SIN DUPLICACIONES =====
+// Sistema unificado optimizado eliminando redundancias
 
-// ===== CONFIGURACIÓN Y CONSTANTES =====
+// ===== CONFIGURACIÓN GLOBAL =====
 const CONFIG = {
     CROSSFADE_DURATION: 15, // segundos
     MONITOR_INTERVAL: 300, // ms
@@ -9,24 +9,115 @@ const CONFIG = {
         "https://api.piped.private.coffee",
         "https://pipedapi.ducks.party"
     ],
-    YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library',
-    SPONSORBLOCK_USER_ID: 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'
+    SPONSORBLOCK_USER_ID: 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd',
+    YOUTUBE_LIBRARY_SOURCE_ID: 'youtube_library'
 };
 
-// ===== ESTADO UNIFICADO MEJORADO =====
+// ===== UTILIDADES COMPARTIDAS =====
+class SharedUtils {
+    static debounce(func, delay) {
+        let timeoutId;
+        return function (...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    static formatDuration(duration) {
+        if (!duration || isNaN(duration)) return "0:00";
+        const totalSeconds = typeof duration === 'number' ? duration : parseInt(duration, 10);
+        if (isNaN(totalSeconds)) return "0:00";
+        
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    static parseDuration(durationInput) {
+        if (typeof durationInput === 'number') return Math.floor(durationInput);
+        if (typeof durationInput !== 'string') return 0;
+
+        // PT0H0M0S format (ISO 8601)
+        const isoMatch = durationInput.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+        if (isoMatch) {
+            const hours = parseInt(isoMatch[1] || '0', 10);
+            const minutes = parseInt(isoMatch[2] || '0', 10);
+            const seconds = parseFloat(isoMatch[3] || '0');
+            return Math.floor(hours * 3600 + minutes * 60 + seconds);
+        }
+
+        // MM:SS or HH:MM:SS format
+        const timeParts = durationInput.split(':').map(part => parseInt(part, 10));
+        if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
+            return timeParts[0] * 60 + timeParts[1];
+        } else if (timeParts.length === 3) {
+            return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+        }
+
+        const directNumber = parseInt(durationInput, 10);
+        return !isNaN(directNumber) ? directNumber : 0;
+    }
+
+    static extractVideoId(video) {
+        let videoId = video.videoId || video.id;
+        if (!videoId && video.url) {
+            const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+            videoId = match ? match[1] : null;
+        }
+        return videoId;
+    }
+
+    static extractPlaylistId(url) {
+        try {
+            const urlObject = new URL(url);
+            return urlObject.searchParams.get('list');
+        } catch (e) {
+            console.error("URL inválida:", url);
+            return null;
+        }
+    }
+
+    static isValidYouTubeUrl(url) {
+        return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url);
+    }
+
+    static async fetchWithTimeout(url, options = {}, timeout = 15000) {
+        return fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'YTCrossMix/2.0',
+                ...options.headers
+            },
+            signal: AbortSignal.timeout(timeout),
+            ...options
+        });
+    }
+
+    static escapeHtml(text) {
+        if (typeof text !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// ===== ESTADO UNIFICADO OPTIMIZADO =====
 class UnifiedStateManager {
     constructor() {
         this.state = {
             app: {
-                // ✅ Del backup: Estados críticos de reproductores
                 player1: null,
                 player2: null,
                 currentPlayer: 1,
                 playersInitialized: false,
                 youtubeAPIReady: false,
                 reproduccionIniciada: false,
-                
-                // ✅ Del backup: Estados de transición mejorados
                 isTransitioning: false,
                 isAudioFading: false,
                 hasOutroCrossfadeStarted: false,
@@ -78,7 +169,6 @@ class UnifiedStateManager {
                 return undefined;
             }
         }
-        
         return current;
     }
 
@@ -97,10 +187,9 @@ class UnifiedStateManager {
         const oldValue = current[lastKey];
         current[lastKey] = value;
         
-        // Emit change event
         this.notifyChange(path, value, oldValue);
         
-        if (this.debug) {
+        if (this.debug && path.includes('currentView') || path.includes('playlistsData') || path.includes('isAuthenticated')) {
             console.log(`📊 Estado cambiado: ${path}`, value);
         }
     }
@@ -118,7 +207,7 @@ class UnifiedStateManager {
     }
 }
 
-// ===== REPRODUCTORES YOUTUBE MEJORADOS =====
+// ===== REPRODUCTORES YOUTUBE OPTIMIZADO =====
 class UnifiedYouTubeManager {
     constructor(stateManager) {
         this.state = stateManager;
@@ -127,12 +216,8 @@ class UnifiedYouTubeManager {
     }
 
     async initialize() {
-        console.log('📺 Inicializando YouTube Manager Unificado...');
-        
-        // Esperar a que la API esté disponible
+        console.log('📺 Inicializando YouTube Manager...');
         await this.waitForYouTubeAPI();
-        
-        // Crear reproductores
         this.createPlayers();
     }
 
@@ -144,14 +229,12 @@ class UnifiedYouTubeManager {
                 return;
             }
 
-            // Setup global callback
             window.onYouTubeIframeAPIReady = () => {
                 this.apiReady = true;
                 console.log('✅ YouTube API Ready');
                 resolve();
             };
 
-            // Load API if not already loading
             if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
                 const script = document.createElement('script');
                 script.src = 'https://www.youtube.com/iframe_api';
@@ -163,10 +246,9 @@ class UnifiedYouTubeManager {
 
     createPlayers() {
         if (this.playersReady) return;
+        console.log('🎮 Creando reproductores...');
 
-        console.log('🎮 Creando reproductores YouTube...');
-
-        const player1 = new YT.Player('player1', {
+        const createPlayerConfig = (elementId, playerNum) => ({
             height: '100%',
             width: '100%',
             playerVars: {
@@ -177,30 +259,15 @@ class UnifiedYouTubeManager {
                 'iv_load_policy': 3
             },
             events: {
-                'onReady': (event) => this.onPlayerReady(event, 1),
-                'onStateChange': (event) => this.onPlayerStateChange(event, 1),
-                'onError': (event) => this.onPlayerError(event, 1)
+                'onReady': (event) => this.onPlayerReady(event, playerNum),
+                'onStateChange': (event) => this.onPlayerStateChange(event, playerNum),
+                'onError': (event) => this.onPlayerError(event, playerNum)
             }
         });
 
-        const player2 = new YT.Player('player2', {
-            height: '100%',
-            width: '100%',
-            playerVars: {
-                'playsinline': 1,
-                'controls': 0,
-                'showinfo': 0,
-                'rel': 0,
-                'iv_load_policy': 3
-            },
-            events: {
-                'onReady': (event) => this.onPlayerReady(event, 2),
-                'onStateChange': (event) => this.onPlayerStateChange(event, 2),
-                'onError': (event) => this.onPlayerError(event, 2)
-            }
-        });
+        const player1 = new YT.Player('player1', createPlayerConfig('player1', 1));
+        const player2 = new YT.Player('player2', createPlayerConfig('player2', 2));
 
-        // Guardar en estado
         this.state.set('app.player1', player1);
         this.state.set('app.player2', player2);
     }
@@ -219,18 +286,11 @@ class UnifiedYouTubeManager {
             
             console.log('🎉 Ambos reproductores listos');
             
-            // Habilitar controles
-            const playButton = document.getElementById('botonPlay');
-            if (playButton) {
-                playButton.disabled = false;
-            }
-
-            // Dispatch event
+            document.getElementById('botonPlay')?.removeAttribute('disabled');
             document.dispatchEvent(new CustomEvent('playersReady', {
                 detail: { player1Ready, player2Ready }
             }));
 
-            // Inicializar PlaylistManager si está disponible
             if (window.PlaylistManager?.initializeManualPlaylist) {
                 window.PlaylistManager.initializeManualPlaylist();
             }
@@ -241,19 +301,13 @@ class UnifiedYouTubeManager {
         const state = event.data;
         const videoData = event.target.getVideoData();
         
-        console.log(`🔄 Player ${playerNum} state: ${state} (Video: ${videoData?.video_id})`);
-
-        // ✅ Del backup: Reset flag de outro cuando nuevo video empieza
         if (state === YT.PlayerState.PLAYING) {
             this.state.set('app.hasOutroCrossfadeStarted', false);
-            
-            // Actualizar info de reproducción
             if (window.PlaylistManager?.updateCurrentPlayingIndex) {
                 window.PlaylistManager.updateCurrentPlayingIndex();
             }
         }
 
-        // Dispatch unified event
         document.dispatchEvent(new CustomEvent('unifiedPlayerStateChanged', {
             detail: { 
                 playerNum, 
@@ -266,14 +320,10 @@ class UnifiedYouTubeManager {
 
     onPlayerError(event, playerNum) {
         console.error(`❌ Player ${playerNum} error:`, event.data);
-        
-        window.unifiedMessageManager?.show(
-            `Error en reproductor ${playerNum}`, 
-            'error'
-        );
+        window.unifiedMessageManager?.show(`Error en reproductor ${playerNum}`, 'error');
     }
 
-    // ✅ Del backup: Métodos de utilidad para reproductores
+    // Métodos de utilidad consolidados
     getActivePlayer() {
         const currentPlayerNum = this.state.get('app.currentPlayer');
         return currentPlayerNum === 1 ? 
@@ -288,10 +338,10 @@ class UnifiedYouTubeManager {
                this.state.get('app.player1');
     }
 
-    // ✅ Del backup: Crossfade mejorado
+    // Crossfade optimizado sin duplicación
     async performCrossfade(prevPlayer, nextPlayer) {
         if (this.state.get('app.crossfadeInProgress')) {
-            console.log("Crossfade ya en progreso, ignorando nueva llamada.");
+            console.log("Crossfade ya en progreso");
             return;
         }
         
@@ -299,59 +349,52 @@ class UnifiedYouTubeManager {
         this.state.set('app.isAudioFading', true);
         
         const DURATION_MS = CONFIG.CROSSFADE_DURATION * 1000;
-        const FPS = 60;
-        const STEP_MS = 1000 / FPS;
-        const STEPS = Math.ceil(DURATION_MS / STEP_MS);
+        const STEPS = 60; // 60 pasos para transición suave
+        const STEP_MS = DURATION_MS / STEPS;
 
         let step = 0;
         const prevStartVol = this.safeGetVolume(prevPlayer, 100);
-        const nextStartVol = this.safeGetVolume(nextPlayer, 0);
 
-        console.log(`🎵 Iniciando crossfade: ${prevStartVol}% → 0% | 0% → 100% (${DURATION_MS}ms)`);
+        console.log(`🎵 Iniciando crossfade (${DURATION_MS}ms)`);
 
-        // Limpiar crossfade anterior
         if (this.state.get('app.crossfadeInterval')) {
             clearInterval(this.state.get('app.crossfadeInterval'));
         }
 
         const interval = setInterval(() => {
             step++;
-            
             const progress = step / STEPS;
             const easedProgress = this.easeInOutCubic(progress);
             
             const prevVol = Math.max(0, Math.round(prevStartVol * (1 - easedProgress)));
-            const nextVol = Math.min(100, Math.round(nextStartVol + ((100 - nextStartVol) * easedProgress)));
+            const nextVol = Math.min(100, Math.round(100 * easedProgress));
 
             this.safeSetVolume(prevPlayer, prevVol);
             this.safeSetVolume(nextPlayer, nextVol);
 
-            if (step % Math.floor(STEPS / 10) === 0 || step === STEPS) {
-                console.log(`Crossfade ${Math.round(progress * 100)}%: Prev=${prevVol}%, Next=${nextVol}%`);
-            }
-
             if (step >= STEPS) {
                 clearInterval(interval);
-                this.state.set('app.crossfadeInterval', null);
-                
-                // Finalizar crossfade
-                this.safeSetVolume(prevPlayer, 0);
-                this.safeSetVolume(nextPlayer, 100);
-                
-                setTimeout(() => {
-                    this.safeStopPlayer(prevPlayer);
-                }, 100);
-                
-                this.state.set('app.isAudioFading', false);
-                this.state.set('app.crossfadeInProgress', false);
-                console.log("✅ Crossfade completado.");
+                this.finalizeCrossfade(prevPlayer, nextPlayer);
             }
         }, STEP_MS);
 
         this.state.set('app.crossfadeInterval', interval);
     }
 
-    // ✅ Del backup: Funciones seguras para manejo de players
+    finalizeCrossfade(prevPlayer, nextPlayer) {
+        this.safeSetVolume(prevPlayer, 0);
+        this.safeSetVolume(nextPlayer, 100);
+        
+        setTimeout(() => this.safeStopPlayer(prevPlayer), 100);
+        
+        this.state.set('app.crossfadeInterval', null);
+        this.state.set('app.isAudioFading', false);
+        this.state.set('app.crossfadeInProgress', false);
+        
+        console.log("✅ Crossfade completado");
+    }
+
+    // Funciones seguras consolidadas
     safeGetVolume(player, defaultVol = 100) {
         try {
             if (player && typeof player.getVolume === 'function') {
@@ -392,14 +435,13 @@ class UnifiedYouTubeManager {
     }
 }
 
-// ===== GESTOR DE REPRODUCCIÓN MEJORADO =====
+// ===== GESTOR DE REPRODUCCIÓN OPTIMIZADO =====
 class UnifiedPlaybackController {
     constructor(stateManager, youtubeManager) {
         this.state = stateManager;
         this.youtube = youtubeManager;
     }
 
-    // ✅ Del backup: Monitoreo optimizado
     startMonitoring() {
         if (!this.state.get('app.monitorInterval')) {
             const interval = setInterval(() => this.monitorPlayers(), CONFIG.MONITOR_INTERVAL);
@@ -417,7 +459,6 @@ class UnifiedPlaybackController {
         }
     }
 
-    // ✅ Del backup: Monitor de reproductores robusto
     monitorPlayers() {
         if (!this.state.get('app.playersInitialized') || 
             !this.state.get('app.reproduccionIniciada')) {
@@ -441,10 +482,8 @@ class UnifiedPlaybackController {
             return;
         }
 
-        // SponsorBlock check
         this.checkSponsorBlock(activePlayer);
 
-        // ✅ Del backup: Lógica de crossfade mejorada
         const timeRemaining = videoDuration - currentTime;
         
         if (playerState === YT.PlayerState.PLAYING &&
@@ -457,7 +496,6 @@ class UnifiedPlaybackController {
             this.playNextVideo();
         }
 
-        // ✅ Del backup: Salvaguarda para reproductores inactivos
         this.checkInactivePlayer();
     }
 
@@ -476,7 +514,7 @@ class UnifiedPlaybackController {
         if (this.validatePlayer(inactivePlayer)) {
             const inactiveState = inactivePlayer.getPlayerState();
             if (inactiveState === YT.PlayerState.PLAYING) {
-                console.warn("🛑 Reproductor inactivo detectado reproduciendo - deteniéndolo");
+                console.warn("🛑 Reproductor inactivo detectado - deteniéndolo");
                 this.youtube.safeStopPlayer(inactivePlayer);
             }
         }
@@ -488,7 +526,6 @@ class UnifiedPlaybackController {
         }
     }
 
-    // ✅ Del backup: playFirstVideo robusto
     playFirstVideo() {
         if (!this.state.get('app.playersInitialized')) {
             console.error('❌ Reproductores no inicializados');
@@ -506,7 +543,6 @@ class UnifiedPlaybackController {
 
         const firstVideo = flatList[0];
         
-        // Actualizar estado
         this.state.set('playlist.currentPlayingInfo.flattenedIndex', 0);
         this.state.set('playlist.currentPlayingInfo.videoId', firstVideo.videoId);
         this.state.set('playlist.currentPlayingInfo.playlistId', firstVideo.sourcePlaylistId);
@@ -522,14 +558,12 @@ class UnifiedPlaybackController {
             player1.loadVideoById(firstVideo.videoId);
             player1.setVolume(100);
 
-            // UI updates
             document.getElementById('player1')?.classList.remove('hidden', 'fade-out', 'fade-in');
             document.getElementById('player2')?.classList.add('hidden');
             
             this.state.set('app.currentPlayer', 1);
             this.state.set('app.reproduccionIniciada', true);
 
-            // Update play button
             const playButton = document.getElementById('botonPlay');
             if (playButton) {
                 playButton.innerHTML = '<i class="fas fa-pause"></i>';
@@ -538,7 +572,6 @@ class UnifiedPlaybackController {
 
             this.startMonitoring();
 
-            // Update UI
             if (window.UIManager?.updatePlaylistsUI) {
                 window.UIManager.updatePlaylistsUI();
             }
@@ -549,15 +582,14 @@ class UnifiedPlaybackController {
         }
     }
 
-    // ✅ Del backup: playNextVideo con lógica mejorada
     async playNextVideo() {
         const currentFlatIndex = this.state.get('playlist.currentPlayingInfo.flattenedIndex');
         const flatList = this.getFlattenedPlaylist();
 
-        console.log(`⏭️ playNextVideo: índice ${currentFlatIndex}, transición=${this.state.get('app.isTransitioning')}`);
+        console.log(`⏭️ playNextVideo: índice ${currentFlatIndex}`);
         
         if (this.state.get('app.isTransitioning') && this.state.get('app.crossfadeInProgress')) {
-            console.log("🔄 Transición en progreso, ignorando llamada duplicada");
+            console.log("🔄 Transición en progreso");
             return;
         }
         
@@ -580,7 +612,6 @@ class UnifiedPlaybackController {
                 throw new Error(`Video siguiente inválido en índice ${nextIndex}`);
             }
 
-            // ✅ Del backup: Preparar transición
             const currentPlayerNum = this.state.get('app.currentPlayer');
             const nextPlayerNum = currentPlayerNum === 1 ? 2 : 1;
             const prevPlayer = this.youtube.getActivePlayer();
@@ -590,42 +621,33 @@ class UnifiedPlaybackController {
                 throw new Error("Reproductores inválidos para crossfade");
             }
 
-            // Preparar siguiente video
             console.log(`🎬 Cargando video: ${nextVideo.videoId}`);
             nextPlayer.cueVideoById(nextVideo.videoId);
             
-            // Configurar volúmenes iniciales
             this.youtube.safeSetVolume(prevPlayer, this.youtube.safeGetVolume(prevPlayer, 100));
             this.youtube.safeSetVolume(nextPlayer, 0);
 
-            // Actualizar estado de reproducción
             this.state.set('playlist.currentPlayingInfo.flattenedIndex', nextIndex);
             this.state.set('playlist.currentPlayingInfo.videoId', nextVideo.videoId);
             this.state.set('playlist.currentPlayingInfo.playlistId', nextVideo.sourcePlaylistId);
 
-            // Update UI
             if (window.UIManager?.updatePlaylistsUI) {
                 window.UIManager.updatePlaylistsUI();
             }
 
-            // ✅ Del backup: Transiciones visuales
             this.applyVisualTransitions(currentPlayerNum, nextPlayerNum);
-
-            // Iniciar reproducción del siguiente
             await this.playNextPlayer(nextPlayer);
 
-            // ✅ Del backup: Delay antes del crossfade para asegurar reproducción
             setTimeout(() => {
                 const nextPlayerState = nextPlayer.getPlayerState();
                 if (nextPlayerState === YT.PlayerState.PLAYING) {
                     this.youtube.performCrossfade(prevPlayer, nextPlayer);
                 } else {
-                    console.warn(`⚠️ Reproductor siguiente no está reproduciendo, retrasando crossfade...`);
+                    console.warn(`⚠️ Reproductor siguiente no está reproduciendo`);
                     setTimeout(() => this.youtube.performCrossfade(prevPlayer, nextPlayer), 200);
                 }
             }, 150);
 
-            // Configurar limpieza post-transición
             this.setupTransitionCleanup(currentPlayerNum, nextPlayerNum);
 
         } catch (error) {
@@ -650,7 +672,6 @@ class UnifiedPlaybackController {
             if (nextPlayer && typeof nextPlayer.playVideo === 'function') {
                 nextPlayer.playVideo();
                 
-                // Actualizar currentPlayer
                 const nextPlayerNum = nextPlayer === this.state.get('app.player1') ? 1 : 2;
                 this.state.set('app.currentPlayer', nextPlayerNum);
                 
@@ -679,7 +700,6 @@ class UnifiedPlaybackController {
 
             currentEl.addEventListener('transitionend', transitionHandler);
             
-            // Fallback timeout
             setTimeout(() => {
                 currentEl.removeEventListener('transitionend', transitionHandler);
                 this.cleanupAfterTransition(prevPlayer, currentEl);
@@ -704,7 +724,6 @@ class UnifiedPlaybackController {
         }
     }
 
-    // ✅ Del backup: Gestión de estados especiales
     handleEmptyPlaylist() {
         console.log("📭 Lista vacía detectada");
         
@@ -725,7 +744,42 @@ class UnifiedPlaybackController {
             window.UIManager.updatePlaylistsUI();
         }
 
-        window.unifiedMessageManager?.show(`Error cambiando video: ${error.message}`, 'error');
+        window.unifiedMessageManager?.show('No hay videos en la cola para reproducir', 'warning');
+    }
+
+    handleEndOfPlaylist() {
+        console.log('🔚 Fin de playlist detectado');
+        
+        const repeat = confirm('Llegaste al final de la lista. ¿Deseas repetir desde el principio?');
+        
+        if (repeat) {
+            this.state.set('playlist.currentPlayingInfo.playlistId', null);
+            this.state.set('playlist.currentPlayingInfo.videoId', null);
+            this.state.set('playlist.currentPlayingInfo.flattenedIndex', -1);
+            this.playFirstVideo();
+        } else {
+            this.stopMonitoring();
+            window.unifiedMessageManager?.show("Playlist finalizada. ¡Gracias por usar YT CrossMix! 🎵", 'info');
+            
+            const state = this.state.state;
+            try {
+                if (state.app.player1) state.app.player1.stopVideo();
+                if (state.app.player2) state.app.player2.stopVideo();
+            } catch(e) {
+                console.warn("Error deteniendo players:", e);
+            }
+            
+            this.state.set('app.reproduccionIniciada', false);
+            
+            const playButton = document.getElementById('botonPlay');
+            if (playButton) {
+                const flatList = this.getFlattenedPlaylist();
+                playButton.disabled = flatList.length === 0;
+                playButton.innerHTML = '<i class="fas fa-play"></i>';
+            }
+        }
+        
+        this.state.set('app.isTransitioning', false);
     }
 
     handlePlaybackError(error) {
@@ -740,7 +794,12 @@ class UnifiedPlaybackController {
             playButton.disabled = true;
         }
         
-        window.unifiedMessageManager?.show('Error de reproducción', 'error');
+        window.unifiedMessageManager?.show(`Error de reproducción: ${error.message}`, 'error');
+    }
+
+    handleCriticalError(error, currentIndex) {
+        console.error("💥 Error crítico:", error);
+        this.handlePlaybackError(error);
     }
 
     // ✅ Del backup: Obtener lista aplanada
