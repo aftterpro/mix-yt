@@ -2,9 +2,7 @@
 // Versión completa corregida con cuadrícula expandible y cola modal
 
 export class UIManager {
-    
-    // ✅ MÉTODO PRINCIPAL DE ACTUALIZACIÓN DE UI
-    static updatePlaylistsUI() {
+      static updatePlaylistsUI() {
         console.log('🔄 UIManager: Actualizando UI con estado unificado...');
         
         try {
@@ -15,6 +13,13 @@ export class UIManager {
             }
             
             const currentView = state.ui.currentView || UIManager.getCurrentView() || 'home';
+            
+            // ✅ FIX: NO actualizar búsqueda cuando se añaden videos
+            if (currentView === 'search') {
+                console.log('🔍 Vista de búsqueda activa - NO reemplazar resultados');
+                return; // Mantener resultados de búsqueda intactos
+            }
+            
             let playlistContainer = UIManager.getPlaylistContainer(currentView);
             
             if (!playlistContainer) {
@@ -37,7 +42,7 @@ export class UIManager {
                     // Vista playing no muestra playlists, solo info actual
                     UIManager.renderNowPlayingInfo();
                 } else {
-                    // Otras vistas: lista tradicional
+                    // Otras vistas: lista tradicional (excluyendo search)
                     UIManager.renderPlaylistList(playlistContainer, state.playlist.playlistsData);
                 }
             }
@@ -55,7 +60,6 @@ export class UIManager {
         }
     }
 
-    // ✅ NUEVO: RENDERIZADO DE BIBLIOTECA COMO CUADRÍCULA
     static renderLibraryGrid(container, playlistsData) {
         console.log('📚 Renderizando biblioteca como cuadrícula...', playlistsData.length);
         
@@ -83,12 +87,15 @@ export class UIManager {
         container.appendChild(grid);
         console.log(`✅ ${libraryPlaylists.length} playlists renderizadas en cuadrícula`);
     }
-
-    // ✅ NUEVO: CREAR CARD EXPANDIBLE DE PLAYLIST
     static createExpandablePlaylistCard(playlist, index) {
         const card = document.createElement('div');
         card.className = 'playlist-card-expandable';
         card.dataset.playlistId = playlist.id;
+        
+        // ✅ FIX: Marcar como expandida si ya lo está en el estado
+        if (playlist.isExpanded) {
+            card.classList.add('expanded');
+        }
         
         const videoCount = playlist.videos ? playlist.videos.length : 
                           (playlist.itemCount || playlist.videoCount || 0);
@@ -109,7 +116,7 @@ export class UIManager {
                          onerror="this.src='https://via.placeholder.com/320x180/333333/ffffff?text=Error'">
                     <div class="playlist-card-overlay">
                         <button class="playlist-expand-btn">
-                            <i class="fas fa-chevron-down"></i>
+                            <i class="fas ${playlist.isExpanded ? 'fa-chevron-up' : 'fa-chevron-down'}"></i>
                         </button>
                     </div>
                 </div>
@@ -141,6 +148,12 @@ export class UIManager {
             </div>
         `;
         
+        // ✅ FIX: Si está expandida y tiene videos, renderizarlos inmediatamente
+        if (playlist.isExpanded && playlist.videos && playlist.videos.length > 0) {
+            const videosContainer = card.querySelector('.playlist-videos-container');
+            UIManager.renderPlaylistVideos(videosContainer, playlist.videos, playlist.id);
+        }
+        
         // Animación escalonada
         card.style.opacity = '0';
         card.style.transform = 'translateY(20px)';
@@ -152,8 +165,6 @@ export class UIManager {
         
         return card;
     }
-
-    // ✅ NUEVO: RENDERIZAR VIDEOS DENTRO DE PLAYLIST
     static renderPlaylistVideos(container, videos, playlistId) {
         console.log('🎵 Renderizando videos de playlist:', videos?.length || 0);
         
@@ -304,13 +315,44 @@ export class UIManager {
     }
 
     // ✅ MEJORADO: MANEJADOR CENTRALIZADO DE CLICKS
-    static handleDocumentClick(e) {
+ static handleDocumentClick(e) {
         try {
+            // ===== COLA DE REPRODUCCIÓN (PRIMERA PRIORIDAD) =====
+            const queueButton = e.target.closest('#queueButton');
+            if (queueButton) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('📋 Click en botón de cola');
+                UIManager.toggleQueue();
+                return;
+            }
+            
+            const queueCloseBtn = e.target.closest('#queueCloseBtn, .queue-close-btn');
+            if (queueCloseBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('❌ Click en cerrar cola');
+                UIManager.hideQueue();
+                return;
+            }
+            
+            // Cerrar cola al hacer click en el overlay
+            if (e.target.classList.contains('queue-section')) {
+                console.log('📋 Click en overlay de cola - cerrando');
+                UIManager.hideQueue();
+                return;
+            }
+            
             // ===== EXPANSIÓN DE PLAYLIST =====
             const playlistHeader = e.target.closest('.playlist-card-header');
             if (playlistHeader && !e.target.closest('.playlist-card-actions')) {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 const playlistId = playlistHeader.dataset.playlistId;
                 const card = playlistHeader.closest('.playlist-card-expandable');
+                
+                console.log('🔽 Click en header de playlist:', playlistId);
                 
                 if (card) {
                     UIManager.handlePlaylistExpand(playlistId, card);
@@ -318,7 +360,7 @@ export class UIManager {
                 return;
             }
             
-            // ===== ACCIONES DE PLAYLIST =====
+            // ===== ACCIONES DE PLAYLIST Y VIDEO =====
             const actionBtn = e.target.closest('[data-action]');
             if (actionBtn) {
                 e.preventDefault();
@@ -350,35 +392,21 @@ export class UIManager {
                 return;
             }
             
-            // ===== COLA DE REPRODUCCIÓN =====
-            const queueButton = e.target.closest('#queueButton');
-            if (queueButton) {
-                e.preventDefault();
-                UIManager.toggleQueue();
-                return;
-            }
-            
-            const queueCloseBtn = e.target.closest('#queueCloseBtn, .queue-close-btn');
-            if (queueCloseBtn) {
-                e.preventDefault();
-                UIManager.hideQueue();
-                return;
-            }
-            
-            // Cerrar cola al hacer click en el overlay
-            if (e.target.classList.contains('queue-section')) {
-                UIManager.hideQueue();
-                return;
-            }
-            
         } catch (error) {
             console.error('💥 Error en handleDocumentClick:', error);
         }
     }
-
-    // ✅ NUEVO: MANEJAR EXPANSIÓN DE PLAYLISTS
     static async handlePlaylistExpand(playlistId, cardElement) {
         console.log('🔽 Expandiendo/contrayendo playlist:', playlistId);
+        
+        const state = window.unifiedStateManager?.state;
+        if (!state) return;
+        
+        const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
+        if (!playlist) {
+            console.warn('Playlist no encontrada:', playlistId);
+            return;
+        }
         
         const isExpanded = cardElement.classList.contains('expanded');
         const expandBtn = cardElement.querySelector('.playlist-expand-btn i');
@@ -390,6 +418,15 @@ export class UIManager {
             if (expandBtn) {
                 expandBtn.className = 'fas fa-chevron-down';
             }
+            
+            // ✅ FIX: Actualizar estado de expansión
+            const playlistsData = [...state.playlist.playlistsData];
+            const index = playlistsData.findIndex(p => p.id === playlistId);
+            if (index !== -1) {
+                playlistsData[index] = { ...playlistsData[index], isExpanded: false };
+                window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+            }
+            
             console.log('📁 Playlist contraída');
             return;
         }
@@ -400,16 +437,15 @@ export class UIManager {
             expandBtn.className = 'fas fa-chevron-up';
         }
         
-        if (!videosContainer) return;
-        
-        const state = window.unifiedStateManager?.state;
-        if (!state) return;
-        
-        const playlist = state.playlist.playlistsData.find(p => p.id === playlistId);
-        if (!playlist) {
-            console.warn('Playlist no encontrada:', playlistId);
-            return;
+        // ✅ FIX: Actualizar estado de expansión
+        const playlistsData = [...state.playlist.playlistsData];
+        const index = playlistsData.findIndex(p => p.id === playlistId);
+        if (index !== -1) {
+            playlistsData[index] = { ...playlistsData[index], isExpanded: true };
+            window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
         }
+        
+        if (!videosContainer) return;
         
         // Si ya tiene videos cargados, mostrarlos
         if (playlist.videos && playlist.videos.length > 0) {
@@ -424,50 +460,35 @@ export class UIManager {
                 console.log('🔄 Cargando videos de YouTube Library...');
                 
                 videosContainer.querySelector('.playlist-videos-content').innerHTML = `
-                    <div class="playlist-videos-loading">
+                    <div class="playlist-videos-loading" style="padding: 20px; text-align: center; color: #aaa;">
                         <i class="fas fa-spinner fa-spin"></i>
-                        <span>Cargando videos...</span>
+                        <span style="margin-left: 8px;">Cargando videos...</span>
                     </div>
                 `;
                 
-                // Cargar videos usando auth manager
-                if (window.authManager?.getPlaylistVideos) {
-                    const videos = await window.authManager.getPlaylistVideos(playlistId);
+                // ✅ FIX: Usar PlaylistManager que ya maneja la carga correctamente
+                if (window.PlaylistManager?.togglePlaylistExpansion) {
+                    await window.PlaylistManager.togglePlaylistExpansion(playlistId);
                     
-                    if (videos && videos.length > 0) {
-                        // Actualizar playlist en estado
-                        const playlistsData = [...state.playlist.playlistsData];
-                        const index = playlistsData.findIndex(p => p.id === playlistId);
-                        if (index !== -1) {
-                            playlistsData[index] = {
-                                ...playlistsData[index],
-                                videos: videos,
-                                isLoaded: true
-                            };
-                            window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+                    // Después de cargar, actualizar la vista
+                    setTimeout(() => {
+                        const updatedPlaylist = window.unifiedStateManager.state.playlist.playlistsData.find(p => p.id === playlistId);
+                        if (updatedPlaylist && updatedPlaylist.videos) {
+                            UIManager.renderPlaylistVideos(videosContainer, updatedPlaylist.videos, playlistId);
                         }
-                        
-                        UIManager.renderPlaylistVideos(videosContainer, videos, playlistId);
-                        
-                        window.unifiedMessageManager?.show(
-                            `${videos.length} videos cargados de "${playlist.name}"`, 
-                            'success', 
-                            3000
-                        );
-                    } else {
-                        throw new Error('No se obtuvieron videos');
-                    }
+                    }, 1000);
                 } else {
-                    throw new Error('AuthManager no disponible');
+                    throw new Error('PlaylistManager.togglePlaylistExpansion no disponible');
                 }
                 
             } catch (error) {
                 console.error('❌ Error cargando videos:', error);
                 videosContainer.querySelector('.playlist-videos-content').innerHTML = `
-                    <div class="playlist-videos-error">
+                    <div class="playlist-videos-error" style="padding: 20px; text-align: center; color: #f44336;">
                         <i class="fas fa-exclamation-triangle"></i>
                         <p>Error cargando videos</p>
-                        <button class="retry-btn" onclick="UIManager.handlePlaylistExpand('${playlistId}', this.closest('.playlist-card-expandable'))">
+                        <button class="retry-btn" onclick="UIManager.handlePlaylistExpand('${playlistId}', this.closest('.playlist-card-expandable'))"
+                                style="margin-top: 8px; padding: 4px 8px; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer;">
                             <i class="fas fa-redo"></i> Reintentar
                         </button>
                     </div>
@@ -503,23 +524,44 @@ export class UIManager {
             window.unifiedMessageManager?.show(`Cargando "${playlist.name}"...`, 'info');
             
             try {
-                const videos = await window.authManager.getPlaylistVideos(playlistId);
-                playlist.videos = videos;
-                playlist.isLoaded = true;
+                const { authManager } = await import('./auth.js');
+                
+                if (!authManager.isUserAuthenticated()) {
+                    window.unifiedMessageManager?.show("Error: No hay sesión de Google activa.", 'error');
+                    return;
+                }
+
+                const videos = await authManager.getPlaylistVideos(playlistId);
+                
+                // Actualizar el estado con los videos cargados
+                const playlistsData = [...state.playlist.playlistsData];
+                const index = playlistsData.findIndex(p => p.id === playlistId);
+                if (index !== -1) {
+                    playlistsData[index] = {
+                        ...playlistsData[index],
+                        videos: videos,
+                        isLoaded: true
+                    };
+                    window.unifiedStateManager.set('playlist.playlistsData', playlistsData);
+                }
+                
+                if (videos && videos.length > 0) {
+                    UIManager.addPlaylistVideos({ ...playlist, videos });
+                } else {
+                    window.unifiedMessageManager?.show('Esta playlist está vacía', 'warning');
+                }
+                
             } catch (error) {
                 console.error('Error cargando playlist:', error);
                 window.unifiedMessageManager?.show('Error cargando playlist', 'error');
                 return;
             }
-        }
-        
-        if (playlist.videos && playlist.videos.length > 0) {
+        } else if (playlist.videos && playlist.videos.length > 0) {
             UIManager.addPlaylistVideos(playlist);
         } else {
             window.unifiedMessageManager?.show('Esta playlist está vacía', 'warning');
         }
     }
-
     static handlePlaylistPlayAll(playlistId) {
         console.log('▶️ Reproducir toda la playlist:', playlistId);
         
@@ -532,7 +574,6 @@ export class UIManager {
             }
         }, 1500);
     }
-
     static addPlaylistVideos(playlist) {
         const addedCount = playlist.videos.length;
         let successCount = 0;
@@ -564,7 +605,7 @@ export class UIManager {
     }
 
     // ✅ ACCIONES DE VIDEO INDIVIDUAL
-    static handleVideoAdd(videoId) {
+   static handleVideoAdd(videoId) {
         console.log('➕ Añadir video individual:', videoId);
         
         const video = UIManager.findVideoById(videoId);
@@ -607,9 +648,6 @@ export class UIManager {
                 if (video) return video;
             }
         }
-        
-        return null;
-    }
 
     // ✅ GESTIÓN DE COLA DE REPRODUCCIÓN
     static toggleQueue() {
@@ -625,15 +663,24 @@ export class UIManager {
             UIManager.hideQueue();
         }
     }
-
     static showQueue() {
-        console.log('📋 Mostrando cola de reproducción');
+        console.log('📋 Mostrando cola de reproducción (GLOBAL)');
         
         const queueSection = document.getElementById('queueSection');
         if (!queueSection) return;
         
-        // Actualizar contenido de la cola
+        // ✅ FIX: Actualizar contenido de la cola ANTES de mostrarla
         UIManager.updateQueueContent();
+        
+        // ✅ FIX: Asegurar que la cola sea visible globalmente
+        queueSection.style.position = 'fixed';
+        queueSection.style.top = '0';
+        queueSection.style.left = '0';
+        queueSection.style.right = '0';
+        queueSection.style.bottom = '0';
+        queueSection.style.zIndex = '1000';
+        queueSection.style.background = 'rgba(0, 0, 0, 0.8)';
+        queueSection.style.backdropFilter = 'blur(10px)';
         
         queueSection.classList.remove('hidden');
         
@@ -642,8 +689,9 @@ export class UIManager {
         if (closeBtn) {
             setTimeout(() => closeBtn.focus(), 100);
         }
+        
+        console.log('✅ Cola mostrada globalmente');
     }
-
     static hideQueue() {
         console.log('📋 Ocultando cola de reproducción');
         
@@ -655,7 +703,10 @@ export class UIManager {
 
     static updateQueueContent() {
         const playlistContainer = document.getElementById('playlistContainer');
-        if (!playlistContainer) return;
+        if (!playlistContainer) {
+            console.warn('⚠️ playlistContainer no encontrado para cola');
+            return;
+        }
         
         const state = window.unifiedStateManager?.state;
         if (!state) return;
@@ -729,7 +780,6 @@ export class UIManager {
         
         return item;
     }
-
     static handleRemoveFromQueue(videoId) {
         console.log('🗑️ Eliminando de la cola:', videoId);
         
