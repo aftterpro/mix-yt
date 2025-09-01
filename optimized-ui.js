@@ -1153,4 +1153,4 @@ if (typeof window !== 'undefined') {
 
 console.log('✅ UIManager Optimizado cargado - Performance mejorado, duplicaciones eliminadas');
 console.log('🔧 UIDebug disponible: window.UIDebug.testFlow()');
-console.log('⌨️  Shortcuts: Ctrl+Shift+U (debug), Ctrl+Shift+T (test), Ctrl+Shift+Q (queue)');
+console.log('⌨️  Shortcuts: Ctrl+Shift+U (debug), Ctrl+Shift+T (test), Ctrl+Shift+Q (queue)'); 
