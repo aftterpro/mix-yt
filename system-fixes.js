@@ -1,849 +1,732 @@
-// ===== SYSTEM-FIXES.JS - CORRECCIONES CRÍTICAS DEL SISTEMA =====
-// Archivo que corrige bugs conocidos y proporciona parches temporales
+// ===== CORRECCIONES CRÍTICAS PARA YT CROSSMIX =====
+// Archivo: critical-fixes.js
+// Soluciona problemas de navegación, búsqueda, autenticación y URLs
 
-console.log('🔧 Cargando System Fixes...');
+console.log('🔧 Aplicando correcciones críticas...');
 
-// ===== GLOBAL ERROR HANDLERS =====
-window.addEventListener('error', function(event) {
-    // Filter out extension errors
-    if (event.error && event.error.message && 
-        (event.error.message.includes('Extension') || 
-         event.error.message.includes('chrome-extension'))) {
-        return;
-    }
+// ===== 1. CORRECCIÓN DE NAVEGACIÓN ENTRE PESTAÑAS =====
+function fixNavigation() {
+    console.log('🔧 Corrigiendo navegación...');
     
-    console.error('🚨 Global Error:', event.error);
-    
-    // Show user-friendly error
-    if (window.unifiedMessageManager && !event.error.message?.includes('Script error')) {
-        window.unifiedMessageManager.show(
-            'Ha ocurrido un error inesperado', 
-            'error', 
-            5000
-        );
-    }
-});
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('🚨 Unhandled Promise Rejection:', event.reason);
-    event.preventDefault();
-    
-    // Show user-friendly error
-    if (window.unifiedMessageManager && 
-        !event.reason?.message?.includes('Extension') &&
-        !event.reason?.message?.includes('NetworkError')) {
-        window.unifiedMessageManager.show(
-            'Error de conexión o servicio', 
-            'warning', 
-            3000
-        );
-    }
-});
-
-// ===== YOUTUBE API FIXES =====
-class YouTubeAPIFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes para YouTube API...');
+    // Función para cambiar vistas
+    function switchView(viewName) {
+        console.log(`📄 Cambiando a vista: ${viewName}`);
         
-        // Fix para YouTube API no cargando
-        if (!window.YT && !window.onYouTubeIframeAPIReady) {
-            let attempts = 0;
-            const maxAttempts = 10;
+        // Ocultar todas las vistas
+        document.querySelectorAll('.content-view').forEach(view => {
+            view.classList.remove('active');
+        });
+        
+        // Mostrar vista objetivo
+        const targetView = document.getElementById(`${viewName}View`);
+        if (targetView) {
+            targetView.classList.add('active');
             
-            const checkAPI = setInterval(() => {
-                attempts++;
-                
-                if (window.YT && window.YT.Player) {
-                    clearInterval(checkAPI);
-                    console.log('✅ YouTube API disponible');
-                    
-                    // Trigger manual ready event
-                    if (window.onYouTubeIframeAPIReady) {
-                        window.onYouTubeIframeAPIReady();
-                    }
-                    return;
+            // Actualizar navegación
+            document.querySelectorAll('[data-view]').forEach(item => {
+                if (item.dataset.view === viewName) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
                 }
-                
-                if (attempts >= maxAttempts) {
-                    clearInterval(checkAPI);
-                    console.error('❌ YouTube API no se cargó después de', maxAttempts, 'intentos');
-                    
-                    // Reload YouTube API
-                    YouTubeAPIFixes.forceReloadAPI();
-                }
-            }, 1000);
+            });
+            
+            // Actualizar estado si existe el manager
+            if (window.unifiedStateManager) {
+                window.unifiedStateManager.set('ui.currentView', viewName);
+            }
+            
+            // Acciones específicas por vista
+            if (viewName === 'library' && window.UIManager?.updatePlaylistsUI) {
+                setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
+            }
+            
+            console.log(`✅ Vista cambiada a: ${viewName}`);
+        } else {
+            console.error(`❌ Vista no encontrada: ${viewName}View`);
         }
     }
     
-    static forceReloadAPI() {
-        console.log('🔄 Forzando recarga de YouTube API...');
-        
-        // Remove existing script
-        const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
-        if (existingScript) {
-            existingScript.remove();
+    // Configurar listeners de navegación
+    document.addEventListener('click', (event) => {
+        const navItem = event.target.closest('[data-view]');
+        if (navItem) {
+            event.preventDefault();
+            const view = navItem.dataset.view;
+            switchView(view);
         }
-        
-        // Add new script
-        const script = document.createElement('script');
-        script.src = 'https://www.youtube.com/iframe_api';
-        script.async = true;
-        script.onload = () => {
-            console.log('✅ YouTube API script recargado');
-        };
-        script.onerror = () => {
-            console.error('❌ Error recargando YouTube API');
-            window.unifiedMessageManager?.show(
-                'Error cargando reproductor de YouTube', 
-                'error'
-            );
-        };
-        
-        document.head.appendChild(script);
-    }
+    });
     
-    static fixPlayerStates() {
-        // Fix para estados inconsistentes de reproductores
-        if (!window.YT || !window.YT.PlayerState) return;
-        
-        const playerStateNames = {
-            [-1]: 'UNSTARTED',
-            [0]: 'ENDED',
-            [1]: 'PLAYING',
-            [2]: 'PAUSED',
-            [3]: 'BUFFERING',
-            [5]: 'CUED'
-        };
-        
-        // Add helper function to get state name
-        window.getPlayerStateName = (state) => {
-            return playerStateNames[state] || `UNKNOWN(${state})`;
-        };
-        
-        console.log('✅ Player state helpers instalados');
-    }
+    // Exponer función globalmente
+    window.switchView = switchView;
+    
+    // Configurar vista inicial
+    setTimeout(() => switchView('home'), 100);
+    
+    console.log('✅ Navegación corregida');
 }
 
-// ===== DOM FIXES =====
-class DOMFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes para DOM...');
-        
-        // Fix para elementos faltantes
-        DOMFixes.ensureRequiredElements();
-        
-        // Fix para event listeners duplicados
-        DOMFixes.preventDuplicateListeners();
-        
-        // Fix para scroll issues
-        DOMFixes.fixScrollIssues();
-    }
+// ===== 2. CORRECCIÓN DE BÚSQUEDA =====
+function fixSearch() {
+    console.log('🔧 Corrigiendo búsqueda...');
     
-    static ensureRequiredElements() {
-        const requiredElements = [
-            { id: 'floatingMessageContainer', tag: 'div', classes: ['floating-messages'] },
-            { id: 'player1', tag: 'div', classes: ['video-player'] },
-            { id: 'player2', tag: 'div', classes: ['video-player', 'hidden'] },
-            { id: 'searchResults', tag: 'div', classes: ['search-results'] },
-            { id: 'playlistsGrid', tag: 'div', classes: ['playlists-grid'] },
-            { id: 'playlistContainer', tag: 'div', classes: ['playlist-container-desktop'] },
-            { id: 'queueSection', tag: 'div', classes: ['queue-section', 'hidden'] }
-        ];
+    // Función de búsqueda unificada
+    async function performSearch(query) {
+        console.log(`🔍 Iniciando búsqueda: ${query}`);
         
-        requiredElements.forEach(({ id, tag, classes }) => {
-            if (!document.getElementById(id)) {
-                const element = document.createElement(tag);
-                element.id = id;
-                element.className = classes.join(' ');
-                
-                // Add to appropriate parent
-                const parent = DOMFixes.findBestParent(id);
-                if (parent) {
-                    parent.appendChild(element);
-                    console.log(`✅ Elemento faltante creado: ${id}`);
-                } else {
-                    document.body.appendChild(element);
-                    console.warn(`⚠️ Elemento ${id} añadido a body (no se encontró padre apropiado)`);
-                }
-            }
-        });
-    }
-    
-    static findBestParent(elementId) {
-        const parentMap = {
-            'player1': '#videoContainer',
-            'player2': '#videoContainer',
-            'searchResults': '#searchView',
-            'playlistsGrid': '#libraryView',
-            'playlistContainer': '#queueSection',
-            'queueSection': '.main-content'
-        };
-        
-        const parentSelector = parentMap[elementId];
-        if (parentSelector) {
-            return document.querySelector(parentSelector);
+        if (!query || query.trim().length < 2) {
+            return;
         }
         
+        // Cambiar a vista de búsqueda
+        if (window.switchView) {
+            window.switchView('search');
+        }
+        
+        const searchResults = document.getElementById('searchResults');
+        if (!searchResults) {
+            console.error('❌ Contenedor de resultados no encontrado');
+            return;
+        }
+        
+        // Mostrar loading
+        searchResults.innerHTML = `
+            <div class="search-loading" style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--primary-color);"></i>
+                <p style="margin-top: 16px; color: var(--text-secondary);">Buscando...</p>
+            </div>
+        `;
+        
+        try {
+            // Usar instancias de Piped
+            const pipedInstances = [
+                "https://api.piped.private.coffee",
+                "https://pipedapi.ducks.party",
+                "https://api.piped.video"
+            ];
+            
+            let searchData = null;
+            
+            // Intentar con múltiples instancias
+            for (const instance of pipedInstances) {
+                try {
+                    console.log(`🔗 Probando instancia: ${instance}`);
+                    
+                    const url = `${instance}/search?q=${encodeURIComponent(query)}&filter=videos`;
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        },
+                        signal: AbortSignal.timeout(10000) // 10s timeout
+                    });
+                    
+                    if (response.ok) {
+                        searchData = await response.json();
+                        console.log(`✅ Búsqueda exitosa en: ${instance}`);
+                        break;
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Falló instancia ${instance}:`, error.message);
+                    continue;
+                }
+            }
+            
+            if (!searchData) {
+                throw new Error('Todas las instancias de búsqueda fallaron');
+            }
+            
+            displaySearchResults(searchData);
+            
+        } catch (error) {
+            console.error('❌ Error en búsqueda:', error);
+            searchResults.innerHTML = `
+                <div class="search-error" style="text-align: center; padding: 40px;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #f44336; margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-secondary); margin-bottom: 16px;">Error de búsqueda: ${error.message}</p>
+                    <button onclick="performSearch('${query}')" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
+        }
+    }
+    
+    // Mostrar resultados
+    function displaySearchResults(data) {
+        const searchResults = document.getElementById('searchResults');
+        if (!searchResults) return;
+        
+        const items = data.items || data.relatedStreams || [];
+        
+        if (!items || items.length === 0) {
+            searchResults.innerHTML = `
+                <div class="search-placeholder" style="text-align: center; padding: 40px;">
+                    <i class="fas fa-search" style="font-size: 24px; opacity: 0.5; margin-bottom: 16px;"></i>
+                    <p style="color: var(--text-secondary);">No se encontraron resultados</p>
+                </div>
+            `;
+            return;
+        }
+        
+        searchResults.innerHTML = '';
+        
+        items.forEach(video => {
+            const videoId = extractVideoId(video);
+            if (!videoId) return;
+            
+            const videoElement = createVideoResultElement(video, videoId);
+            searchResults.appendChild(videoElement);
+        });
+        
+        console.log(`✅ ${items.length} resultados mostrados`);
+    }
+    
+    function extractVideoId(video) {
+        if (video.videoId) return video.videoId;
+        if (video.id) return video.id;
+        if (video.url) {
+            const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+            return match ? match[1] : null;
+        }
         return null;
     }
     
-    static preventDuplicateListeners() {
-        // Store original addEventListener
-        if (!Element.prototype._originalAddEventListener) {
-            Element.prototype._originalAddEventListener = Element.prototype.addEventListener;
-            
-            Element.prototype.addEventListener = function(type, listener, options) {
-                // Create unique identifier for listener
-                const listenerId = `${type}_${listener.toString().slice(0, 50)}`;
-                
-                if (!this._eventListeners) {
-                    this._eventListeners = new Set();
-                }
-                
-                if (this._eventListeners.has(listenerId)) {
-                    console.warn(`⚠️ Duplicate event listener prevented: ${type} on`, this);
-                    return;
-                }
-                
-                this._eventListeners.add(listenerId);
-                this._originalAddEventListener(type, listener, options);
-            };
-            
-            console.log('✅ Duplicate listener prevention installed');
-        }
+    function createVideoResultElement(video, videoId) {
+        const videoDiv = document.createElement('div');
+        videoDiv.className = 'video-result';
+        videoDiv.dataset.videoId = videoId;
+        
+        const thumbnailUrl = video.thumbnail || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+        const duration = formatDuration(video.duration);
+        const title = escapeHtml(video.title || 'Título no disponible');
+        const author = escapeHtml(video.uploaderName || video.channelTitle || 'Desconocido');
+        
+        videoDiv.innerHTML = `
+            <div class="thumbnail-container">
+                <img src="${thumbnailUrl}" alt="${title}" class="thumbnail" loading="lazy">
+                ${duration ? `<span class="duration">${duration}</span>` : ''}
+            </div>
+            <div class="video-details">
+                <h3 class="video-title">${title}</h3>
+                <p class="video-author">${author}</p>
+                <button class="search-result-add-button" onclick="addToQueue('${videoId}', '${title.replace(/'/g, "\\'")}', '${thumbnailUrl}', '${author.replace(/'/g, "\\'")}')">
+                    <i class="fa-solid fa-arrow-right-to-line"></i>
+                    <span class="add-text">Reproducir Después</span>
+                </button>
+            </div>
+        `;
+        
+        return videoDiv;
     }
     
-    static fixScrollIssues() {
-        // Fix para scroll containers sin altura
-        const scrollContainers = [
-            '.content-view',
-            '.search-results',
-            '.library-container',
-            '.playlist-videos-content'
-        ];
-        
-        scrollContainers.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(element => {
-                if (element.scrollHeight === 0) {
-                    element.style.minHeight = '100px';
+    // Configurar listeners de búsqueda
+    const searchInputs = ['sidebarSearchInput', 'mobileSearchInput', 'searchInput'];
+    
+    searchInputs.forEach(inputId => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            // Búsqueda al presionar Enter
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    const query = input.value.trim();
+                    if (query.length > 0) {
+                        performSearch(query);
+                    }
                 }
             });
-        });
-        
-        // Fix para scroll restoration
-        if ('scrollRestoration' in history) {
-            history.scrollRestoration = 'manual';
-        }
-    }
-}
-
-// ===== STATE MANAGEMENT FIXES =====
-class StateFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes para gestión de estado...');
-        
-        // Fix para estado perdido
-        StateFixes.createStateBackup();
-        
-        // Fix para setState inconsistente
-        StateFixes.fixStateManager();
-        
-        // Fix para memory leaks
-        StateFixes.preventMemoryLeaks();
-    }
-    
-    static createStateBackup() {
-        // Backup del estado cada 30 segundos
-        setInterval(() => {
-            if (window.unifiedStateManager?.state) {
-                try {
-                    const stateBackup = JSON.stringify(window.unifiedStateManager.state);
-                    sessionStorage.setItem('ytcrossmix_state_backup', stateBackup);
-                } catch (error) {
-                    console.warn('⚠️ No se pudo crear backup del estado:', error);
-                }
-            }
-        }, 30000);
-    }
-    
-    static fixStateManager() {
-        // Validate state manager exists
-        const checkStateManager = () => {
-            if (!window.unifiedStateManager) {
-                console.warn('⚠️ StateManager no encontrado, creando fallback...');
+            
+            // Búsqueda con delay
+            let searchTimeout;
+            input.addEventListener('input', (event) => {
+                clearTimeout(searchTimeout);
+                const query = event.target.value.trim();
                 
-                // Create minimal state manager fallback
-                window.unifiedStateManager = {
-                    state: {
-                        app: {
-                            player1: null,
-                            player2: null,
-                            currentPlayer: 1,
-                            playersInitialized: false,
-                            reproduccionIniciada: false
-                        },
-                        playlist: {
-                            playlistsData: [],
-                            currentPlayingInfo: {
-                                playlistId: null,
-                                videoId: null,
-                                flattenedIndex: -1
-                            }
-                        },
-                        ui: {
-                            currentView: 'home'
-                        }
-                    },
-                    get: function(path) {
-                        const keys = path.split('.');
-                        let current = this.state;
-                        for (const key of keys) {
-                            if (current && typeof current === 'object' && key in current) {
-                                current = current[key];
-                            } else {
-                                return undefined;
-                            }
-                        }
-                        return current;
-                    },
-                    set: function(path, value) {
-                        const keys = path.split('.');
-                        const lastKey = keys.pop();
-                        let current = this.state;
-                        for (const key of keys) {
-                            if (!(key in current)) {
-                                current[key] = {};
-                            }
-                            current = current[key];
-                        }
-                        current[lastKey] = value;
-                        
-                        // Dispatch change event
-                        window.dispatchEvent(new CustomEvent('ytcrossmix:state:changed', {
-                            detail: { path, newValue: value }
-                        }));
-                    }
-                };
-                
-                console.log('✅ StateManager fallback creado');
-            }
-        };
-        
-        // Check immediately and after DOM ready
-        checkStateManager();
-        document.addEventListener('DOMContentLoaded', checkStateManager);
-    }
-    
-    static preventMemoryLeaks() {
-        // Clear intervals on page unload
-        window.addEventListener('beforeunload', () => {
-            const state = window.unifiedStateManager?.state;
-            if (state) {
-                // Clear monitoring interval
-                if (state.app.monitorInterval) {
-                    clearInterval(state.app.monitorInterval);
+                if (query.length > 2) {
+                    searchTimeout = setTimeout(() => {
+                        performSearch(query);
+                    }, 500);
                 }
-                
-                // Clear crossfade interval
-                if (state.app.crossfadeInterval) {
-                    clearInterval(state.app.crossfadeInterval);
-                }
-            }
-            
-            // Clear all active timeouts
-            let highestTimeoutId = setTimeout(() => {});
-            for (let i = 0; i < highestTimeoutId; i++) {
-                clearTimeout(i);
-            }
-            
-            console.log('🧹 Memory cleanup completado');
-        });
-    }
-}
-
-// ===== NETWORK FIXES =====
-class NetworkFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes de red...');
-        
-        // Fix para timeouts de fetch
-        NetworkFixes.setupFetchTimeout();
-        
-        // Fix para retry logic
-        NetworkFixes.setupRetryLogic();
-        
-        // Fix para CORS issues
-        NetworkFixes.setupCORSFallbacks();
-    }
-    
-    static setupFetchTimeout() {
-        const originalFetch = window.fetch;
-        
-        window.fetch = function(url, options = {}) {
-            const timeout = options.timeout || 15000;
-            
-            return Promise.race([
-                originalFetch(url, options),
-                new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Request timeout')), timeout);
-                })
-            ]);
-        };
-        
-        console.log('✅ Fetch timeout configurado');
-    }
-    
-    static setupRetryLogic() {
-        window.fetchWithRetry = async function(url, options = {}, maxRetries = 3) {
-            let lastError;
-            
-            for (let attempt = 0; attempt <= maxRetries; attempt++) {
-                try {
-                    const response = await window.fetch(url, options);
-                    if (response.ok) {
-                        return response;
-                    } else if (response.status >= 500 && attempt < maxRetries) {
-                        // Retry on server errors
-                        await NetworkFixes.delay(Math.pow(2, attempt) * 1000);
-                        continue;
-                    } else {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                } catch (error) {
-                    lastError = error;
-                    
-                    if (attempt < maxRetries && error.message.includes('timeout')) {
-                        await NetworkFixes.delay(Math.pow(2, attempt) * 1000);
-                        continue;
-                    }
-                    
-                    if (attempt === maxRetries) {
-                        throw lastError;
-                    }
-                }
-            }
-        };
-        
-        console.log('✅ Retry logic configurado');
-    }
-    
-    static setupCORSFallbacks() {
-        // Fallback para APIs que fallen por CORS
-        window.corsProxyFallback = function(url) {
-            const fallbacks = [
-                `/.netlify/functions/cors-proxy/${encodeURIComponent(url)}`,
-                `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-                `https://corsproxy.io/?${encodeURIComponent(url)}`
-            ];
-            
-            return fallbacks;
-        };
-        
-        console.log('✅ CORS fallbacks configurados');
-    }
-    
-    static delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-}
-
-// ===== UI FIXES =====
-class UIFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes de UI...');
-        
-        // Fix para elementos solapados
-        UIFixes.fixZIndexIssues();
-        
-        // Fix para responsive design
-        UIFixes.fixResponsiveIssues();
-        
-        // Fix para accessibility
-        UIFixes.fixAccessibilityIssues();
-        
-        // Fix para animations
-        UIFixes.fixAnimationIssues();
-    }
-    
-    static fixZIndexIssues() {
-        // Ensure proper stacking order
-        const zIndexMap = {
-            '.bottom-nav': '100',
-            '.desktop-sidebar': '200',
-            '.bottom-player': '300',
-            '.mobile-header': '400',
-            '.queue-section': '1000',
-            '.unified-loading-overlay': '2000',
-            '.floating-messages': '3000',
-            '#notification-container': '4000'
-        };
-        
-        Object.entries(zIndexMap).forEach(([selector, zIndex]) => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(element => {
-                element.style.zIndex = zIndex;
             });
-        });
-        
-        console.log('✅ Z-index issues fixed');
-    }
-    
-    static fixResponsiveIssues() {
-        // Fix para viewport en mobile
-        const viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-            viewport.setAttribute('content', 
-                'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
-            );
         }
-        
-        // Fix para altura en mobile
-        const fixMobileHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        };
-        
-        fixMobileHeight();
-        window.addEventListener('resize', UIFixes.debounce(fixMobileHeight, 100));
-        
-        console.log('✅ Responsive issues fixed');
-    }
+    });
     
-    static fixAccessibilityIssues() {
-        // Add missing ARIA labels
-        const buttons = document.querySelectorAll('button:not([aria-label]):not([title])');
-        buttons.forEach((button, index) => {
-            if (!button.textContent.trim()) {
-                button.setAttribute('aria-label', `Button ${index + 1}`);
-            }
-        });
-        
-        // Fix focus management
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Tab') {
-                document.body.classList.add('keyboard-navigation');
-            }
-        });
-        
-        document.addEventListener('mousedown', () => {
-            document.body.classList.remove('keyboard-navigation');
-        });
-        
-        console.log('✅ Accessibility issues fixed');
-    }
+    // Exponer funciones globalmente
+    window.performSearch = performSearch;
+    window.addToQueue = addToQueue;
     
-    static fixAnimationIssues() {
-        // Respect reduced motion preference
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            const style = document.createElement('style');
-            style.textContent = `
-                *, *::before, *::after {
-                    animation-duration: 0.01ms !important;
-                    animation-iteration-count: 1 !important;
-                    transition-duration: 0.01ms !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        // Fix para animations que no terminan
-        document.addEventListener('animationend', (event) => {
-            if (event.target.classList.contains('fade-out')) {
-                event.target.classList.add('hidden');
-            }
-        });
-        
-        console.log('✅ Animation issues fixed');
-    }
-    
-    static debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    }
+    console.log('✅ Búsqueda corregida');
 }
 
-// ===== PERFORMANCE FIXES =====
-class PerformanceFixes {
-    static init() {
-        console.log('🔧 Aplicando fixes de performance...');
-        
-        // Fix para memory leaks en event listeners
-        PerformanceFixes.fixEventListenerLeaks();
-        
-        // Fix para DOM queries repetitivas
-        PerformanceFixes.cacheCommonElements();
-        
-        // Fix para animations costosas
-        PerformanceFixes.optimizeAnimations();
-    }
+// ===== 3. CORRECCIÓN DE AUTENTICACIÓN =====
+function fixAuth() {
+    console.log('🔧 Corrigiendo autenticación...');
     
-    static fixEventListenerLeaks() {
-        // Track event listeners for cleanup
-        if (!window.eventListenerRegistry) {
-            window.eventListenerRegistry = new WeakMap();
+    // Configurar botones de Google
+    function setupGoogleButtons() {
+        const signInButton = document.getElementById('googleSignInButton');
+        const signOutButton = document.getElementById('googleSignOutButton');
+        
+        if (signInButton) {
+            signInButton.classList.remove('hidden');
+            signInButton.addEventListener('click', () => {
+                console.log('👤 Intento de login con Google');
+                
+                if (window.authManager && window.authManager.handleAuthClick) {
+                    window.authManager.handleAuthClick();
+                } else {
+                    showMessage('Sistema de autenticación no disponible', 'error');
+                }
+            });
         }
         
-        const originalAddEventListener = EventTarget.prototype.addEventListener;
-        const originalRemoveEventListener = EventTarget.prototype.removeEventListener;
-        
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
-            if (!window.eventListenerRegistry.has(this)) {
-                window.eventListenerRegistry.set(this, new Map());
-            }
-            
-            const listeners = window.eventListenerRegistry.get(this);
-            const key = `${type}_${options && options.capture ? 'capture' : 'bubble'}`;
-            
-            if (!listeners.has(key)) {
-                listeners.set(key, new Set());
-            }
-            
-            listeners.get(key).add(listener);
-            originalAddEventListener.call(this, type, listener, options);
-        };
-        
-        EventTarget.prototype.removeEventListener = function(type, listener, options) {
-            const listeners = window.eventListenerRegistry.get(this);
-            if (listeners) {
-                const key = `${type}_${options && options.capture ? 'capture' : 'bubble'}`;
-                const typeListeners = listeners.get(key);
-                if (typeListeners) {
-                    typeListeners.delete(listener);
+        if (signOutButton) {
+            signOutButton.addEventListener('click', () => {
+                console.log('👤 Intento de logout');
+                
+                if (window.authManager && window.authManager.handleSignOutClick) {
+                    window.authManager.handleSignOutClick();
+                } else {
+                    showMessage('Sistema de autenticación no disponible', 'error');
                 }
-            }
-            
-            originalRemoveEventListener.call(this, type, listener, options);
-        };
-        
-        console.log('✅ Event listener leak tracking installed');
+            });
+        }
     }
     
-    static cacheCommonElements() {
-        // Cache frequently accessed elements
-        window.cachedElements = {
-            get playButton() {
-                return this._playButton || (this._playButton = document.getElementById('botonPlay'));
-            },
-            get searchResults() {
-                return this._searchResults || (this._searchResults = document.getElementById('searchResults'));
-            },
-            get playlistsGrid() {
-                return this._playlistsGrid || (this._playlistsGrid = document.getElementById('playlistsGrid'));
-            },
-            // Clear cache when DOM changes
-            clearCache() {
-                Object.keys(this).forEach(key => {
-                    if (key.startsWith('_')) {
-                        delete this[key];
-                    }
-                });
-            }
-        };
-        
-        // Clear cache on DOM mutations
-        const observer = new MutationObserver(() => {
-            window.cachedElements.clearCache();
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-        
-        console.log('✅ Element caching configured');
+    // Verificar estado de autenticación
+    function checkAuthState() {
+        if (window.authManager && window.authManager.isUserAuthenticated) {
+            const isAuth = window.authManager.isUserAuthenticated();
+            updateAuthUI(isAuth);
+            return isAuth;
+        }
+        return false;
     }
     
-    static optimizeAnimations() {
-        // Use requestAnimationFrame for smooth animations
-        window.smoothTransition = function(element, property, from, to, duration = 300) {
-            const start = performance.now();
-            const initialValue = from;
-            const targetValue = to;
-            
-            function animate(currentTime) {
-                const elapsed = currentTime - start;
-                const progress = Math.min(elapsed / duration, 1);
-                
-                // Easing function
-                const easeOut = 1 - Math.pow(1 - progress, 3);
-                const currentValue = initialValue + (targetValue - initialValue) * easeOut;
-                
-                element.style[property] = currentValue + (property.includes('opacity') ? '' : 'px');
-                
-                if (progress < 1) {
-                    requestAnimationFrame(animate);
-                }
-            }
-            
-            requestAnimationFrame(animate);
-        };
+    function updateAuthUI(isLoggedIn) {
+        const signInButton = document.getElementById('googleSignInButton');
+        const signOutButton = document.getElementById('googleSignOutButton');
         
-        console.log('✅ Animation optimization configured');
+        if (signInButton && signOutButton) {
+            if (isLoggedIn) {
+                signInButton.classList.add('hidden');
+                signOutButton.classList.remove('hidden');
+            } else {
+                signInButton.classList.remove('hidden');
+                signOutButton.classList.add('hidden');
+            }
+        }
     }
+    
+    // Configurar inmediatamente
+    setupGoogleButtons();
+    
+    // Verificar cada 2 segundos si hay cambios en authManager
+    const authCheckInterval = setInterval(() => {
+        if (window.authManager) {
+            checkAuthState();
+            clearInterval(authCheckInterval);
+        }
+    }, 2000);
+    
+    // Timeout para evitar bucle infinito
+    setTimeout(() => {
+        clearInterval(authCheckInterval);
+    }, 30000);
+    
+    console.log('✅ Autenticación corregida');
 }
 
-// ===== MAIN FIXES INITIALIZER =====
-class SystemFixes {
-    static async init() {
-        console.log('🚀 Inicializando System Fixes...');
+// ===== 4. CORRECCIÓN DE URLs DE PLAYLIST =====
+function fixPlaylistUrl() {
+    console.log('🔧 Corrigiendo añadir playlist desde URL...');
+    
+    function handlePlaylistUrlAdd() {
+        const input = document.getElementById('searchInput2');
+        if (!input) {
+            console.error('❌ Input de URL no encontrado');
+            return;
+        }
+        
+        const url = input.value.trim();
+        if (!url) {
+            showMessage('Ingresa una URL válida', 'warning');
+            return;
+        }
+        
+        console.log(`🔗 Procesando URL: ${url}`);
+        
+        // Validar URL de YouTube
+        if (!isValidYouTubeUrl(url)) {
+            showMessage('URL de YouTube no válida', 'error');
+            return;
+        }
+        
+        // Extraer playlist ID
+        const playlistId = extractPlaylistId(url);
+        if (!playlistId) {
+            showMessage('URL no contiene una playlist válida', 'error');
+            return;
+        }
+        
+        console.log(`📋 ID de playlist extraído: ${playlistId}`);
+        
+        // Limpiar input
+        input.value = '';
+        
+        // Procesar playlist
+        loadPlaylistFromUrl(playlistId, url);
+    }
+    
+    async function loadPlaylistFromUrl(playlistId, originalUrl) {
+        showMessage('Cargando playlist...', 'info');
         
         try {
-            // Initialize all fix categories
-            YouTubeAPIFixes.init();
-            DOMFixes.init();
-            StateFixes.init();
-            NetworkFixes.init();
-            UIFixes.init();
-            PerformanceFixes.init();
+            // Intentar cargar desde Piped
+            const pipedInstances = [
+                "https://api.piped.private.coffee",
+                "https://pipedapi.ducks.party"
+            ];
             
-            // Setup health monitoring
-            SystemFixes.setupHealthMonitoring();
+            let playlistData = null;
             
-            // Setup debug tools
-            SystemFixes.setupDebugTools();
-            
-            console.log('✅ System Fixes inicializados correctamente');
-            
-            // Dispatch ready event
-            window.dispatchEvent(new CustomEvent('ytcrossmix:fixes:ready', {
-                detail: {
-                    timestamp: Date.now(),
-                    version: '2.0.0',
-                    fixes: [
-                        'YouTube API',
-                        'DOM',
-                        'State Management', 
-                        'Network',
-                        'UI',
-                        'Performance'
-                    ]
-                }
-            }));
-            
-        } catch (error) {
-            console.error('💥 Error inicializando System Fixes:', error);
-            
-            // Show fallback error message
-            setTimeout(() => {
-                if (window.unifiedMessageManager) {
-                    window.unifiedMessageManager.show(
-                        'Algunos componentes pueden no funcionar correctamente',
-                        'warning',
-                        5000
-                    );
-                }
-            }, 2000);
-        }
-    }
-    
-    static setupHealthMonitoring() {
-        // Monitor system health every 30 seconds
-        setInterval(() => {
-            const health = SystemFixes.checkSystemHealth();
-            
-            if (health.critical > 0) {
-                console.warn('⚠️ System health issues detected:', health);
-            }
-        }, 30000);
-    }
-    
-    static checkSystemHealth() {
-        const issues = {
-            critical: 0,
-            warnings: 0,
-            info: 0,
-            details: []
-        };
-        
-        // Check YouTube API
-        if (!window.YT || !window.YT.Player) {
-            issues.critical++;
-            issues.details.push('YouTube API not loaded');
-        }
-        
-        // Check state manager
-        if (!window.unifiedStateManager) {
-            issues.critical++;
-            issues.details.push('State manager missing');
-        }
-        
-        // Check required elements
-        const requiredElements = ['player1', 'player2', 'searchResults', 'playlistsGrid'];
-        requiredElements.forEach(id => {
-            if (!document.getElementById(id)) {
-                issues.warnings++;
-                issues.details.push(`Missing element: ${id}`);
-            }
-        });
-        
-        // Check memory usage (if available)
-        if (performance.memory) {
-            const memoryUsage = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit;
-            if (memoryUsage > 0.8) {
-                issues.warnings++;
-                issues.details.push(`High memory usage: ${(memoryUsage * 100).toFixed(1)}%`);
-            }
-        }
-        
-        return issues;
-    }
-    
-    static setupDebugTools() {
-        // Debug tools only in development
-        if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
-            window.SystemDebug = {
-                checkHealth: () => SystemFixes.checkSystemHealth(),
-                reloadYouTubeAPI: () => YouTubeAPIFixes.forceReloadAPI(),
-                clearStateBackup: () => sessionStorage.removeItem('ytcrossmix_state_backup'),
-                restoreStateBackup: () => {
-                    const backup = sessionStorage.getItem('ytcrossmix_state_backup');
-                    if (backup && window.unifiedStateManager) {
-                        try {
-                            window.unifiedStateManager.state = JSON.parse(backup);
-                            console.log('✅ State restored from backup');
-                            return true;
-                        } catch (error) {
-                            console.error('❌ Error restoring state:', error);
-                            return false;
-                        }
+            for (const instance of pipedInstances) {
+                try {
+                    console.log(`🔗 Intentando cargar playlist desde: ${instance}`);
+                    
+                    const response = await fetch(`${instance}/playlists/${playlistId}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                        signal: AbortSignal.timeout(15000)
+                    });
+                    
+                    if (response.ok) {
+                        playlistData = await response.json();
+                        console.log(`✅ Playlist cargada desde: ${instance}`);
+                        break;
                     }
-                    return false;
-                },
-                triggerError: () => {
-                    throw new Error('Test error for debugging');
-                },
-                getEventListeners: (element) => {
-                    return window.eventListenerRegistry?.get(element);
-                },
-                clearElementCache: () => {
-                    window.cachedElements?.clearCache();
+                } catch (error) {
+                    console.warn(`⚠️ Error en instancia ${instance}:`, error.message);
+                    continue;
                 }
+            }
+            
+            if (!playlistData) {
+                throw new Error('No se pudo cargar la playlist desde ninguna instancia');
+            }
+            
+            // Procesar datos de la playlist
+            const processedPlaylist = {
+                id: playlistId,
+                name: playlistData.name || 'Playlist Sin Nombre',
+                thumbnailUrl: playlistData.thumbnailUrl || 'https://via.placeholder.com/320x180/333333/ffffff?text=Playlist',
+                videos: [],
+                isExpanded: true,
+                source: 'external'
             };
             
-            console.log('🔧 Debug tools available: window.SystemDebug');
+            // Procesar videos
+            if (playlistData.relatedStreams && Array.isArray(playlistData.relatedStreams)) {
+                processedPlaylist.videos = playlistData.relatedStreams
+                    .filter(video => video && extractVideoId(video))
+                    .map(video => ({
+                        videoId: extractVideoId(video),
+                        title: video.title || 'Título Desconocido',
+                        thumbnail: video.thumbnail || `https://img.youtube.com/vi/${extractVideoId(video)}/default.jpg`,
+                        duration: parseDuration(video.duration) || 0,
+                        channelTitle: video.uploaderName || 'YouTube'
+                    }));
+            }
+            
+            if (processedPlaylist.videos.length === 0) {
+                throw new Error('La playlist no contiene videos válidos');
+            }
+            
+            // Añadir playlist al estado
+            addPlaylistToState(processedPlaylist);
+            
+            showMessage(`Playlist "${processedPlaylist.name}" cargada (${processedPlaylist.videos.length} videos)`, 'success');
+            
+            // Cambiar a vista de biblioteca
+            if (window.switchView) {
+                window.switchView('library');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error cargando playlist:', error);
+            showMessage(`Error cargando playlist: ${error.message}`, 'error');
         }
+    }
+    
+    function addPlaylistToState(playlist) {
+        // Si existe un estado unificado, usarlo
+        if (window.unifiedStateManager && window.unifiedStateManager.state) {
+            const currentPlaylists = window.unifiedStateManager.state.playlist.playlistsData || [];
+            
+            // Verificar duplicados
+            if (currentPlaylists.some(p => p.id === playlist.id)) {
+                showMessage('Esta playlist ya está cargada', 'warning');
+                return;
+            }
+            
+            const updatedPlaylists = [...currentPlaylists, playlist];
+            window.unifiedStateManager.set('playlist.playlistsData', updatedPlaylists);
+            
+            // Actualizar UI si existe
+            if (window.UIManager && window.UIManager.updatePlaylistsUI) {
+                setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
+            }
+        }
+        // Fallback a variable global
+        else if (window.playlistsData) {
+            if (window.playlistsData.some(p => p.id === playlist.id)) {
+                showMessage('Esta playlist ya está cargada', 'warning');
+                return;
+            }
+            
+            window.playlistsData.push(playlist);
+            
+            // Actualizar UI si existe función global
+            if (window.updatePlaylistsUI) {
+                setTimeout(() => window.updatePlaylistsUI(), 100);
+            }
+        }
+        
+        console.log(`✅ Playlist añadida: ${playlist.name} (${playlist.videos.length} videos)`);
+    }
+    
+    // Configurar listener del botón
+    const addButton = document.getElementById('añadirUrlButton');
+    if (addButton) {
+        addButton.addEventListener('click', handlePlaylistUrlAdd);
+        console.log('✅ Botón de añadir URL configurado');
+    }
+    
+    // Configurar listener del input (Enter key)
+    const urlInput = document.getElementById('searchInput2');
+    if (urlInput) {
+        urlInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                handlePlaylistUrlAdd();
+            }
+        });
+        console.log('✅ Input de URL configurado');
+    }
+    
+    console.log('✅ Añadir playlist desde URL corregido');
+}
+
+// ===== 5. FUNCIONES AUXILIARES =====
+function isValidYouTubeUrl(url) {
+    return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url);
+}
+
+function extractPlaylistId(url) {
+    try {
+        const urlObject = new URL(url);
+        return urlObject.searchParams.get('list');
+    } catch (e) {
+        const match = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+        return match ? match[1] : null;
     }
 }
 
-// ===== AUTO-INITIALIZATION =====
-// Initialize fixes as soon as possible
+function extractVideoId(video) {
+    if (video.videoId) return video.videoId;
+    if (video.id) return video.id;
+    if (video.url) {
+        const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        return match ? match[1] : null;
+    }
+    return null;
+}
+
+function formatDuration(duration) {
+    if (!duration) return '';
+    
+    if (typeof duration === 'number') {
+        const minutes = Math.floor(duration / 60);
+        const seconds = Math.floor(duration % 60);
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    if (typeof duration === 'string') {
+        // PT format
+        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (match) {
+            const hours = parseInt(match[1] || '0');
+            const minutes = parseInt(match[2] || '0');
+            const seconds = parseInt(match[3] || '0');
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // Already formatted
+        if (/^\d+:\d{2}$/.test(duration)) {
+            return duration;
+        }
+    }
+    
+    return '';
+}
+
+function parseDuration(duration) {
+    if (!duration) return 0;
+    
+    if (typeof duration === 'number') return Math.floor(duration);
+    
+    if (typeof duration === 'string') {
+        // PT format
+        const ptMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+        if (ptMatch) {
+            const hours = parseInt(ptMatch[1] || '0');
+            const minutes = parseInt(ptMatch[2] || '0');
+            const seconds = parseFloat(ptMatch[3] || '0');
+            return Math.floor(hours * 3600 + minutes * 60 + seconds);
+        }
+        
+        // MM:SS format
+        const timeMatch = duration.match(/^(\d+):(\d{2})$/);
+        if (timeMatch) {
+            const minutes = parseInt(timeMatch[1]);
+            const seconds = parseInt(timeMatch[2]);
+            return minutes * 60 + seconds;
+        }
+    }
+    
+    return 0;
+}
+
+function escapeHtml(text) {
+    if (typeof text !== 'string') return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Función para añadir videos a la cola
+function addToQueue(videoId, title, thumbnail, author) {
+    console.log(`➕ Añadiendo a cola: ${title}`);
+    
+    const videoData = {
+        videoId: videoId,
+        title: title,
+        thumbnail: thumbnail,
+        channelTitle: author,
+        duration: 0
+    };
+    
+    // Intentar usar el sistema unificado
+    if (window.PlaylistManager && window.PlaylistManager.addVideoToManualPlaylist) {
+        const result = window.PlaylistManager.addVideoToManualPlaylist(videoData);
+        if (result) {
+            showMessage(`"${title}" añadido a la cola`, 'success');
+        }
+    }
+    // Fallback al sistema legacy
+    else if (window.addVideoToManualPlaylist) {
+        window.addVideoToManualPlaylist(videoData);
+    }
+    // Último recurso: mensaje de error
+    else {
+        showMessage('Sistema de playlists no disponible', 'error');
+    }
+}
+
+// Sistema de mensajes mejorado
+function showMessage(message, type = 'info', duration = 3000) {
+    console.log(`💬 Mensaje [${type}]: ${message}`);
+    
+    // Intentar usar el sistema unificado
+    if (window.unifiedMessageManager && window.unifiedMessageManager.show) {
+        return window.unifiedMessageManager.show(message, type, duration);
+    }
+    
+    // Fallback al sistema legacy
+    if (window.mostrarMensajeFlotante) {
+        return window.mostrarMensajeFlotante(message, duration, type);
+    }
+    
+    // Último recurso: crear mensaje simple
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `floating-message ${type} show`;
+    messageDiv.textContent = message;
+    messageDiv.style.cssText = `
+        position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+        background: var(--background-elevated); color: var(--text-primary);
+        padding: 12px 16px; border-radius: 8px; z-index: 3000;
+        font-size: 14px; text-align: center; box-shadow: var(--shadow-medium);
+        transition: all 0.3s ease; cursor: pointer;
+    `;
+    
+    // Tipo-specific styling
+    const typeStyles = {
+        success: 'background: rgba(76, 175, 80, 0.9); color: white;',
+        error: 'background: rgba(244, 67, 54, 0.9); color: white;',
+        warning: 'background: rgba(255, 193, 7, 0.9); color: black;',
+        info: 'background: rgba(33, 150, 243, 0.9); color: white;'
+    };
+    
+    if (typeStyles[type]) {
+        messageDiv.style.cssText += typeStyles[type];
+    }
+    
+    document.body.appendChild(messageDiv);
+    
+    // Auto-remove
+    const remove = () => {
+        messageDiv.style.opacity = '0';
+        setTimeout(() => messageDiv.remove(), 300);
+    };
+    
+    messageDiv.addEventListener('click', remove);
+    setTimeout(remove, duration);
+    
+    return messageDiv;
+}
+
+// ===== 6. FUNCIÓN PRINCIPAL DE CORRECCIÓN =====
+function applyCriticalFixes() {
+    console.log('🚀 Aplicando todas las correcciones críticas...');
+    
+    try {
+        fixNavigation();
+        fixSearch();
+        fixAuth();
+        fixPlaylistUrl();
+        
+        // Configurar funciones globales
+        window.showMessage = showMessage;
+        window.isValidYouTubeUrl = isValidYouTubeUrl;
+        window.extractPlaylistId = extractPlaylistId;
+        window.formatDuration = formatDuration;
+        window.parseDuration = parseDuration;
+        window.escapeHtml = escapeHtml;
+        
+        console.log('✅ Todas las correcciones aplicadas exitosamente');
+        
+        // Mostrar mensaje de éxito
+        setTimeout(() => {
+            showMessage('Sistema corregido y listo para usar', 'success');
+        }, 1000);
+        
+    } catch (error) {
+        console.error('💥 Error aplicando correcciones:', error);
+        showMessage('Error en las correcciones del sistema', 'error');
+    }
+}
+
+// ===== 7. INICIALIZACIÓN AUTOMÁTICA =====
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => SystemFixes.init());
+    document.addEventListener('DOMContentLoaded', applyCriticalFixes);
 } else {
-    SystemFixes.init();
+    applyCriticalFixes();
 }
 
-// Export for module systems
-if (typeof window !== 'undefined') {
-    window.SystemFixes = SystemFixes;
-}
+// Aplicar correcciones después de un delay para asegurar que otros scripts carguen
+setTimeout(applyCriticalFixes, 2000);
 
-console.log('✅ System Fixes loaded and ready');
+console.log('✅ Sistema de correcciones críticas cargado');
