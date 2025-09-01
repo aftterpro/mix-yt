@@ -1018,7 +1018,504 @@
         } else {
             initializeUnifiedUI();
         }
+        // ===== FUNCIÓN DEBUG FALTANTE PARA INDEX.HTML =====
+// Esta función debe estar disponible globalmente para los controles de debug
+
+// Toggle function for unified debug panels
+function toggleUnifiedDebug() {
+    const debugPanel = document.getElementById('unifiedDebugPanel');
+    const stateDebug = document.getElementById('unifiedStateDebug');
+    
+    if (debugPanel) {
+        debugPanel.classList.toggle('show');
+    }
+    
+    if (stateDebug) {
+        stateDebug.classList.toggle('show');
+    }
+    
+    // Update debug panels if visible
+    if (debugPanel?.classList.contains('show') || stateDebug?.classList.contains('show')) {
+        if (window.unifiedHelpers?.updateDebugPanels) {
+            window.unifiedHelpers.updateDebugPanels();
+        }
+    }
+    
+    console.log('🔧 Debug panels toggled');
+}
+
+// Global debug functions
+function debugUnified() {
+    if (!window.ytCrossMixUnified) {
+        console.error('❌ Sistema unificado no disponible');
+        return;
+    }
+    
+    console.log('🔧 Sistema Unificado Debug Info:');
+    console.log('Initialized:', window.ytCrossMixUnified.initialized);
+    console.log('Modules loaded:', window.ytCrossMixUnified.moduleLoader?.loaded?.size || 0);
+    console.log('State manager:', !!window.unifiedStateManager);
+    console.log('YouTube manager:', !!window.unifiedYouTubeManager);
+    console.log('Loading manager:', !!window.unifiedLoadingManager);
+    console.log('Message manager:', !!window.unifiedMessageManager);
+    
+    if (window.ytCrossMixUnified.performHealthCheck) {
+        console.log('Health check:', window.ytCrossMixUnified.performHealthCheck());
+    }
+    
+    // Show debug info in UI
+    if (window.unifiedMessageManager) {
+        const moduleCount = window.ytCrossMixUnified.moduleLoader?.loaded?.size || 0;
+        window.unifiedMessageManager.show(
+            `Debug: ${moduleCount} módulos cargados`, 
+            'info', 
+            3000
+        );
+    }
+}
+
+function resetUnified() {
+    if (!confirm('¿Reiniciar completamente el sistema unificado?')) {
+        return;
+    }
+    
+    console.log('🔄 Reiniciando sistema unificado...');
+    
+    try {
+        // Stop all intervals and timeouts
+        if (window.unifiedStateManager?.state) {
+            const state = window.unifiedStateManager.state;
+            
+            if (state.app.monitorInterval) {
+                clearInterval(state.app.monitorInterval);
+            }
+            
+            if (state.app.crossfadeInterval) {
+                clearInterval(state.app.crossfadeInterval);
+            }
+        }
         
+        // Clear all active loaders
+        if (window.unifiedLoadingManager?.hideAll) {
+            window.unifiedLoadingManager.hideAll();
+        }
+        
+        // Clear all messages
+        if (window.unifiedMessageManager?.hideAll) {
+            window.unifiedMessageManager.hideAll();
+        }
+        
+        // Reset YouTube players
+        if (window.unifiedStateManager?.state) {
+            try {
+                const state = window.unifiedStateManager.state;
+                if (state.app.player1) state.app.player1.stopVideo();
+                if (state.app.player2) state.app.player2.stopVideo();
+            } catch (e) {
+                console.warn('Error stopping players:', e);
+            }
+        }
+        
+        // Clear local storage items
+        const itemsToRemove = [
+            'google_token',
+            'ytcrossmix_state_backup',
+            'ytcrossmix_preferences'
+        ];
+        
+        itemsToRemove.forEach(item => {
+            localStorage.removeItem(item);
+            sessionStorage.removeItem(item);
+        });
+        
+        // Reset state to initial values
+        if (window.unifiedStateManager) {
+            window.unifiedStateManager.state = {
+                app: {
+                    player1: null,
+                    player2: null,
+                    currentPlayer: 1,
+                    playersInitialized: false,
+                    youtubeAPIReady: false,
+                    reproduccionIniciada: false,
+                    isTransitioning: false,
+                    isAudioFading: false,
+                    hasOutroCrossfadeStarted: false,
+                    crossfadeInProgress: false,
+                    crossfadeInterval: null,
+                    monitorInterval: null
+                },
+                playlist: {
+                    playlistsData: [],
+                    currentPlayingInfo: {
+                        playlistId: null,
+                        videoId: null,
+                        flattenedIndex: -1
+                    }
+                },
+                search: {
+                    currentSearchQuery: '',
+                    nextPageContext: null,
+                    isLoadingMore: false
+                },
+                sponsorBlock: {
+                    segmentosCache: {},
+                    lastSeekEndTime: -1,
+                    lastSeekVideoId: null
+                },
+                auth: {
+                    isAuthenticated: false,
+                    token: null
+                },
+                ui: {
+                    currentView: 'home'
+                }
+            };
+        }
+        
+        // Reset UI to initial state
+        if (window.UIManager) {
+            // Hide all views
+            document.querySelectorAll('.content-view').forEach(view => {
+                view.classList.remove('active');
+            });
+            
+            // Show home view
+            const homeView = document.getElementById('homeView');
+            if (homeView) {
+                homeView.classList.add('active');
+            }
+            
+            // Reset navigation
+            document.querySelectorAll('[data-view]').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            const homeNavItem = document.querySelector('[data-view="home"]');
+            if (homeNavItem) {
+                homeNavItem.classList.add('active');
+            }
+            
+            // Update playlists UI
+            setTimeout(() => {
+                if (window.UIManager.updatePlaylistsUI) {
+                    window.UIManager.updatePlaylistsUI();
+                }
+            }, 500);
+        }
+        
+        // Reset auth state
+        if (window.authManager) {
+            window.authManager.isAuthenticated = false;
+            window.authManager.updateUI(false);
+        }
+        
+        // Reset play button
+        const playButton = document.getElementById('botonPlay');
+        if (playButton) {
+            playButton.innerHTML = '<i class="fas fa-play"></i>';
+            playButton.disabled = true;
+        }
+        
+        // Clear search results
+        const searchResults = document.getElementById('searchResults');
+        if (searchResults) {
+            searchResults.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>Busca música, artistas o playlists</p>
+                </div>
+            `;
+        }
+        
+        // Clear playlists grid
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        if (playlistsGrid) {
+            playlistsGrid.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-music"></i>
+                    <p><strong>¡Conecta tu cuenta de Google!</strong></p>
+                    <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
+                </div>
+            `;
+        }
+        
+        // Hide debug panels
+        const debugPanel = document.getElementById('unifiedDebugPanel');
+        const stateDebug = document.getElementById('unifiedStateDebug');
+        
+        if (debugPanel) debugPanel.classList.remove('show');
+        if (stateDebug) stateDebug.classList.remove('show');
+        
+        console.log('✅ Reset completo del sistema unificado');
+        
+        // Show success message
+        setTimeout(() => {
+            if (window.unifiedMessageManager) {
+                window.unifiedMessageManager.show(
+                    'Sistema reiniciado correctamente',
+                    'success',
+                    3000
+                );
+            }
+        }, 1000);
+        
+        // Re-initialize system after delay
+        setTimeout(() => {
+            if (window.ytCrossMixUnified?.initialize) {
+                window.ytCrossMixUnified.initialize();
+            } else {
+                console.warn('⚠️ Sistema unificado no disponible para reinicialización');
+            }
+        }, 2000);
+        
+    } catch (error) {
+        console.error('💥 Error durante reset:', error);
+        
+        if (window.unifiedMessageManager) {
+            window.unifiedMessageManager.show(
+                'Error durante el reset del sistema',
+                'error',
+                5000
+            );
+        }
+        
+        // Fallback: reload page
+        if (confirm('Error durante reset. ¿Recargar la página?')) {
+            location.reload();
+        }
+    }
+}
+
+// System health check function
+function checkSystemHealth() {
+    const health = {
+        core: !!window.ytCrossMixUnified,
+        coreInitialized: window.ytCrossMixUnified?.initialized || false,
+        stateManager: !!window.unifiedStateManager,
+        youtubeManager: !!window.unifiedYouTubeManager,
+        loadingManager: !!window.unifiedLoadingManager,
+        messageManager: !!window.unifiedMessageManager,
+        youtubeAPI: !!(window.YT && window.YT.Player),
+        playersReady: window.unifiedYouTubeManager?.playersReady || false,
+        authManager: !!window.authManager,
+        playlistManager: !!window.PlaylistManager,
+        searchManager: !!window.SearchManager,
+        uiManager: !!window.UIManager,
+        requiredElements: {
+            player1: !!document.getElementById('player1'),
+            player2: !!document.getElementById('player2'),
+            searchResults: !!document.getElementById('searchResults'),
+            playlistsGrid: !!document.getElementById('playlistsGrid'),
+            playlistContainer: !!document.getElementById('playlistContainer')
+        }
+    };
+    
+    // Calculate overall health score
+    const totalChecks = Object.keys(health).length + Object.keys(health.requiredElements).length - 1;
+    const passedChecks = Object.values(health).filter(v => typeof v === 'boolean' ? v : true).length +
+                        Object.values(health.requiredElements).filter(v => v).length - 1;
+    
+    health.score = Math.round((passedChecks / totalChecks) * 100);
+    health.status = health.score >= 90 ? 'excellent' : 
+                   health.score >= 70 ? 'good' : 
+                   health.score >= 50 ? 'fair' : 'poor';
+    
+    console.log('🏥 System Health Check:');
+    console.table(health);
+    
+    if (window.unifiedMessageManager) {
+        const color = health.score >= 90 ? 'success' : 
+                     health.score >= 70 ? 'info' : 
+                     health.score >= 50 ? 'warning' : 'error';
+        
+        window.unifiedMessageManager.show(
+            `System Health: ${health.score}% (${health.status})`,
+            color,
+            3000
+        );
+    }
+    
+    return health;
+}
+
+// Quick system repair function
+function repairSystem() {
+    console.log('🔧 Intentando reparar sistema...');
+    
+    let repaired = 0;
+    
+    // Repair missing elements
+    const requiredElements = [
+        { id: 'player1', parent: '#videoContainer', classes: ['video-player'] },
+        { id: 'player2', parent: '#videoContainer', classes: ['video-player', 'hidden'] },
+        { id: 'searchResults', parent: '#searchView', classes: ['search-results'] },
+        { id: 'playlistsGrid', parent: '#libraryView', classes: ['playlists-grid'] },
+        { id: 'playlistContainer', parent: '#queueSection', classes: ['playlist-container-desktop'] }
+    ];
+    
+    requiredElements.forEach(({ id, parent, classes }) => {
+        if (!document.getElementById(id)) {
+            const element = document.createElement('div');
+            element.id = id;
+            element.className = classes.join(' ');
+            
+            const parentElement = document.querySelector(parent) || document.body;
+            parentElement.appendChild(element);
+            
+            repaired++;
+            console.log(`✅ Reparado: ${id}`);
+        }
+    });
+    
+    // Repair state manager
+    if (!window.unifiedStateManager) {
+        if (window.UnifiedStateManager) {
+            window.unifiedStateManager = new window.UnifiedStateManager();
+            repaired++;
+            console.log('✅ State Manager reparado');
+        }
+    }
+    
+    // Repair YouTube API
+    if (!window.YT || !window.YT.Player) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        document.head.appendChild(script);
+        
+        repaired++;
+        console.log('✅ YouTube API script reparado');
+    }
+    
+    // Repair message manager
+    if (!window.unifiedMessageManager && window.UnifiedMessageManager) {
+        window.unifiedMessageManager = new window.UnifiedMessageManager();
+        repaired++;
+        console.log('✅ Message Manager reparado');
+    }
+    
+    // Repair loading manager
+    if (!window.unifiedLoadingManager && window.UnifiedLoadingManager) {
+        window.unifiedLoadingManager = new window.UnifiedLoadingManager();
+        repaired++;
+        console.log('✅ Loading Manager reparado');
+    }
+    
+    console.log(`🔧 Reparación completada: ${repaired} elementos reparados`);
+    
+    if (window.unifiedMessageManager) {
+        window.unifiedMessageManager.show(
+            `${repaired} componentes reparados`,
+            repaired > 0 ? 'success' : 'info',
+            3000
+        );
+    }
+    
+    // Check health after repair
+    setTimeout(() => {
+        checkSystemHealth();
+    }, 1000);
+    
+    return repaired;
+}
+
+// Export debug functions to global scope
+if (typeof window !== 'undefined') {
+    Object.assign(window, {
+        toggleUnifiedDebug,
+        debugUnified,
+        resetUnified,
+        checkSystemHealth,
+        repairSystem
+    });
+    
+    // Enhanced debug object
+    window.UnifiedDebugTools = {
+        toggle: toggleUnifiedDebug,
+        debug: debugUnified,
+        reset: resetUnified,
+        health: checkSystemHealth,
+        repair: repairSystem,
+        
+        // Additional debug utilities
+        getState: () => window.unifiedStateManager?.state,
+        getManagers: () => ({
+            stateManager: !!window.unifiedStateManager,
+            youtubeManager: !!window.unifiedYouTubeManager,
+            loadingManager: !!window.unifiedLoadingManager,
+            messageManager: !!window.unifiedMessageManager,
+            authManager: !!window.authManager,
+            playlistManager: !!window.PlaylistManager,
+            searchManager: !!window.SearchManager,
+            uiManager: !!window.UIManager
+        }),
+        
+        // Performance monitoring
+        getPerformance: () => ({
+            memory: performance.memory ? {
+                used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+                total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB',
+                limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB'
+            } : 'Not available',
+            navigation: performance.navigation ? {
+                type: performance.navigation.type,
+                redirectCount: performance.navigation.redirectCount
+            } : 'Not available',
+            timing: performance.timing ? {
+                loadTime: performance.timing.loadEventEnd - performance.timing.navigationStart + ' ms',
+                domReady: performance.timing.domContentLoadedEventEnd - performance.timing.navigationStart + ' ms'
+            } : 'Not available'
+        }),
+        
+        // Quick tests
+        testMessage: (type = 'info') => {
+            if (window.unifiedMessageManager) {
+                window.unifiedMessageManager.show(`Test ${type} message`, type, 2000);
+                return true;
+            }
+            return false;
+        },
+        
+        testLoading: () => {
+            if (window.unifiedLoadingManager) {
+                window.unifiedLoadingManager.show('debug-test', {
+                    message: 'Test loading...',
+                    timeout: 3000
+                });
+                return true;
+            }
+            return false;
+        },
+        
+        // System info
+        getSystemInfo: () => ({
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            language: navigator.language,
+            cookieEnabled: navigator.cookieEnabled,
+            onLine: navigator.onLine,
+            screen: {
+                width: screen.width,
+                height: screen.height,
+                colorDepth: screen.colorDepth
+            },
+            window: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            },
+            location: {
+                host: location.host,
+                protocol: location.protocol,
+                pathname: location.pathname
+            }
+        })
+    };
+    
+    console.log('✅ Debug functions loaded and available globally');
+    console.log('🔧 Available: toggleUnifiedDebug(), debugUnified(), resetUnified(), checkSystemHealth(), repairSystem()');
+    console.log('📊 Enhanced tools: window.UnifiedDebugTools');
+}
         // ===== DEBUGGING HELPERS GLOBALES =====
         window.unifiedHelpers = {
             toggleDebug: toggleUnifiedDebug,
