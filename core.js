@@ -230,8 +230,131 @@ class UnifiedStateManager {
 class UnifiedPlaylistManager {
     constructor(stateManager) {
         this.state = stateManager;
-        this.setupPlaylistUrlListener();
+        // ❌ ELIMINADO: this.setupPlaylistUrlListener();
         this.initializeManualQueue();
+        this.setupEventListeners(); // ✅ AÑADIDO
+    }
+
+    // ✅ AÑADIDO: Setup de event listeners
+    setupEventListeners() {
+        // Configurar listeners para URL de playlist
+        const setupUrlListeners = () => {
+            const addButton = document.getElementById('añadirUrlButton');
+            const urlInput = document.getElementById('searchInput2');
+            
+            if (addButton) {
+                addButton.addEventListener('click', () => this.handlePlaylistUrlAdd());
+            }
+            
+            if (urlInput) {
+                urlInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        this.handlePlaylistUrlAdd();
+                    }
+                });
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupUrlListeners);
+        } else {
+            setupUrlListeners();
+        }
+    }
+
+    // ✅ AÑADIDO: Manejar URL de playlist
+    handlePlaylistUrlAdd() {
+        const input = document.getElementById('searchInput2');
+        if (!input) return;
+        
+        const url = input.value.trim();
+        if (!url) {
+            this.showMessage('Ingresa una URL válida', 'warning');
+            return;
+        }
+        
+        if (!SharedUtils.isValidYouTubeUrl(url)) {
+            this.showMessage('URL de YouTube no válida', 'error');
+            return;
+        }
+        
+        const playlistId = SharedUtils.extractPlaylistId(url);
+        if (!playlistId) {
+            this.showMessage('URL no contiene una playlist válida', 'error');
+            return;
+        }
+        
+        input.value = '';
+        this.loadPlaylistFromUrl(playlistId, url);
+    }
+
+    // ✅ AÑADIDO: Cargar playlist desde URL
+    async loadPlaylistFromUrl(playlistId, originalUrl) {
+        this.showMessage('Cargando playlist desde URL...', 'info');
+        
+        try {
+            // Verificar si ya existe la playlist
+            const existingPlaylist = this.state.get('playlist.playlistsData').find(p => p.id === playlistId);
+            if (existingPlaylist) {
+                this.showMessage('Esta playlist ya está añadida', 'warning');
+                return;
+            }
+
+            // Usar Piped API para obtener información de la playlist
+            let playlistData = null;
+            
+            for (const instance of CONFIG.PIPED_INSTANCES) {
+                try {
+                    const response = await SharedUtils.fetchWithTimeout(`${instance}/playlists/${playlistId}`, {}, 10000);
+                    if (response.ok) {
+                        playlistData = await response.json();
+                        break;
+                    }
+                } catch (error) {
+                    console.warn(`Falló instancia ${instance}:`, error);
+                    continue;
+                }
+            }
+
+            if (!playlistData) {
+                throw new Error('No se pudo obtener información de la playlist');
+            }
+
+            // Crear objeto de playlist
+            const newPlaylist = {
+                id: playlistId,
+                name: playlistData.name || 'Playlist Externa',
+                thumbnailUrl: playlistData.thumbnailUrl || 
+                             playlistData.thumbnail || 
+                             'https://via.placeholder.com/320x180/333333/ffffff?text=Playlist',
+                videos: playlistData.relatedStreams?.map(stream => ({
+                    videoId: SharedUtils.extractVideoId(stream),
+                    title: stream.title,
+                    thumbnail: stream.thumbnail,
+                    channelTitle: stream.uploaderName || 'Desconocido',
+                    duration: SharedUtils.parseDuration(stream.duration)
+                })).filter(video => video.videoId) || [],
+                isExpanded: false,
+                source: 'external',
+                isLoaded: true,
+                itemCount: playlistData.relatedStreams?.length || 0
+            };
+
+            // Añadir al estado
+            const currentPlaylists = this.state.get('playlist.playlistsData') || [];
+            this.state.set('playlist.playlistsData', [...currentPlaylists, newPlaylist]);
+
+            this.showMessage(`Playlist "${newPlaylist.name}" añadida (${newPlaylist.itemCount} videos)`, 'success');
+            
+            // Actualizar UI si está disponible
+            if (window.UIManager?.updatePlaylistsUI) {
+                setTimeout(() => window.UIManager.updatePlaylistsUI(), 500);
+            }
+
+        } catch (error) {
+            console.error('❌ Error cargando playlist desde URL:', error);
+            this.showMessage('Error cargando playlist desde URL', 'error');
+        }
     }
 
     // ✅ INICIALIZAR COLA MANUAL
@@ -315,7 +438,40 @@ class UnifiedPlaylistManager {
         // Resetear reproducción
         this.state.set('playlist.currentPlayingInfo.videoId', null);
         this.state.set('playlist.currentPlayingInfo.flattenedIndex', -1);
-        this.state.set('app.monitorInterval', interval);
+        
+        this.stopMonitoring();
+        this.updateQueueDisplay();
+        this.showMessage('Cola limpiada', 'success');
+    }
+
+    // ✅ VERIFICAR Y HABILITAR BOTÓN PLAY
+    checkAndEnablePlayButton() {
+        const flatList = this.getFlattenedPlaylist();
+        const playersReady = this.state.get('app.playersInitialized');
+        
+        const playButtons = ['botonPlay', 'miniPlayBtn'];
+        const navButtons = ['botonNext', 'prevButton'];
+        
+        playButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.disabled = !(flatList.length > 0 && playersReady);
+            }
+        });
+        
+        navButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.disabled = !(flatList.length > 1 && playersReady);
+            }
+        });
+    }
+
+    // ✅ ACTUALIZAR DISPLAY DE COLA
+    updateQueueDisplay() {
+        if (window.UIManager?.updateQueueDisplay) {
+            window.UIManager.updateQueueDisplay();
+        }
     }
 
     // ✅ DETENER MONITOREO
@@ -325,6 +481,32 @@ class UnifiedPlaylistManager {
             clearInterval(interval);
             this.state.set('app.monitorInterval', null);
             console.log('⏹️ Monitoreo detenido');
+        }
+    }
+
+    // ✅ MANEJAR VIDEO ACTUAL ELIMINADO
+    handleCurrentVideoRemoved() {
+        const currentIndex = this.state.get('playlist.currentPlayingInfo.flattenedIndex');
+        const flatList = this.getFlattenedPlaylist();
+        
+        if (flatList.length === 0) {
+            this.handleEmptyPlaylist();
+            return;
+        }
+        
+        // Reproducir el siguiente video o el primero
+        const nextIndex = Math.min(currentIndex, flatList.length - 1);
+        const nextVideo = flatList[nextIndex];
+        
+        if (nextVideo) {
+            this.state.set('playlist.currentPlayingInfo.videoId', nextVideo.videoId);
+            this.state.set('playlist.currentPlayingInfo.flattenedIndex', nextIndex);
+            
+            if (window.unifiedCore?.playbackController?.playVideoAtIndex) {
+                setTimeout(() => {
+                    window.unifiedCore.playbackController.playVideoAtIndex(nextIndex);
+                }, 500);
+            }
         }
     }
 
@@ -344,7 +526,7 @@ class UnifiedPlaylistManager {
             playButton.disabled = true;
         }
 
-        this.playlistManager.updateQueueDisplay();
+        this.updateQueueDisplay();
         this.showMessage("Cola vacía - reproducción detenida", 'info');
     }
 
@@ -358,7 +540,10 @@ class UnifiedPlaylistManager {
             this.state.set('playlist.currentPlayingInfo.playlistId', null);
             this.state.set('playlist.currentPlayingInfo.videoId', null);
             this.state.set('playlist.currentPlayingInfo.flattenedIndex', -1);
-            this.playFirstVideo();
+            
+            if (window.unifiedCore?.playbackController?.playFirstVideo) {
+                window.unifiedCore.playbackController.playFirstVideo();
+            }
         } else {
             this.stopMonitoring();
             this.showMessage("Reproducción finalizada", 'info');
@@ -375,7 +560,7 @@ class UnifiedPlaylistManager {
             const playButton = document.getElementById('botonPlay');
             if (playButton) {
                 playButton.innerHTML = '<i class="fas fa-play"></i>';
-                playButton.disabled = this.playlistManager.getFlattenedPlaylist().length === 0;
+                playButton.disabled = this.getFlattenedPlaylist().length === 0;
             }
         }
         
@@ -383,8 +568,8 @@ class UnifiedPlaylistManager {
     }
 
     showMessage(message, type = 'info') {
-        if (window.unifiedCore?.playlistManager?.showMessage) {
-            window.unifiedCore.playlistManager.showMessage(message, type);
+        if (window.unifiedMessageManager?.show) {
+            window.unifiedMessageManager.show(message, type);
         } else {
             console.log(`💬 [${type.toUpperCase()}]: ${message}`);
         }
@@ -604,107 +789,13 @@ class UnifiedYouTubeManager {
                 'playsinline': 1,
                 'controls': 0,
                 'showinfo': 0,
-                'rel': 0,
-                'iv_load_policy': 3
-            },
-            events: {
-                'onReady': (event) => this.onPlayerReady(event, playerNum),
-                'onStateChange': (event) => this.onPlayerStateChange(event, playerNum),
-                'onError': (event) => this.onPlayerError(event, playerNum)
+                'rel': 0
             }
-        });
+       })
+                                                    
+     }
 
-        const player1 = new YT.Player('player1', createPlayerConfig('player1', 1));
-        const player2 = new YT.Player('player2', createPlayerConfig('player2', 2));
-
-        this.state.set('app.player1', player1);
-        this.state.set('app.player2', player2);
-    }
-
-    onPlayerReady(event, playerNum) {
-        console.log(`✅ Player ${playerNum} listo`);
-        
-        const player1Ready = this.state.get('app.player1') && 
-                           typeof this.state.get('app.player1').getPlayerState === 'function';
-        const player2Ready = this.state.get('app.player2') && 
-                           typeof this.state.get('app.player2').getPlayerState === 'function';
-
-        if (player1Ready && player2Ready && !this.playersReady) {
-            this.playersReady = true;
-            this.state.set('app.playersInitialized', true);
-            
-            console.log('🎉 Ambos reproductores listos');
-            
-            // Habilitar controles
-            if (window.unifiedCore?.playlistManager) {
-                window.unifiedCore.playlistManager.checkAndEnablePlayButton();
-            }
-            
-            document.dispatchEvent(new CustomEvent('playersReady', {
-                detail: { player1Ready, player2Ready }
-            }));
-        }
-    }
-
-    onPlayerStateChange(event, playerNum) {
-        const state = event.data;
-        const videoData = event.target.getVideoData();
-        
-        document.dispatchEvent(new CustomEvent('unifiedPlayerStateChanged', {
-            detail: { 
-                playerNum, 
-                state, 
-                videoId: videoData?.video_id,
-                timestamp: Date.now()
-            }
-        }));
-    }
-
-    onPlayerError(event, playerNum) {
-        console.error(`❌ Player ${playerNum} error:`, event.data);
-        if (window.unifiedMessageManager) {
-            window.unifiedMessageManager.show(`Error en reproductor ${playerNum}`, 'error');
-        }
-    }
-
-    getActivePlayer() {
-        const currentPlayerNum = this.state.get('app.currentPlayer');
-        return currentPlayerNum === 1 ? 
-               this.state.get('app.player1') : 
-               this.state.get('app.player2');
-    }
-
-    getInactivePlayer() {
-        const currentPlayerNum = this.state.get('app.currentPlayer');
-        return currentPlayerNum === 1 ? 
-               this.state.get('app.player2') : 
-               this.state.get('app.player1');
-    }
-
-    safeSetVolume(player, volume) {
-        try {
-            if (player && typeof player.setVolume === 'function') {
-                player.setVolume(Math.max(0, Math.min(100, volume)));
-            }
-        } catch(e) {
-            console.warn("Error configurando volumen:", e);
-        }
-    }
-
-    safeStopPlayer(player) {
-        try {
-            if (player && typeof player.stopVideo === 'function') {
-                const state = player.getPlayerState();
-                if (state !== YT.PlayerState.ENDED && state !== YT.PlayerState.UNSTARTED) {
-                    player.stopVideo();
-                }
-            }
-        } catch(e) {
-            console.warn("Error deteniendo reproductor:", e);
-        }
-    }
 }
-
 // ===== GESTOR DE NAVEGACIÓN CORREGIDO =====
 class UnifiedNavigationManager {
     constructor(stateManager) {
@@ -887,7 +978,9 @@ class UnifiedAuthManager {
 
     handleAuthClick() {
         if (!this.gapiReady || !this.gisReady) {
-            window.unifiedMessageManager?.show('APIs de Google no están listas', 'warning');
+            if (window.unifiedMessageManager) {
+                window.unifiedMessageManager.show('APIs de Google no están listas', 'warning');
+            }
             return;
         }
         
@@ -917,11 +1010,15 @@ class UnifiedAuthManager {
                 
                 await this.getPlaylists();
                 
-                window.unifiedMessageManager?.show("Autenticación exitosa. Cargando playlists...", 'success');
+                if (window.unifiedMessageManager) {
+                    window.unifiedMessageManager.show("Autenticación exitosa. Cargando playlists...", 'success');
+                }
                 
             } catch (error) {
                 console.error("❌ Error procesando token:", error);
-                window.unifiedMessageManager?.show("Error al procesar la autenticación.", 'error');
+                if (window.unifiedMessageManager) {
+                    window.unifiedMessageManager.show("Error al procesar la autenticación.", 'error');
+                }
             }
         }
     }
@@ -929,10 +1026,12 @@ class UnifiedAuthManager {
     async getPlaylists() {
         if (!this.isAuthenticated || !this.gapiReady) return;
 
-        window.unifiedLoadingManager?.show('youtube-playlists', {
-            type: 'overlay',
-            message: 'Cargando playlists de YouTube...'
-        });
+        if (window.unifiedLoadingManager) {
+            window.unifiedLoadingManager.show('youtube-playlists', {
+                type: 'overlay',
+                message: 'Cargando playlists de YouTube...'
+            });
+        }
         
         try {
             let allPlaylists = [];
@@ -974,13 +1073,17 @@ class UnifiedAuthManager {
                         
         } catch (err) {
             console.error("❌ Error al obtener playlists:", err);
-            window.unifiedMessageManager?.show("Error al cargar las playlists.", 'error');
+            if (window.unifiedMessageManager) {
+                window.unifiedMessageManager.show("Error al cargar las playlists.", 'error');
+            }
             
             if (err.status === 401) {
                 this.performSignOut();
             }
         } finally {
-            window.unifiedLoadingManager?.hide('youtube-playlists');
+            if (window.unifiedLoadingManager) {
+                window.unifiedLoadingManager.hide('youtube-playlists');
+            }
         }
     }
 
@@ -1111,6 +1214,28 @@ class UnifiedAuthManager {
 
     isUserAuthenticated() {
         return this.isAuthenticated && this.gapiReady;
+    }
+
+    // ✅ FALLBACK DE AUTENTICACIÓN
+    createFallbackAuth() {
+        console.log('🔄 Creando sistema de autenticación fallback...');
+        
+        const setupButtons = () => {
+            const signInButton = document.getElementById('googleSignInButton');
+            if (signInButton) {
+                signInButton.addEventListener('click', () => {
+                    if (window.unifiedMessageManager) {
+                        window.unifiedMessageManager.show('Sistema de autenticación no disponible. Intenta recargar la página.', 'error');
+                    }
+                });
+            }
+        };
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupButtons);
+        } else {
+            setupButtons();
+        }
     }
 }
 
@@ -1306,7 +1431,11 @@ class YTCrossMixUnified {
     }
 
     showMessage(message, type = 'info', duration = 3000) {
-        return this.playlistManager.showMessage(message, type, duration);
+        if (window.unifiedMessageManager?.show) {
+            return window.unifiedMessageManager.show(message, type, duration);
+        } else {
+            console.log(`💬 [${type.toUpperCase()}]: ${message}`);
+        }
     }
 
     getDebugInfo() {
@@ -1395,4 +1524,3 @@ window.updatePlaylistsUI = function() {
 console.log('✅ Core Unificado CORREGIDO cargado');
 console.log('🔧 Funciones principales: addVideoToQueue, performSearch, switchView');
 console.log('📋 Cola manual implementada correctamente');
-        
