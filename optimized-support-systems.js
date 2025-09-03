@@ -769,7 +769,106 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }));
 });
+// AÑADIR AL FINAL DE optimized-support-systems.js:
+class SystemCompatibilityChecker {
+    static checkAndRepair() {
+        console.log('🔧 Verificando compatibilidad del sistema...');
+        
+        const checks = {
+            messageManager: !!window.unifiedMessageManager,
+            loadingManager: !!window.unifiedLoadingManager,
+            stateManager: !!window.unifiedStateManager,
+            coreSystem: !!window.unifiedCore,
+            requiredElements: SystemCompatibilityChecker.checkElements()
+        };
+        
+        const issues = Object.entries(checks)
+            .filter(([key, status]) => !status)
+            .map(([key]) => key);
+        
+        if (issues.length > 0) {
+            console.warn('⚠️ Problemas de compatibilidad detectados:', issues);
+            return SystemCompatibilityChecker.attemptRepair(issues);
+        }
+        
+        console.log('✅ Sistema compatible');
+        return true;
+    }
+    
+    static checkElements() {
+        const required = [
+            'floatingMessageContainer',
+            'player1', 'player2',
+            'searchResults',
+            'playlistsGrid',
+            'botonPlay'
+        ];
+        
+        return required.every(id => document.getElementById(id));
+    }
+    
+    static attemptRepair(issues) {
+        console.log('🔧 Intentando reparar:', issues);
+        
+        let repaired = 0;
+        
+        // Reparar message manager
+        if (issues.includes('messageManager') && !window.unifiedMessageManager) {
+            try {
+                window.unifiedMessageManager = new UnifiedMessageManager();
+                repaired++;
+                console.log('✅ Message Manager reparado');
+            } catch (error) {
+                console.error('❌ Error reparando Message Manager:', error);
+            }
+        }
+        
+        // Reparar loading manager
+        if (issues.includes('loadingManager') && !window.unifiedLoadingManager) {
+            try {
+                window.unifiedLoadingManager = new UnifiedLoadingManager();
+                repaired++;
+                console.log('✅ Loading Manager reparado');
+            } catch (error) {
+                console.error('❌ Error reparando Loading Manager:', error);
+            }
+        }
+        
+        // Reparar elementos faltantes
+        if (issues.includes('requiredElements')) {
+            const elementsToCreate = [
+                { id: 'floatingMessageContainer', class: 'floating-messages' },
+                { id: 'player1', class: 'video-player', parent: '#videoContainer' },
+                { id: 'player2', class: 'video-player hidden', parent: '#videoContainer' }
+            ];
+            
+            elementsToCreate.forEach(({ id, class: className, parent }) => {
+                if (!document.getElementById(id)) {
+                    const element = document.createElement('div');
+                    element.id = id;
+                    element.className = className;
+                    
+                    const parentEl = parent ? document.querySelector(parent) : document.body;
+                    if (parentEl) {
+                        parentEl.appendChild(element);
+                        repaired++;
+                        console.log(`✅ Elemento ${id} creado`);
+                    }
+                }
+            });
+        }
+        
+        console.log(`🔧 Reparación completada: ${repaired} elementos reparados`);
+        return repaired > 0;
+    }
+}
 
+// Auto-ejecutar verificación
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        SystemCompatibilityChecker.checkAndRepair();
+    }, 2000);
+});
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -780,3 +879,4 @@ if (typeof module !== 'undefined' && module.exports) {
         NotificationSystem
     };
 }
+
