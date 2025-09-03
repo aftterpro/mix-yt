@@ -1,7 +1,30 @@
 // ===== SYSTEM-FIXES.JS - CORRECCIONES FINALES COMPLETAS =====
 
 console.log('🔧 Aplicando correcciones críticas finales...');
+function checkAndEnablePlayButton() {
+    if (window.unifiedCore?.playlistManager?.checkAndEnablePlayButton) {
+        return window.unifiedCore.playlistManager.checkAndEnablePlayButton();
+    }
+    
+    // Fallback
+    const flatList = window.unifiedCore?.playlistManager?.getFlattenedPlaylist() || [];
+    const playersReady = window.unifiedStateManager?.state?.app?.playersInitialized;
+    
+    ['botonPlay', 'botonNext', 'prevButton', 'miniPlayBtn'].forEach(buttonId => {
+        const button = document.getElementById(buttonId);
+        if (button) {
+            button.disabled = !(flatList.length > 0 && playersReady);
+        }
+    });
+}
 
+function updateQueueDisplay() {
+    if (window.UIManager?.updateQueueDisplay) {
+        window.UIManager.updateQueueDisplay();
+    } else if (window.unifiedCore?.playlistManager?.updateQueueDisplay) {
+        window.unifiedCore.playlistManager.updateQueueDisplay();
+    }
+}
 // ===== 1. CORRECCIÓN DE NAVEGACIÓN ENTRE PESTAÑAS MEJORADA =====
 function fixNavigation() {
     console.log('🔧 Corrigiendo navegación...');
