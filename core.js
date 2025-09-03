@@ -1395,4 +1395,5 @@ window.updatePlaylistsUI = function() {
 
 console.log('✅ Core Unificado CORREGIDO cargado');
 console.log('🔧 Funciones principales: addVideoToQueue, performSearch, switchView');
-console.log('📋 Cola manual implementada correctamente')
+console.log('📋 Cola manual implementada correctamente');reproduccionIniciada', false);
+        
