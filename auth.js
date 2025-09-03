@@ -1,6 +1,9 @@
 // ===== 5. AUTH.JS - MODIFICADO PARA SISTEMA UNIFICADO =====
-// auth.js - Solo modificaciones críticas
-
+// AÑADIR AL INICIO DE auth.js:
+if (window.unifiedAuthManager) {
+    console.log('⚠️ UnifiedAuthManager ya existe, omitiendo auth.js legacy');
+    // No ejecutar el resto del archivo
+} else {
 export class GoogleAuthManager {
   
 async getPlaylistVideos(playlistId) {
@@ -467,3 +470,4 @@ document.dispatchEvent(new CustomEvent('playlists-loaded', {
 
 // Crear instancia única
 export const authManager = new GoogleAuthManager();
+}
