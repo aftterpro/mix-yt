@@ -1,13 +1,223 @@
-document.getElementById('popupAddAllBtn').addEventListener('click', () => {
-                const playlistId = popup.dataset.currentPlaylistId;
+export class UIManager {
+    static initialized = false;
+
+    // ✅ INICIALIZACIÓN CORREGIDA
+    static initialize() {
+        if (UIManager.initialized) return;
+        
+        console.log('🎨 Inicializando UIManager...');
+        
+        UIManager.setupEventListeners();
+        UIManager.setupResponsiveDesign();
+        UIManager.enableInteractivity();
+        UIManager.setupPopup();
+        
+        UIManager.initialized = true;
+        console.log('✅ UIManager inicializado');
+    }
+
+    // ✅ SETUP DE EVENT LISTENERS GLOBAL
+    static setupEventListeners() {
+        // Event listener global optimizado
+        document.addEventListener('click', UIManager.handleGlobalClick);
+        document.addEventListener('input', UIManager.handleGlobalInput);
+        document.addEventListener('keydown', UIManager.handleGlobalKeydown);
+        
+        // Event listeners específicos
+        document.addEventListener('playlistsFetched', (event) => {
+            console.log('📚 Playlists recibidas:', event.detail?.length || 0);
+            setTimeout(() => UIManager.updatePlaylistsUI(), 500);
+        });
+
+        document.addEventListener('userLoggedOut', () => {
+            console.log('👤 Usuario deslogueado');
+            setTimeout(() => UIManager.updatePlaylistsUI(), 500);
+        });
+    }
+
+    // ✅ MANEJO GLOBAL DE CLICKS
+    static handleGlobalClick(event) {
+        const target = event.target;
+        const button = target.closest('button');
+        
+        if (!button) return;
+        
+        const action = button.dataset.action;
+        const playlistId = button.dataset.playlistId;
+        const videoId = button.dataset.videoId;
+        
+        // Prevenir múltiples clicks
+        if (button.disabled) return;
+        
+        switch (action) {
+            case 'add-video':
+                if (videoId) {
+                    UIManager.handleAddVideoToQueue(button, videoId);
+                }
+                break;
+                
+            case 'remove-from-queue':
+                if (videoId) {
+                    UIManager.handleRemoveFromQueue(videoId);
+                }
+                break;
+                
+            case 'play-now':
+                if (videoId) {
+                    UIManager.handlePlayVideoNow(button, videoId);
+                }
+                break;
+                
+            case 'add-all':
                 if (playlistId) {
                     UIManager.handleAddAllToQueue(playlistId);
-                    UIManager.hidePlaylistPopup();
                 }
-            });
+                break;
+                
+            case 'play-all':
+                if (playlistId) {
+                    UIManager.handlePlayAllPlaylist(playlistId);
+                }
+                break;
+                
+            case 'expand-playlist':
+                if (playlistId) {
+                    window.PlaylistManager?.togglePlaylistExpansion?.(playlistId);
+                }
+                break;
+        }
+        
+        // Botones específicos por ID
+        if (button.id) {
+            switch (button.id) {
+                case 'botonPlay':
+                case 'miniPlayBtn':
+                    UIManager.handlePlayButtonClick();
+                    break;
+                    
+                case 'botonNext':
+                    UIManager.handleNextButtonClick();
+                    break;
+                    
+                case 'queueButton':
+                    UIManager.toggleQueue();
+                    break;
+                    
+                case 'añadirUrlButton':
+                    UIManager.handlePlaylistUrlAdd();
+                    break;
+            }
+        }
+        
+        // Botones de playlist expand
+        if (button.classList.contains('playlist-expand-btn')) {
+            const playlistCard = button.closest('[data-playlist-id]');
+            if (playlistCard) {
+                const pid = playlistCard.dataset.playlistId;
+                UIManager.showPlaylistPopup(pid);
+            }
         }
     }
 
+    // ✅ MANEJO GLOBAL DE INPUTS
+    static handleGlobalInput(event) {
+        const input = event.target;
+        
+        if (input.classList.contains('sidebar-search-input') || 
+            input.classList.contains('mobile-search-input') ||
+            input.id === 'searchInput') {
+            
+            const query = input.value.trim();
+            if (UIManager.debouncedSearch) {
+                UIManager.debouncedSearch(query);
+            }
+        }
+    }
+
+    // ✅ MANEJO GLOBAL DE TECLADO
+    static handleGlobalKeydown(event) {
+        const input = event.target;
+        
+        // Enter en campos de búsqueda
+        if (event.key === 'Enter' && input.type === 'text') {
+            if (input.classList.contains('sidebar-search-input') || 
+                input.classList.contains('mobile-search-input') ||
+                input.id === 'searchInput') {
+                
+                const query = input.value.trim();
+                if (query.length > 0) {
+                    UIManager.handleSearch(query);
+                }
+            }
+            
+            // Enter en campo de URL de playlist
+            if (input.id === 'searchInput2') {
+                UIManager.handlePlaylistUrlAdd();
+            }
+        }
+        
+        // Shortcuts de teclado globales
+        if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
+            switch (event.key.toLowerCase()) {
+                case ' ':  // Spacebar
+                    event.preventDefault();
+                    UIManager.handlePlayButtonClick();
+                    break;
+                    
+                case 'arrowright':
+                    event.preventDefault();
+                    UIManager.handleNextButtonClick();
+                    break;
+                    
+                case 'q':
+                    if (event.ctrlKey) {
+                        event.preventDefault();
+                        UIManager.toggleQueue();
+                    }
+                    break;
+            }
+        }
+    }
+
+    // ✅ SETUP DE POPUP CORREGIDO
+    static setupPopup() {
+        // Crear popup si no existe
+        if (!document.getElementById('playlistPopup')) {
+            UIManager.createPlaylistPopup();
+        }
+        
+        // Setup listeners del popup
+        const popup = document.getElementById('playlistPopup');
+        if (popup) {
+            // Click fuera del popup para cerrar
+            popup.addEventListener('click', (event) => {
+                if (event.target === popup) {
+                    UIManager.hidePlaylistPopup();
+                }
+            });
+            
+            // Botón de cerrar
+            const closeBtn = popup.querySelector('.playlist-popup-close, .popup-close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    UIManager.hidePlaylistPopup();
+                });
+            }
+            
+            // Escape key para cerrar
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && popup.classList.contains('show')) {
+                    UIManager.hidePlaylistPopup();
+                }
+            });
+            
+            // Setup botones del popup
+            const addAllBtn = document.getElementById('popupAddAllBtn');
+            if (addAllBtn) {
+            }   
+        }
+      }
+}
     // ✅ MOSTRAR POPUP DE PLAYLIST
     static async showPlaylistPopup(playlistId) {
         const popup = document.getElementById('playlistPopup');
