@@ -1,7 +1,6 @@
 // functions/search-unified.js - Función de búsqueda optimizada para Sistema Unificado
 
 const pipedInstances = [
-    "https://pipedapi.reallyaweso.me",
     "https://pipedapi.ducks.party",
     "https://api.piped.private.coffee"
 ];
@@ -238,3 +237,4 @@ exports.handler = async function(event, context) {
         };
     }
 };
+
