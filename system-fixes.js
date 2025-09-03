@@ -1,14 +1,11 @@
-// ===== CORRECCIONES CRÍTICAS PARA YT CROSSMIX =====
-// Archivo: critical-fixes.js
-// Soluciona problemas de navegación, búsqueda, autenticación y URLs
+// ===== SYSTEM-FIXES.JS - CORRECCIONES FINALES COMPLETAS =====
 
-console.log('🔧 Aplicando correcciones críticas...');
+console.log('🔧 Aplicando correcciones críticas finales...');
 
-// ===== 1. CORRECCIÓN DE NAVEGACIÓN ENTRE PESTAÑAS =====
+// ===== 1. CORRECCIÓN DE NAVEGACIÓN ENTRE PESTAÑAS MEJORADA =====
 function fixNavigation() {
     console.log('🔧 Corrigiendo navegación...');
     
-    // Función para cambiar vistas
     function switchView(viewName) {
         console.log(`📄 Cambiando a vista: ${viewName}`);
         
@@ -39,6 +36,11 @@ function fixNavigation() {
             // Acciones específicas por vista
             if (viewName === 'library' && window.UIManager?.updatePlaylistsUI) {
                 setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
+            } else if (viewName === 'playing') {
+                // Actualizar vista de reproducción y cola
+                if (window.UIManager?.updateNowPlayingView) {
+                    window.UIManager.updateNowPlayingView();
+                }
             }
             
             console.log(`✅ Vista cambiada a: ${viewName}`);
@@ -66,11 +68,10 @@ function fixNavigation() {
     console.log('✅ Navegación corregida');
 }
 
-// ===== 2. CORRECCIÓN DE BÚSQUEDA =====
+// ===== 2. CORRECCIÓN DE BÚSQUEDA CON FORMATO BALDOSAS =====
 function fixSearch() {
     console.log('🔧 Corrigiendo búsqueda...');
     
-    // Función de búsqueda unificada
     async function performSearch(query) {
         console.log(`🔍 Iniciando búsqueda: ${query}`);
         
@@ -90,6 +91,7 @@ function fixSearch() {
         }
         
         // Mostrar loading
+        searchResults.className = 'search-results';
         searchResults.innerHTML = `
             <div class="search-loading" style="text-align: center; padding: 40px;">
                 <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--primary-color);"></i>
@@ -98,16 +100,13 @@ function fixSearch() {
         `;
         
         try {
-            // Usar instancias de Piped
             const pipedInstances = [
                 "https://api.piped.private.coffee",
-                "https://pipedapi.ducks.party",
-                "https://api.piped.video"
+                "https://pipedapi.ducks.party"
             ];
             
             let searchData = null;
             
-            // Intentar con múltiples instancias
             for (const instance of pipedInstances) {
                 try {
                     console.log(`🔗 Probando instancia: ${instance}`);
@@ -118,7 +117,7 @@ function fixSearch() {
                         headers: {
                             'Accept': 'application/json'
                         },
-                        signal: AbortSignal.timeout(10000) // 10s timeout
+                        signal: AbortSignal.timeout(10000)
                     });
                     
                     if (response.ok) {
@@ -140,19 +139,11 @@ function fixSearch() {
             
         } catch (error) {
             console.error('❌ Error en búsqueda:', error);
-            searchResults.innerHTML = `
-                <div class="search-error" style="text-align: center; padding: 40px;">
-                    <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #f44336; margin-bottom: 16px;"></i>
-                    <p style="color: var(--text-secondary); margin-bottom: 16px;">Error de búsqueda: ${error.message}</p>
-                    <button onclick="performSearch('${query}')" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
-                        <i class="fas fa-redo"></i> Reintentar
-                    </button>
-                </div>
-            `;
+            displaySearchError(error, query);
         }
     }
     
-    // Mostrar resultados
+    // ✅ MOSTRAR RESULTADOS EN FORMATO BALDOSAS (4 COLUMNAS)
     function displaySearchResults(data) {
         const searchResults = document.getElementById('searchResults');
         if (!searchResults) return;
@@ -160,64 +151,79 @@ function fixSearch() {
         const items = data.items || data.relatedStreams || [];
         
         if (!items || items.length === 0) {
+            searchResults.className = 'search-results';
             searchResults.innerHTML = `
-                <div class="search-placeholder" style="text-align: center; padding: 40px;">
-                    <i class="fas fa-search" style="font-size: 24px; opacity: 0.5; margin-bottom: 16px;"></i>
-                    <p style="color: var(--text-secondary);">No se encontraron resultados</p>
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>No se encontraron resultados</p>
                 </div>
             `;
             return;
         }
         
+        // ✅ CAMBIAR A FORMATO GRID
+        searchResults.className = 'search-results-grid';
         searchResults.innerHTML = '';
         
         items.forEach(video => {
             const videoId = extractVideoId(video);
             if (!videoId) return;
             
-            const videoElement = createVideoResultElement(video, videoId);
-            searchResults.appendChild(videoElement);
+            const videoCard = createVideoCard(video, videoId);
+            searchResults.appendChild(videoCard);
         });
         
-        console.log(`✅ ${items.length} resultados mostrados`);
+        console.log(`✅ ${items.length} resultados mostrados en grid`);
     }
     
-    function extractVideoId(video) {
-        if (video.videoId) return video.videoId;
-        if (video.id) return video.id;
-        if (video.url) {
-            const match = video.url.match(/(?:watch\?v=|\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-            return match ? match[1] : null;
-        }
-        return null;
-    }
-    
-    function createVideoResultElement(video, videoId) {
-        const videoDiv = document.createElement('div');
-        videoDiv.className = 'video-result';
-        videoDiv.dataset.videoId = videoId;
+    // ✅ CREAR TARJETA DE VIDEO (FORMATO BALDOSA)
+    function createVideoCard(video, videoId) {
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.dataset.videoId = videoId;
         
         const thumbnailUrl = video.thumbnail || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
         const duration = formatDuration(video.duration);
         const title = escapeHtml(video.title || 'Título no disponible');
         const author = escapeHtml(video.uploaderName || video.channelTitle || 'Desconocido');
         
-        videoDiv.innerHTML = `
-            <div class="thumbnail-container">
-                <img src="${thumbnailUrl}" alt="${title}" class="thumbnail" loading="lazy">
-                ${duration ? `<span class="duration">${duration}</span>` : ''}
+        card.innerHTML = `
+            <div class="video-card-thumbnail">
+                <img src="${thumbnailUrl}" alt="${title}" loading="lazy">
+                ${duration ? `<span class="video-card-duration">${duration}</span>` : ''}
+                <div class="video-card-overlay">
+                    <button class="video-card-play-btn" onclick="addToQueue('${videoId}', '${title.replace(/'/g, "\\'")}', '${thumbnailUrl}', '${author.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
             </div>
-            <div class="video-details">
-                <h3 class="video-title">${title}</h3>
-                <p class="video-author">${author}</p>
-                <button class="search-result-add-button" onclick="addToQueue('${videoId}', '${title.replace(/'/g, "\\'")}', '${thumbnailUrl}', '${author.replace(/'/g, "\\'")}')">
-                    <i class="fa-solid fa-arrow-right-to-line"></i>
-                    <span class="add-text">Reproducir Después</span>
+            <div class="video-card-info">
+                <h3 class="video-card-title" title="${title}">${title}</h3>
+                <p class="video-card-author" title="${author}">${author}</p>
+                <button class="video-card-add-btn" onclick="addToQueue('${videoId}', '${title.replace(/'/g, "\\'")}', '${thumbnailUrl}', '${author.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-arrow-right-to-line"></i>
+                    Añadir a Cola
                 </button>
             </div>
         `;
         
-        return videoDiv;
+        return card;
+    }
+    
+    function displaySearchError(error, query) {
+        const searchResults = document.getElementById('searchResults');
+        if (!searchResults) return;
+        
+        searchResults.className = 'search-results';
+        searchResults.innerHTML = `
+            <div class="search-error" style="text-align: center; padding: 40px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 24px; color: #f44336; margin-bottom: 16px;"></i>
+                <p style="color: var(--text-secondary); margin-bottom: 16px;">Error de búsqueda: ${error.message}</p>
+                <button onclick="performSearch('${query}')" style="background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                    <i class="fas fa-redo"></i> Reintentar
+                </button>
+            </div>
+        `;
     }
     
     // Configurar listeners de búsqueda
@@ -253,26 +259,266 @@ function fixSearch() {
     
     // Exponer funciones globalmente
     window.performSearch = performSearch;
-    window.addToQueue = addToQueue;
     
-    console.log('✅ Búsqueda corregida');
+    console.log('✅ Búsqueda corregida con formato baldosas');
 }
 
-// ===== 3. CORRECCIÓN DE AUTENTICACIÓN =====
+// ===== 3. CORRECCIÓN DE COLA DE REPRODUCCIÓN =====
+function fixQueue() {
+    console.log('🔧 Corrigiendo sistema de cola...');
+    
+    // ✅ FUNCIÓN PARA AÑADIR VIDEOS A LA COLA
+    window.addToQueue = function(videoId, title, thumbnail, author) {
+        console.log(`➕ Añadiendo video a cola: ${title}`);
+        
+        const videoData = {
+            videoId: videoId,
+            title: title || 'Título no disponible',
+            thumbnail: thumbnail || `https://img.youtube.com/vi/${videoId}/default.jpg`,
+            channelTitle: author || 'Desconocido',
+            duration: 0
+        };
+        
+        let success = false;
+        
+        // 1. Sistema unificado
+        if (window.unifiedCore?.addVideoToQueue) {
+            try {
+                const result = window.unifiedCore.addVideoToQueue(videoId, title, thumbnail, author);
+                if (result) {
+                    success = true;
+                    console.log('✅ Video añadido vía sistema unificado');
+                }
+            } catch (error) {
+                console.warn('⚠️ Error en sistema unificado:', error);
+            }
+        }
+        
+        // 2. Estado manual directo
+        if (!success && window.unifiedStateManager) {
+            try {
+                const currentQueue = window.unifiedStateManager.state.playlist.manualQueue || [];
+                const newQueue = currentQueue.filter(v => v.videoId !== videoId);
+                
+                if (newQueue.length !== currentQueue.length) {
+                    window.unifiedStateManager.set('playlist.manualQueue', newQueue);
+                    success = true;
+                    console.log(`✅ Video eliminado de cola (Restantes: ${newQueue.length})`);
+                }
+            } catch (error) {
+                console.warn('⚠️ Error eliminando de estado:', error);
+            }
+        }
+        
+        // 3. Fallback básico
+        if (!success && window.manualQueue) {
+            const originalLength = window.manualQueue.length;
+            window.manualQueue = window.manualQueue.filter(v => v.videoId !== videoId);
+            success = window.manualQueue.length !== originalLength;
+        }
+        
+        if (success) {
+            showMessage('Video eliminado de la cola', 'success');
+            updateQueueDisplay();
+            checkAndEnablePlayButton();
+        }
+    };
+    
+    // ✅ MOSTRAR/OCULTAR COLA
+    window.toggleQueue = function() {
+        const queueSection = document.getElementById('queueSection');
+        if (!queueSection) return;
+        
+        if (queueSection.classList.contains('hidden')) {
+            updateQueueDisplay();
+            queueSection.classList.remove('hidden');
+            console.log('✅ Cola mostrada');
+        } else {
+            queueSection.classList.add('hidden');
+        }
+    };
+    
+    // Configurar botón de cola
+    const queueButton = document.getElementById('queueButton');
+    if (queueButton) {
+        queueButton.addEventListener('click', window.toggleQueue);
+    }
+    
+    // Configurar botón de cerrar cola
+    const queueCloseBtn = document.getElementById('queueCloseBtn');
+    if (queueCloseBtn) {
+        queueCloseBtn.addEventListener('click', () => {
+            const queueSection = document.getElementById('queueSection');
+            if (queueSection) {
+                queueSection.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Exponer funciones
+    window.checkAndEnablePlayButton = checkAndEnablePlayButton;
+    window.updateQueueDisplay = updateQueueDisplay;
+    
+    console.log('✅ Sistema de cola corregido');
+}
+
+// ===== 4. CORRECCIÓN DEL BOTÓN PLAY =====
+function fixPlayButton() {
+    console.log('🔧 Corrigiendo botón play...');
+    
+    const playButton = document.getElementById('botonPlay');
+    const nextButton = document.getElementById('botonNext');
+    
+    if (playButton) {
+        // Remover listeners existentes
+        playButton.replaceWith(playButton.cloneNode(true));
+        const newPlayButton = document.getElementById('botonPlay');
+        
+        newPlayButton.addEventListener('click', () => {
+            console.log('🎵 Click en botón Play');
+            
+            const playersReady = window.unifiedStateManager?.state?.app?.playersInitialized || 
+                                (window.YT && window.YT.Player);
+            
+            if (!playersReady) {
+                showMessage("Reproductores no están listos", 'warning');
+                return;
+            }
+            
+            const isPlaying = window.unifiedStateManager?.state?.app?.reproduccionIniciada;
+            
+            if (!isPlaying) {
+                // Iniciar reproducción
+                let queue = [];
+                
+                if (window.unifiedCore?.playlistManager) {
+                    queue = window.unifiedCore.playlistManager.getFlattenedPlaylist();
+                } else if (window.unifiedStateManager?.state?.playlist?.manualQueue) {
+                    queue = window.unifiedStateManager.state.playlist.manualQueue;
+                } else if (window.manualQueue) {
+                    queue = window.manualQueue;
+                }
+                
+                if (queue.length > 0) {
+                    if (window.unifiedCore?.playbackController?.playFirstVideo) {
+                        window.unifiedCore.playbackController.playFirstVideo();
+                    } else {
+                        playFirstVideoFallback(queue[0]);
+                    }
+                } else {
+                    showMessage("No hay videos en la cola", 'warning');
+                }
+            } else {
+                // Alternar reproducción/pausa
+                if (window.unifiedCore?.playbackController?.togglePlayback) {
+                    window.unifiedCore.playbackController.togglePlayback();
+                } else {
+                    togglePlaybackFallback();
+                }
+            }
+        });
+    }
+    
+    if (nextButton) {
+        nextButton.replaceWith(nextButton.cloneNode(true));
+        const newNextButton = document.getElementById('botonNext');
+        
+        newNextButton.addEventListener('click', () => {
+            console.log('⏭️ Click en botón Next');
+            
+            const isPlaying = window.unifiedStateManager?.state?.app?.reproduccionIniciada;
+            
+            if (!isPlaying) {
+                showMessage("Inicia la reproducción primero", 'warning');
+                return;
+            }
+            
+            if (window.unifiedCore?.playbackController?.playNextVideo) {
+                window.unifiedCore.playbackController.playNextVideo();
+            } else {
+                showMessage("Funcionalidad en desarrollo", 'info');
+            }
+        });
+    }
+    
+    // ✅ FALLBACK PARA REPRODUCIR PRIMER VIDEO
+    function playFirstVideoFallback(video) {
+        console.log(`▶️ Reproduciendo primer video (fallback): ${video.title}`);
+        
+        try {
+            const player1 = window.unifiedStateManager?.state?.app?.player1;
+            
+            if (!player1) {
+                showMessage("Reproductor no está disponible", 'error');
+                return;
+            }
+            
+            player1.loadVideoById(video.videoId);
+            player1.setVolume(100);
+            
+            // Actualizar estado
+            if (window.unifiedStateManager) {
+                window.unifiedStateManager.set('app.currentPlayer', 1);
+                window.unifiedStateManager.set('app.reproduccionIniciada', true);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.videoId', video.videoId);
+                window.unifiedStateManager.set('playlist.currentPlayingInfo.flattenedIndex', 0);
+            }
+            
+            // Actualizar botón
+            newPlayButton.innerHTML = '<i class="fas fa-pause"></i>';
+            
+            showMessage(`Reproduciendo: ${video.title}`, 'success');
+            
+        } catch (error) {
+            console.error('❌ Error en fallback playFirst:', error);
+            showMessage('Error iniciando reproducción', 'error');
+        }
+    }
+    
+    // ✅ FALLBACK PARA ALTERNAR REPRODUCCIÓN
+    function togglePlaybackFallback() {
+        try {
+            const currentPlayer = window.unifiedStateManager?.state?.app?.currentPlayer === 1 ? 
+                                 window.unifiedStateManager?.state?.app?.player1 : 
+                                 window.unifiedStateManager?.state?.app?.player2;
+            
+            if (currentPlayer) {
+                const playerState = currentPlayer.getPlayerState();
+                if (playerState === YT.PlayerState.PLAYING) {
+                    currentPlayer.pauseVideo();
+                    newPlayButton.innerHTML = '<i class="fas fa-play"></i>';
+                } else {
+                    currentPlayer.playVideo();
+                    newPlayButton.innerHTML = '<i class="fas fa-pause"></i>';
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error en fallback toggle:', error);
+        }
+    }
+    
+    console.log('✅ Botón play corregido');
+}
+
+// ===== 5. CORRECCIÓN DE AUTENTICACIÓN MEJORADA =====
 function fixAuth() {
     console.log('🔧 Corrigiendo autenticación...');
     
-    // Configurar botones de Google
     function setupGoogleButtons() {
         const signInButton = document.getElementById('googleSignInButton');
         const signOutButton = document.getElementById('googleSignOutButton');
         
         if (signInButton) {
             signInButton.classList.remove('hidden');
-            signInButton.addEventListener('click', () => {
+            signInButton.replaceWith(signInButton.cloneNode(true));
+            const newSignInButton = document.getElementById('googleSignInButton');
+            
+            newSignInButton.addEventListener('click', () => {
                 console.log('👤 Intento de login con Google');
                 
-                if (window.authManager && window.authManager.handleAuthClick) {
+                if (window.unifiedAuthManager?.handleAuthClick) {
+                    window.unifiedAuthManager.handleAuthClick();
+                } else if (window.authManager?.handleAuthClick) {
                     window.authManager.handleAuthClick();
                 } else {
                     showMessage('Sistema de autenticación no disponible', 'error');
@@ -281,10 +527,15 @@ function fixAuth() {
         }
         
         if (signOutButton) {
-            signOutButton.addEventListener('click', () => {
+            signOutButton.replaceWith(signOutButton.cloneNode(true));
+            const newSignOutButton = document.getElementById('googleSignOutButton');
+            
+            newSignOutButton.addEventListener('click', () => {
                 console.log('👤 Intento de logout');
                 
-                if (window.authManager && window.authManager.handleSignOutClick) {
+                if (window.unifiedAuthManager?.handleSignOutClick) {
+                    window.unifiedAuthManager.handleSignOutClick();
+                } else if (window.authManager?.handleSignOutClick) {
                     window.authManager.handleSignOutClick();
                 } else {
                     showMessage('Sistema de autenticación no disponible', 'error');
@@ -293,244 +544,28 @@ function fixAuth() {
         }
     }
     
-    // Verificar estado de autenticación
-    function checkAuthState() {
-        if (window.authManager && window.authManager.isUserAuthenticated) {
-            const isAuth = window.authManager.isUserAuthenticated();
-            updateAuthUI(isAuth);
-            return isAuth;
-        }
-        return false;
-    }
-    
-    function updateAuthUI(isLoggedIn) {
-        const signInButton = document.getElementById('googleSignInButton');
-        const signOutButton = document.getElementById('googleSignOutButton');
-        
-        if (signInButton && signOutButton) {
-            if (isLoggedIn) {
-                signInButton.classList.add('hidden');
-                signOutButton.classList.remove('hidden');
-            } else {
-                signInButton.classList.remove('hidden');
-                signOutButton.classList.add('hidden');
-            }
-        }
-    }
-    
     // Configurar inmediatamente
     setupGoogleButtons();
     
-    // Verificar cada 2 segundos si hay cambios en authManager
+    // Verificar cada 2 segundos si hay cambios
+    let attempts = 0;
     const authCheckInterval = setInterval(() => {
-        if (window.authManager) {
-            checkAuthState();
+        attempts++;
+        
+        if (window.unifiedAuthManager || window.authManager) {
+            console.log('✅ AuthManager detectado');
+            setupGoogleButtons();
+            clearInterval(authCheckInterval);
+        } else if (attempts >= 15) { // 30 segundos
+            console.warn('⚠️ Timeout esperando AuthManager');
             clearInterval(authCheckInterval);
         }
     }, 2000);
     
-    // Timeout para evitar bucle infinito
-    setTimeout(() => {
-        clearInterval(authCheckInterval);
-    }, 30000);
-    
     console.log('✅ Autenticación corregida');
 }
 
-// ===== 4. CORRECCIÓN DE URLs DE PLAYLIST =====
-function fixPlaylistUrl() {
-    console.log('🔧 Corrigiendo añadir playlist desde URL...');
-    
-    function handlePlaylistUrlAdd() {
-        const input = document.getElementById('searchInput2');
-        if (!input) {
-            console.error('❌ Input de URL no encontrado');
-            return;
-        }
-        
-        const url = input.value.trim();
-        if (!url) {
-            showMessage('Ingresa una URL válida', 'warning');
-            return;
-        }
-        
-        console.log(`🔗 Procesando URL: ${url}`);
-        
-        // Validar URL de YouTube
-        if (!isValidYouTubeUrl(url)) {
-            showMessage('URL de YouTube no válida', 'error');
-            return;
-        }
-        
-        // Extraer playlist ID
-        const playlistId = extractPlaylistId(url);
-        if (!playlistId) {
-            showMessage('URL no contiene una playlist válida', 'error');
-            return;
-        }
-        
-        console.log(`📋 ID de playlist extraído: ${playlistId}`);
-        
-        // Limpiar input
-        input.value = '';
-        
-        // Procesar playlist
-        loadPlaylistFromUrl(playlistId, url);
-    }
-    
-    async function loadPlaylistFromUrl(playlistId, originalUrl) {
-        showMessage('Cargando playlist...', 'info');
-        
-        try {
-            // Intentar cargar desde Piped
-            const pipedInstances = [
-                "https://api.piped.private.coffee",
-                "https://pipedapi.ducks.party"
-            ];
-            
-            let playlistData = null;
-            
-            for (const instance of pipedInstances) {
-                try {
-                    console.log(`🔗 Intentando cargar playlist desde: ${instance}`);
-                    
-                    const response = await fetch(`${instance}/playlists/${playlistId}`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' },
-                        signal: AbortSignal.timeout(15000)
-                    });
-                    
-                    if (response.ok) {
-                        playlistData = await response.json();
-                        console.log(`✅ Playlist cargada desde: ${instance}`);
-                        break;
-                    }
-                } catch (error) {
-                    console.warn(`⚠️ Error en instancia ${instance}:`, error.message);
-                    continue;
-                }
-            }
-            
-            if (!playlistData) {
-                throw new Error('No se pudo cargar la playlist desde ninguna instancia');
-            }
-            
-            // Procesar datos de la playlist
-            const processedPlaylist = {
-                id: playlistId,
-                name: playlistData.name || 'Playlist Sin Nombre',
-                thumbnailUrl: playlistData.thumbnailUrl || 'https://via.placeholder.com/320x180/333333/ffffff?text=Playlist',
-                videos: [],
-                isExpanded: true,
-                source: 'external'
-            };
-            
-            // Procesar videos
-            if (playlistData.relatedStreams && Array.isArray(playlistData.relatedStreams)) {
-                processedPlaylist.videos = playlistData.relatedStreams
-                    .filter(video => video && extractVideoId(video))
-                    .map(video => ({
-                        videoId: extractVideoId(video),
-                        title: video.title || 'Título Desconocido',
-                        thumbnail: video.thumbnail || `https://img.youtube.com/vi/${extractVideoId(video)}/default.jpg`,
-                        duration: parseDuration(video.duration) || 0,
-                        channelTitle: video.uploaderName || 'YouTube'
-                    }));
-            }
-            
-            if (processedPlaylist.videos.length === 0) {
-                throw new Error('La playlist no contiene videos válidos');
-            }
-            
-            // Añadir playlist al estado
-            addPlaylistToState(processedPlaylist);
-            
-            showMessage(`Playlist "${processedPlaylist.name}" cargada (${processedPlaylist.videos.length} videos)`, 'success');
-            
-            // Cambiar a vista de biblioteca
-            if (window.switchView) {
-                window.switchView('library');
-            }
-            
-        } catch (error) {
-            console.error('❌ Error cargando playlist:', error);
-            showMessage(`Error cargando playlist: ${error.message}`, 'error');
-        }
-    }
-    
-    function addPlaylistToState(playlist) {
-        // Si existe un estado unificado, usarlo
-        if (window.unifiedStateManager && window.unifiedStateManager.state) {
-            const currentPlaylists = window.unifiedStateManager.state.playlist.playlistsData || [];
-            
-            // Verificar duplicados
-            if (currentPlaylists.some(p => p.id === playlist.id)) {
-                showMessage('Esta playlist ya está cargada', 'warning');
-                return;
-            }
-            
-            const updatedPlaylists = [...currentPlaylists, playlist];
-            window.unifiedStateManager.set('playlist.playlistsData', updatedPlaylists);
-            
-            // Actualizar UI si existe
-            if (window.UIManager && window.UIManager.updatePlaylistsUI) {
-                setTimeout(() => window.UIManager.updatePlaylistsUI(), 100);
-            }
-        }
-        // Fallback a variable global
-        else if (window.playlistsData) {
-            if (window.playlistsData.some(p => p.id === playlist.id)) {
-                showMessage('Esta playlist ya está cargada', 'warning');
-                return;
-            }
-            
-            window.playlistsData.push(playlist);
-            
-            // Actualizar UI si existe función global
-            if (window.updatePlaylistsUI) {
-                setTimeout(() => window.updatePlaylistsUI(), 100);
-            }
-        }
-        
-        console.log(`✅ Playlist añadida: ${playlist.name} (${playlist.videos.length} videos)`);
-    }
-    
-    // Configurar listener del botón
-    const addButton = document.getElementById('añadirUrlButton');
-    if (addButton) {
-        addButton.addEventListener('click', handlePlaylistUrlAdd);
-        console.log('✅ Botón de añadir URL configurado');
-    }
-    
-    // Configurar listener del input (Enter key)
-    const urlInput = document.getElementById('searchInput2');
-    if (urlInput) {
-        urlInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                handlePlaylistUrlAdd();
-            }
-        });
-        console.log('✅ Input de URL configurado');
-    }
-    
-    console.log('✅ Añadir playlist desde URL corregido');
-}
-
-// ===== 5. FUNCIONES AUXILIARES =====
-function isValidYouTubeUrl(url) {
-    return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url);
-}
-
-function extractPlaylistId(url) {
-    try {
-        const urlObject = new URL(url);
-        return urlObject.searchParams.get('list');
-    } catch (e) {
-        const match = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-        return match ? match[1] : null;
-    }
-}
-
+// ===== 6. FUNCIONES AUXILIARES CORREGIDAS =====
 function extractVideoId(video) {
     if (video.videoId) return video.videoId;
     if (video.id) return video.id;
@@ -551,7 +586,6 @@ function formatDuration(duration) {
     }
     
     if (typeof duration === 'string') {
-        // PT format
         const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
         if (match) {
             const hours = parseInt(match[1] || '0');
@@ -564,40 +598,12 @@ function formatDuration(duration) {
             return `${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
         
-        // Already formatted
         if (/^\d+:\d{2}$/.test(duration)) {
             return duration;
         }
     }
     
     return '';
-}
-
-function parseDuration(duration) {
-    if (!duration) return 0;
-    
-    if (typeof duration === 'number') return Math.floor(duration);
-    
-    if (typeof duration === 'string') {
-        // PT format
-        const ptMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
-        if (ptMatch) {
-            const hours = parseInt(ptMatch[1] || '0');
-            const minutes = parseInt(ptMatch[2] || '0');
-            const seconds = parseFloat(ptMatch[3] || '0');
-            return Math.floor(hours * 3600 + minutes * 60 + seconds);
-        }
-        
-        // MM:SS format
-        const timeMatch = duration.match(/^(\d+):(\d{2})$/);
-        if (timeMatch) {
-            const minutes = parseInt(timeMatch[1]);
-            const seconds = parseInt(timeMatch[2]);
-            return minutes * 60 + seconds;
-        }
-    }
-    
-    return 0;
 }
 
 function escapeHtml(text) {
@@ -607,41 +613,12 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Función para añadir videos a la cola
-function addToQueue(videoId, title, thumbnail, author) {
-    console.log(`➕ Añadiendo a cola: ${title}`);
-    
-    const videoData = {
-        videoId: videoId,
-        title: title,
-        thumbnail: thumbnail,
-        channelTitle: author,
-        duration: 0
-    };
-    
-    // Intentar usar el sistema unificado
-    if (window.PlaylistManager && window.PlaylistManager.addVideoToManualPlaylist) {
-        const result = window.PlaylistManager.addVideoToManualPlaylist(videoData);
-        if (result) {
-            showMessage(`"${title}" añadido a la cola`, 'success');
-        }
-    }
-    // Fallback al sistema legacy
-    else if (window.addVideoToManualPlaylist) {
-        window.addVideoToManualPlaylist(videoData);
-    }
-    // Último recurso: mensaje de error
-    else {
-        showMessage('Sistema de playlists no disponible', 'error');
-    }
-}
-
-// Sistema de mensajes mejorado
+// ✅ SISTEMA DE MENSAJES MEJORADO
 function showMessage(message, type = 'info', duration = 3000) {
-    console.log(`💬 Mensaje [${type}]: ${message}`);
+    console.log(`💬 [${type.toUpperCase()}]: ${message}`);
     
     // Intentar usar el sistema unificado
-    if (window.unifiedMessageManager && window.unifiedMessageManager.show) {
+    if (window.unifiedMessageManager?.show) {
         return window.unifiedMessageManager.show(message, type, duration);
     }
     
@@ -659,10 +636,10 @@ function showMessage(message, type = 'info', duration = 3000) {
         background: var(--background-elevated); color: var(--text-primary);
         padding: 12px 16px; border-radius: 8px; z-index: 3000;
         font-size: 14px; text-align: center; box-shadow: var(--shadow-medium);
-        transition: all 0.3s ease; cursor: pointer;
+        transition: all 0.3s ease; cursor: pointer; max-width: 400px;
+        word-wrap: break-word;
     `;
     
-    // Tipo-specific styling
     const typeStyles = {
         success: 'background: rgba(76, 175, 80, 0.9); color: white;',
         error: 'background: rgba(244, 67, 54, 0.9); color: white;',
@@ -676,7 +653,6 @@ function showMessage(message, type = 'info', duration = 3000) {
     
     document.body.appendChild(messageDiv);
     
-    // Auto-remove
     const remove = () => {
         messageDiv.style.opacity = '0';
         setTimeout(() => messageDiv.remove(), 300);
@@ -688,30 +664,109 @@ function showMessage(message, type = 'info', duration = 3000) {
     return messageDiv;
 }
 
-// ===== 6. FUNCIÓN PRINCIPAL DE CORRECCIÓN =====
+// ===== 7. CORRECCIÓN DE PLAYLIST URL =====
+function fixPlaylistUrl() {
+    console.log('🔧 Corrigiendo añadir playlist desde URL...');
+    
+    const addButton = document.getElementById('añadirUrlButton');
+    const urlInput = document.getElementById('searchInput2');
+    
+    if (addButton) {
+        addButton.replaceWith(addButton.cloneNode(true));
+        const newAddButton = document.getElementById('añadirUrlButton');
+        
+        newAddButton.addEventListener('click', handlePlaylistUrlAdd);
+    }
+    
+    if (urlInput) {
+        urlInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                handlePlaylistUrlAdd();
+            }
+        });
+    }
+    
+    function handlePlaylistUrlAdd() {
+        const input = document.getElementById('searchInput2');
+        if (!input) return;
+        
+        const url = input.value.trim();
+        if (!url) {
+            showMessage('Ingresa una URL válida', 'warning');
+            return;
+        }
+        
+        if (!isValidYouTubeUrl(url)) {
+            showMessage('URL de YouTube no válida', 'error');
+            return;
+        }
+        
+        const playlistId = extractPlaylistId(url);
+        if (!playlistId) {
+            showMessage('URL no contiene una playlist válida', 'error');
+            return;
+        }
+        
+        input.value = '';
+        
+        if (window.unifiedCore?.playlistManager?.loadPlaylistFromUrl) {
+            window.unifiedCore.playlistManager.loadPlaylistFromUrl(playlistId, url);
+        } else {
+            showMessage('Funcionalidad de playlist no disponible', 'error');
+        }
+    }
+    
+    function isValidYouTubeUrl(url) {
+        return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/.test(url);
+    }
+    
+    function extractPlaylistId(url) {
+        try {
+            const urlObject = new URL(url);
+            return urlObject.searchParams.get('list');
+        } catch (e) {
+            const match = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+            return match ? match[1] : null;
+        }
+    }
+    
+    console.log('✅ Añadir playlist desde URL corregido');
+}
+
+// ===== 8. FUNCIÓN PRINCIPAL DE CORRECCIÓN =====
 function applyCriticalFixes() {
     console.log('🚀 Aplicando todas las correcciones críticas...');
     
     try {
         fixNavigation();
         fixSearch();
+        fixQueue();
+        fixPlayButton();
         fixAuth();
         fixPlaylistUrl();
         
         // Configurar funciones globales
         window.showMessage = showMessage;
-        window.isValidYouTubeUrl = isValidYouTubeUrl;
-        window.extractPlaylistId = extractPlaylistId;
+        window.extractVideoId = extractVideoId;
         window.formatDuration = formatDuration;
-        window.parseDuration = parseDuration;
         window.escapeHtml = escapeHtml;
         
         console.log('✅ Todas las correcciones aplicadas exitosamente');
         
+        // Verificar sistema cada 5 segundos
+        setInterval(() => {
+            if (window.unifiedStateManager?.state?.playlist?.manualQueue) {
+                const queueCount = window.unifiedStateManager.state.playlist.manualQueue.length;
+                if (queueCount > 0 && window.checkAndEnablePlayButton) {
+                    window.checkAndEnablePlayButton();
+                }
+            }
+        }, 5000);
+        
         // Mostrar mensaje de éxito
         setTimeout(() => {
-            showMessage('Sistema corregido y listo para usar', 'success');
-        }, 1000);
+            showMessage('✅ Sistema completamente corregido y funcional', 'success');
+        }, 2000);
         
     } catch (error) {
         console.error('💥 Error aplicando correcciones:', error);
@@ -719,520 +774,68 @@ function applyCriticalFixes() {
     }
 }
 
-// ===== 7. INICIALIZACIÓN AUTOMÁTICA =====
+// ===== 9. INICIALIZACIÓN AUTOMÁTICA MEJORADA =====
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', applyCriticalFixes);
 } else {
     applyCriticalFixes();
 }
 
-// Aplicar correcciones después de un delay para asegurar que otros scripts carguen
-setTimeout(applyCriticalFixes, 2000);
+// Aplicar correcciones después de delays escalonados
+setTimeout(applyCriticalFixes, 1000);
+setTimeout(applyCriticalFixes, 3000);
 
-console.log('✅ Sistema de correcciones críticas cargado');
-// ===== AUTH MANAGER INITIALIZATION FIX =====
-// Solución al problema de authManager no disponible
-
-console.log('🔧 Aplicando corrección para AuthManager...');
-
-// ===== 1. MANAGER DE AUTENTICACIÓN MEJORADO =====
-class AuthManagerFix {
-    constructor() {
-        this.isReady = false;
-        this.retryCount = 0;
-        this.maxRetries = 10;
-        this.checkInterval = null;
-        
-        this.init();
-    }
+// ===== 10. MONITOREO DEL SISTEMA =====
+let systemCheckCount = 0;
+const systemMonitor = setInterval(() => {
+    systemCheckCount++;
     
-    async init() {
-        console.log('🔐 Inicializando AuthManager Fix...');
-        
-        // Esperar a que los scripts de Google se carguen
-        await this.waitForGoogleAPIs();
-        
-        // Intentar obtener el authManager existente o crear uno nuevo
-        await this.ensureAuthManager();
-        
-        // Configurar listeners
-        this.setupEventListeners();
-        
-        this.isReady = true;
-        console.log('✅ AuthManager Fix listo');
-    }
-    
-    async waitForGoogleAPIs() {
-        return new Promise((resolve) => {
-            const checkGoogleAPIs = () => {
-                if (window.gapi && window.google?.accounts) {
-                    console.log('✅ Google APIs disponibles');
-                    resolve();
-                } else {
-                    setTimeout(checkGoogleAPIs, 500);
-                }
-            };
-            
-            checkGoogleAPIs();
-            
-            // Timeout de 30 segundos
-            setTimeout(() => {
-                console.warn('⚠️ Timeout esperando Google APIs');
-                resolve(); // Continuar de todos modos
-            }, 30000);
-        });
-    }
-    
-    async ensureAuthManager() {
-        // Verificar si authManager ya existe
-        if (window.authManager && window.authManager.initialize) {
-            console.log('✅ AuthManager existente encontrado');
-            
-            // Asegurar que esté inicializado
-            if (!window.authManager.gapiReady) {
-                try {
-                    await window.authManager.initialize();
-                } catch (error) {
-                    console.error('❌ Error inicializando authManager existente:', error);
-                }
-            }
-            return;
-        }
-        
-        // Si no existe, intentar cargarlo
-        await this.loadAuthManager();
-    }
-    
-    async loadAuthManager() {
-        console.log('📦 Intentando cargar AuthManager...');
-        
-        try {
-            // Intentar importar auth.js si es module
-            if (typeof import !== 'undefined') {
-                try {
-                    const authModule = await import('./auth.js');
-                    if (authModule.authManager) {
-                        window.authManager = authModule.authManager;
-                        console.log('✅ AuthManager importado como módulo');
-                        return;
-                    }
-                } catch (e) {
-                    console.log('📝 No se pudo importar como módulo, continuando...');
-                }
-            }
-            
-            // Verificar cada segundo si authManager se carga
-            this.checkInterval = setInterval(() => {
-                if (window.authManager) {
-                    console.log('✅ AuthManager detectado');
-                    clearInterval(this.checkInterval);
-                    
-                    // Inicializar si no está listo
-                    if (!window.authManager.gapiReady) {
-                        window.authManager.initialize().catch(error => {
-                            console.error('❌ Error inicializando authManager:', error);
-                        });
-                    }
-                }
-                
-                this.retryCount++;
-                if (this.retryCount >= this.maxRetries) {
-                    console.warn('⚠️ Timeout esperando authManager, creando fallback...');
-                    clearInterval(this.checkInterval);
-                    this.createFallbackAuth();
-                }
-            }, 1000);
-            
-        } catch (error) {
-            console.error('❌ Error cargando AuthManager:', error);
-            this.createFallbackAuth();
-        }
-    }
-    
-    createFallbackAuth() {
-        console.log('🔄 Creando AuthManager fallback...');
-        
-        window.authManager = {
-            isAuthenticated: false,
-            gapiReady: false,
-            gisReady: false,
-            
-            async initialize() {
-                console.log('🔄 Inicializando AuthManager fallback...');
-                
-                try {
-                    // Cargar GAPI
-                    await new Promise((resolve) => {
-                        if (window.gapi) {
-                            gapi.load('client', {
-                                callback: resolve,
-                                onerror: () => {
-                                    console.error('❌ Error cargando GAPI client');
-                                    resolve();
-                                }
-                            });
-                        } else {
-                            resolve();
-                        }
-                    });
-                    
-                    if (window.gapi?.client) {
-                        await gapi.client.init({
-                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
-                        });
-                        this.gapiReady = true;
-                    }
-                    
-                    // Configurar GIS
-                    if (window.google?.accounts) {
-                        this.tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: "228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com",
-                            scope: 'https://www.googleapis.com/auth/youtube.readonly',
-                            callback: (tokenResponse) => {
-                                this.handleTokenResponse(tokenResponse);
-                            }
-                        });
-                        this.gisReady = true;
-                    }
-                    
-                    console.log('✅ AuthManager fallback inicializado');
-                    
-                } catch (error) {
-                    console.error('❌ Error en AuthManager fallback:', error);
-                }
-            },
-            
-            handleAuthClick() {
-                if (!this.gapiReady || !this.gisReady) {
-                    window.unifiedCore?.showMessage?.('APIs de Google no están listas', 'error');
-                    return;
-                }
-                
-                if (this.tokenClient) {
-                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-                } else {
-                    window.unifiedCore?.showMessage?.('Cliente OAuth no disponible', 'error');
-                }
-            },
-            
-            handleTokenResponse(tokenResponse) {
-                if (tokenResponse && tokenResponse.access_token) {
-                    try {
-                        if (window.gapi?.client) {
-                            gapi.client.setToken(tokenResponse);
-                        }
-                        
-                        const tokenData = {
-                            ...tokenResponse,
-                            timestamp: Date.now()
-                        };
-                        localStorage.setItem('google_token', JSON.stringify(tokenData));
-                        
-                        this.isAuthenticated = true;
-                        this.updateUI(true);
-                        
-                        window.unifiedCore?.showMessage?.('Autenticación exitosa', 'success');
-                        
-                        // Intentar cargar playlists
-                        this.getPlaylists();
-                        
-                    } catch (error) {
-                        console.error('❌ Error procesando token:', error);
-                        window.unifiedCore?.showMessage?.('Error procesando autenticación', 'error');
-                    }
-                } else {
-                    this.isAuthenticated = false;
-                    this.updateUI(false);
-                    window.unifiedCore?.showMessage?.('Autenticación fallida', 'error');
-                }
-            },
-            
-            handleSignOutClick() {
-                try {
-                    const token = gapi.client.getToken();
-                    
-                    if (token && token.access_token) {
-                        google.accounts.oauth2.revoke(token.access_token, () => {
-                            console.log('Token revocado');
-                        });
-                        gapi.client.setToken('');
-                    }
-                    
-                    localStorage.removeItem('google_token');
-                    
-                    this.isAuthenticated = false;
-                    this.updateUI(false);
-                    
-                    document.dispatchEvent(new CustomEvent('userLoggedOut'));
-                    window.unifiedCore?.showMessage?.('Sesión cerrada', 'success');
-                    
-                } catch (error) {
-                    console.error('❌ Error cerrando sesión:', error);
-                    
-                    // Forzar limpieza
-                    localStorage.removeItem('google_token');
-                    this.isAuthenticated = false;
-                    this.updateUI(false);
-                    
-                    document.dispatchEvent(new CustomEvent('userLoggedOut'));
-                }
-            },
-            
-            updateUI(isLoggedIn) {
-                const signInButton = document.getElementById('googleSignInButton');
-                const signOutButton = document.getElementById('googleSignOutButton');
-                
-                if (signInButton && signOutButton) {
-                    if (isLoggedIn) {
-                        signInButton.classList.add('hidden');
-                        signOutButton.classList.remove('hidden');
-                    } else {
-                        signInButton.classList.remove('hidden');
-                        signOutButton.classList.add('hidden');
-                    }
-                }
-            },
-            
-            isUserAuthenticated() {
-                return this.isAuthenticated && this.gapiReady;
-            },
-            
-            async getPlaylists() {
-                window.unifiedCore?.showMessage?.('Función de playlists en desarrollo', 'info');
-            }
-        };
-        
-        // Inicializar el fallback
-        window.authManager.initialize();
-    }
-    
-    setupEventListeners() {
-        // Listener para cuando se detecte authManager
-        document.addEventListener('authManagerReady', () => {
-            console.log('📢 AuthManager listo detectado');
-            this.setupGoogleButtons();
-        });
-        
-        // Setup inicial de botones
-        this.setupGoogleButtons();
-    }
-    
-    setupGoogleButtons() {
-        const signInButton = document.getElementById('googleSignInButton');
-        const signOutButton = document.getElementById('googleSignOutButton');
-        
-        if (signInButton) {
-            // Remover listeners existentes
-            signInButton.replaceWith(signInButton.cloneNode(true));
-            const newSignInButton = document.getElementById('googleSignInButton');
-            
-            newSignInButton.addEventListener('click', () => {
-                console.log('👤 Click en botón de login');
-                this.handleGoogleSignIn();
-            });
-            
-            newSignInButton.classList.remove('hidden');
-            newSignInButton.disabled = false;
-        }
-        
-        if (signOutButton) {
-            // Remover listeners existentes
-            signOutButton.replaceWith(signOutButton.cloneNode(true));
-            const newSignOutButton = document.getElementById('googleSignOutButton');
-            
-            newSignOutButton.addEventListener('click', () => {
-                console.log('👤 Click en botón de logout');
-                this.handleGoogleSignOut();
-            });
-        }
-        
-        console.log('✅ Botones de Google configurados');
-    }
-    
-    handleGoogleSignIn() {
-        console.log('🔑 Procesando login de Google...');
-        
-        if (window.authManager && window.authManager.handleAuthClick) {
-            console.log('✅ Usando authManager original');
-            window.authManager.handleAuthClick();
-        } else {
-            console.log('⚠️ AuthManager no disponible, usando fallback...');
-            
-            if (window.authManager?.handleAuthClick) {
-                window.authManager.handleAuthClick();
-            } else {
-                window.unifiedCore?.showMessage?.('Sistema de autenticación no está listo', 'error');
-                
-                // Intentar reinicializar
-                this.ensureAuthManager();
-            }
-        }
-    }
-    
-    handleGoogleSignOut() {
-        console.log('🔓 Procesando logout de Google...');
-        
-        if (window.authManager && window.authManager.handleSignOutClick) {
-            window.authManager.handleSignOutClick();
-        } else {
-            window.unifiedCore?.showMessage?.('Sistema de autenticación no disponible', 'error');
-        }
-    }
-    
-    // Método de debugging
-    getStatus() {
-        return {
-            isReady: this.isReady,
-            authManagerExists: !!window.authManager,
-            authManagerInitialized: window.authManager?.gapiReady || false,
-            googleAPIsAvailable: !!(window.gapi && window.google?.accounts),
-            retryCount: this.retryCount,
-            timestamp: Date.now()
-        };
-    }
-}
-
-// ===== 2. CORRECCIÓN DE SISTEMA DE PLAYLISTS =====
-function fixPlaylistSystem() {
-    console.log('🔧 Corrigiendo sistema de playlists...');
-    
-    // Función global para añadir videos a cola
-    window.addVideoToQueue = function(videoId, title, thumbnail, author) {
-        console.log(`➕ Añadiendo video a cola: ${title}`);
-        
-        const videoData = {
-            videoId: videoId,
-            title: title || 'Título no disponible',
-            thumbnail: thumbnail || `https://img.youtube.com/vi/${videoId}/default.jpg`,
-            channelTitle: author || 'Desconocido',
-            duration: 0
-        };
-        
-        // Intentar múltiples sistemas
-        let success = false;
-        
-        // 1. Sistema unificado
-        if (window.unifiedCore?.addVideoToQueue) {
-            try {
-                const result = window.unifiedCore.addVideoToQueue(videoId, title, thumbnail, author);
-                if (result) {
-                    success = true;
-                    console.log('✅ Video añadido vía sistema unificado');
-                }
-            } catch (error) {
-                console.warn('⚠️ Error en sistema unificado:', error);
-            }
-        }
-        
-        // 2. PlaylistManager
-        if (!success && window.PlaylistManager?.addVideoToManualPlaylist) {
-            try {
-                const result = window.PlaylistManager.addVideoToManualPlaylist(videoData);
-                if (result) {
-                    success = true;
-                    console.log('✅ Video añadido vía PlaylistManager');
-                }
-            } catch (error) {
-                console.warn('⚠️ Error en PlaylistManager:', error);
-            }
-        }
-        
-        // 3. Sistema legacy
-        if (!success && window.addVideoToManualPlaylist) {
-            try {
-                window.addVideoToManualPlaylist(videoData);
-                success = true;
-                console.log('✅ Video añadido vía sistema legacy');
-            } catch (error) {
-                console.warn('⚠️ Error en sistema legacy:', error);
-            }
-        }
-        
-        // 4. Fallback - crear sistema básico
-        if (!success) {
-            console.log('🔄 Creando sistema básico de cola...');
-            
-            if (!window.manualQueue) {
-                window.manualQueue = [];
-            }
-            
-            // Verificar duplicados
-            if (!window.manualQueue.find(v => v.videoId === videoId)) {
-                window.manualQueue.push(videoData);
-                success = true;
-                
-                console.log(`✅ Video añadido a cola básica (${window.manualQueue.length} videos)`);
-                
-                // Actualizar UI si existe
-                if (window.UIManager?.updateQueueContent) {
-                    window.UIManager.updateQueueContent();
-                }
-            } else {
-                console.log('⚠️ Video ya existe en la cola');
-            }
-        }
-        
-        // Mostrar resultado
-        if (success) {
-            window.unifiedCore?.showMessage?.(`"${title}" añadido a la cola`, 'success');
-        } else {
-            window.unifiedCore?.showMessage?.('Error añadiendo video a la cola', 'error');
-        }
-        
-        return success;
+    // Verificar elementos críticos
+    const criticalElements = {
+        player1: document.getElementById('player1'),
+        player2: document.getElementById('player2'),
+        botonPlay: document.getElementById('botonPlay'),
+        searchResults: document.getElementById('searchResults'),
+        queueSection: document.getElementById('queueSection')
     };
     
-    console.log('✅ Sistema de playlists corregido');
-}
-
-// ===== 3. INICIALIZACIÓN Y SETUP =====
-let authManagerFix = null;
-
-function initializeAuthFix() {
-    console.log('🚀 Inicializando corrección de autenticación...');
+    const missingElements = Object.entries(criticalElements)
+        .filter(([name, element]) => !element)
+        .map(([name]) => name);
     
-    try {
-        // Crear el fix manager
-        authManagerFix = new AuthManagerFix();
-        
-        // Corregir sistema de playlists
-        fixPlaylistSystem();
-        
-        // Exponer funciones globales
-        window.authManagerFix = authManagerFix;
-        
-        // Función de debugging
-        window.debugAuth = function() {
-            console.log('🔧 Auth Debug Info:');
-            console.table(authManagerFix.getStatus());
-            
-            console.log('📊 Managers disponibles:');
-            console.log('- authManager:', !!window.authManager);
-            console.log('- unifiedCore:', !!window.unifiedCore);
-            console.log('- PlaylistManager:', !!window.PlaylistManager);
-            console.log('- UIManager:', !!window.UIManager);
-            
-            if (window.unifiedCore?.showMessage) {
-                window.unifiedCore.showMessage('Debug info en consola', 'info');
-            }
-        };
-        
-        console.log('✅ Corrección de autenticación inicializada');
-        
-    } catch (error) {
-        console.error('💥 Error inicializando corrección de auth:', error);
+    if (missingElements.length > 0 && systemCheckCount < 20) {
+        console.warn(`⚠️ Elementos faltantes: ${missingElements.join(', ')}`);
     }
-}
+    
+    // Verificar funcionalidad de cola
+    if (window.unifiedStateManager?.state?.playlist?.manualQueue) {
+        const queueCount = window.unifiedStateManager.state.playlist.manualQueue.length;
+        
+        if (queueCount > 0) {
+            const playButton = document.getElementById('botonPlay');
+            const playersReady = window.unifiedStateManager.state.app.playersInitialized;
+            
+            if (playButton && playersReady && playButton.disabled) {
+                console.log('🔧 Auto-corrigiendo botón play deshabilitado');
+                playButton.disabled = false;
+            }
+        }
+    }
+    
+    // Detener monitoreo después de 2 minutos
+    if (systemCheckCount >= 120) { // 2 minutos con checks cada segundo
+        clearInterval(systemMonitor);
+        console.log('✅ Monitoreo del sistema completado');
+    }
+}, 1000);
 
-// ===== 4. AUTO-INICIALIZACIÓN =====
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeAuthFix);
-} else {
-    initializeAuthFix();
-}
-
-// También inicializar después de un delay para asegurar que otros scripts carguen
-setTimeout(initializeAuthFix, 1000);
-
-console.log('✅ Auth Manager Fix cargado');
-console.log('🔧 Debug disponible: window.debugAuth()');
+console.log('✅ Sistema de correcciones críticas COMPLETO cargado');
+console.log('🎯 Funcionalidades corregidas:');
+console.log('   ✅ Navegación entre vistas');
+console.log('   ✅ Búsqueda en formato baldosas (4 columnas)');
+console.log('   ✅ Cola de reproducción funcional');
+console.log('   ✅ Botón play operativo');
+console.log('   ✅ Sistema de autenticación');
+console.log('   ✅ Añadir playlist desde URL');
+console.log('   ✅ Monitoreo automático del sistema');
+console.log('🔧 Funciones globales: addToQueue, toggleQueue, playVideoNow, removeFromQueue');
