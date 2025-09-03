@@ -1075,20 +1075,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // ===== REFERENCIAS GLOBALES OPTIMIZADAS =====
 if (typeof window !== 'undefined') {
     // Assign to window with conflict prevention
-    Object.assign(window, {
+    window.OptimizedManagers = {
         PlaylistManager,
         SearchManager, 
         PlaybackController,
         SponsorBlockManager,
         AudioManager
-    });
+    };
     
     // Consolidated debug object
-    window.ManagersDebug = {
-        // Playlist debugging
-        getQueue: () => PlaylistManager.getQueueInfo(),
-        clearQueue: () => PlaylistManager.clearQueue(),
-        
+    window.ManagersDebug = {      
         // Search debugging  
         testSearch: (query = 'test music') => SearchManager.performSearch(query),
         testInstances: () => SearchManager.testPipedInstances(),
@@ -1112,8 +1108,208 @@ if (typeof window !== 'undefined') {
             timestamp: Date.now()
         })
     };
+
+    // Evitar conflictos con el core
+if (!window.PlaylistManager && window.unifiedCore?.playlistManager) {
+    window.PlaylistManager = {
+        getFlattenedPlaylist: () => window.unifiedCore.playlistManager.getFlattenedPlaylist(),
+        addVideoToManualPlaylist: (data) => window.unifiedCore.playlistManager.addVideoToManualPlaylist(data),
+        checkAndEnablePlayButton: () => window.unifiedCore.playlistManager.checkAndEnablePlayButton(),
+        clearQueue: () => window.unifiedCore.playlistManager.clearQueue(),
+        // ... otros métodos necesarios
+    };
+}
 }
 
-console.log('✅ Managers Optimizados cargados - Eliminadas duplicaciones');
-console.log('🔧 ManagersDebug disponible: window.ManagersDebug.getAllInfo()');
+// ===== VERIFICACIÓN FINAL DEL SISTEMA =====
+class FinalSystemVerification {
+    static verify() {
+        console.log('🔍 Verificación final del sistema...');
+        
+        const results = {
+            coreSystem: {
+                unifiedCore: !!window.unifiedCore,
+                initialized: window.unifiedCore?.initialized || false,
+                managers: {
+                    state: !!window.unifiedStateManager,
+                    youtube: !!window.unifiedYouTubeManager,
+                    playlist: !!window.unifiedPlaylistManager,
+                    search: !!window.unifiedSearchManager,
+                    auth: !!window.unifiedAuthManager,
+                    playback: !!window.unifiedPlaybackController
+                }
+            },
+            supportSystems: {
+                messages: !!window.unifiedMessageManager,
+                loading: !!window.unifiedLoadingManager,
+                notifications: !!window.notificationSystem
+            },
+            uiSystems: {
+                uiManager: !!window.UIManager,
+                legacyManagers: {
+                    playlist: !!window.PlaylistManager,
+                    search: !!window.SearchManager,
+                    playback: !!window.PlaybackController
+                }
+            },
+            criticalElements: {
+                players: {
+                    player1: !!document.getElementById('player1'),
+                    player2: !!document.getElementById('player2')
+                },
+                containers: {
+                    searchResults: !!document.getElementById('searchResults'),
+                    playlistsGrid: !!document.getElementById('playlistsGrid'),
+                    playlistContainer: !!document.getElementById('playlistContainer'),
+                    queueSection: !!document.getElementById('queueSection')
+                },
+                controls: {
+                    playButton: !!document.getElementById('botonPlay'),
+                    nextButton: !!document.getElementById('botonNext'),
+                    queueButton: !!document.getElementById('queueButton')
+                }
+            },
+            apis: {
+                youtubeAPI: !!(window.YT && window.YT.Player),
+                googleAPI: !!window.gapi,
+                googleAuth: !!window.google?.accounts
+            }
+        };
+        
+        // Calcular puntuación de salud
+        const flattenedResults = FinalSystemVerification.flattenResults(results);
+        const totalChecks = flattenedResults.length;
+        const passedChecks = flattenedResults.filter(r => r.status).length;
+        const healthScore = Math.round((passedChecks / totalChecks) * 100);
+        
+        console.log('📊 Resultados de verificación:');
+        console.table(flattenedResults.filter(r => !r.status));
+        
+        const healthStatus = healthScore >= 90 ? '🟢 EXCELENTE' : 
+                           healthScore >= 75 ? '🟡 BUENO' : 
+                           healthScore >= 60 ? '🟠 REGULAR' : '🔴 CRÍTICO';
+        
+        console.log(`📈 Estado del sistema: ${healthScore}% ${healthStatus}`);
+        
+        if (window.unifiedMessageManager && healthScore >= 75) {
+            window.unifiedMessageManager.show(
+                `Sistema listo: ${healthScore}% funcional`, 
+                healthScore >= 90 ? 'success' : 'info', 
+                3000
+            );
+        }
+        
+        return {
+            results,
+            healthScore,
+            status: healthScore >= 75 ? 'ready' : 'issues'
+        };
+    }
+    
+    static flattenResults(obj, prefix = '') {
+        let flattened = [];
+        
+        for (const [key, value] of Object.entries(obj)) {
+            const newKey = prefix ? `${prefix}.${key}` : key;
+            
+            if (typeof value === 'boolean') {
+                flattened.push({ component: newKey, status: value });
+            } else if (typeof value === 'object' && value !== null) {
+                flattened.push(...FinalSystemVerification.flattenResults(value, newKey));
+            }
+        }
+        
+        return flattened;
+    }
+    
+    static generateReport() {
+        const verification = FinalSystemVerification.verify();
+        
+        const report = {
+            timestamp: new Date().toISOString(),
+            healthScore: verification.healthScore,
+            status: verification.status,
+            summary: {
+                coreReady: verification.results.coreSystem.initialized,
+                managersReady: Object.values(verification.results.coreSystem.managers).filter(Boolean).length,
+                elementsReady: Object.values(verification.results.criticalElements).flat().map(obj => 
+                    Object.values(obj)).flat().filter(Boolean).length,
+                apisReady: Object.values(verification.results.apis).filter(Boolean).length
+            },
+            recommendations: FinalSystemVerification.generateRecommendations(verification.results)
+        };
+        
+        console.log('📋 Reporte del sistema:', report);
+        return report;
+    }
+    
+    static generateRecommendations(results) {
+        const recommendations = [];
+        
+        if (!results.coreSystem.initialized) {
+            recommendations.push('Reinicializar el sistema core');
+        }
+        
+        if (!results.supportSystems.messages) {
+            recommendations.push('Cargar sistema de mensajes');
+        }
+        
+        if (!results.apis.youtubeAPI) {
+            recommendations.push('Verificar carga de YouTube API');
+        }
+        
+        const missingElements = Object.entries(results.criticalElements)
+            .filter(([_, group]) => Object.values(group).some(exists => !exists))
+            .map(([group]) => group);
+        
+        if (missingElements.length > 0) {
+            recommendations.push(`Crear elementos faltantes: ${missingElements.join(', ')}`);
+        }
+        
+        return recommendations;
+    }
+}
+
+// Auto-ejecutar verificación final
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const verification = FinalSystemVerification.verify();
+        
+        // Si hay problemas críticos, mostrar herramientas de reparación
+        if (verification.healthScore < 75) {
+            console.warn('⚠️ Sistema con problemas, activando herramientas de reparación...');
+            
+            // Crear botón de reparación
+            const repairBtn = document.createElement('button');
+            repairBtn.textContent = '🔧 Reparar Sistema';
+            repairBtn.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 10000;
+                background: #ff9800; color: white; border: none; padding: 12px 16px;
+                border-radius: 6px; font-size: 14px; cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            `;
+            
+            repairBtn.onclick = () => {
+                SystemCompatibilityChecker.checkAndRepair();
+                location.reload();
+            };
+            
+            document.body.appendChild(repairBtn);
+            
+            // Auto-remover después de 30 segundos
+            setTimeout(() => {
+                if (repairBtn.parentNode) {
+                    repairBtn.remove();
+                }
+            }, 30000);
+        }
+    }, 5000);
+});
+
+// Exponer herramientas de verificación
+window.SystemVerification = {
+    verify: FinalSystemVerification.verify,
+    generateReport: FinalSystemVerification.generateReport,
+    repair: SystemCompatibilityChecker.checkAndRepair
+};
 console.log('📦 Módulos unificados: Playlist, Search, Playback, SponsorBlock, Audio');
