@@ -1398,7 +1398,7 @@ class UnifiedCore {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
- await function obtenerSegmentosSponsorBlock(videoId) {
+ function obtenerSegmentosSponsorBlock(videoId) {
     if (segmentosCache[videoId] === 'fetching') return;
     
     segmentosCache[videoId] = 'fetching';
