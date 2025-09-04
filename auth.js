@@ -15,10 +15,10 @@ function getClientIdForDomain() {
     // CLIENT_IDs para diferentes entornos
     const clientIds = {
         // Producción
-        'mix-yt.netlify.app': '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
+        'mix-yt.netlify.app': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
         
         // Desarrollo local
-        'localhost': '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
+        'localhost': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
         '127.0.0.1': '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
         
         // Netlify deploy previews
@@ -35,7 +35,7 @@ function getClientIdForDomain() {
     
     // Fallback al CLIENT_ID principal
     if (!clientId) {
-        clientId = '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com';
+        clientId = '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com';
     }
     
     console.log('🔑 CLIENT_ID seleccionado:', clientId);
