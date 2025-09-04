@@ -1,4 +1,3 @@
-// auth_simple.js - Sistema de Autenticación Google Corregido para YT CrossMix
 console.log('🔐 Cargando módulo de autenticación simple...');
 
 // =============================================
