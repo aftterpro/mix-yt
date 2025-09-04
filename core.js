@@ -945,7 +945,7 @@ class UnifiedCore {
 
     async getPlaylistInfo(playlistId) {
         const pipedInstances = [
-            "https://piped.private.coffee"
+            "https://api.piped.private.coffee"
         ];
         
         const instanceUrl = pipedInstances[Math.floor(Math.random() * pipedInstances.length)];
