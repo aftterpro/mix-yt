@@ -1,4 +1,4 @@
-// auth.js - Sistema de Autenticación Google para YT CrossMix Unificado
+// auth.js - Sistema de Autenticación Google para YT CrossMix Unificado - CORREGIDO
 
 console.log('🔐 Cargando módulo de autenticación...');
 
@@ -23,107 +23,148 @@ let isAuthorized = false;
 // =============================================
 
 /**
- * Inicializar la API de Google
+ * Inicializar la API de Google - CORREGIDO
  */
-// REEMPLAZAR TODA esta función:
 async function gapiInitialize() {
     try {
         console.log('📡 Inicializando Google API...');
         
-        // Esperar a que gapi esté disponible
+        // Verificar que gapi esté disponible
         if (typeof gapi === 'undefined') {
             console.error('❌ gapi no está disponible');
+            setTimeout(gapiInitialize, 1000); // Reintentar
             return;
         }
         
-        // Cargar cliente con Promise
+        // Cargar cliente con Promise y manejo mejorado de errores
         await new Promise((resolve, reject) => {
             gapi.load('client', {
-                callback: resolve,
-                onerror: reject,
-                timeout: 5000
+                callback: () => {
+                    console.log('✅ gapi.client cargado');
+                    resolve();
+                },
+                onerror: (error) => {
+                    console.error('❌ Error cargando gapi.client:', error);
+                    reject(error);
+                },
+                timeout: 10000, // 10 segundos timeout
+                ontimeout: () => {
+                    console.error('❌ Timeout cargando gapi.client');
+                    reject(new Error('Timeout cargando Google API'));
+                }
             });
         });
         
-        // Inicializar cliente
+        // Inicializar cliente con configuración corregida
         await gapi.client.init({
-            apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4',
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+            apiKey: GOOGLE_CONFIG.API_KEY,
+            discoveryDocs: [GOOGLE_CONFIG.DISCOVERY_DOC]
         });
         
-        window.ytCrossMixAPIs.gapi = true;
+        gapiLoaded = true;
         console.log('✅ Google API inicializada correctamente');
+        
+        // Actualizar estado global
+        if (window.ytCrossMixAPIs) {
+            window.ytCrossMixAPIs.gapi = true;
+        }
+        
         updateAuthUI();
+        
+        // Verificar token guardado
+        checkStoredToken();
         
     } catch (error) {
         console.error('❌ Error inicializando Google API:', error);
-        showAuthError('Error de conexión con Google');
-    }
-}
-/**
- * Inicializar cliente de la API
- */
-async function initializeGapiClient() {
-    try {
-        await gapi.client.init({
-            apiKey: GOOGLE_CONFIG.API_KEY,
-            discoveryDocs: [GOOGLE_CONFIG.DISCOVERY_DOC],
-        });
-        console.log('✅ Cliente Google API inicializado');
-        updateAuthUI();
-    } catch (error) {
-        console.error('❌ Error inicializando cliente:', error);
-        showAuthError('Error configurando autenticación');
+        showAuthError('Error de conexión con Google API');
+        gapiLoaded = false;
+        
+        // Reintentar después de un tiempo
+        setTimeout(() => {
+            if (!gapiLoaded) {
+                console.log('🔄 Reintentando inicialización de Google API...');
+                gapiInitialize();
+            }
+        }, 3000);
     }
 }
 
 /**
- * Inicializar Google Identity Services
+ * Inicializar Google Identity Services - CORREGIDO
  */
-// REEMPLAZAR TODA esta función:
 function gisInitalize() {
     try {
         console.log('🔑 Inicializando Google Identity Services...');
         
         if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-            console.error('❌ Google Identity Services no disponible');
-            setTimeout(gisInitalize, 1000); // Reintentar en 1 segundo
+            console.warn('⚠️ Google Identity Services no disponible aún, reintentando...');
+            setTimeout(gisInitalize, 1000);
             return;
         }
         
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
-            scope: 'https://www.googleapis.com/auth/youtube.readonly',
+            client_id: GOOGLE_CONFIG.CLIENT_ID,
+            scope: GOOGLE_CONFIG.SCOPES,
             callback: handleAuthCallback,
         });
         
-        window.ytCrossMixAPIs.gis = true;
+        gisLoaded = true;
         console.log('✅ Google Identity Services inicializado');
+        
+        // Actualizar estado global
+        if (window.ytCrossMixAPIs) {
+            window.ytCrossMixAPIs.gis = true;
+        }
+        
         updateAuthUI();
         
     } catch (error) {
         console.error('❌ Error inicializando GIS:', error);
-        showAuthError('Error de autenticación');
+        showAuthError('Error de autenticación Google Identity');
+        gisLoaded = false;
+        
+        // Reintentar después de un tiempo
+        setTimeout(() => {
+            if (!gisLoaded) {
+                console.log('🔄 Reintentando inicialización de Google Identity...');
+                gisInitalize();
+            }
+        }, 3000);
     }
 }
+
 /**
- * Callback de autenticación
+ * Callback de autenticación - MEJORADO
  */
 function handleAuthCallback(response) {
+    console.log('🔐 Callback de autenticación recibido:', response);
+    
     if (response.error !== undefined) {
         console.error('❌ Error de autenticación:', response.error);
-        showAuthError('Error en la autenticación');
+        showAuthError(`Error en la autenticación: ${response.error}`);
+        return;
+    }
+
+    if (!response.access_token) {
+        console.error('❌ No se recibió token de acceso');
+        showAuthError('No se pudo obtener token de acceso');
         return;
     }
 
     console.log('✅ Autenticación exitosa');
     isAuthorized = true;
     
-    // Guardar token
-    localStorage.setItem('google_token', JSON.stringify({
-        access_token: gapi.client.getToken().access_token,
-        timestamp: Date.now()
-    }));
+    // Guardar token con información adicional
+    try {
+        localStorage.setItem('google_token', JSON.stringify({
+            access_token: response.access_token,
+            timestamp: Date.now(),
+            expires_in: response.expires_in || 3600
+        }));
+        console.log('💾 Token guardado en localStorage');
+    } catch (error) {
+        console.warn('⚠️ Error guardando token:', error);
+    }
 
     updateAuthUI();
     loadUserPlaylists();
@@ -139,11 +180,19 @@ function handleAuthCallback(response) {
 // =============================================
 
 /**
- * Iniciar sesión
+ * Iniciar sesión - MEJORADO
  */
 function signIn() {
-    if (!gapiLoaded || !gisLoaded) {
-        showAuthError('Servicios de autenticación no disponibles');
+    console.log('🔐 Intentando iniciar sesión...');
+    console.log('Estado APIs - GAPI:', gapiLoaded, 'GIS:', gisLoaded);
+    
+    if (!gapiLoaded) {
+        showAuthError('Google API no está disponible. Recarga la página.');
+        return;
+    }
+    
+    if (!gisLoaded || !tokenClient) {
+        showAuthError('Servicios de autenticación no están listos. Recarga la página.');
         return;
     }
 
@@ -153,57 +202,94 @@ function signIn() {
         window.unifiedCore.showMessage('Conectando con Google...', 'info');
     }
 
-    // Solicitar token
-    tokenClient.requestAccessToken({prompt: 'consent'});
+    try {
+        // Solicitar token con configuración específica
+        tokenClient.requestAccessToken({
+            prompt: 'consent',
+            hint: '',
+            hd: '' // Para cuentas de dominio específico si es necesario
+        });
+    } catch (error) {
+        console.error('❌ Error solicitando token:', error);
+        showAuthError('Error iniciando autenticación');
+    }
 }
 
 /**
- * Cerrar sesión
+ * Cerrar sesión - MEJORADO
  */
 function signOut() {
-    if (!gapi.client.getToken()) {
-        console.log('👋 No hay sesión activa');
-        return;
-    }
-
     console.log('👋 Cerrando sesión...');
     
-    // Revocar token
-    const token = gapi.client.getToken();
-    if (token !== null) {
-        google.accounts.oauth2.revoke(token.access_token);
-        gapi.client.setToken('');
-    }
+    try {
+        // Obtener token actual
+        const token = gapi.client.getToken();
+        
+        if (token !== null && token.access_token) {
+            // Revocar token
+            google.accounts.oauth2.revoke(token.access_token, () => {
+                console.log('✅ Token revocado exitosamente');
+            });
+            
+            // Limpiar token del cliente
+            gapi.client.setToken('');
+        }
 
-    // Limpiar almacenamiento local
-    localStorage.removeItem('google_token');
-    
-    isAuthorized = false;
-    updateAuthUI();
-    
-    // Disparar evento de logout
-    document.dispatchEvent(new CustomEvent('userLoggedOut'));
-    
-    if (window.unifiedCore) {
-        window.unifiedCore.showMessage('Sesión cerrada', 'info');
+        // Limpiar almacenamiento local
+        localStorage.removeItem('google_token');
+        
+        isAuthorized = false;
+        updateAuthUI();
+        
+        // Disparar evento de logout
+        document.dispatchEvent(new CustomEvent('userLoggedOut'));
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('Sesión cerrada correctamente', 'success');
+        }
+        
+        console.log('✅ Sesión cerrada correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error cerrando sesión:', error);
+        
+        // Limpiar forzadamente
+        localStorage.removeItem('google_token');
+        isAuthorized = false;
+        updateAuthUI();
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('Sesión cerrada (con advertencias)', 'warning');
+        }
     }
 }
 
 /**
- * Verificar token guardado
+ * Verificar token guardado - MEJORADO
  */
 function checkStoredToken() {
     const storedToken = localStorage.getItem('google_token');
-    if (!storedToken) return false;
+    if (!storedToken) {
+        console.log('📱 No hay token guardado');
+        return false;
+    }
 
     try {
         const tokenData = JSON.parse(storedToken);
         const tokenAge = Date.now() - tokenData.timestamp;
-        const oneHour = 60 * 60 * 1000;
+        const expirationTime = (tokenData.expires_in || 3600) * 1000; // Convertir a ms
+        
+        console.log('📱 Token encontrado, edad:', Math.round(tokenAge / 1000 / 60), 'minutos');
 
-        // Si el token tiene menos de 1 hora, intentar usarlo
-        if (tokenAge < oneHour && tokenData.access_token) {
-            console.log('📱 Token guardado encontrado, verificando...');
+        // Verificar si el token ha expirado
+        if (tokenAge >= expirationTime) {
+            console.log('⏰ Token expirado, eliminando...');
+            localStorage.removeItem('google_token');
+            return false;
+        }
+
+        if (tokenData.access_token && gapiLoaded) {
+            console.log('📱 Intentando usar token guardado...');
             
             gapi.client.setToken({
                 access_token: tokenData.access_token
@@ -211,10 +297,6 @@ function checkStoredToken() {
             
             // Verificar si el token sigue siendo válido
             return testTokenValidity();
-        } else {
-            console.log('⏰ Token expirado, eliminando...');
-            localStorage.removeItem('google_token');
-            return false;
         }
     } catch (error) {
         console.error('❌ Error procesando token guardado:', error);
@@ -224,26 +306,36 @@ function checkStoredToken() {
 }
 
 /**
- * Probar validez del token
+ * Probar validez del token - MEJORADO
  */
 async function testTokenValidity() {
     try {
+        console.log('🔍 Verificando validez del token...');
+        
         // Hacer una llamada simple para verificar el token
-        await gapi.client.youtube.channels.list({
+        const response = await gapi.client.youtube.channels.list({
             part: ['id'],
             mine: true,
             maxResults: 1
         });
         
-        console.log('✅ Token válido');
-        isAuthorized = true;
-        updateAuthUI();
-        loadUserPlaylists();
-        return true;
+        if (response.result) {
+            console.log('✅ Token válido, usuario autenticado');
+            isAuthorized = true;
+            updateAuthUI();
+            
+            // Cargar playlists automáticamente
+            setTimeout(loadUserPlaylists, 1000);
+            return true;
+        }
     } catch (error) {
-        console.log('❌ Token inválido:', error);
+        console.log('❌ Token inválido o expirado:', error);
+        
+        // Limpiar token inválido
         localStorage.removeItem('google_token');
-        gapi.client.setToken('');
+        if (gapi.client.getToken()) {
+            gapi.client.setToken('');
+        }
         isAuthorized = false;
         updateAuthUI();
         return false;
@@ -255,7 +347,7 @@ async function testTokenValidity() {
 // =============================================
 
 /**
- * Cargar playlists del usuario
+ * Cargar playlists del usuario - SIN CAMBIOS SIGNIFICATIVOS
  */
 async function loadUserPlaylists() {
     if (!isAuthorized) {
@@ -299,7 +391,7 @@ async function loadUserPlaylists() {
 }
 
 /**
- * Obtener todas las playlists del usuario
+ * Obtener todas las playlists del usuario - SIN CAMBIOS
  */
 async function fetchAllPlaylists() {
     const allPlaylists = [];
@@ -340,7 +432,7 @@ async function fetchAllPlaylists() {
 }
 
 /**
- * Obtener videos de una playlist específica (para carga bajo demanda)
+ * Obtener videos de una playlist específica - SIN CAMBIOS
  */
 async function getYouTubeLibraryPlaylistItems(playlistId) {
     if (!isAuthorized) {
@@ -404,7 +496,7 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 // =============================================
 
 /**
- * Actualizar interfaz de autenticación
+ * Actualizar interfaz de autenticación - MEJORADO
  */
 function updateAuthUI() {
     const signInButton = document.getElementById('googleSignInButton');
@@ -432,6 +524,9 @@ function updateAuthUI() {
         signInButton.innerHTML = '<i class="fab fa-google"></i> Conectar';
         signInButton.disabled = false;
         
+        // AGREGAR EVENT LISTENER AL BOTÓN - ESTO FALTABA
+        signInButton.onclick = signIn;
+        
     } else {
         // APIs aún cargando
         signInButton.classList.remove('hidden');
@@ -441,12 +536,15 @@ function updateAuthUI() {
         signInButton.disabled = true;
     }
 
+    // También agregar listener al botón de cerrar sesión
+    signOutButton.onclick = signOut;
+
     // Actualizar estado en overview si existe
     updateOverviewAuthStatus();
 }
 
 /**
- * Actualizar estado de auth en overview
+ * Actualizar estado de auth en overview - SIN CAMBIOS
  */
 function updateOverviewAuthStatus() {
     const authStatus = document.getElementById('unifiedSystemStatus');
@@ -462,39 +560,69 @@ function updateOverviewAuthStatus() {
 }
 
 /**
- * Mostrar error de autenticación
+ * Mostrar error de autenticación - SIN CAMBIOS
  */
 function showAuthError(message) {
     console.error('🔴 Error de autenticación:', message);
     
     if (window.unifiedCore) {
         window.unifiedCore.showMessage(message, 'error');
-    } else {
-        // Fallback si el sistema unificado no está disponible
     }
 }
+
+// =============================================
+// EXPORTAR FUNCIONES GLOBALES Y AUTO-INIT
+// =============================================
+
 // Hacer funciones disponibles globalmente
 window.gapiInitialize = gapiInitialize;
 window.gisInitalize = gisInitalize;
+window.signIn = signIn;
+window.signOut = signOut;
 
-// Auto-inicialización cuando el DOM esté listo
+// Auto-inicialización mejorada cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 DOM listo, inicializando APIs...');
+    console.log('🎯 DOM listo para autenticación, esperando APIs...');
     
-    // Esperar un poco a que los scripts se carguen
-    setTimeout(() => {
+    // Función para verificar y inicializar APIs
+    const initializeAPIs = () => {
+        let gapiReady = false;
+        let gisReady = false;
+        
+        // Verificar GAPI
         if (typeof gapi !== 'undefined') {
             console.log('📡 GAPI disponible, inicializando...');
             gapiInitialize();
+            gapiReady = true;
         } else {
-            console.warn('⚠️ GAPI no disponible');
+            console.warn('⚠️ GAPI no disponible aún');
         }
         
+        // Verificar Google Identity
         if (typeof google !== 'undefined' && google.accounts) {
             console.log('🔑 Google Identity disponible, inicializando...');
             gisInitalize();
+            gisReady = true;
         } else {
-            console.warn('⚠️ Google Identity no disponible');
+            console.warn('⚠️ Google Identity no disponible aún');
         }
-    }, 1000);
+        
+        // Si no están listas, reintentar
+        if (!gapiReady || !gisReady) {
+            setTimeout(initializeAPIs, 1000);
+        }
+    };
+    
+    // Esperar un poco para que los scripts se carguen
+    setTimeout(initializeAPIs, 1000);
+    
+    // Timeout de seguridad
+    setTimeout(() => {
+        if (!gapiLoaded || !gisLoaded) {
+            console.error('⏰ Timeout inicializando APIs de Google');
+            showAuthError('Error de timeout - Recarga la página');
+        }
+    }, 15000);
 });
+
+console.log('✅ Módulo de autenticación cargado');
