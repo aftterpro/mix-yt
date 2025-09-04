@@ -1456,16 +1456,29 @@ function checkAndSkipSegment(player) {
         const segments = segmentosCache[videoId];
         if (!Array.isArray(segments) || segments.length === 0) return;
 
-        // Buscar segmento a saltar - VALIDACIÓN COMPLETA
+        // Buscar segmento a saltar - CORREGIDO para estructura SponsorBlock real
         const segmentToSkip = segments.find(segment => {
-            // Validar estructura del segmento
-            if (!segment || !segment.segment || !Array.isArray(segment.segment)) {
+            // NUEVA VALIDACIÓN: SponsorBlock usa startTime/endTime, NO segment array
+            if (!segment || typeof segment !== 'object') {
                 console.warn('⚠️ Segmento con estructura inválida:', segment);
                 return false;
             }
             
-            const start = segment.segment[0];
-            const end = segment.segment[1];
+            // Verificar si usa la estructura nueva (startTime/endTime) o antigua (segment array)
+            let start, end;
+            
+            if (segment.startTime !== undefined && segment.endTime !== undefined) {
+                // Estructura nueva de SponsorBlock
+                start = segment.startTime;
+                end = segment.endTime;
+            } else if (segment.segment && Array.isArray(segment.segment)) {
+                // Estructura antigua (por compatibilidad)
+                start = segment.segment[0];
+                end = segment.segment[1];
+            } else {
+                console.warn('⚠️ Segmento sin tiempos válidos:', segment);
+                return false;
+            }
             
             // Validar que start y end sean números válidos
             if (typeof start !== 'number' || typeof end !== 'number' || 
@@ -1477,21 +1490,24 @@ function checkAndSkipSegment(player) {
             return currentTime >= start && currentTime < end;
         });
 
-        if (segmentToSkip && segmentToSkip.segment && segmentToSkip.segment[1]) {
-            const skipToTime = segmentToSkip.segment[1];
+        if (segmentToSkip) {
+            // Determinar tiempo de salto según estructura
+            const skipToTime = segmentToSkip.endTime || segmentToSkip.segment?.[1];
             const category = segmentToSkip.category || 'unknown';
             
-            console.log(`⏭️ SponsorBlock: Saltando segmento ${category} de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s`);
-            
-            try {
-                player.seekTo(skipToTime, true);
+            if (skipToTime && typeof skipToTime === 'number' && skipToTime > currentTime) {
+                console.log(`⏭️ SponsorBlock: Saltando segmento ${category} de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s`);
                 
-                // Mostrar mensaje opcional
-                if (window.unifiedCore) {
-                    window.unifiedCore.showMessage(`Saltado: ${category}`, 'info', 2000);
+                try {
+                    player.seekTo(skipToTime, true);
+                    
+                    // Mostrar mensaje opcional
+                    if (window.unifiedCore) {
+                        window.unifiedCore.showMessage(`Saltado: ${category}`, 'info', 2000);
+                    }
+                } catch (seekError) {
+                    console.error("❌ Error saltando segmento:", seekError);
                 }
-            } catch (seekError) {
-                console.error("❌ Error saltando segmento:", seekError);
             }
         }
         
@@ -1499,7 +1515,6 @@ function checkAndSkipSegment(player) {
         console.error("❌ Error general en checkAndSkipSegment:", error);
     }
 }
-
 /**
  * Monitorear reproductores - MEJORADO
  */
