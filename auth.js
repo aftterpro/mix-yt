@@ -7,7 +7,7 @@ console.log('🔐 Cargando módulo de autenticación...');
 // =============================================
 const GOOGLE_CONFIG = {
     CLIENT_ID: '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
-    API_KEY: 'AIzaSyBpZ4u-yDUJe1wSxhkGjWJBGvPMIRlKhts',
+    API_KEY: 'AIzaSyDjJG8wqhqR7zCm6WvJo-cKoGGDO8eQ7F0', 
     DISCOVERY_DOC: 'https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest',
     SCOPES: 'https://www.googleapis.com/auth/youtube.readonly'
 };
@@ -440,19 +440,28 @@ function showAuthError(message) {
         // Fallback si el sistema unificado no está disponible
     }
 }
-// Añadir al final de auth.js
+// Hacer funciones disponibles globalmente
 window.gapiInitialize = gapiInitialize;
 window.gisInitalize = gisInitalize;
 
-// Auto-inicializar cuando las APIs se cargan
-window.addEventListener('load', () => {
-    // Verificar si gapi está disponible
-    if (typeof gapi !== 'undefined') {
-        gapiInitialize();
-    }
+// Auto-inicialización cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎯 DOM listo, inicializando APIs...');
     
-    // Verificar si google identity está disponible
-    if (typeof google !== 'undefined' && google.accounts) {
-        gisInitalize();
-    }
+    // Esperar un poco a que los scripts se carguen
+    setTimeout(() => {
+        if (typeof gapi !== 'undefined') {
+            console.log('📡 GAPI disponible, inicializando...');
+            gapiInitialize();
+        } else {
+            console.warn('⚠️ GAPI no disponible');
+        }
+        
+        if (typeof google !== 'undefined' && google.accounts) {
+            console.log('🔑 Google Identity disponible, inicializando...');
+            gisInitalize();
+        } else {
+            console.warn('⚠️ Google Identity no disponible');
+        }
+    }, 1000);
 });
