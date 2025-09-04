@@ -172,7 +172,7 @@ class UnifiedCore {
             this.playNextVideo();
         } else if (state === YT.PlayerState.PLAYING) {
             hasOutroCrossfadeStarted = false;
-            this.updateCurrentPlayingInfo();
+            this.updateCurrentPlayingIndex();
         }
     }
 
