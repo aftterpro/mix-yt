@@ -1,6 +1,4 @@
 // init.js - Script de Inicialización Unificada
-// Este script debe cargarse ANTES de core.js para asegurar que las APIs estén disponibles
-
 console.log('🚀 Iniciando YT CrossMix - Carga de APIs...');
 
 // Estado global de APIs
