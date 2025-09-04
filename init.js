@@ -19,30 +19,17 @@ window.ytCrossMixAPIs = {
  * Función llamada automáticamente cuando gapi se carga
  */
 window.gapiInitialize = async function() {
-    try {
-        console.log('📡 Inicializando Google API Client...');
-        
-        await new Promise((resolve, reject) => {
-            gapi.load('client', {
-                callback: resolve,
-                onerror: reject,
-                timeout: 10000
-            });
-        });
-        
-        await gapi.client.init({
-            apiKey: 'AIzaSyBpZ4u-yDUJe1wSxhkGjWJBGvPMIRlKhts',
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
-        });
-        
-        window.ytCrossMixAPIs.gapi = true;
-        console.log('✅ Google API Client inicializado');
-        
-        checkAllAPIsReady();
-        
-    } catch (error) {
-        console.error('❌ Error inicializando Google API:', error);
-        showInitError('Error cargando Google API');
+    console.log('📡 [INIT] Iniciando coordinación con auth.js...');
+    
+    // NO inicializar aquí, dejar que auth.js lo haga
+    // Solo marcar como disponible
+    if (typeof gapi !== 'undefined') {
+        setTimeout(() => {
+            if (window.gapiInitialize_auth) {
+                console.log('🔄 [INIT] Delegando a auth.js...');
+                window.gapiInitialize_auth();
+            }
+        }, 1000);
     }
 };
 
@@ -50,26 +37,19 @@ window.gapiInitialize = async function() {
  * Función llamada automáticamente cuando GIS se carga
  */
 window.gisInitalize = function() {
-    try {
-        console.log('🔑 Inicializando Google Identity Services...');
-        
-        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-            console.warn('⚠️ Google Identity Services no disponible aún, reintentando...');
-            setTimeout(window.gisInitalize, 500);
-            return;
-        }
-        
+    console.log('🔑 [INIT] GIS disponible, delegando a auth.js...');
+    
+    // Solo actualizar estado, no inicializar
+    if (typeof google !== 'undefined' && google.accounts) {
         window.ytCrossMixAPIs.gis = true;
-        console.log('✅ Google Identity Services disponible');
         
-        checkAllAPIsReady();
-        
-    } catch (error) {
-        console.error('❌ Error inicializando GIS:', error);
-        showInitError('Error cargando Google Identity');
+        if (window.gisInitalize_auth) {
+            setTimeout(() => {
+                window.gisInitalize_auth();
+            }, 500);
+        }
     }
 };
-
 /**
  * Función llamada automáticamente cuando YouTube IFrame API se carga
  */
