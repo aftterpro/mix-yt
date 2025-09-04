@@ -7,7 +7,7 @@ console.log('🔐 Cargando módulo de autenticación...');
 // =============================================
 const GOOGLE_CONFIG = {
     CLIENT_ID: '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
-    API_KEY: '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', 
+    API_KEY: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4', 
     DISCOVERY_DOC: 'https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest',
     SCOPES: 'https://www.googleapis.com/auth/youtube.readonly'
 };
