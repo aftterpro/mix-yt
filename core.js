@@ -1404,7 +1404,7 @@ class UnifiedCore {
     segmentosCache[videoId] = 'fetching';
     console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
 
-    fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
+    fetch(`/api/segments/${videoId}`, {
         headers: { 'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd' }
     })
     .then(response => {
