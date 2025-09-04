@@ -1318,69 +1318,6 @@ class UnifiedCore {
         }
     }
 
- checkAndSkipSegment(player) {
-    const currentTime = player.getCurrentTime();
-    const videoId = player.getVideoData()?.video_id;
-
-    if (!videoId || isNaN(currentTime)) return;
-
-    // Si no hay segmentos en caché, obtenerlos
-    if (!segmentosCache[videoId]) {
-        obtenerSegmentosSponsorBlock(videoId);
-        return;
-    }
-
-    // Si aún se están obteniendo, esperar
-    if (segmentosCache[videoId] === 'fetching') return;
-
-    // Si no hay segmentos válidos, salir
-    const segments = segmentosCache[videoId];
-    if (!segments || segments.length === 0) return;
-
-    // Buscar segmento a saltar
-    const segmentToSkip = segments.find(segment => {
-        const start = segment.segment[0];
-        const end = segment.segment[1];
-        return currentTime >= start && currentTime < end;
-    });
-
-    if (segmentToSkip) {
-        const skipToTime = segmentToSkip.segment[1];
-        console.log(`⏭️ SponsorBlock: Saltando segmento ${segmentToSkip.category} a ${skipToTime.toFixed(1)}s`);
-        
-        try {
-            player.seekTo(skipToTime, true);
-        } catch (e) {
-            console.error("Error saltando segmento:", e);
-        }
-    }
-}
-
- obtenerSegmentosSponsorBlock(videoId) {
-    if (segmentosCache[videoId] === 'fetching') return;
-    
-    segmentosCache[videoId] = 'fetching';
-    console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
-
-    fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
-        headers: { 'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd' }
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        } else {
-            throw new Error(`HTTP ${response.status}`);
-        }
-    })
-    .then(segments => {
-        segmentosCache[videoId] = Array.isArray(segments) ? segments : [];
-        console.log(`✅ ${segmentosCache[videoId].length} segmentos SponsorBlock para ${videoId}`);
-    })
-    .catch(error => {
-        console.error("❌ Error obteniendo segmentos SponsorBlock:", error);
-        segmentosCache[videoId] = [];
-    });
-}
     // =============================================
     // SISTEMA DE MENSAJES Y DEBUG
     // =============================================
@@ -1461,6 +1398,68 @@ class UnifiedCore {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
+ await function obtenerSegmentosSponsorBlock(videoId) {
+    if (segmentosCache[videoId] === 'fetching') return;
+    
+    segmentosCache[videoId] = 'fetching';
+    console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
+
+    fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
+        headers: { 'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd' }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error(`HTTP ${response.status}`);
+        }
+    })
+    .then(segments => {
+        segmentosCache[videoId] = Array.isArray(segments) ? segments : [];
+        console.log(`✅ ${segmentosCache[videoId].length} segmentos SponsorBlock para ${videoId}`);
+    })
+    .catch(error => {
+        console.error("❌ Error obteniendo segmentos SponsorBlock:", error);
+        segmentosCache[videoId] = [];
+    });
+}
+ function checkAndSkipSegment(player) {
+    const currentTime = player.getCurrentTime();
+    const videoId = player.getVideoData()?.video_id;
+
+    if (!videoId || isNaN(currentTime)) return;
+
+    // Si no hay segmentos en caché, obtenerlos
+    if (!segmentosCache[videoId]) {
+        obtenerSegmentosSponsorBlock(videoId);
+        return;
+    }
+
+    // Si aún se están obteniendo, esperar
+    if (segmentosCache[videoId] === 'fetching') return;
+
+    // Si no hay segmentos válidos, salir
+    const segments = segmentosCache[videoId];
+    if (!segments || segments.length === 0) return;
+
+    // Buscar segmento a saltar
+    const segmentToSkip = segments.find(segment => {
+        const start = segment.segment[0];
+        const end = segment.segment[1];
+        return currentTime >= start && currentTime < end;
+    });
+
+    if (segmentToSkip) {
+        const skipToTime = segmentToSkip.segment[1];
+        console.log(`⏭️ SponsorBlock: Saltando segmento ${segmentToSkip.category} a ${skipToTime.toFixed(1)}s`);
+        
+        try {
+            player.seekTo(skipToTime, true);
+        } catch (e) {
+            console.error("Error saltando segmento:", e);
+        }
+    }
+}
 function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
