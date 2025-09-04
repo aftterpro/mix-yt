@@ -440,3 +440,19 @@ function showAuthError(message) {
         // Fallback si el sistema unificado no está disponible
     }
 }
+// Añadir al final de auth.js
+window.gapiInitialize = gapiInitialize;
+window.gisInitalize = gisInitalize;
+
+// Auto-inicializar cuando las APIs se cargan
+window.addEventListener('load', () => {
+    // Verificar si gapi está disponible
+    if (typeof gapi !== 'undefined') {
+        gapiInitialize();
+    }
+    
+    // Verificar si google identity está disponible
+    if (typeof google !== 'undefined' && google.accounts) {
+        gisInitalize();
+    }
+});
