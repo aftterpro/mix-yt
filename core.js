@@ -1391,26 +1391,25 @@ class UnifiedCore {
     segmentosCache[videoId] = 'fetching';
     console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
 
-    try {
-        const response = await fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
-            headers: {
-                'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'
-            }
-        });
-
+    fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
+        headers: { 'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd' }
+    })
+    .then(response => {
         if (response.ok) {
-            const segments = await response.json();
-            segmentosCache[videoId] = Array.isArray(segments) ? segments : [];
-            console.log(`✅ ${segmentosCache[videoId].length} segmentos obtenidos para ${videoId}`);
+            return response.json();
         } else {
-            segmentosCache[videoId] = [];
-            console.log(`📭 No hay segmentos para ${videoId}`);
+            throw new Error(`HTTP ${response.status}`);
         }
-    } catch (error) {
-        console.error("Error obteniendo segmentos:", error);
+    })
+    .then(segments => {
+        segmentosCache[videoId] = Array.isArray(segments) ? segments : [];
+        console.log(`✅ ${segmentosCache[videoId].length} segmentos SponsorBlock para ${videoId}`);
+    })
+    .catch(error => {
+        console.error("❌ Error obteniendo segmentos SponsorBlock:", error);
         segmentosCache[videoId] = [];
-    }
-}    
+    });
+}
     // =============================================
     // SISTEMA DE MENSAJES Y DEBUG
     // =============================================
