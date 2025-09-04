@@ -9,9 +9,7 @@ function getClientIdForDomain() {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
     const currentOrigin = window.location.origin;
-    
-    console.log('🌐 Dominio actual:', { hostname, protocol, currentOrigin });
-    
+        
     // CLIENT_IDs para diferentes entornos
     const clientIds = {
         // Producción
@@ -37,9 +35,7 @@ function getClientIdForDomain() {
     if (!clientId) {
         clientId = '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com';
     }
-    
-    console.log('🔑 CLIENT_ID seleccionado:', clientId);
-    return clientId;
+        return clientId;
 }
 
 const GOOGLE_CONFIG = {
@@ -59,9 +55,7 @@ const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library';
 // =============================================
 // FUNCIÓN DE DEBUGGING OAUTH
 // =============================================
-window.debugOAuth = function() {
-    console.log('🔍 === DIAGNÓSTICO OAUTH ===');
-    
+window.debugOAuth = function() {    
     const info = {
         currentOrigin: window.location.origin,
         hostname: window.location.hostname,
@@ -90,7 +84,6 @@ window.debugOAuth = function() {
     
     if (!isOriginAllowed) {
         console.error('❌ PROBLEMA: Tu origen actual no está en la lista de permitidos');
-        console.log('💡 Añade este origen en Google Console:', window.location.origin);
     }
     
     return info;
@@ -152,9 +145,7 @@ async function initializeGoogleAPIs() {
         console.log('✅ GAPI inicializado');
         gapiReady = true;
         
-        // Inicializar GIS con configuración mejorada
-        console.log('🔧 Configurando Google Identity Services...');
-        
+        // Inicializar GIS con configuración mejorada        
         const tokenClientConfig = {
             client_id: GOOGLE_CONFIG.CLIENT_ID,
             scope: GOOGLE_CONFIG.SCOPES,
