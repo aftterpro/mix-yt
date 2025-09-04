@@ -27,34 +27,35 @@ let isAuthorized = false;
  */
 async function gapiInitialize() {
     try {
-        console.log('📡 Inicializando Google API...');
+        console.log('📡 [AUTH] Inicializando Google API...');
         
-        // Verificar que gapi esté disponible con reintentos
+        // Verificar que gapi esté disponible
         if (typeof gapi === 'undefined') {
-            console.warn('⚠️ gapi no disponible, esperando...');
+            console.warn('⚠️ [AUTH] gapi no disponible, esperando...');
             setTimeout(gapiInitialize, 1000);
             return;
         }
+
+        // Verificar si ya está inicializando desde init.js
+        if (window.ytCrossMixAPIs && window.ytCrossMixAPIs.gapi) {
+            console.log('✅ [AUTH] GAPI ya inicializado por init.js');
+            gapiLoaded = true;
+            updateAuthUI();
+            setTimeout(checkStoredToken, 1000);
+            return;
+        }
         
-        // Usar método alternativo sin timeout problemático
+        // Si init.js no lo hizo, lo hacemos nosotros
+        console.log('🔧 [AUTH] Inicializando GAPI manualmente...');
+        
+        // Método simplificado SIN timeout problemático
         await new Promise((resolve, reject) => {
-            // MÉTODO SIMPLIFICADO sin timeout que causa problemas
-            gapi.load('client', {
-                callback: () => {
-                    console.log('✅ gapi.client cargado exitosamente');
-                    resolve();
-                },
-                onerror: (error) => {
-                    console.error('❌ Error cargando gapi.client:', error);
-                    reject(error);
-                }
-                // REMOVIDO: timeout y ontimeout que causan problemas
-            });
+            gapi.load('client', resolve);
             
-            // Timeout manual más confiable
+            // Timeout manual
             setTimeout(() => {
-                reject(new Error('Timeout manual de Google API'));
-            }, 15000);
+                reject(new Error('Timeout cargando gapi.client'));
+            }, 10000);
         });
         
         // Inicializar cliente
@@ -64,7 +65,7 @@ async function gapiInitialize() {
         });
         
         gapiLoaded = true;
-        console.log('✅ Google API inicializada correctamente');
+        console.log('✅ [AUTH] Google API inicializada correctamente');
         
         // Actualizar estado global
         if (window.ytCrossMixAPIs) {
@@ -72,39 +73,48 @@ async function gapiInitialize() {
         }
         
         updateAuthUI();
-        
-        // Verificar token guardado
         setTimeout(checkStoredToken, 1000);
         
     } catch (error) {
-        console.error('❌ Error inicializando Google API:', error);
+        console.error('❌ [AUTH] Error inicializando Google API:', error);
         gapiLoaded = false;
         
-        // Reintentar una sola vez más
-        if (!window._gapiRetryAttempted) {
-            window._gapiRetryAttempted = true;
-            console.log('🔄 Reintentando inicialización de Google API...');
-            setTimeout(() => {
-                gapiInitialize();
-            }, 3000);
+        // Reintentar una vez más
+        if (!window._authGapiRetryAttempted) {
+            window._authGapiRetryAttempted = true;
+            console.log('🔄 [AUTH] Reintentando inicialización...');
+            setTimeout(gapiInitialize, 3000);
         } else {
-            showAuthError('Error persistente con Google API - Verifica tu conexión');
+            console.error('💥 [AUTH] GAPI falló definitivamente');
+            // Continuar sin GAPI pero con mensaje
+            updateAuthUI();
         }
     }
 }
+
 
 /**
  * Inicializar Google Identity Services - CORREGIDO
  */
 function gisInitalize() {
     try {
-        console.log('🔑 Inicializando Google Identity Services...');
+        console.log('🔑 [AUTH] Inicializando Google Identity Services...');
         
         if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-            console.warn('⚠️ Google Identity Services no disponible aún, reintentando...');
+            console.warn('⚠️ [AUTH] GIS no disponible aún, reintentando...');
             setTimeout(gisInitalize, 1000);
             return;
         }
+
+        // Verificar si ya está inicializado desde init.js
+        if (window.ytCrossMixAPIs && window.ytCrossMixAPIs.gis) {
+            console.log('✅ [AUTH] GIS ya inicializado por init.js');
+            gisLoaded = true;
+            updateAuthUI();
+            return;
+        }
+        
+        console.log('🔧 [AUTH] Inicializando GIS manualmente...');
         
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: GOOGLE_CONFIG.CLIENT_ID,
@@ -113,7 +123,7 @@ function gisInitalize() {
         });
         
         gisLoaded = true;
-        console.log('✅ Google Identity Services inicializado');
+        console.log('✅ [AUTH] Google Identity Services inicializado');
         
         // Actualizar estado global
         if (window.ytCrossMixAPIs) {
@@ -123,19 +133,18 @@ function gisInitalize() {
         updateAuthUI();
         
     } catch (error) {
-        console.error('❌ Error inicializando GIS:', error);
-        showAuthError('Error de autenticación Google Identity');
+        console.error('❌ [AUTH] Error inicializando GIS:', error);
         gisLoaded = false;
         
-        // Reintentar después de un tiempo
         setTimeout(() => {
             if (!gisLoaded) {
-                console.log('🔄 Reintentando inicialización de Google Identity...');
+                console.log('🔄 [AUTH] Reintentando GIS...');
                 gisInitalize();
             }
-        }, 3000);
+        }, 2000);
     }
 }
+
 
 /**
  * Callback de autenticación - MEJORADO
@@ -187,38 +196,38 @@ function handleAuthCallback(response) {
  * Iniciar sesión - MEJORADO
  */
 function signIn() {
-    console.log('🔐 Intentando iniciar sesión...');
-    console.log('Estado APIs - GAPI:', gapiLoaded, 'GIS:', gisLoaded);
+    console.log('🔐 [AUTH] === INICIO DE SIGN IN ===');
+    console.log('Estados:', { gapiLoaded, gisLoaded, tokenClient: !!tokenClient });
     
     if (!gapiLoaded) {
-        showAuthError('Google API no está disponible. Recarga la página.');
+        console.error('❌ [AUTH] GAPI no está cargado');
+        showAuthError('Google API no disponible');
         return;
     }
     
     if (!gisLoaded || !tokenClient) {
-        showAuthError('Servicios de autenticación no están listos. Recarga la página.');
+        console.error('❌ [AUTH] GIS no está listo');
+        showAuthError('Sistema de autenticación no listo');
         return;
     }
 
-    console.log('🔐 Iniciando proceso de autenticación...');
+    console.log('🔐 [AUTH] Solicitando token de acceso...');
     
     if (window.unifiedCore) {
-        window.unifiedCore.showMessage('Conectando con Google...', 'info');
+        window.unifiedCore.showMessage('Abriendo ventana de Google...', 'info');
     }
 
     try {
-        // Solicitar token con configuración específica
+        // Esto DEBERÍA abrir el popup de Google
         tokenClient.requestAccessToken({
-            prompt: 'consent',
-            hint: '',
-            hd: '' // Para cuentas de dominio específico si es necesario
+            prompt: 'consent'
         });
+        console.log('🚀 [AUTH] Token solicitado, esperando popup...');
     } catch (error) {
-        console.error('❌ Error solicitando token:', error);
-        showAuthError('Error iniciando autenticación');
+        console.error('❌ [AUTH] Error solicitando token:', error);
+        showAuthError('Error iniciando autenticación con Google');
     }
 }
-
 /**
  * Cerrar sesión - MEJORADO
  */
@@ -506,66 +515,69 @@ function updateAuthUI() {
     const signInButton = document.getElementById('googleSignInButton');
     const signOutButton = document.getElementById('googleSignOutButton');
 
-    console.log('🔄 Actualizando UI auth. Estados:', { 
+    console.log('🔄 [AUTH] Actualizando UI. Estados:', { 
         isAuthorized, 
         gapiLoaded, 
         gisLoaded,
         signInButton: !!signInButton,
-        signOutButton: !!signOutButton 
+        signOutButton: !!signOutButton,
+        ytAPIs: window.ytCrossMixAPIs
     });
 
     if (!signInButton || !signOutButton) {
-        console.warn('⚠️ Botones de autenticación no encontrados en DOM');
+        console.warn('⚠️ [AUTH] Botones no encontrados, reintentando...');
+        setTimeout(updateAuthUI, 1000);
         return;
     }
 
-    // LIMPIAR listeners anteriores
+    // Limpiar listeners anteriores
     signInButton.onclick = null;
     signOutButton.onclick = null;
+    signInButton.removeAttribute('disabled');
 
-    if (isAuthorized && gapiLoaded && gisLoaded) {
-        // Usuario autenticado
+    if (isAuthorized) {
+        // Usuario YA autenticado
         signInButton.classList.add('hidden');
         signOutButton.classList.remove('hidden');
-        
         signOutButton.innerHTML = '<i class="fas fa-sign-out-alt"></i> Cerrar Sesión';
-        signOutButton.disabled = false;
+        signOutButton.onclick = signOut;
         
-        // Asignar listener de cerrar sesión
-        signOutButton.onclick = (e) => {
-            e.preventDefault();
-            console.log('🔐 Click en cerrar sesión');
-            signOut();
-        };
-        
-    } else if (gapiLoaded && gisLoaded) {
-        // APIs cargadas pero no autenticado
+    } else if (gapiLoaded && gisLoaded && tokenClient) {
+        // TODO listo para autenticar
         signInButton.classList.remove('hidden');
         signOutButton.classList.add('hidden');
-        
-        signInButton.innerHTML = '<i class="fab fa-google"></i> Conectar';
+        signInButton.innerHTML = '<i class="fab fa-google"></i> Conectar con Google';
         signInButton.disabled = false;
         
-        // ASIGNAR LISTENER DE CONEXIÓN - ESTO ES CRÍTICO
-        signInButton.onclick = (e) => {
+        // ASIGNAR EL LISTENER CRÍTICO
+        signInButton.onclick = function(e) {
             e.preventDefault();
-            console.log('🔐 Click en botón conectar');
+            console.log('🚀 [AUTH] ¡Click en conectar detectado!');
             signIn();
         };
         
-        console.log('✅ Listener de conexión asignado al botón');
+        console.log('✅ [AUTH] Botón LISTO para autenticación');
         
     } else {
-        // APIs aún cargando
+        // Aún cargando o error
         signInButton.classList.remove('hidden');
         signOutButton.classList.add('hidden');
         
-        signInButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando APIs...';
-        signInButton.disabled = true;
-        signInButton.onclick = null;
+        if (!gapiLoaded && !gisLoaded) {
+            signInButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando Google APIs...';
+            signInButton.disabled = true;
+        } else if (!gapiLoaded) {
+            signInButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Google API';
+            signInButton.disabled = true;
+        } else if (!gisLoaded) {
+            signInButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando Identity...';
+            signInButton.disabled = true;
+        } else if (!tokenClient) {
+            signInButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Token Client';
+            signInButton.disabled = true;
+        }
     }
 
-    // Actualizar estado en overview
     updateOverviewAuthStatus();
 }
 
@@ -608,54 +620,109 @@ window.signOut = signOut;
 
 // Auto-inicialización mejorada cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 DOM listo para autenticación');
+    console.log('🎯 [AUTH] DOM listo, iniciando verificación coordinada...');
     
-    // Resetear flag de reintentos
-    window._gapiRetryAttempted = false;
-    
-    // Función para verificar e inicializar APIs
-    const checkAndInitAPIs = () => {
-        console.log('🔍 Verificando disponibilidad de APIs...');
+    // Esperar un poco a que init.js haga su trabajo
+    setTimeout(() => {
+        console.log('🔍 [AUTH] Verificando estado después de init.js...');
         
-        let gapiAvailable = typeof gapi !== 'undefined';
-        let gisAvailable = typeof google !== 'undefined' && google.accounts;
+        // Si init.js ya inicializó las APIs, usar esas
+        if (window.ytCrossMixAPIs) {
+            if (window.ytCrossMixAPIs.gapi) {
+                console.log('✅ [AUTH] Usando GAPI de init.js');
+                gapiLoaded = true;
+            }
+            if (window.ytCrossMixAPIs.gis) {
+                console.log('✅ [AUTH] Usando GIS de init.js');
+                gisLoaded = true;
+                // Pero aún necesitamos crear el tokenClient
+                gisInitalize();
+            }
+        }
         
-        console.log('📊 Estado APIs:', { gapiAvailable, gisAvailable });
-        
-        // Inicializar GAPI si está disponible
-        if (gapiAvailable && !gapiLoaded) {
-            console.log('📡 GAPI disponible, inicializando...');
+        // Si no, intentar inicializar nosotros
+        if (!gapiLoaded && typeof gapi !== 'undefined') {
+            console.log('🔧 [AUTH] Init.js no inicializó GAPI, haciéndolo nosotros...');
             gapiInitialize();
         }
         
-        // Inicializar GIS si está disponible
-        if (gisAvailable && !gisLoaded) {
-            console.log('🔑 Google Identity disponible, inicializando...');
+        if (!gisLoaded && typeof google !== 'undefined' && google.accounts) {
+            console.log('🔧 [AUTH] Init.js no inicializó GIS, haciéndolo nosotros...');
             gisInitalize();
         }
         
-        // Si no están disponibles, reintentar
-        if (!gapiAvailable || !gisAvailable) {
-            console.log('⏳ Algunas APIs no disponibles, reintentando en 1s...');
-            setTimeout(checkAndInitAPIs, 1000);
-        }
+        // Actualizar UI inicialmente
+        updateAuthUI();
+        
+        // Verificar cada 2 segundos si algo cambió
+        const checkInterval = setInterval(() => {
+            if (gapiLoaded && gisLoaded) {
+                clearInterval(checkInterval);
+                console.log('✅ [AUTH] Todas las APIs listas, actualizando UI final');
+                updateAuthUI();
+            }
+        }, 2000);
+        
+        // Timeout final
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            console.log('⏰ [AUTH] Timeout final, estado:', { gapiLoaded, gisLoaded });
+            updateAuthUI();
+        }, 15000);
+        
+    }, 2000); // Esperar 2 segundos a que init.js termine
+});
+// Función de testing
+window.testAuthButton = function() {
+    console.log('🧪 [TEST] === TEST BOTÓN AUTH ===');
+    const btn = document.getElementById('googleSignInButton');
+    
+    const state = {
+        buttonExists: !!btn,
+        buttonVisible: btn ? !btn.classList.contains('hidden') : false,
+        buttonDisabled: btn ? btn.disabled : false,
+        buttonText: btn ? btn.innerHTML : 'N/A',
+        hasOnclick: btn ? !!btn.onclick : false,
+        gapiLoaded,
+        gisLoaded,
+        tokenClient: !!tokenClient,
+        isAuthorized,
+        ytAPIs: window.ytCrossMixAPIs
     };
     
-    // Iniciar verificación después de que el DOM esté listo
-    setTimeout(checkAndInitAPIs, 500);
+    console.table(state);
     
-    // Timeout final de seguridad
-    setTimeout(() => {
-        if (!gapiLoaded || !gisLoaded) {
-            console.error('⏰ Timeout final - APIs no cargadas después de 20s');
-            console.log('Estado final:', { gapiLoaded, gisLoaded });
-            
-            // Intentar habilitar botón con lo que tengamos
-            updateAuthUI();
-            
-            if (!gapiLoaded) {
-                showAuthError('Google API no pudo cargarse - Verifica tu conexión a internet');
-            }
-        }
-    }, 20000);
-});
+    if (btn && !btn.disabled && !btn.classList.contains('hidden') && btn.onclick) {
+        console.log('✅ [TEST] Botón parece funcional, haciendo click...');
+        btn.click();
+    } else {
+        console.log('❌ [TEST] Botón no funcional. Intentando forzar actualización...');
+        updateAuthUI();
+        
+        setTimeout(() => {
+            console.log('🔄 [TEST] Estado después de actualización:');
+            window.testAuthButton();
+        }, 1000);
+    }
+};
+
+// Debug de estado completo
+window.debugAuth = function() {
+    console.log('🐛 [DEBUG] === ESTADO COMPLETO AUTH ===');
+    console.log('Variables globales:', {
+        gapiLoaded,
+        gisLoaded,
+        tokenClient: !!tokenClient,
+        isAuthorized,
+        GOOGLE_CONFIG
+    });
+    console.log('Window objects:', {
+        gapi: typeof gapi,
+        google: typeof google,
+        ytCrossMixAPIs: window.ytCrossMixAPIs
+    });
+    console.log('DOM elements:', {
+        signInBtn: !!document.getElementById('googleSignInButton'),
+        signOutBtn: !!document.getElementById('googleSignOutButton')
+    });
+};
