@@ -601,6 +601,7 @@ class UnifiedCore {
             
             this.updatePlayButton('pause');
             this.startMonitoring();
+            this.startMonitoring();
             this.updateNowPlaying();
             this.updatePlaylistsUI();
             
@@ -1101,30 +1102,35 @@ class UnifiedCore {
         }
     }
 
-    monitorPlayers() {
-        if (!playersInitialized || !reproduccionIniciada) return;
+function monitorPlayers() {
+    if (!playersInitialized || !reproduccionIniciada) return;
 
-        const activePlayer = currentPlayer === 1 ? player1 : player2;
-        if (!activePlayer?.getPlayerState) return;
+    const activePlayer = (currentPlayer === 1) ? player1 : player2;
+    if (!activePlayer?.getPlayerState) return;
 
-        const playerState = activePlayer.getPlayerState();
-        const currentTime = activePlayer.getCurrentTime();
-        const videoDuration = activePlayer.getDuration();
+    const playerState = activePlayer.getPlayerState();
+    const currentTime = activePlayer.getCurrentTime();
+    const videoDuration = activePlayer.getDuration();
+    const videoId = activePlayer.getVideoData()?.video_id;
 
-        if (playerState === YT.PlayerState.PLAYING && videoDuration > 0) {
-            const timeRemaining = videoDuration - currentTime;
-            
-            // Disparar crossfade cerca del final
-            if (timeRemaining <= CROSSFADE_DURATION + 0.5 && 
-                timeRemaining > 0 && 
-                !hasOutroCrossfadeStarted && 
-                !crossfadeInProgress) {
-                
-                console.log(`⏰ Tiempo restante: ${timeRemaining.toFixed(1)}s, iniciando crossfade`);
-                this.playNextVideo();
-            }
+    // AÑADIR ESTA LÍNEA CRÍTICA:
+    if (videoId && playerState === YT.PlayerState.PLAYING) {
+        checkAndSkipSegment(activePlayer); // ← ESTA ES LA LÍNEA CLAVE
+    }
+
+    // Resto del código de monitoreo...
+    if (playerState === YT.PlayerState.PLAYING && videoDuration > 0) {
+        const timeRemaining = videoDuration - currentTime;
+        
+        if (timeRemaining <= CROSSFADE_DURATION + 0.5 && 
+            timeRemaining > 0 && 
+            !hasOutroCrossfadeStarted && 
+            !crossfadeInProgress) {
+            console.log(`⏰ Tiempo restante: ${timeRemaining.toFixed(1)}s, iniciando crossfade`);
+            playNextVideo();
         }
     }
+}
 
     updateCurrentPlayingIndex() {
         const flatList = this.getFlattenedPlaylist();
@@ -1333,7 +1339,71 @@ class UnifiedCore {
             this.switchView('playing');
         }
     }
+// Añadir al final de core.js
+function checkAndSkipSegment(player) {
+    const currentTime = player.getCurrentTime();
+    const videoId = player.getVideoData()?.video_id;
 
+    if (!videoId || isNaN(currentTime)) return;
+
+    // Si no hay segmentos en caché, obtenerlos
+    if (!segmentosCache[videoId]) {
+        obtenerSegmentosSponsorBlock(videoId);
+        return;
+    }
+
+    // Si aún se están obteniendo, esperar
+    if (segmentosCache[videoId] === 'fetching') return;
+
+    // Si no hay segmentos válidos, salir
+    const segments = segmentosCache[videoId];
+    if (!segments || segments.length === 0) return;
+
+    // Buscar segmento a saltar
+    const segmentToSkip = segments.find(segment => {
+        const start = segment.segment[0];
+        const end = segment.segment[1];
+        return currentTime >= start && currentTime < end;
+    });
+
+    if (segmentToSkip) {
+        const skipToTime = segmentToSkip.segment[1];
+        console.log(`⏭️ SponsorBlock: Saltando segmento ${segmentToSkip.category} a ${skipToTime.toFixed(1)}s`);
+        
+        try {
+            player.seekTo(skipToTime, true);
+        } catch (e) {
+            console.error("Error saltando segmento:", e);
+        }
+    }
+}
+
+async function obtenerSegmentosSponsorBlock(videoId) {
+    if (segmentosCache[videoId] === 'fetching') return;
+    
+    segmentosCache[videoId] = 'fetching';
+    console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
+
+    try {
+        const response = await fetch(`/.netlify/functions/sponsorblock/segments/${videoId}`, {
+            headers: {
+                'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'
+            }
+        });
+
+        if (response.ok) {
+            const segments = await response.json();
+            segmentosCache[videoId] = Array.isArray(segments) ? segments : [];
+            console.log(`✅ ${segmentosCache[videoId].length} segmentos obtenidos para ${videoId}`);
+        } else {
+            segmentosCache[videoId] = [];
+            console.log(`📭 No hay segmentos para ${videoId}`);
+        }
+    } catch (error) {
+        console.error("Error obteniendo segmentos:", error);
+        segmentosCache[videoId] = [];
+    }
+}    
     // =============================================
     // SISTEMA DE MENSAJES Y DEBUG
     // =============================================
