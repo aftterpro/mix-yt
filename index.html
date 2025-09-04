@@ -16,7 +16,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     
-    <!-- Estilos -->
+    <!-- ✅ ESTILOS UNIFICADOS -->
     <link rel="stylesheet" type="text/css" href="./styles-youtube-music.css">
     
     <link rel="icon" href="./electronic.ico">
@@ -36,30 +36,264 @@
       }
     }
     </script>
+
+    <!-- ✅ ESTILOS ADICIONALES PARA SISTEMA UNIFICADO -->
+    <style>
+        /* Sistema Unificado - Estilos adicionales */
+        .unified-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+        }
+
+        .spinner-inline {
+            position: relative;
+            padding: 20px;
+        }
+
+        .spinner-append {
+            position: relative;
+            margin-top: 20px;
+        }
+
+        .spinner-small .spinner-animation {
+            width: 24px !important;
+            height: 24px !important;
+            border-width: 2px !important;
+        }
+
+        .spinner-large .spinner-animation {
+            width: 60px !important;
+            height: 60px !important;
+            border-width: 4px !important;
+        }
+
+        .unified-message {
+            will-change: transform, opacity;
+            user-select: none;
+            white-space: pre-wrap;
+        }
+
+        /* Estados de debugging unificado */
+        .unified-debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: monospace;
+            max-width: 300px;
+            z-index: 9999;
+            display: none;
+        }
+
+        .unified-debug-panel.show {
+            display: block;
+        }
+
+        /* Indicadores de estado unificado */
+        .unified-status-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 12px;
+            font-size: 11px;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .unified-status-indicator.show {
+            opacity: 1;
+        }
+
+        .unified-status-indicator.success {
+            background: rgba(76, 175, 80, 0.9);
+        }
+
+        .unified-status-indicator.error {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .unified-status-indicator.warning {
+            background: rgba(255, 193, 7, 0.9);
+            color: black;
+        }
+
+        /* Fix para elementos que necesitan el sistema unificado */
+        [data-requires-unified]:not(.unified-ready) {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        [data-requires-unified].unified-ready {
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Loading states específicos del sistema unificado */
+        .unified-loading .search-results,
+        .unified-loading .playlists-grid,
+        .unified-loading .playlist-container {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        /* Transiciones mejoradas para sistema unificado */
+        .unified-transition {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* Mejoras para mensajes unificados */
+        .floating-message {
+            /* Heredar estilos base pero con mejoras para sistema unificado */
+            font-family: 'Roboto', sans-serif;
+            letter-spacing: 0.3px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* Compatibilidad temporal - estos elementos se eliminarán gradualmente */
+        .legacy-hidden {
+            display: none !important;
+        }
+
+        /* Estados específicos para debugging */
+        .unified-state-debug {
+            position: fixed;
+            top: 100px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            z-index: 10000;
+            border: 1px solid #333;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .unified-state-debug.show {
+            display: block;
+        }
+
+        .unified-state-debug h4 {
+            color: #ff6b35;
+            margin: 0 0 10px 0;
+            font-size: 12px;
+        }
+
+        .unified-state-debug .state-section {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+
+        .unified-state-debug .state-key {
+            color: #00aaff;
+        }
+
+        .unified-state-debug .state-value {
+            color: #00ff00;
+        }
+
+        /* Botones de control unificado */
+        .unified-controls {
+            position: fixed;
+            top: 60px;
+            right: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 9998;
+        }
+
+        .unified-control-btn {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .unified-control-btn:hover {
+            background: rgba(255, 107, 53, 0.8);
+            border-color: #ff6b35;
+        }
+
+        .unified-control-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
 </head>
 <body class="unified-loading">
-    <!-- Indicador de estado -->
+    <!-- ✅ INDICADOR DE ESTADO UNIFICADO -->
     <div class="unified-status-indicator" id="unifiedStatusIndicator">
-        Inicializando APIs...
+        Inicializando Sistema Unificado...
     </div>
 
-    <!-- Panel de debug (solo desarrollo) -->
+    <!-- ✅ DEBUG PANEL UNIFICADO (Solo en desarrollo) -->
     <div class="unified-debug-panel" id="unifiedDebugPanel">
-        <h4>🔧 YT CrossMix Debug</h4>
+        <h4>🔧 YT CrossMix Debug Unificado</h4>
         <div id="debugContent">Cargando...</div>
     </div>
 
-    <!-- Panel de estado -->
+    <!-- ✅ STATE DEBUG PANEL -->
     <div class="unified-state-debug" id="unifiedStateDebug">
-        <h4>📊 Estado del Sistema</h4>
+        <h4>📊 Estado Unificado</h4>
         <div id="stateDebugContent">Inicializando...</div>
     </div>
 
-    <!-- Controles de desarrollo -->
+    <!-- ✅ CONTROLES DE DESARROLLO UNIFICADO -->
     <div class="unified-controls" id="unifiedControls" style="display: none;">
-        <button class="unified-control-btn" onclick="window.debugUnified?.()">Debug</button>
-        <button class="unified-control-btn" onclick="toggleUnifiedDebug()">Toggle Debug</button>
-        <button class="unified-control-btn" onclick="window.resetUnified?.()">Reset</button>
+        <button class="unified-control-btn" onclick="window.debugUnified?.()">
+            Debug
+        </button>
+        <button class="unified-control-btn" onclick="window.unifiedStateManager?.debug?.()">
+            State
+        </button>
+        <button class="unified-control-btn" onclick="window.resetUnified?.()">
+            Reset
+        </button>
+        <button class="unified-control-btn" onclick="toggleUnifiedDebug()">
+            Toggle Debug
+        </button>
+    </div>
+
+    <!-- Loading inicial mejorado -->
+    <div class="loading-spinner hidden" id="loadingSpinner">
+        <div class="spinner"></div>
     </div>
 
     <div class="app-container">
@@ -70,6 +304,7 @@
                     <i class="fas fa-music"></i>
                 </div>
                 <h1 class="app-name">YT CrossMix</h1>
+                <!-- ✅ INDICADOR SISTEMA UNIFICADO -->
                 <div class="unified-indicator" id="unifiedIndicator" style="
                     width: 8px; height: 8px; border-radius: 50%; 
                     background: #666; margin-left: auto;
@@ -115,6 +350,10 @@
                         <i class="fas fa-heart"></i>
                         Me gusta
                     </button>
+                    <button class="nav-item" data-view="recientes" data-requires-unified>
+                        <i class="fas fa-clock"></i>
+                        Recientes
+                    </button>
                 </div>
 
                 <!-- Añadir Playlist -->
@@ -146,8 +385,16 @@
                 </div>
                 
                 <div class="user-actions">
+                    <!-- ✅ CONTROLES DEBUG UNIFICADO -->
+                    <button class="control-btn" id="unifiedDebugToggle" title="Debug Unificado" onclick="toggleUnifiedDebug()" style="display: none;">
+                        <i class="fas fa-bug"></i>
+                    </button>
+                    
                     <button class="control-btn" id="debugButton" title="Debug" onclick="window.debugUnified?.()">
                         <i class="fas fa-bug"></i>
+                    </button>
+                    <button class="control-btn" id="resetButton" title="Reset" onclick="window.resetUnified?.()">
+                        <i class="fas fa-refresh"></i>
                     </button>
                     <button class="auth-btn" id="googleSignInButton" title="Cargar mi Biblioteca" data-requires-unified>
                         <i class="fab fa-google"></i>
@@ -187,7 +434,7 @@
                             <div class="overview-stats">
                                 <div class="overview-stat">0 playlists cargadas</div>
                                 <div class="overview-stat">0 videos en total</div>
-                                <div class="overview-stat" id="unifiedSystemStatus">Sistema: Iniciando...</div>
+                                <div class="overview-stat" id="unifiedSystemStatus">Sistema: Cargando...</div>
                             </div>
                         </div>
                         
@@ -207,6 +454,17 @@
                     </div>
                 </div>
 
+                <!-- Vista Búsqueda -->
+                <div class="content-view" id="searchView">
+                    <div class="search-results" id="searchResults" data-requires-unified>
+                        <div class="search-placeholder">
+                            <i class="fas fa-search"></i>
+                            <p>Busca música, artistas o playlists</p>
+                            <p><small>Sistema Unificado Activo</small></p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Vista Biblioteca -->
                 <div class="content-view" id="libraryView">
                     <div id="playlistsGrid" class="playlists-grid" data-requires-unified>
@@ -219,34 +477,34 @@
                     </div>
                 </div>
 
-                <!-- Vista Reproduciendo -->
-                <div class="content-view" id="playingView">
-                    <div class="now-playing-container">
-                        <div class="video-container" id="videoContainer">
-                            <div id="player1" class="video-player"></div>
-                            <div id="player2" class="video-player hidden"></div>
-                        </div>
-                        <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
-                        <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix - Sistema Unificado</p>
-                    </div>
-                    
-                    <!-- Cola de reproducción -->
-                    <div class="queue-section hidden" id="queueSection">
-                        <div class="queue-header">
-                            <h3 class="queue-title">Cola de reproducción</h3>
-                            <button class="queue-close-btn" id="queueCloseBtn">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div id="playlistContainer" class="playlist-container-desktop">
-                            <div class="empty-queue-message">
-                                <i class="fas fa-music"></i>
-                                <p>La cola está vacía</p>
-                                <p>Añade música desde la biblioteca o búsqueda</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<!-- Vista Reproduciendo -->
+<div class="content-view" id="playingView">
+    <div class="now-playing-container">
+        <div class="video-container" id="videoContainer">
+            <div id="player1" class="video-player"></div>
+            <div id="player2" class="video-player hidden"></div>
+        </div>
+        <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
+        <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix - Sistema Unificado</p>
+    </div>
+    
+    <!-- Cola de reproducción SOLO aparece cuando se presiona el botón cola -->
+    <div class="queue-section hidden" id="queueSection">
+        <div class="queue-header">
+            <h3 class="queue-title">Cola de reproducción</h3>
+            <button class="queue-close-btn" id="queueCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="playlistContainer" class="playlist-container-desktop">
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
+            </div>
+        </div>
+    </div>
+</div>
             </div>
         </div>
     </div>
@@ -291,7 +549,7 @@
         </div>
     </div>
 
-    <!-- Elementos móviles -->
+    <!-- ELEMENTOS MOBILE FALTANTES -->
     <div class="mobile-header" style="display: none;">
         <div class="mobile-logo">
             <div class="logo-icon">
@@ -309,7 +567,7 @@
         </div>
     </div>
 
-    <!-- Mini player móvil -->
+    <!-- MINI PLAYER MOBILE -->
     <div class="mini-player" style="display: none;">
         <div class="mini-player-track">
             <img src="" alt="Playing" class="mini-track-image">
@@ -328,7 +586,7 @@
         </div>
     </div>
 
-    <!-- Navegación inferior móvil -->
+    <!-- BOTTOM NAVIGATION MOBILE -->
     <div class="bottom-nav" style="display: none;">
         <button class="nav-tab active" data-view="home" data-requires-unified>
             <i class="fas fa-home"></i>
@@ -354,26 +612,19 @@
         <p>Utilizamos la API de <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.</p>
     </footer>
 
-    <!-- Elementos de compatibilidad -->
+    <!-- Hidden search input for mobile compatibility -->
     <input type="text" id="searchInput" style="display: none;" placeholder="Buscar música..." data-requires-unified>
+
+    <!-- Elements for compatibility -->
     <div id="floatingMessageContainer" class="floating-messages"></div>
 
-    <!-- Scripts -->
-    <!-- CRÍTICO: Cargar en este orden específico -->
-    
-    <!-- 1. APIs de Google (deben cargarse primero) -->
+
+    <!-- ✅ CARGA DEL SISTEMA UNIFICADO -->
     <script src="https://apis.google.com/js/api.js" async defer onload="gapiInitialize()"></script>
     <script src="https://accounts.google.com/gsi/client" async defer onload="gisInitalize()"></script>
-    
-    <!-- 2. Script de inicialización (gestiona las APIs) -->
     <script src="./init.js"></script>
-    
-    <!-- 3. Módulo de autenticación -->
     <script src="./auth.js"></script>
-    
-    <!-- 4. Sistema principal (último, depende de todo lo anterior) -->
     <script type="module" src="./core.js"></script>
-
     <script>
         // Script inline para manejar errores de carga
         window.addEventListener('error', function(e) {
