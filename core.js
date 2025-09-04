@@ -1385,7 +1385,7 @@ class UnifiedCore {
     }
 }
 
-async function obtenerSegmentosSponsorBlock(videoId) {
+ obtenerSegmentosSponsorBlock(videoId) {
     if (segmentosCache[videoId] === 'fetching') return;
     
     segmentosCache[videoId] = 'fetching';
