@@ -25,17 +25,41 @@ let isAuthorized = false;
 /**
  * Inicializar la API de Google
  */
+// REEMPLAZAR TODA esta función:
 async function gapiInitialize() {
     try {
         console.log('📡 Inicializando Google API...');
-        await gapi.load('client', initializeGapiClient);
-        gapiLoaded = true;
+        
+        // Esperar a que gapi esté disponible
+        if (typeof gapi === 'undefined') {
+            console.error('❌ gapi no está disponible');
+            return;
+        }
+        
+        // Cargar cliente con Promise
+        await new Promise((resolve, reject) => {
+            gapi.load('client', {
+                callback: resolve,
+                onerror: reject,
+                timeout: 5000
+            });
+        });
+        
+        // Inicializar cliente
+        await gapi.client.init({
+            apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4',
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+        });
+        
+        window.ytCrossMixAPIs.gapi = true;
+        console.log('✅ Google API inicializada correctamente');
+        updateAuthUI();
+        
     } catch (error) {
         console.error('❌ Error inicializando Google API:', error);
         showAuthError('Error de conexión con Google');
     }
 }
-
 /**
  * Inicializar cliente de la API
  */
@@ -56,23 +80,32 @@ async function initializeGapiClient() {
 /**
  * Inicializar Google Identity Services
  */
+// REEMPLAZAR TODA esta función:
 function gisInitalize() {
     try {
         console.log('🔑 Inicializando Google Identity Services...');
+        
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+            console.error('❌ Google Identity Services no disponible');
+            setTimeout(gisInitalize, 1000); // Reintentar en 1 segundo
+            return;
+        }
+        
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: GOOGLE_CONFIG.CLIENT_ID,
-            scope: GOOGLE_CONFIG.SCOPES,
+            client_id: '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
+            scope: 'https://www.googleapis.com/auth/youtube.readonly',
             callback: handleAuthCallback,
         });
-        gisLoaded = true;
+        
+        window.ytCrossMixAPIs.gis = true;
         console.log('✅ Google Identity Services inicializado');
         updateAuthUI();
+        
     } catch (error) {
         console.error('❌ Error inicializando GIS:', error);
         showAuthError('Error de autenticación');
     }
 }
-
 /**
  * Callback de autenticación
  */
