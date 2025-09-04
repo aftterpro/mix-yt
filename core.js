@@ -1109,35 +1109,6 @@ class UnifiedCore {
         }
     }
 
- monitorPlayers() {
-    if (!playersInitialized || !reproduccionIniciada) return;
-
-    const activePlayer = (currentPlayer === 1) ? player1 : player2;
-    if (!activePlayer?.getPlayerState) return;
-
-    const playerState = activePlayer.getPlayerState();
-    const currentTime = activePlayer.getCurrentTime();
-    const videoDuration = activePlayer.getDuration();
-    const videoId = activePlayer.getVideoData()?.video_id;
-
-    // AÑADIR ESTA LÍNEA CRÍTICA:
-    if (videoId && playerState === YT.PlayerState.PLAYING) {
-        checkAndSkipSegment(activePlayer); // ← ESTA ES LA LÍNEA CLAVE
-    }
-
-    // Resto del código de monitoreo...
-    if (playerState === YT.PlayerState.PLAYING && videoDuration > 0) {
-        const timeRemaining = videoDuration - currentTime;
-        
-        if (timeRemaining <= CROSSFADE_DURATION + 0.5 && 
-            timeRemaining > 0 && 
-            !hasOutroCrossfadeStarted && 
-            !crossfadeInProgress) {
-            console.log(`⏰ Tiempo restante: ${timeRemaining.toFixed(1)}s, iniciando crossfade`);
-            playNextVideo();
-        }
-    }
-}
 
     updateCurrentPlayingIndex() {
         const flatList = this.getFlattenedPlaylist();
@@ -1490,6 +1461,36 @@ class UnifiedCore {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
+function monitorPlayers() {
+    if (!playersInitialized || !reproduccionIniciada) return;
+
+    const activePlayer = (currentPlayer === 1) ? player1 : player2;
+    if (!activePlayer?.getPlayerState) return;
+
+    const playerState = activePlayer.getPlayerState();
+    const currentTime = activePlayer.getCurrentTime();
+    const videoDuration = activePlayer.getDuration();
+    const videoId = activePlayer.getVideoData()?.video_id;
+
+    // AÑADIR ESTA LÍNEA CRÍTICA:
+    if (videoId && playerState === YT.PlayerState.PLAYING) {
+        checkAndSkipSegment(activePlayer); // ← ESTA ES LA LÍNEA CLAVE
+    }
+
+    // Resto del código de monitoreo...
+    if (playerState === YT.PlayerState.PLAYING && videoDuration > 0) {
+        const timeRemaining = videoDuration - currentTime;
+        
+        if (timeRemaining <= CROSSFADE_DURATION + 0.5 && 
+            timeRemaining > 0 && 
+            !hasOutroCrossfadeStarted && 
+            !crossfadeInProgress) {
+            console.log(`⏰ Tiempo restante: ${timeRemaining.toFixed(1)}s, iniciando crossfade`);
+            playNextVideo();
+        }
+    }
+}
+
 function toggleUnifiedDebug() {
     const debugPanel = document.getElementById('unifiedDebugPanel');
     const statePanel = document.getElementById('unifiedStateDebug');
