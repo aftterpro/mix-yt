@@ -601,7 +601,6 @@ class UnifiedCore {
             
             this.updatePlayButton('pause');
             this.startMonitoring();
-            this.startMonitoring();
             this.updateNowPlaying();
             this.updatePlaylistsUI();
             
@@ -1088,11 +1087,19 @@ class UnifiedCore {
     // MONITOREO Y ESTADO
     // =============================================
     startMonitoring() {
-        if (!monitorInterval) {
-            monitorInterval = setInterval(() => this.monitorPlayers(), 300);
-            console.log('📊 Monitoreo iniciado');
-        }
+    if (!monitorInterval) {
+        monitorInterval = setInterval(() => {
+            monitorPlayers(); // ← ESTA FUNCIÓN DEBE EXISTIR
+            
+            // AÑADIR SPONSORBLOCK AQUÍ:
+            const activePlayer = (currentPlayer === 1) ? player1 : player2;
+            if (activePlayer && reproduccionIniciada) {
+                checkAndSkipSegment(activePlayer);
+            }
+        }, 300);
+        console.log('📊 Monitoreo iniciado (intervalo: 300ms)');
     }
+}
 
     stopMonitoring() {
         if (monitorInterval) {
@@ -1339,8 +1346,8 @@ class UnifiedCore {
             this.switchView('playing');
         }
     }
-// Añadir al final de core.js
-function checkAndSkipSegment(player) {
+
+ checkAndSkipSegment(player) {
     const currentTime = player.getCurrentTime();
     const videoId = player.getVideoData()?.video_id;
 
