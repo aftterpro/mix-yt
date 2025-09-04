@@ -1102,7 +1102,7 @@ class UnifiedCore {
         }
     }
 
-function monitorPlayers() {
+ monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
     const activePlayer = (currentPlayer === 1) ? player1 : player2;
