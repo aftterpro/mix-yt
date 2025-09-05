@@ -1,49 +1,335 @@
-/* Reemplazar la sección .video-player existente con: */
+/* efecto.css - Efectos Visuales Impactantes para YT CrossMix */
+
+:root {
+  --crossfade-duration: 15s;
+  --glow-color: #ff6b35;
+  --glow-secondary: #ff8a65;
+  --pulse-speed: 2s;
+}
+
+/* =============================================
+   REPRODUCTORES CON EFECTOS AVANZADOS
+   ============================================= */
 .video-player {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 1;
-    filter: blur(0px) brightness(1.0);
-    background-color: #000;
-    transition: opacity var(--crossfade-duration) ease-in-out,
-                filter var(--crossfade-duration) ease-in-out,
-                transform var(--crossfade-duration) ease-in-out;
-    will-change: opacity, filter, transform;
-    z-index: 1;
+  position: absolute;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  opacity: 1;
+  filter: blur(0px) brightness(1.0) saturate(1.1) contrast(1.05);
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: 
+    opacity var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
+    filter var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
+    transform var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
+    box-shadow var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: opacity, filter, transform, box-shadow;
+  z-index: 1;
+  
+  /* Sombra dinámica */
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(255, 107, 53, 0.1);
 }
 
+/* =============================================
+   ENTRADA VISUAL IMPACTANTE
+   ============================================= */
 .video-player.fade-in {
-    opacity: 1;
-    filter: blur(0px) brightness(1.0);
-    transform: scale(1);
-    z-index: 2;
+  opacity: 1;
+  filter: blur(0px) brightness(1.1) saturate(1.2) contrast(1.1);
+  transform: scale(1) rotateY(0deg);
+  z-index: 3;
+  
+  box-shadow: 
+    0 16px 64px rgba(255, 107, 53, 0.3),
+    0 8px 32px rgba(255, 107, 53, 0.2),
+    0 0 40px rgba(255, 107, 53, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    
+  /* Borde brillante */
+  border: 2px solid rgba(255, 107, 53, 0.4);
+  
+  /* Animación de pulso sutil */
+  animation: subtlePulse var(--pulse-speed) infinite alternate;
 }
 
+@keyframes subtlePulse {
+  0% {
+    box-shadow: 
+      0 16px 64px rgba(255, 107, 53, 0.3),
+      0 8px 32px rgba(255, 107, 53, 0.2),
+      0 0 40px rgba(255, 107, 53, 0.15);
+    filter: blur(0px) brightness(1.1) saturate(1.2);
+  }
+  100% {
+    box-shadow: 
+      0 20px 80px rgba(255, 107, 53, 0.4),
+      0 12px 48px rgba(255, 107, 53, 0.3),
+      0 0 60px rgba(255, 107, 53, 0.2);
+    filter: blur(0px) brightness(1.15) saturate(1.25);
+  }
+}
+
+/* =============================================
+   SALIDA VISUAL DRAMÁTICA  
+   ============================================= */
 .video-player.fade-out {
+  opacity: 0;
+  filter: blur(8px) brightness(0.7) saturate(0.8) contrast(0.9);
+  transform: scale(0.95) rotateY(-5deg);
+  z-index: 1;
+  
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.6),
+    0 0 20px rgba(255, 107, 53, 0.05);
+    
+  border: 1px solid rgba(255, 107, 53, 0.1);
+  
+  /* Desvanecimiento progresivo */
+  animation: fadeOutEffect calc(var(--crossfade-duration) * 0.8) ease-out forwards;
+}
+
+@keyframes fadeOutEffect {
+  0% {
+    opacity: 1;
+    filter: blur(0px) brightness(1.0) saturate(1.0);
+    transform: scale(1) rotateY(0deg);
+  }
+  30% {
+    opacity: 0.8;
+    filter: blur(2px) brightness(0.95) saturate(0.95);
+    transform: scale(0.99) rotateY(-1deg);
+  }
+  70% {
+    opacity: 0.3;
+    filter: blur(6px) brightness(0.8) saturate(0.85);
+    transform: scale(0.97) rotateY(-3deg);
+  }
+  100% {
     opacity: 0;
-    filter: blur(4px) brightness(0.85);
-    transform: scale(0.98);
-    z-index: 0;
+    filter: blur(8px) brightness(0.7) saturate(0.8);
+    transform: scale(0.95) rotateY(-5deg);
+  }
 }
 
+/* =============================================
+   OCULTAMIENTO COMPLETO
+   ============================================= */
 .video-player.hidden {
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+  transform: scale(0.9) translateZ(-100px) !important;
+  filter: blur(20px) brightness(0.5) !important;
+  transition: all 0.3s ease !important;
 }
 
+/* =============================================
+   EFECTOS DE OVERLAY DINÁMICOS
+   ============================================= */
+.video-player::before {
+  content: '';
+  position: absolute;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: 
+    radial-gradient(circle at 30% 70%, rgba(255, 107, 53, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(255, 138, 101, 0.06) 0%, transparent 50%),
+    linear-gradient(135deg, transparent 0%, rgba(255, 107, 53, 0.02) 100%);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity var(--crossfade-duration) ease;
+}
+
+.video-player.fade-in::before {
+  opacity: 1;
+  animation: overlayPulse var(--pulse-speed) infinite alternate;
+}
+
+@keyframes overlayPulse {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Efecto de partículas flotantes */
 .video-player::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at center, rgba(233,30,99,0.2) 0%, rgba(233,30,99,0) 70%);
-    mix-blend-mode: overlay;
-    pointer-events: none;
+  content: '';
+  position: absolute;
+  top: 0; 
+  left: 0;
+  width: 100%; 
+  height: 100%;
+  background: 
+    radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.1), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255, 107, 53, 0.1), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(255, 138, 101, 0.1), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.05), transparent);
+  background-repeat: repeat;
+  background-size: 150px 150px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  animation: particles 20s linear infinite;
+}
+
+.video-player.fade-in::after {
+  opacity: 0.3;
+}
+
+@keyframes particles {
+  0% { 
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.3;
+  }
+  90% {
+    opacity: 0.3;
+  }
+  100% { 
+    transform: translate(-20px, -20px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* =============================================
+   EFECTOS DE TRANSICIÓN 3D
+   ============================================= */
+.video-container {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+/* Efecto de entrada lateral */
+@keyframes slideInFromRight {
+  0% {
+    transform: translateX(100%) rotateY(45deg) scale(0.8);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  50% {
+    transform: translateX(10%) rotateY(5deg) scale(0.95);
+    opacity: 0.7;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translateX(0) rotateY(0deg) scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+/* Efecto de salida lateral */
+@keyframes slideOutToLeft {
+  0% {
+    transform: translateX(0) rotateY(0deg) scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  50% {
+    transform: translateX(-10%) rotateY(-5deg) scale(0.95);
+    opacity: 0.3;
+    filter: blur(5px);
+  }
+  100% {
+    transform: translateX(-100%) rotateY(-45deg) scale(0.8);
+    opacity: 0;
+    filter: blur(15px);
+  }
+}
+
+/* Activar animaciones 3D en crossfade */
+.video-player.crossfade-enter {
+  animation: slideInFromRight calc(var(--crossfade-duration) * 0.6) ease-out;
+}
+
+.video-player.crossfade-exit {
+  animation: slideOutToLeft calc(var(--crossfade-duration) * 0.8) ease-in;
+}
+
+/* =============================================
+   EFECTOS RESPONSIVOS
+   ============================================= */
+@media (max-width: 768px) {
+  .video-player {
+    border-radius: 8px;
+  }
+  
+  .video-player.fade-in {
+    box-shadow: 
+      0 8px 32px rgba(255, 107, 53, 0.2),
+      0 4px 16px rgba(255, 107, 53, 0.1);
+  }
+  
+  /* Reducir efectos en móvil para mejor rendimiento */
+  .video-player::after {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --crossfade-duration: 10s;
+  }
+  
+  .video-player.fade-in {
+    animation: none; /* Desactivar pulso en pantallas muy pequeñas */
+  }
+}
+
+/* =============================================
+   EFECTOS DE CARGA Y BUFFERING
+   ============================================= */
+.video-player.loading {
+  position: relative;
+}
+
+.video-player.loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border: 3px solid rgba(255, 107, 53, 0.3);
+  border-top: 3px solid var(--glow-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 10;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* =============================================
+   EFECTOS DE ERROR
+   ============================================= */
+.video-player.error {
+  border: 2px solid #f44336;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a1a1a 100%);
+  
+  animation: errorPulse 1s ease-in-out 3;
+}
+
+@keyframes errorPulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.3);
+    filter: brightness(1.0);
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(244, 67, 54, 0.6);
+    filter: brightness(1.2);
+  }
 }
