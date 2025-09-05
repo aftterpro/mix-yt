@@ -1287,29 +1287,53 @@ body {
 }
 
 @media (max-width: 640px) {
-    .player-info {
-        min-width: 120px;
+    .app-container {
+        padding-bottom: 120px; /* Espacio para controles móviles */
     }
     
-    .player-text {
-        max-width: 120px;
+    .content-view {
+        padding: 8px;
+        padding-bottom: 140px;
     }
     
     .search-results-grid,
     .playlists-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 8px;
     }
     
-    .welcome-title {
-        font-size: 24px;
+    /* Mantener búsqueda siempre como grid */
+    .search-results {
+        padding: 16px 8px;
     }
     
-    .welcome-subtitle {
-        font-size: 14px;
+    /* Arreglar títulos largos */
+    .search-result-title,
+    .playlist-card-title {
+        font-size: 12px;
+        line-height: 1.2;
+        -webkit-line-clamp: 3;
     }
     
-    .overview-grid {
-        grid-template-columns: 1fr;
+    /* Mejorar controles inferiores */
+    .bottom-player {
+        padding: 8px 12px;
+        height: 60px;
+    }
+    
+    .player-info {
+        min-width: 100px;
+        max-width: 140px;
+    }
+    
+    .control-button {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    
+    .control-button.primary {
+        font-size: 18px;
     }
 }
 
