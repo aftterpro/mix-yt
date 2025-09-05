@@ -1242,7 +1242,275 @@ body {
     width: 70%;
     transition: var(--transition-fast);
 }
+/* Estilos mejorados para popup de playlist - Agregar al final de styles-youtube-music.css */
 
+/* =============================================
+   POPUP DE PLAYLIST MEJORADO
+   ============================================= */
+.playlist-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.playlist-popup-overlay.show {
+    opacity: 1;
+}
+
+.playlist-popup {
+    background: linear-gradient(135deg, var(--surface-color) 0%, var(--surface-light) 100%);
+    border-radius: var(--border-radius-lg);
+    max-width: 700px;
+    max-height: 85vh;
+    width: 95%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--surface-light);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 107, 53, 0.1);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.playlist-popup-overlay.show .playlist-popup {
+    transform: scale(1) translateY(0);
+}
+
+.playlist-popup-header {
+    padding: var(--spacing-lg);
+    border-bottom: 2px solid rgba(255, 107, 53, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, transparent 100%);
+}
+
+.playlist-header-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.playlist-popup-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: var(--border-radius);
+    border: 2px solid rgba(255, 107, 53, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.playlist-header-text h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-primary);
+}
+
+.playlist-video-count {
+    color: var(--text-secondary);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.playlist-video-count::before {
+    content: "🎵";
+    font-size: 12px;
+}
+
+.playlist-popup-close {
+    background: rgba(244, 67, 54, 0.1);
+    border: 2px solid transparent;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.playlist-popup-close:hover {
+    background: rgba(244, 67, 54, 0.2);
+    border-color: #f44336;
+    color: #f44336;
+    transform: scale(1.1);
+}
+
+.playlist-popup-content {
+    overflow-y: auto;
+    flex: 1;
+    padding: var(--spacing-md);
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) var(--surface-light);
+}
+
+.playlist-popup-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.playlist-popup-content::-webkit-scrollbar-track {
+    background: var(--surface-light);
+    border-radius: 4px;
+}
+
+.playlist-popup-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border-radius: 4px;
+}
+
+.playlist-popup-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+}
+
+/* =============================================
+   ITEMS DE VIDEO MEJORADOS
+   ============================================= */
+.playlist-video-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: 1px solid transparent;
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.playlist-video-item:hover {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(255, 107, 53, 0.04) 100%);
+    border-color: rgba(255, 107, 53, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15);
+}
+
+.video-number {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--surface-light), var(--surface-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    transition: all var(--transition-fast);
+}
+
+.playlist-video-item:hover .video-number {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.video-thumb {
+    width: 80px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--surface-light);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.playlist-video-item:hover .video-thumb {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    transform: scale(1.05);
+}
+
+.video-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.video-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--text-primary);
+}
+
+.video-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 12px;
+}
+
+.video-duration {
+    background: rgba(255, 107, 53, 0.1);
+    color: var(--primary-color);
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+    border: 1px solid rgba(255, 107, 53, 0.2);
+}
+
+.video-author {
+    color: var(--text-secondary);
+    padding: 2px var(--spacing-sm);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius-sm);
+}
+
+.video-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    opacity: 0;
+    transition: all var(--transition-fast);
+    transform: translateX(10px);
+}
+
+.playlist-video-item:hover .video-actions {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.video-play-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
 /* =============================================
    MENSAJES FLOTANTES
    ============================================= */
