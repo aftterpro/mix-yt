@@ -335,45 +335,45 @@ class UnifiedCore {
     // =============================================
     // GESTIÓN DE VISTAS
     // =============================================
-    switchView(viewName) {
-        if (!this.views.includes(viewName)) return;
+switchView(viewName) {
+    if (!this.views.includes(viewName)) return;
 
-        console.log(`🔄 Cambiando a vista: ${viewName}`);
+    console.log(`🔄 Cambiando a vista: ${viewName}`);
 
-        // Actualizar navegación activa
-        document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelectorAll(`[data-view="${viewName}"]`).forEach(item => {
-            item.classList.add('active');
-        });
+    // Actualizar navegación activa (tanto desktop como móvil)
+    document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.querySelectorAll(`[data-view="${viewName}"]`).forEach(item => {
+        item.classList.add('active');
+    });
 
-        // Ocultar todas las vistas
-        document.querySelectorAll('.content-view').forEach(view => {
-            view.classList.remove('active');
-        });
+    // Ocultar todas las vistas
+    document.querySelectorAll('.content-view').forEach(view => {
+        view.classList.remove('active');
+    });
 
-        // Mostrar vista seleccionada
-        const targetView = document.getElementById(`${viewName}View`);
-        if (targetView) {
-            targetView.classList.add('active');
-        }
-
-        this.currentView = viewName;
-
-        // Acciones específicas por vista
-        switch (viewName) {
-            case 'library':
-                this.refreshLibraryView();
-                break;
-            case 'search':
-                this.focusSearchInput();
-                break;
-            case 'playing':
-                this.refreshPlayingView();
-                break;
-        }
+    // Mostrar vista seleccionada
+    const targetView = document.getElementById(`${viewName}View`);
+    if (targetView) {
+        targetView.classList.add('active');
     }
+
+    this.currentView = viewName;
+
+    // Acciones específicas por vista
+    switch (viewName) {
+        case 'library':
+            this.refreshLibraryView();
+            break;
+        case 'search':
+            this.focusSearchInput();
+            break;
+        case 'playing':
+            this.refreshPlayingView();
+            break;
+    }
+}
 
     refreshLibraryView() {
         this.updatePlaylistsUI();
