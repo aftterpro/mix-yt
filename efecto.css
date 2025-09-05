@@ -1,52 +1,49 @@
-:root {
-  --crossfade-duration: 10s; /* Debe coincidir con app.js */
-}
-
-/* Reproductores empalmados y animados */
+/* Reemplazar la sección .video-player existente con: */
 .video-player {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  opacity: 1;
-  filter: blur(0px) brightness(1.0); /* Reiniciar filtros */
-  background-color: #000; /* Asegúrate de que el fondo del iframe no sea transparente si esto es necesario */
-  transition: opacity var(--crossfade-duration) ease-in-out,
-              filter var(--crossfade-duration) ease-in-out,
-              transform var(--crossfade-duration) ease-in-out;
-  /* z-index es manejado por JS ahora para mayor control durante la transición */
-  will-change: opacity, filter, transform; /* Avisa al navegador qué se animará */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+    filter: blur(0px) brightness(1.0);
+    background-color: #000;
+    transition: opacity var(--crossfade-duration) ease-in-out,
+                filter var(--crossfade-duration) ease-in-out,
+                transform var(--crossfade-duration) ease-in-out;
+    will-change: opacity, filter, transform;
+    z-index: 1;
 }
 
-/* Entrada visual */
-.fade-in {
-  opacity: 1;
-  filter: blur(0px) brightness(1.0);
-  transform: scale(1);
+.video-player.fade-in {
+    opacity: 1;
+    filter: blur(0px) brightness(1.0);
+    transform: scale(1);
+    z-index: 2;
 }
 
-/* Salida visual */
-.fade-out {
-  opacity: 0;
-  filter: blur(4px) brightness(0.85); /* Puedes ajustar estos valores */
-  transform: scale(0.98); /* Puedes ajustar estos valores */
+.video-player.fade-out {
+    opacity: 0;
+    filter: blur(4px) brightness(0.85);
+    transform: scale(0.98);
+    z-index: 0;
 }
 
-/* Ocultamiento absoluto */
-.hidden {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important; /* Asegura que no se pueda interactuar */
-  z-index: -1 !important; /* Asegurar que esté completamente detrás y no interfiera */
-  /* Si display: none no causa problemas, puedes añadirlo: display: none !important; */
+.video-player.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    z-index: -1 !important;
 }
 
-/* El efecto ::after puede mantenerse si te gusta visualmente, no debería interferir con la lógica principal de opacidad */
 .video-player::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: radial-gradient(circle at center, rgba(233,30,99,0.2) 0%, rgba(233,30,99,0) 70%); /* Sutil gradiente para efecto visual */
-  mix-blend-mode: overlay; /* Opcional: mezcla el gradiente con el video */
-  pointer-events: none; /* No debe interferir con la interacción del video */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at center, rgba(233,30,99,0.2) 0%, rgba(233,30,99,0) 70%);
+    mix-blend-mode: overlay;
+    pointer-events: none;
 }
