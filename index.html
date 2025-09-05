@@ -259,6 +259,24 @@
     </style>
 </head>
 <body class="unified-loading">
+    
+    <!-- ELEMENTOS MOBILE FALTANTES -->
+    <div class="mobile-header" style="display: none;">
+        <div class="mobile-logo">
+            <div class="logo-icon">
+                <i class="fas fa-music"></i>
+            </div>
+            <span class="logo-text">YT CrossMix</span>
+        </div>
+        <div class="mobile-search">
+            <input type="text" id="mobileSearchInput" class="mobile-search-input" placeholder="Buscar música..." data-requires-unified>
+        </div>
+        <div class="mobile-user-actions">
+            <button class="mobile-menu-btn" data-requires-unified>
+                <i class="fas fa-user"></i>
+            </button>
+        </div>
+    </div>
     <!-- ✅ INDICADOR DE ESTADO UNIFICADO -->
     <div class="unified-status-indicator" id="unifiedStatusIndicator">
         Inicializando Sistema Unificado...
@@ -550,23 +568,6 @@
         </div>
     </div>
 
-    <!-- ELEMENTOS MOBILE FALTANTES -->
-    <div class="mobile-header" style="display: none;">
-        <div class="mobile-logo">
-            <div class="logo-icon">
-                <i class="fas fa-music"></i>
-            </div>
-            <span class="logo-text">YT CrossMix</span>
-        </div>
-        <div class="mobile-search">
-            <input type="text" id="mobileSearchInput" class="mobile-search-input" placeholder="Buscar música..." data-requires-unified>
-        </div>
-        <div class="mobile-user-actions">
-            <button class="mobile-menu-btn" data-requires-unified>
-                <i class="fas fa-user"></i>
-            </button>
-        </div>
-    </div>
     <!-- BOTTOM NAVIGATION MOBILE -->
     <div class="bottom-nav" style="display: none;">
         <button class="nav-tab active" data-view="home" data-requires-unified>
