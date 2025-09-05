@@ -1,5 +1,4 @@
 // core.js - Sistema Unificado YT CrossMix - CORREGIDO
-// Combina funcionalidades de los backups en una arquitectura moderna
 
 console.log('🚀 Iniciando YT CrossMix - Sistema Unificado');
 
@@ -457,15 +456,113 @@ class UnifiedCore {
         `;
 
         // Event listener para reproducir playlist
-        const playBtn = card.querySelector('.play-playlist-btn');
-        playBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.playPlaylist(playlist.id);
-        });
+const playBtn = card.querySelector('.play-playlist-btn');
+
+// Agregar click en toda la card para popup
+card.addEventListener('click', (e) => {
+    if (!e.target.closest('.play-playlist-btn')) {
+        this.createPlaylistPopup(playlist);
+    }
+});
 
         return card;
     }
+createPlaylistPopup(playlist) {
+    const popup = document.createElement('div');
+    popup.className = 'playlist-popup-overlay';
+    popup.innerHTML = `
+        <div class="playlist-popup">
+            <div class="playlist-popup-header">
+                <h3>${playlist.name}</h3>
+                <button class="playlist-popup-close">×</button>
+            </div>
+            <div class="playlist-popup-content">
+                ${playlist.videos.length === 0 ? 
+                    '<div class="empty-playlist">Esta playlist está vacía</div>' :
+                    playlist.videos.map((video, index) => `
+                        <div class="playlist-video-item">
+                            <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
+                            <div class="video-info">
+                                <div class="video-title">${video.title}</div>
+                                <div class="video-duration">${this.formatDuration(video.duration)}</div>
+                            </div>
+                            <div class="video-actions">
+                                <button class="video-menu-btn" data-video-id="${video.videoId}">⋮</button>
+                            </div>
+                        </div>
+                    `).join('')
+                }
+            </div>
+        </div>
+    `;
 
+    // Event listeners
+    popup.querySelector('.playlist-popup-close').addEventListener('click', () => {
+        popup.remove();
+    });
+
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) popup.remove();
+    });
+
+    // Menu de 3 puntos
+    popup.querySelectorAll('.video-menu-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const videoId = btn.dataset.videoId;
+            const video = playlist.videos.find(v => v.videoId === videoId);
+            this.showVideoMenu(video, btn);
+        });
+    });
+
+    document.body.appendChild(popup);
+}
+
+showVideoMenu(video, buttonElement) {
+    const menu = document.createElement('div');
+    menu.className = 'video-context-menu';
+    menu.innerHTML = `
+        <button class="context-menu-item" data-action="play">
+            <i class="fas fa-play"></i> Reproducir ahora
+        </button>
+        <button class="context-menu-item" data-action="queue">
+            <i class="fas fa-plus"></i> Añadir a cola
+        </button>
+    `;
+
+    // Posicionar cerca del botón
+    const rect = buttonElement.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.style.left = `${rect.left - 100}px`;
+    menu.style.zIndex = '10000';
+
+    // Event listeners
+    menu.querySelectorAll('.context-menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            const action = e.target.dataset.action;
+            if (action === 'queue') {
+                this.addVideoToManualPlaylist(video);
+            } else if (action === 'play') {
+                this.addVideoToManualPlaylist(video);
+                // Reproducir inmediatamente
+                const flatList = this.getFlattenedPlaylist();
+                const index = flatList.findIndex(v => v.videoId === video.videoId);
+                if (index !== -1) {
+                    this.playVideoAtIndex(index);
+                }
+            }
+            menu.remove();
+        });
+    });
+
+    // Cerrar al hacer click fuera
+    setTimeout(() => {
+        document.addEventListener('click', () => menu.remove(), { once: true });
+    }, 100);
+
+    document.body.appendChild(menu);
+}
     updateQueueDisplay() {
         const queueContainer = document.getElementById('playlistContainer');
         if (!queueContainer) return;
