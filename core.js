@@ -395,6 +395,46 @@ class UnifiedCore {
     // =============================================
     // GESTIÓN DE PLAYLISTS
     // =============================================
+    async loadPlaylistVideos(playlistId) {
+    // Verificar si ya están cargados
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    if (!playlist || playlist.isLoaded || playlist.videos.length > 0) {
+        return playlist;
+    }
+
+    console.log(`📥 Cargando videos de playlist: ${playlist.name}`);
+    this.showMessage(`Cargando videos de "${playlist.name}"...`, 'loading');
+
+    try {
+        // Usar la función global de YouTube Library
+        const videos = await getYouTubeLibraryPlaylistItems(playlistId);
+        
+        if (videos && videos.length > 0) {
+            playlist.videos = videos.map(video => ({
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                duration: video.duration || 0,
+                uploaderName: 'YouTube', // Fallback ya que YouTube Library no siempre tiene esta info
+                author: 'YouTube'
+            }));
+            playlist.isLoaded = true;
+            
+            console.log(`✅ ${videos.length} videos cargados para ${playlist.name}`);
+            this.showMessage(`${videos.length} videos cargados`, 'success');
+            
+            return playlist;
+        } else {
+            console.warn(`⚠️ No se encontraron videos en playlist ${playlistId}`);
+            playlist.isLoaded = true; // Marcar como intentado
+            return playlist;
+        }
+    } catch (error) {
+        console.error(`❌ Error cargando videos de playlist ${playlistId}:`, error);
+        this.showMessage(`Error cargando playlist: ${error.message}`, 'error');
+        return playlist;
+    }
+}
     updatePlaylistsUI() {
         const container = document.getElementById('playlistsGrid');
         const queueContainer = document.getElementById('playlistContainer');
@@ -467,27 +507,52 @@ card.addEventListener('click', (e) => {
 
         return card;
     }
-createPlaylistPopup(playlist) {
+async createPlaylistPopup(playlist) {
+    // Si es una playlist de YouTube Library y no está cargada, cargarla primero
+    if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded && playlist.videos.length === 0) {
+        await this.loadPlaylistVideos(playlist.id);
+        playlist = playlistsData.find(p => p.id === playlist.id); // Recargar datos actualizados
+    }
+
     const popup = document.createElement('div');
     popup.className = 'playlist-popup-overlay';
     popup.innerHTML = `
         <div class="playlist-popup">
             <div class="playlist-popup-header">
-                <h3>${playlist.name}</h3>
+                <div class="playlist-header-info">
+                    <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="playlist-popup-thumb">
+                    <div class="playlist-header-text">
+                        <h3>${playlist.name}</h3>
+                        <p class="playlist-video-count">${playlist.videos.length} videos</p>
+                    </div>
+                </div>
                 <button class="playlist-popup-close">×</button>
             </div>
             <div class="playlist-popup-content">
                 ${playlist.videos.length === 0 ? 
-                    '<div class="empty-playlist">Esta playlist está vacía</div>' :
+                    `<div class="empty-playlist">
+                        <i class="fas fa-music-slash"></i>
+                        <h4>Esta playlist está vacía</h4>
+                        <p>No se encontraron videos válidos</p>
+                    </div>` :
                     playlist.videos.map((video, index) => `
-                        <div class="playlist-video-item">
+                        <div class="playlist-video-item" data-index="${index}">
+                            <div class="video-number">${index + 1}</div>
                             <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
                             <div class="video-info">
-                                <div class="video-title">${video.title}</div>
-                                <div class="video-duration">${this.formatDuration(video.duration)}</div>
+                                <div class="video-title" title="${video.title}">${video.title}</div>
+                                <div class="video-meta">
+                                    <span class="video-duration">${this.formatDuration(video.duration)}</span>
+                                    ${video.uploaderName ? `<span class="video-author">${video.uploaderName}</span>` : ''}
+                                </div>
                             </div>
                             <div class="video-actions">
-                                <button class="video-menu-btn" data-video-id="${video.videoId}">⋮</button>
+                                <button class="video-play-btn" title="Reproducir ahora" data-video-index="${index}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="video-menu-btn" title="Más opciones" data-video-id="${video.videoId}">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
                             </div>
                         </div>
                     `).join('')
@@ -505,6 +570,27 @@ createPlaylistPopup(playlist) {
         if (e.target === popup) popup.remove();
     });
 
+    // Reproducir video directamente
+    popup.querySelectorAll('.video-play-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const videoIndex = parseInt(btn.dataset.videoIndex);
+            const video = playlist.videos[videoIndex];
+            
+            // Añadir toda la playlist a la cola manual si no está
+            this.addPlaylistToQueue(playlist);
+            
+            // Reproducir este video específico
+            const flatList = this.getFlattenedPlaylist();
+            const globalIndex = flatList.findIndex(v => v.videoId === video.videoId);
+            if (globalIndex !== -1) {
+                this.playVideoAtIndex(globalIndex);
+                popup.remove();
+                this.switchView('playing');
+            }
+        });
+    });
+
     // Menu de 3 puntos
     popup.querySelectorAll('.video-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -516,8 +602,44 @@ createPlaylistPopup(playlist) {
     });
 
     document.body.appendChild(popup);
+    
+    // Animación de entrada
+    setTimeout(() => {
+        popup.classList.add('show');
+    }, 10);
 }
+// Función helper para añadir playlist completa a la cola
+addPlaylistToQueue(playlist) {
+    let manualPlaylist = playlistsData.find(p => p.id === 'manual');
+    
+    if (!manualPlaylist) {
+        manualPlaylist = {
+            id: 'manual',
+            name: 'Mis Vídeos Añadidos',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true
+        };
+        playlistsData.unshift(manualPlaylist);
+    }
 
+    let addedCount = 0;
+    playlist.videos.forEach(video => {
+        const isDuplicate = manualPlaylist.videos.some(v => v.videoId === video.videoId);
+        if (!isDuplicate) {
+            manualPlaylist.videos.push({ ...video });
+            addedCount++;
+        }
+    });
+
+    if (addedCount > 0) {
+        this.showMessage(`${addedCount} videos añadidos de "${playlist.name}"`, 'success');
+        this.updatePlaylistsUI();
+        this.enablePlayButton();
+    } else {
+        this.showMessage(`Todos los videos de "${playlist.name}" ya están en la cola`, 'info');
+    }
+}
 showVideoMenu(video, buttonElement) {
     const menu = document.createElement('div');
     menu.className = 'video-context-menu';
