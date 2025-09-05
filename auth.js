@@ -433,38 +433,37 @@ function updateAuthUI() {
     signOutBtn.onclick = null;
     signInBtn.removeAttribute('disabled');
     
-    if (isAuthorized) {
-        // Usuario YA autenticado
-        signInBtn.classList.add('hidden');
-        signOutBtn.classList.remove('hidden');
-        signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Cerrar Sesión';
-        signOutBtn.onclick = signOut;
-        
-    } else if (gapiReady && gisReady && tokenClient) {
-        // TODO listo para autenticar
-        signInBtn.classList.remove('hidden');
-        signOutBtn.classList.add('hidden');
-        signInBtn.innerHTML = '<i class="fab fa-google"></i> Conectar con Google';
-        signInBtn.disabled = false;
-        
-        // ASIGNAR EL LISTENER CRÍTICO
-        signInBtn.onclick = function(e) {
-            e.preventDefault();
-            console.log('🚀 ¡Click en conectar detectado!');
-            signIn();
-        };
-        
-        console.log('✅ Botón listo para autenticación');
-        
-    } else {
-        // Aún cargando o error
-        signInBtn.classList.remove('hidden');
-        signOutBtn.classList.add('hidden');
-        
-        if (!gapiReady && !gisReady) {
-            signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando Google APIs...';
-            signInBtn.disabled = true;
-        } else if (!gapiReady) {
+if (isAuthorized) {
+    // Usuario YA autenticado
+    signInBtn.classList.add('hidden');
+    signOutBtn.classList.remove('hidden');
+    signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span> Cerrar Sesión</span>';
+    signOutBtn.onclick = signOut;
+    
+} else if (gapiReady && gisReady && tokenClient) {
+    // TODO listo para autenticar
+    signInBtn.classList.remove('hidden');
+    signOutBtn.classList.add('hidden');
+    signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
+    signInBtn.disabled = false;
+    
+    // ASIGNAR EL LISTENER CRÍTICO
+    signInBtn.onclick = function(e) {
+        e.preventDefault();
+        console.log('🚀 ¡Click en conectar detectado!');
+        signIn();
+    };
+    
+    console.log('✅ Botón listo para autenticación');
+} else {
+    // Estados de carga mejorados
+    signInBtn.classList.remove('hidden');
+    signOutBtn.classList.add('hidden');
+    
+    if (!gapiReady && !gisReady) {
+        signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Cargando...</span>';
+        signInBtn.disabled = true;
+       } else if (!gapiReady) {
             signInBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Google API';
             signInBtn.disabled = true;
         } else if (!gisReady) {
