@@ -766,45 +766,61 @@ showVideoMenu(video, buttonElement) {
         }
     }
 
-    startCrossfade(prevPlayer, nextPlayer) {
-        if (crossfadeInProgress) return;
-        
-        crossfadeInProgress = true;
-        const duration = CROSSFADE_DURATION * 1000;
-        const steps = 60; // 60 pasos para transición suave
-        const stepTime = duration / steps;
-        
-        let step = 0;
-        
-        crossfadeInterval = setInterval(() => {
-            step++;
-            const progress = step / steps;
-            
-            // Curva de volumen
-            const prevVolume = Math.max(0, Math.round(100 * (1 - progress)));
-            const nextVolume = Math.min(100, Math.round(100 * progress));
-            
-            try {
-                prevPlayer.setVolume(prevVolume);
-                nextPlayer.setVolume(nextVolume);
-            } catch (e) {
-                console.warn("Error durante crossfade:", e);
-            }
-            
-            if (step >= steps) {
-                clearInterval(crossfadeInterval);
-                crossfadeInterval = null;
-                crossfadeInProgress = false;
-                
-                // Detener reproductor anterior
-                setTimeout(() => {
-                    try {
-                        prevPlayer.stopVideo();
-                    } catch (e) {}
-                }, 100);
-            }
-        }, stepTime);
+startCrossfade(prevPlayer, nextPlayer) {
+    if (crossfadeInProgress) return;
+    
+    crossfadeInProgress = true;
+    const duration = CROSSFADE_DURATION * 1000;
+    const steps = 60;
+    const stepTime = duration / steps;
+    
+    // Aplicar clases CSS para efectos visuales
+    const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    const nextElement = document.getElementById(`player${currentPlayer}`);
+    
+    if (prevElement) {
+        prevElement.classList.remove('fade-in');
+        prevElement.classList.add('fade-out');
     }
+    
+    if (nextElement) {
+        nextElement.classList.remove('hidden', 'fade-out');
+        nextElement.classList.add('fade-in');
+    }
+    
+    let step = 0;
+    crossfadeInterval = setInterval(() => {
+        step++;
+        const progress = step / steps;
+        
+        const prevVolume = Math.max(0, Math.round(100 * (1 - progress)));
+        const nextVolume = Math.min(100, Math.round(100 * progress));
+        
+        try {
+            prevPlayer.setVolume(prevVolume);
+            nextPlayer.setVolume(nextVolume);
+        } catch (e) {
+            console.warn("Error durante crossfade:", e);
+        }
+        
+        if (step >= steps) {
+            clearInterval(crossfadeInterval);
+            crossfadeInterval = null;
+            crossfadeInProgress = false;
+            
+            // Limpiar elementos después del crossfade
+            setTimeout(() => {
+                try {
+                    prevPlayer.stopVideo();
+                    if (prevElement) {
+                        prevElement.classList.add('hidden');
+                        prevElement.classList.remove('fade-out');
+                    }
+                } catch (e) {}
+            }, 100);
+        }
+    }, stepTime);
+}
 
     // =============================================
     // BÚSQUEDA
@@ -920,19 +936,19 @@ showVideoMenu(video, buttonElement) {
                 </button>
             </div>
         `;
-
         // Event listener para añadir
-        const addBtn = card.querySelector('.search-result-add-btn');
-        addBtn.addEventListener('click', (e) => {
-            const videoData = {
-                videoId: e.target.dataset.videoId,
-                title: e.target.dataset.title,
-                thumbnail: e.target.dataset.thumbnail,
-                duration: parseInt(e.target.dataset.duration) || 0
-            };
-            this.addVideoToManualPlaylist(videoData);
-        });
-
+const addBtn = card.querySelector('.search-result-add-btn');
+addBtn.addEventListener('click', (e) => {
+    const videoData = {
+        videoId: e.target.dataset.videoId,
+        title: e.target.dataset.title,
+        thumbnail: e.target.dataset.thumbnail,
+        duration: parseInt(e.target.dataset.duration) || 0,
+        uploaderName: author, // Agregar esta línea
+        author: author // Y esta también como fallback
+    };
+    this.addVideoToManualPlaylist(videoData);
+});
         return card;
     }
 
@@ -1241,30 +1257,45 @@ showVideoMenu(video, buttonElement) {
     // =============================================
     // UI UPDATES
     // =============================================
-    updateNowPlaying() {
-        const flatList = this.getFlattenedPlaylist();
-        const currentVideo = flatList[currentPlayingInfo.flattenedIndex];
+updateNowPlaying() {
+    const flatList = this.getFlattenedPlaylist();
+    const currentVideo = flatList[currentPlayingInfo.flattenedIndex];
+    
+    if (currentVideo) {
+        // Obtener información adicional del video si está disponible
+        let artistInfo = 'YT CrossMix';
         
-        if (currentVideo) {
-            // Actualizar información en vista de reproducción
-            const elements = {
-                nowPlayingTitle: document.getElementById('nowPlayingTitle'),
-                nowPlayingArtist: document.getElementById('nowPlayingArtist'),
-                playerTitle: document.getElementById('playerTitle'),
-                playerArtist: document.getElementById('playerArtist'),
-                playerThumbnail: document.getElementById('playerThumbnail')
-            };
-
-            if (elements.nowPlayingTitle) elements.nowPlayingTitle.textContent = currentVideo.title;
-            if (elements.nowPlayingArtist) elements.nowPlayingArtist.textContent = 'YT CrossMix';
-            if (elements.playerTitle) elements.playerTitle.textContent = currentVideo.title;
-            if (elements.playerArtist) elements.playerArtist.textContent = 'YT CrossMix - Sistema Unificado';
-            if (elements.playerThumbnail) {
-                elements.playerThumbnail.src = currentVideo.thumbnail;
-                elements.playerThumbnail.alt = currentVideo.title;
+        // Si el video tiene información del canal, usarla
+        if (currentVideo.uploaderName) {
+            artistInfo = currentVideo.uploaderName;
+        } else if (currentVideo.author) {
+            artistInfo = currentVideo.author;
+        } else {
+            // Intentar extraer del título
+            const titleParts = currentVideo.title.split(' - ');
+            if (titleParts.length > 1) {
+                artistInfo = titleParts[0];
             }
         }
+        
+        const elements = {
+            nowPlayingTitle: document.getElementById('nowPlayingTitle'),
+            nowPlayingArtist: document.getElementById('nowPlayingArtist'),
+            playerTitle: document.getElementById('playerTitle'),
+            playerArtist: document.getElementById('playerArtist'),
+            playerThumbnail: document.getElementById('playerThumbnail')
+        };
+
+        if (elements.nowPlayingTitle) elements.nowPlayingTitle.textContent = currentVideo.title;
+        if (elements.nowPlayingArtist) elements.nowPlayingArtist.textContent = artistInfo;
+        if (elements.playerTitle) elements.playerTitle.textContent = currentVideo.title;
+        if (elements.playerArtist) elements.playerArtist.textContent = artistInfo;
+        if (elements.playerThumbnail) {
+            elements.playerThumbnail.src = currentVideo.thumbnail;
+            elements.playerThumbnail.alt = currentVideo.title;
+        }
     }
+}
 
     updatePlayButton(state) {
         const playBtn = document.getElementById('botonPlay');
