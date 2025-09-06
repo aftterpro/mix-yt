@@ -774,16 +774,33 @@ showVideoMenu(video, buttonElement) {
         }
     }
 
-    handleNext() {
-        if (!reproduccionIniciada) {
-            this.showMessage("Inicia la reproducción primero", 'warning');
-            return;
-        }
-        
-        this.stopMonitoring();
-        this.playNextVideo();
-        setTimeout(() => this.startMonitoring(), 500);
+handleNext() {
+    if (!reproduccionIniciada) {
+        this.showMessage("Inicia la reproducción primero", 'warning');
+        return;
     }
+    
+    const flatList = this.getFlattenedPlaylist();
+    if (flatList.length === 0) {
+        this.showMessage("No hay videos en la cola", 'warning');
+        return;
+    }
+    
+    // Detener monitoreo temporalmente
+    this.stopMonitoring();
+    
+    // Obtener índice siguiente
+    let nextIndex = currentPlayingInfo.flattenedIndex + 1;
+    if (nextIndex >= flatList.length) {
+        nextIndex = 0; // Volver al principio
+    }
+    
+    const nextVideo = flatList[nextIndex];
+    console.log(`⏭️ Botón Next: Saltando a ${nextVideo.title} (índice ${nextIndex})`);
+    
+    // Reproducir directamente
+    this.playVideoAtIndex(nextIndex);
+}
 
     handlePrevious() {
         // Implementar lógica de video anterior
@@ -830,63 +847,113 @@ showVideoMenu(video, buttonElement) {
             this.updatePlayButton('play');
         }
     }
+async playNextVideo() {
+    const currentFlatIndex = currentPlayingInfo.flattenedIndex;
+    const flatList = this.getFlattenedPlaylist();
 
-    async playNextVideo() {
-        const currentFlatIndex = currentPlayingInfo.flattenedIndex;
-        const flatList = this.getFlattenedPlaylist();
+    if (flatList.length === 0) {
+        this.handleEmptyPlaylist();
+        return;
+    }
 
-        if (flatList.length === 0) {
-            this.handleEmptyPlaylist();
-            return;
-        }
+    let nextIndex = currentFlatIndex + 1;
+    if (nextIndex >= flatList.length) {
+        this.handleEndOfPlaylist();
+        return;
+    }
 
-        let nextIndex = currentFlatIndex + 1;
-        if (nextIndex >= flatList.length) {
-            this.handleEndOfPlaylist();
-            return;
-        }
+    const nextVideo = flatList[nextIndex];
+    console.log(`⏭️ Reproduciendo siguiente: ${nextVideo.title} (índice ${nextIndex})`);
 
-        const nextVideo = flatList[nextIndex];
-        console.log(`⏭️ Reproduciendo siguiente: ${nextVideo.title}`);
+    // Actualizar estado INMEDIATAMENTE antes de cualquier cambio
+    currentPlayingInfo = {
+        flattenedIndex: nextIndex,
+        videoId: nextVideo.videoId,
+        playlistId: nextVideo.sourcePlaylistId
+    };
 
-        // Lógica de crossfade (simplificada para el ejemplo)
-        const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
-        const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
-        const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    // Actualizar UI inmediatamente
+    this.updateNowPlaying();
 
-        try {
-            // Preparar siguiente reproductor
-            nextPlayerInstance.cueVideoById(nextVideo.videoId);
-            nextPlayerInstance.setVolume(0);
-            
-            if (nextPlayerElement) {
-                nextPlayerElement.classList.remove('hidden', 'fade-out');
-            }
+    // Determinar reproductores
+    const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
+    const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
+    const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
 
-            // Actualizar estado
-            currentPlayingInfo = {
-                flattenedIndex: nextIndex,
-                videoId: nextVideo.videoId,
-                playlistId: nextVideo.sourcePlaylistId
+    try {
+        console.log(`🎬 Preparando video en player${currentPlayer === 1 ? 2 : 1}`);
+        
+        // Preparar siguiente reproductor
+        await new Promise((resolve, reject) => {
+            // Timeout para evitar cuelgues
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout cargando video'));
+            }, 10000);
+
+            const onReady = () => {
+                clearTimeout(timeout);
+                resolve();
             };
 
-            // Iniciar reproducción
-            await nextPlayerInstance.playVideo();
+            // Cargar video
+            nextPlayerInstance.cueVideoById({
+                videoId: nextVideo.videoId,
+                startSeconds: 0
+            });
+
+            // Configurar volumen inicial
+            nextPlayerInstance.setVolume(0);
             
-            // Cambiar reproductor activo
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-            
-            // Aplicar crossfade
-            this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
-            
+            // Mostrar elemento si estaba oculto
+            if (nextPlayerElement) {
+                nextPlayerElement.classList.remove('hidden');
+                nextPlayerElement.style.display = 'block';
+            }
+
+            // Resolver inmediatamente para continuar - el video se cargará en background
+            setTimeout(onReady, 100);
+        });
+
+        console.log(`▶️ Iniciando reproducción en player${currentPlayer === 1 ? 2 : 1}`);
+        
+        // Iniciar reproducción del siguiente
+        await nextPlayerInstance.playVideo();
+        
+        // CAMBIAR currentPlayer ANTES del crossfade
+        const previousPlayer = currentPlayer;
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        
+        console.log(`🔄 Cambio de reproductor: ${previousPlayer} → ${currentPlayer}`);
+        
+        // Iniciar crossfade visual y de audio
+        this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
+        
+        // Actualizar UI final después de un breve delay
+        setTimeout(() => {
             this.updateNowPlaying();
             this.updatePlaylistsUI();
+            
+            // Verificar que la información sea correcta
+            console.log(`✅ Reproducción actualizada: ${currentPlayingInfo.videoId} en player${currentPlayer}`);
+        }, 200);
+        
+        // Reset de bandera de crossfade
+        hasOutroCrossfadeStarted = false;
 
-        } catch (error) {
-            console.error("Error en reproducción siguiente:", error);
-            this.showMessage("Error cambiando video", 'error');
+    } catch (error) {
+        console.error("❌ Error en playNextVideo:", error);
+        this.showMessage(`Error cambiando video: ${error.message}`, 'error');
+        
+        // En caso de error, intentar reproducción directa
+        try {
+            console.log("🔄 Intentando reproducción directa como fallback...");
+            this.playVideoAtIndex(nextIndex);
+        } catch (fallbackError) {
+            console.error("❌ Error en fallback:", fallbackError);
+            this.handleEmptyPlaylist();
         }
     }
+}
 
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) return;
@@ -1164,15 +1231,49 @@ addBtn.addEventListener('click', (e) => {
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
-    getFlattenedPlaylist() {
-        let flatList = [];
-        playlistsData.forEach(playlist => {
-            playlist.videos.forEach(video => {
-                flatList.push({ ...video, sourcePlaylistId: playlist.id });
-            });
+getFlattenedPlaylist() {
+    let flatList = [];
+    playlistsData.forEach(playlist => {
+        playlist.videos.forEach(video => {
+            // Unificar formato de datos independientemente del origen
+            const unifiedVideo = {
+                videoId: video.videoId,
+                title: video.title || "Título Desconocido",
+                thumbnail: video.thumbnail || './electronic.ico',
+                duration: this.parseDuration(video.duration) || 0, // Asegurar que duration sea número
+                uploaderName: video.uploaderName || video.author || this.extractArtistFromTitle(video.title),
+                author: video.author || video.uploaderName || this.extractArtistFromTitle(video.title),
+                sourcePlaylistId: playlist.id,
+                source: video.source || playlist.source || 'manual'
+            };
+            flatList.push(unifiedVideo);
         });
-        return flatList;
+    });
+    
+    console.log(`📊 Lista plana: ${flatList.length} videos total`);
+    return flatList;
+}
+
+// Función helper para extraer artista del título
+extractArtistFromTitle(title) {
+    if (!title) return 'Artista Desconocido';
+    
+    // Patrones comunes: "Artista - Canción" o "Artista: Canción"
+    const patterns = [
+        /^([^-]+)\s*-\s*(.+)$/,
+        /^([^:]+)\s*:\s*(.+)$/,
+        /^([^|]+)\s*\|\s*(.+)$/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = title.match(pattern);
+        if (match) {
+            return match[1].trim();
+        }
     }
+    
+    return 'YT CrossMix';
+}
 
     formatDuration(duration) {
         if (isNaN(duration) || duration < 0) return "0:00";
@@ -1239,12 +1340,20 @@ addBtn.addEventListener('click', (e) => {
             return;
         }
 
-        const loadedVideos = playlistInfo.relatedStreams.map(video => ({
-            videoId: video.url?.split('v=')[1],
-            title: video.title || "Título Desconocido",
-            thumbnail: video.thumbnail || './electronic.ico',
-            duration: this.parseDuration(video.duration) || 0,
-        })).filter(v => v.videoId);
+    const loadedVideos = playlistInfo.relatedStreams.map(video => {
+    const videoId = video.url?.split('v=')[1];
+    const duration = this.parseDuration(video.duration);
+    
+    return {
+        videoId: videoId,
+        title: video.title || "Título Desconocido",
+        thumbnail: video.thumbnail || './electronic.ico',
+        duration: duration || 0, // Asegurar que sea número
+        uploaderName: video.uploaderName || this.extractArtistFromTitle(video.title),
+        author: video.uploaderName || this.extractArtistFromTitle(video.title),
+        source: 'url'
+        };
+        }).filter(v => v.videoId && v.title);
 
         if (loadedVideos.length === 0) {
             this.showMessage("La playlist no contiene videos válidos", 'error');
@@ -1272,30 +1381,40 @@ addBtn.addEventListener('click', (e) => {
         this.enablePlayButton();
     }
 
-    parseDuration(durationInput) {
-        if (typeof durationInput === 'number') return Math.floor(durationInput);
-        if (typeof durationInput !== 'string') return 0;
-
-        // Formato ISO PT1H2M3S
-        const isoMatch = durationInput.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
-        if (isoMatch) {
-            const hours = parseInt(isoMatch[1] || '0', 10);
-            const minutes = parseInt(isoMatch[2] || '0', 10);
-            const seconds = parseFloat(isoMatch[3] || '0');
-            return Math.floor(hours * 3600 + minutes * 60 + seconds);
-        }
-
-        // Formato MM:SS o HH:MM:SS
-        const timeParts = durationInput.split(':').map(part => parseInt(part, 10));
-        if (timeParts.length === 2 && timeParts.every(p => !isNaN(p))) {
-            return timeParts[0] * 60 + timeParts[1];
-        } else if (timeParts.length === 3 && timeParts.every(p => !isNaN(p))) {
-            return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-        }
-
-        const directNumber = parseInt(durationInput, 10);
-        return !isNaN(directNumber) ? directNumber : 0;
+parseDuration(durationInput) {
+    if (typeof durationInput === 'number' && !isNaN(durationInput)) {
+        return Math.floor(Math.abs(durationInput));
     }
+    
+    if (typeof durationInput !== 'string') return 0;
+
+    // Formato ISO PT1H2M3S
+    const isoMatch = durationInput.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+    if (isoMatch) {
+        const hours = parseInt(isoMatch[1] || '0', 10);
+        const minutes = parseInt(isoMatch[2] || '0', 10);
+        const seconds = parseFloat(isoMatch[3] || '0');
+        return Math.floor(hours * 3600 + minutes * 60 + seconds);
+    }
+
+    // Formato MM:SS o HH:MM:SS
+    const timeParts = durationInput.split(':').map(part => parseInt(part, 10));
+    if (timeParts.length === 2 && timeParts.every(p => !isNaN(p))) {
+        return timeParts[0] * 60 + timeParts[1];
+    } else if (timeParts.length === 3 && timeParts.every(p => !isNaN(p))) {
+        return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+    }
+
+    // Número directo
+    const directNumber = parseInt(durationInput, 10);
+    if (!isNaN(directNumber) && directNumber > 0) {
+        return directNumber;
+    }
+
+    // Si no se puede parsear, asumir duración promedio de canción (3.5 minutos)
+    console.warn(`⚠️ No se pudo parsear duración: "${durationInput}", usando 210s por defecto`);
+    return 210;
+}
 
     // =============================================
     // PLAYLISTS DE YOUTUBE LIBRARY
@@ -1928,7 +2047,23 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => window.unifiedCore?.enableDebugMode(), 1000);
     }
 });
-
+// Preservar datos al cambiar tamaño de ventana
+window.addEventListener('resize', () => {
+    // Debounce para evitar múltiples llamadas
+    clearTimeout(this.resizeTimeout);
+    this.resizeTimeout = setTimeout(() => {
+        console.log('🖥️ Redimensionando ventana, preservando datos...');
+        this.updatePlaylistsUI();
+        this.updateNowPlaying();
+        
+        // Forzar actualización de auth UI
+        setTimeout(() => {
+            if (window.updateAuthUI) {
+                window.updateAuthUI();
+            }
+        }, 100);
+    }, 300);
+});
 // Cleanup al salir
 window.addEventListener('beforeunload', () => {
     if (window.unifiedCore?.state?.initialized) {
