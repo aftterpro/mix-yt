@@ -5,7 +5,7 @@ console.log('🚀 Iniciando YT CrossMix - Sistema Unificado');
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
-const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
+const CROSSFADE_DURATION = 10; // Duración del crossfade en segundos
 const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library';
 
 let player1, player2;
@@ -891,26 +891,38 @@ showVideoMenu(video, buttonElement) {
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) return;
     
+    console.log('🎨 Iniciando crossfade visual y de audio...');
     crossfadeInProgress = true;
-    const duration = CROSSFADE_DURATION * 1000;
-    const steps = 60;
-    const stepTime = duration / steps;
     
-    // Aplicar clases CSS para efectos visuales
+    // Obtener elementos DOM
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
     
+    console.log('🎨 Elementos:', {
+        prev: prevElement ? `player${currentPlayer === 1 ? 2 : 1}` : 'null',
+        next: nextElement ? `player${currentPlayer}` : 'null'
+    });
+    
+    // Aplicar efectos visuales INMEDIATAMENTE
     if (prevElement) {
-        prevElement.classList.remove('fade-in');
-        prevElement.classList.add('fade-out');
+        prevElement.classList.remove('fade-in', 'hidden');
+        prevElement.classList.add('fade-out', 'crossfade-exit');
+        console.log('🎨 Aplicando fade-out a elemento previo');
     }
     
     if (nextElement) {
         nextElement.classList.remove('hidden', 'fade-out');
-        nextElement.classList.add('fade-in');
+        nextElement.classList.add('fade-in', 'crossfade-enter');
+        nextElement.style.zIndex = '3';
+        console.log('🎨 Aplicando fade-in a elemento siguiente');
     }
     
+    // Crossfade de audio
+    const duration = CROSSFADE_DURATION * 1000;
+    const steps = 60;
+    const stepTime = duration / steps;
     let step = 0;
+    
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
@@ -922,7 +934,7 @@ startCrossfade(prevPlayer, nextPlayer) {
             prevPlayer.setVolume(prevVolume);
             nextPlayer.setVolume(nextVolume);
         } catch (e) {
-            console.warn("Error durante crossfade:", e);
+            console.warn("Error durante crossfade de audio:", e);
         }
         
         if (step >= steps) {
@@ -930,16 +942,24 @@ startCrossfade(prevPlayer, nextPlayer) {
             crossfadeInterval = null;
             crossfadeInProgress = false;
             
+            console.log('🎨 Crossfade completado');
+            
             // Limpiar elementos después del crossfade
             setTimeout(() => {
                 try {
                     prevPlayer.stopVideo();
                     if (prevElement) {
                         prevElement.classList.add('hidden');
-                        prevElement.classList.remove('fade-out');
+                        prevElement.classList.remove('fade-out', 'crossfade-exit');
+                        prevElement.style.zIndex = '1';
                     }
-                } catch (e) {}
-            }, 100);
+                    if (nextElement) {
+                        nextElement.classList.remove('crossfade-enter');
+                    }
+                } catch (e) {
+                    console.error('Error limpiando después del crossfade:', e);
+                }
+            }, 500);
         }
     }, stepTime);
 }
@@ -1344,38 +1364,47 @@ addBtn.addEventListener('click', (e) => {
         }
     }
 
-    updateCurrentPlayingIndex() {
-        const flatList = this.getFlattenedPlaylist();
-        let playingVideoId = null;
+updateCurrentPlayingIndex() {
+    const flatList = this.getFlattenedPlaylist();
+    let playingVideoId = null;
+    let activePlayerNum = null;
 
-        try {
-            if (player1?.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = player1.getVideoData()?.video_id;
-                currentPlayer = 1;
-            } else if (player2?.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = player2.getVideoData()?.video_id;
-                currentPlayer = 2;
-            }
-        } catch (e) {
-            console.error("Error obteniendo datos de reproducción:", e);
+    try {
+        // Verificar cuál reproductor está activo
+        if (player1 && player1.getPlayerState() === YT.PlayerState.PLAYING) {
+            playingVideoId = player1.getVideoData()?.video_id;
+            activePlayerNum = 1;
+        } else if (player2 && player2.getPlayerState() === YT.PlayerState.PLAYING) {
+            playingVideoId = player2.getVideoData()?.video_id;
+            activePlayerNum = 2;
         }
-
-        if (playingVideoId && currentPlayingInfo.videoId !== playingVideoId) {
-            const newIndex = flatList.findIndex(v => v.videoId === playingVideoId);
-            if (newIndex !== -1) {
-                const videoObj = flatList[newIndex];
-                currentPlayingInfo = {
-                    videoId: playingVideoId,
-                    playlistId: videoObj.sourcePlaylistId,
-                    flattenedIndex: newIndex
-                };
-                console.log(`📍 Índice actualizado: ${newIndex} (${playingVideoId})`);
-                this.updateNowPlaying();
-                this.updatePlaylistsUI();
-            }
+        
+        if (!playingVideoId) return;
+        
+        console.log(`🔄 Video activo: ${playingVideoId} en player${activePlayerNum}`);
+        
+        // Buscar el índice correcto en la lista plana
+        const newIndex = flatList.findIndex(v => v.videoId === playingVideoId);
+        
+        if (newIndex !== -1 && currentPlayingInfo.flattenedIndex !== newIndex) {
+            const videoObj = flatList[newIndex];
+            currentPlayingInfo = {
+                videoId: playingVideoId,
+                playlistId: videoObj.sourcePlaylistId,
+                flattenedIndex: newIndex
+            };
+            
+            // Actualizar currentPlayer al reproductor activo
+            currentPlayer = activePlayerNum;
+            
+            console.log(`📍 Índice actualizado: ${newIndex} (${playingVideoId}) en player${currentPlayer}`);
+            this.updateNowPlaying();
+            this.updatePlaylistsUI();
         }
+    } catch (e) {
+        console.error("Error obteniendo datos de reproducción:", e);
     }
-
+}
     // =============================================
     // UI UPDATES
     // =============================================
@@ -1693,6 +1722,15 @@ function checkAndSkipSegment(player) {
 
         if (!videoId || isNaN(currentTime) || currentTime < 0) return;
 
+        // CRITICAL: Evitar loop infinito - verificar si ya saltamos este segmento recientemente
+        const skipKey = `${videoId}_${Math.floor(currentTime)}`;
+        const now = Date.now();
+        
+        // Si saltamos este mismo segundo en los últimos 2 segundos, no saltar de nuevo
+        if (lastSeekVideoId === videoId && Math.abs(currentTime - lastSeekEndTime) < 3) {
+            return;
+        }
+
         // Si no hay segmentos en caché, obtenerlos
         if (!segmentosCache[videoId]) {
             obtenerSegmentosSponsorBlock(videoId);
@@ -1706,54 +1744,39 @@ function checkAndSkipSegment(player) {
         const segments = segmentosCache[videoId];
         if (!Array.isArray(segments) || segments.length === 0) return;
 
-        // Buscar segmento a saltar - CORREGIDO para estructura SponsorBlock real
+        // Buscar segmento a saltar - SOLO music_offtopic para música
         const segmentToSkip = segments.find(segment => {
-            // NUEVA VALIDACIÓN: SponsorBlock usa startTime/endTime, NO segment array
-            if (!segment || typeof segment !== 'object') {
-                console.warn('⚠️ Segmento con estructura inválida:', segment);
-                return false;
+            if (!segment || typeof segment !== 'object') return false;
+            
+            // FILTRAR: Solo saltar intros/outros muy largos, no música
+            if (segment.category === 'music_offtopic') {
+                const start = segment.startTime || segment.segment?.[0] || 0;
+                const end = segment.endTime || segment.segment?.[1] || 0;
+                
+                // Solo saltar si es intro/outro muy largo (más de 10 segundos)
+                if ((end - start) < 10) return false;
+                
+                return currentTime >= start && currentTime < end;
             }
             
-            // Verificar si usa la estructura nueva (startTime/endTime) o antigua (segment array)
-            let start, end;
-            
-            if (segment.startTime !== undefined && segment.endTime !== undefined) {
-                // Estructura nueva de SponsorBlock
-                start = segment.startTime;
-                end = segment.endTime;
-            } else if (segment.segment && Array.isArray(segment.segment)) {
-                // Estructura antigua (por compatibilidad)
-                start = segment.segment[0];
-                end = segment.segment[1];
-            } else {
-                console.warn('⚠️ Segmento sin tiempos válidos:', segment);
-                return false;
-            }
-            
-            // Validar que start y end sean números válidos
-            if (typeof start !== 'number' || typeof end !== 'number' || 
-                isNaN(start) || isNaN(end) || start < 0 || end < 0 || start >= end) {
-                console.warn('⚠️ Tiempos de segmento inválidos:', { start, end });
-                return false;
-            }
-            
-            return currentTime >= start && currentTime < end;
+            return false; // No saltar otros tipos de segmentos en música
         });
 
         if (segmentToSkip) {
-            // Determinar tiempo de salto según estructura
             const skipToTime = segmentToSkip.endTime || segmentToSkip.segment?.[1];
-            const category = segmentToSkip.category || 'unknown';
             
             if (skipToTime && typeof skipToTime === 'number' && skipToTime > currentTime) {
-                console.log(`⏭️ SponsorBlock: Saltando segmento ${category} de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s`);
+                console.log(`⏭️ SponsorBlock: Saltando intro/outro de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s`);
+                
+                // Guardar información del salto para evitar loops
+                lastSeekVideoId = videoId;
+                lastSeekEndTime = skipToTime;
                 
                 try {
                     player.seekTo(skipToTime, true);
                     
-                    // Mostrar mensaje opcional
                     if (window.unifiedCore) {
-                        window.unifiedCore.showMessage(`Saltado: ${category}`, 'info', 2000);
+                        window.unifiedCore.showMessage(`Saltado intro/outro`, 'info', 2000);
                     }
                 } catch (seekError) {
                     console.error("❌ Error saltando segmento:", seekError);
@@ -1785,22 +1808,24 @@ function monitorPlayers() {
             currentTime > 0 && !isNaN(currentTime)) {
             checkAndSkipSegment(activePlayer);
         }
-
-        // Lógica de crossfade
-        if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime > 0) {
-            const timeRemaining = videoDuration - currentTime;
-            
-            if (timeRemaining <= CROSSFADE_DURATION + 0.5 && 
-                timeRemaining > 0 && 
-                !hasOutroCrossfadeStarted && 
-                !crossfadeInProgress) {
-                console.log(`⏰ Tiempo restante: ${timeRemaining.toFixed(1)}s, iniciando crossfade`);
-                hasOutroCrossfadeStarted = true; // Marcar que ya se inició
-                if (window.unifiedCore) {
-                    window.unifiedCore.playNextVideo();
-                }
-            }
+// Lógica de crossfade - MEJORADA
+if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime > 0) {
+    const timeRemaining = videoDuration - currentTime;
+    
+    // Iniciar crossfade cuando queden exactamente 10 segundos
+    if (timeRemaining <= CROSSFADE_DURATION && 
+        timeRemaining > (CROSSFADE_DURATION - 1) && 
+        !hasOutroCrossfadeStarted && 
+        !crossfadeInProgress) {
+        
+        console.log(`⏰ Iniciando crossfade: ${timeRemaining.toFixed(1)}s restantes`);
+        hasOutroCrossfadeStarted = true;
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.playNextVideo();
         }
+    }
+}
         
     } catch (error) {
         console.error("❌ Error en monitorPlayers:", error);
