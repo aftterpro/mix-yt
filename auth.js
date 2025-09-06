@@ -477,8 +477,34 @@ if (isAuthorized) {
 
     // Actualizar estado en overview
     updateOverviewAuthStatus();
-}
+// ARREGLO MÓVIL: Asegurar que los botones móviles también se actualicen
+const mobileAuthElements = {
+    mobileSignIn: document.querySelector('.mobile-user-actions .auth-btn'),
+    mobileSignOut: document.querySelector('.mobile-user-actions .auth-btn.hidden')
+};
 
+// Si hay elementos móviles, sincronizar con desktop
+if (mobileAuthElements.mobileSignIn || mobileAuthElements.mobileSignOut) {
+    if (isAuthorized) {
+        if (mobileAuthElements.mobileSignIn) {
+            mobileAuthElements.mobileSignIn.classList.add('hidden');
+        }
+        if (mobileAuthElements.mobileSignOut) {
+            mobileAuthElements.mobileSignOut.classList.remove('hidden');
+            mobileAuthElements.mobileSignOut.onclick = signOut;
+        }
+    } else if (gapiReady && gisReady && tokenClient) {
+        if (mobileAuthElements.mobileSignIn) {
+            mobileAuthElements.mobileSignIn.classList.remove('hidden');
+            mobileAuthElements.mobileSignIn.onclick = signIn;
+            mobileAuthElements.mobileSignIn.disabled = false;
+        }
+        if (mobileAuthElements.mobileSignOut) {
+            mobileAuthElements.mobileSignOut.classList.add('hidden');
+        }
+    }
+  }
+}
 // Actualizar estado de auth en overview
 function updateOverviewAuthStatus() {
     const authStatus = document.getElementById('unifiedSystemStatus');
