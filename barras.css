@@ -1,4 +1,487 @@
 /* =============================================
+   COLA COMO POPUP - NUEVOS ESTILOS
+   ============================================= */
+.queue-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.queue-popup-overlay.show {
+    opacity: 1;
+}
+
+.queue-popup-overlay.fade-out {
+    opacity: 0;
+    transform: scale(0.95);
+}
+
+.queue-popup {
+    background: linear-gradient(135deg, var(--surface-color) 0%, var(--surface-light) 100%);
+    border-radius: var(--border-radius-lg);
+    max-width: 700px;
+    max-height: 85vh;
+    width: 95%;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--surface-light);
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 107, 53, 0.1);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.queue-popup-overlay.show .queue-popup {
+    transform: scale(1) translateY(0);
+}
+
+.queue-popup-header {
+    padding: var(--spacing-lg);
+    border-bottom: 2px solid rgba(255, 107, 53, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, transparent 100%);
+}
+
+.queue-popup-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.queue-popup-title i {
+    color: var(--primary-color);
+    font-size: 18px;
+}
+
+.queue-popup-close {
+    background: rgba(244, 67, 54, 0.1);
+    border: 2px solid transparent;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.queue-popup-close:hover {
+    background: rgba(244, 67, 54, 0.2);
+    border-color: #f44336;
+    color: #f44336;
+    transform: scale(1.1);
+}
+
+.queue-popup-content {
+    overflow-y: auto;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) var(--surface-light);
+}
+
+.queue-popup-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.queue-popup-content::-webkit-scrollbar-track {
+    background: var(--surface-light);
+    border-radius: 4px;
+}
+
+.queue-popup-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border-radius: 4px;
+}
+
+.queue-popup-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+}
+
+/* =============================================
+   CONTROLES DE COLA EN POPUP
+   ============================================= */
+.queue-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: rgba(255, 107, 53, 0.05);
+    border-bottom: 2px solid rgba(255, 107, 53, 0.1);
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.queue-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.clear-queue-btn {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.clear-queue-btn:hover {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+/* =============================================
+   ITEMS DE COLA EN POPUP
+   ============================================= */
+.queue-items {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+}
+
+.queue-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: 1px solid transparent;
+    position: relative;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.queue-item:hover {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(255, 107, 53, 0.04) 100%);
+    border-color: rgba(255, 107, 53, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 53, 0.15);
+}
+
+.queue-item.playing {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 107, 53, 0.08) 100%);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.queue-item-number {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--surface-light), var(--surface-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    transition: all var(--transition-fast);
+}
+
+.queue-item:hover .queue-item-number {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.queue-item.playing .queue-item-number {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-color: var(--primary-color);
+    animation: pulseQueueNumber 2s infinite;
+}
+
+@keyframes pulseQueueNumber {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 0 8px rgba(255, 107, 53, 0.1);
+    }
+}
+
+.queue-item-thumbnail {
+    width: 80px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--surface-light);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.queue-item:hover .queue-item-thumbnail {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    transform: scale(1.05);
+}
+
+.queue-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.queue-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--text-primary);
+}
+
+.queue-item-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 12px;
+}
+
+.queue-item-duration {
+    background: rgba(255, 107, 53, 0.1);
+    color: var(--primary-color);
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    min-width: 40px;
+    text-align: center;
+}
+
+.queue-item-author {
+    color: var(--text-secondary);
+    padding: 2px var(--spacing-sm);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--border-radius-sm);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.queue-item-playing {
+    color: var(--primary-color);
+    font-size: 16px;
+    animation: pulseIcon 2s infinite;
+}
+
+@keyframes pulseIcon {
+    0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+.queue-item-remove {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all var(--transition-fast);
+    opacity: 0;
+}
+
+.queue-item:hover .queue-item-remove {
+    opacity: 1;
+}
+
+.queue-item-remove:hover {
+    background: rgba(244, 67, 54, 0.3);
+    border-color: #f44336;
+    color: #f44336;
+    transform: scale(1.1);
+}
+
+/* =============================================
+   ESTADO VACÍO EN POPUP
+   ============================================= */
+.empty-queue-message {
+    text-align: center;
+    padding: var(--spacing-xl) var(--spacing-lg);
+    color: var(--text-muted);
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.03) 0%, transparent 100%);
+    border-radius: var(--border-radius);
+    border: 2px dashed rgba(255, 107, 53, 0.2);
+    margin: var(--spacing-lg);
+}
+
+.empty-queue-message i {
+    font-size: 48px;
+    margin-bottom: var(--spacing-md);
+    color: rgba(255, 107, 53, 0.5);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.empty-queue-message p {
+    font-size: 14px;
+    margin-bottom: var(--spacing-sm);
+    line-height: 1.5;
+}
+
+.empty-queue-message p:first-of-type {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* =============================================
+   RESPONSIVE PARA POPUP DE COLA
+   ============================================= */
+@media (max-width: 768px) {
+    .queue-popup {
+        width: 98%;
+        max-height: 90vh;
+        margin: var(--spacing-md);
+    }
+    
+    .queue-popup-header {
+        padding: var(--spacing-md);
+    }
+    
+    .queue-popup-title {
+        font-size: 18px;
+    }
+    
+    .queue-controls {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: stretch;
+        padding: var(--spacing-md);
+    }
+    
+    .clear-queue-btn {
+        align-self: center;
+        width: 200px;
+    }
+    
+    .queue-item {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+    }
+    
+    .queue-item-thumbnail {
+        width: 60px;
+        height: 34px;
+    }
+    
+    .queue-item-number {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+    }
+    
+    .queue-item-title {
+        font-size: 13px;
+    }
+    
+    .queue-item-meta {
+        font-size: 11px;
+        gap: 4px;
+    }
+    
+    .queue-item-author {
+        max-width: 80px;
+    }
+}
+
+@media (max-width: 480px) {
+    .queue-popup {
+        width: 100%;
+        height: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+        margin: 0;
+    }
+    
+    .queue-popup-header {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .queue-popup-title {
+        font-size: 16px;
+    }
+    
+    .queue-popup-close {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+    }
+    
+    .queue-controls {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
+    
+    .queue-items {
+        padding: 0 var(--spacing-sm) var(--spacing-sm);
+    }
+    
+    .queue-item-remove {
+        width: 28px;
+        height: 28px;
+        font-size: 10px;
+    }
+    
+    .empty-queue-message {
+        margin: var(--spacing-md);
+        padding: var(--spacing-lg) var(--spacing-md);
+    }
+    
+    .empty-queue-message i {
+        font-size: 36px;
+    }
+}
+/* =============================================
    PESTAÑAS PARA EXPLORAR Y BIBLIOTECA
    ============================================= */
 .explore-tabs,
