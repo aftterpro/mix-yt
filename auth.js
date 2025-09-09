@@ -65,7 +65,7 @@ window.debugOAuth = function() {
         scopes: GOOGLE_CONFIG.SCOPES
     };
     
-    console.table(info);
+   // console.table(info);
     
     // Verificar si el origen está en la lista de permitidos
     const allowedOrigins = [
