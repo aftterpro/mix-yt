@@ -166,10 +166,16 @@ async function initializeGoogleAPIs() {
         console.log('✅ GIS inicializado correctamente');
         gisReady = true;
         
+        // CORREGIDO: Marcar APIs como listas en el estado global
+        if (window.ytCrossMixAPIs) {
+            window.ytCrossMixAPIs.gapi = true;
+            window.ytCrossMixAPIs.gis = true;
+        }
+        
         // Actualizar UI
         updateAuthUI();
         
-        // Verificar token guardado
+        // CORREGIDO: Verificar token guardado DESPUÉS de que todo esté listo
         setTimeout(checkStoredToken, 1000);
         
     } catch (error) {
@@ -223,24 +229,44 @@ function handleAuthResponse(response) {
         console.log('✅ Token recibido exitosamente');
         isAuthorized = true;
         
-        // Guardar token
+        // CORREGIDO: Configurar el token en gapi.client inmediatamente
+        gapi.client.setToken({
+            access_token: response.access_token
+        });
+        
+        // Guardar token con más información
         try {
-            localStorage.setItem('google_token', JSON.stringify({
+            const tokenData = {
                 access_token: response.access_token,
                 timestamp: Date.now(),
-                expires_in: response.expires_in || 3600
-            }));
-            console.log('💾 Token guardado');
+                expires_in: response.expires_in || 3600,
+                scope: response.scope || GOOGLE_CONFIG.SCOPES
+            };
+            
+            localStorage.setItem('google_token', JSON.stringify(tokenData));
+            console.log('💾 Token guardado:', {
+                expires_in: tokenData.expires_in,
+                scope: tokenData.scope,
+                timestamp: new Date(tokenData.timestamp).toLocaleString()
+            });
         } catch (e) {
             console.warn('⚠️ No se pudo guardar token:', e);
         }
         
         updateAuthUI();
-        loadUserPlaylists();
+        
+        // CORREGIDO: Cargar playlists inmediatamente después de autenticar
+        setTimeout(() => {
+            loadUserPlaylists();
+        }, 500);
         
         if (window.unifiedCore) {
             window.unifiedCore.showMessage('¡Conectado exitosamente!', 'success');
         }
+        
+        // Exponer estado globalmente para otras funciones
+        window.isAuthorized = true;
+        
     } else {
         console.warn('⚠️ Respuesta sin token:', response);
         showError('No se recibió token de acceso');
@@ -308,24 +334,11 @@ function signOut() {
         localStorage.removeItem('google_token');
         
         isAuthorized = false;
+        window.isAuthorized = false; // Limpiar estado global
         updateAuthUI();
         
         // Disparar evento de logout
         document.dispatchEvent(new CustomEvent('userLoggedOut'));
-        
-        if (window.unifiedCore) {
-            window.unifiedCore.showMessage('Sesión cerrada correctamente', 'success');
-        }
-        
-        console.log('✅ Sesión cerrada correctamente');
-        
-    } catch (error) {
-        console.error('❌ Error cerrando sesión:', error);
-        
-        // Limpiar forzadamente
-        localStorage.removeItem('google_token');
-        isAuthorized = false;
-        updateAuthUI();
         
         if (window.unifiedCore) {
             window.unifiedCore.showMessage('Sesión cerrada (con advertencias)', 'warning');
@@ -333,8 +346,10 @@ function signOut() {
     }
 }
 
-// Verificar token guardado
+// CORREGIDO: Verificar token guardado con validación mejorada
 function checkStoredToken() {
+    console.log('🔍 Verificando token guardado...');
+    
     const storedToken = localStorage.getItem('google_token');
     if (!storedToken) {
         console.log('📱 No hay token guardado');
@@ -346,18 +361,24 @@ function checkStoredToken() {
         const tokenAge = Date.now() - tokenData.timestamp;
         const expirationTime = (tokenData.expires_in || 3600) * 1000; // Convertir a ms
         
-        console.log('📱 Token encontrado, edad:', Math.round(tokenAge / 1000 / 60), 'minutos');
+        console.log('📱 Token encontrado:', {
+            edad: Math.round(tokenAge / 1000 / 60) + ' minutos',
+            expira_en: Math.round((expirationTime - tokenAge) / 1000 / 60) + ' minutos',
+            scope: tokenData.scope
+        });
 
-        // Verificar si el token ha expirado
-        if (tokenAge >= expirationTime) {
-            console.log('⏰ Token expirado, eliminando...');
+        // Verificar si el token ha expirado (con 5 minutos de margen)
+        const marginTime = 5 * 60 * 1000; // 5 minutos en ms
+        if (tokenAge >= (expirationTime - marginTime)) {
+            console.log('⏰ Token expirado o próximo a expirar, eliminando...');
             localStorage.removeItem('google_token');
             return false;
         }
 
         if (tokenData.access_token && gapiReady) {
-            console.log('📱 Intentando usar token guardado...');
+            console.log('📱 Configurando token en gapi.client...');
             
+            // CORREGIDO: Configurar token en gapi.client
             gapi.client.setToken({
                 access_token: tokenData.access_token
             });
@@ -372,7 +393,7 @@ function checkStoredToken() {
     }
 }
 
-// Probar validez del token
+// CORREGIDO: Probar validez del token con mejor manejo de errores
 async function testTokenValidity() {
     try {
         console.log('🔍 Verificando validez del token...');
@@ -387,14 +408,19 @@ async function testTokenValidity() {
         if (response.result) {
             console.log('✅ Token válido, usuario autenticado');
             isAuthorized = true;
+            window.isAuthorized = true; // Configurar estado global
             updateAuthUI();
             
-            // Cargar playlists automáticamente
-            setTimeout(loadUserPlaylists, 1000);
+            // CORREGIDO: Cargar playlists automáticamente después de validar token
+            setTimeout(() => {
+                console.log('🔄 Cargando playlists automáticamente...');
+                loadUserPlaylists();
+            }, 1000);
+            
             return true;
         }
     } catch (error) {
-        console.log('❌ Token inválido o expirado:', error);
+        console.log('❌ Token inválido o expirado:', error.result?.error || error);
         
         // Limpiar token inválido
         localStorage.removeItem('google_token');
@@ -402,6 +428,7 @@ async function testTokenValidity() {
             gapi.client.setToken('');
         }
         isAuthorized = false;
+        window.isAuthorized = false;
         updateAuthUI();
         return false;
     }
@@ -433,37 +460,37 @@ function updateAuthUI() {
     signOutBtn.onclick = null;
     signInBtn.removeAttribute('disabled');
     
-if (isAuthorized) {
-    // Usuario YA autenticado
-    signInBtn.classList.add('hidden');
-    signOutBtn.classList.remove('hidden');
-    signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span> Cerrar Sesión</span>';
-    signOutBtn.onclick = signOut;
-    
-} else if (gapiReady && gisReady && tokenClient) {
-    // TODO listo para autenticar
-    signInBtn.classList.remove('hidden');
-    signOutBtn.classList.add('hidden');
-    signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
-    signInBtn.disabled = false;
-    
-    // ASIGNAR EL LISTENER CRÍTICO
-    signInBtn.onclick = function(e) {
-        e.preventDefault();
-        console.log('🚀 ¡Click en conectar detectado!');
-        signIn();
-    };
-    
-    console.log('✅ Botón listo para autenticación');
-} else {
-    // Estados de carga mejorados
-    signInBtn.classList.remove('hidden');
-    signOutBtn.classList.add('hidden');
-    
-    if (!gapiReady && !gisReady) {
-        signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Cargando...</span>';
-        signInBtn.disabled = true;
-       } else if (!gapiReady) {
+    if (isAuthorized) {
+        // Usuario YA autenticado
+        signInBtn.classList.add('hidden');
+        signOutBtn.classList.remove('hidden');
+        signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span> Cerrar Sesión</span>';
+        signOutBtn.onclick = signOut;
+        
+    } else if (gapiReady && gisReady && tokenClient) {
+        // TODO listo para autenticar
+        signInBtn.classList.remove('hidden');
+        signOutBtn.classList.add('hidden');
+        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
+        signInBtn.disabled = false;
+        
+        // ASIGNAR EL LISTENER CRÍTICO
+        signInBtn.onclick = function(e) {
+            e.preventDefault();
+            console.log('🚀 ¡Click en conectar detectado!');
+            signIn();
+        };
+        
+        console.log('✅ Botón listo para autenticación');
+    } else {
+        // Estados de carga mejorados
+        signInBtn.classList.remove('hidden');
+        signOutBtn.classList.add('hidden');
+        
+        if (!gapiReady && !gisReady) {
+            signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Cargando...</span>';
+            signInBtn.disabled = true;
+        } else if (!gapiReady) {
             signInBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Google API';
             signInBtn.disabled = true;
         } else if (!gisReady) {
@@ -477,34 +504,36 @@ if (isAuthorized) {
 
     // Actualizar estado en overview
     updateOverviewAuthStatus();
-// ARREGLO MÓVIL: Asegurar que los botones móviles también se actualicen
-const mobileAuthElements = {
-    mobileSignIn: document.querySelector('.mobile-user-actions .auth-btn'),
-    mobileSignOut: document.querySelector('.mobile-user-actions .auth-btn.hidden')
-};
+    
+    // ARREGLO MÓVIL: Asegurar que los botones móviles también se actualicen
+    const mobileAuthElements = {
+        mobileSignIn: document.querySelector('.mobile-user-actions .auth-btn'),
+        mobileSignOut: document.querySelector('.mobile-user-actions .auth-btn.hidden')
+    };
 
-// Si hay elementos móviles, sincronizar con desktop
-if (mobileAuthElements.mobileSignIn || mobileAuthElements.mobileSignOut) {
-    if (isAuthorized) {
-        if (mobileAuthElements.mobileSignIn) {
-            mobileAuthElements.mobileSignIn.classList.add('hidden');
-        }
-        if (mobileAuthElements.mobileSignOut) {
-            mobileAuthElements.mobileSignOut.classList.remove('hidden');
-            mobileAuthElements.mobileSignOut.onclick = signOut;
-        }
-    } else if (gapiReady && gisReady && tokenClient) {
-        if (mobileAuthElements.mobileSignIn) {
-            mobileAuthElements.mobileSignIn.classList.remove('hidden');
-            mobileAuthElements.mobileSignIn.onclick = signIn;
-            mobileAuthElements.mobileSignIn.disabled = false;
-        }
-        if (mobileAuthElements.mobileSignOut) {
-            mobileAuthElements.mobileSignOut.classList.add('hidden');
+    // Si hay elementos móviles, sincronizar con desktop
+    if (mobileAuthElements.mobileSignIn || mobileAuthElements.mobileSignOut) {
+        if (isAuthorized) {
+            if (mobileAuthElements.mobileSignIn) {
+                mobileAuthElements.mobileSignIn.classList.add('hidden');
+            }
+            if (mobileAuthElements.mobileSignOut) {
+                mobileAuthElements.mobileSignOut.classList.remove('hidden');
+                mobileAuthElements.mobileSignOut.onclick = signOut;
+            }
+        } else if (gapiReady && gisReady && tokenClient) {
+            if (mobileAuthElements.mobileSignIn) {
+                mobileAuthElements.mobileSignIn.classList.remove('hidden');
+                mobileAuthElements.mobileSignIn.onclick = signIn;
+                mobileAuthElements.mobileSignIn.disabled = false;
+            }
+            if (mobileAuthElements.mobileSignOut) {
+                mobileAuthElements.mobileSignOut.classList.add('hidden');
+            }
         }
     }
-  }
 }
+
 // Actualizar estado de auth en overview
 function updateOverviewAuthStatus() {
     const authStatus = document.getElementById('unifiedSystemStatus');
@@ -520,11 +549,18 @@ function updateOverviewAuthStatus() {
 }
 
 // =============================================
-// CARGAR PLAYLISTS DEL USUARIO
+// CARGAR PLAYLISTS DEL USUARIO - CORREGIDO
 // =============================================
 async function loadUserPlaylists() {
     if (!isAuthorized) {
         console.warn('⚠️ No autorizado para cargar playlists');
+        return;
+    }
+    
+    // CORREGIDO: Verificar que gapi.client tenga el token configurado
+    const currentToken = gapi.client.getToken();
+    if (!currentToken || !currentToken.access_token) {
+        console.warn('⚠️ No hay token configurado en gapi.client');
         return;
     }
     
@@ -557,8 +593,23 @@ async function loadUserPlaylists() {
         }
     } catch (error) {
         console.error('❌ Error cargando playlists:', error);
-        if (window.unifiedCore) {
-            window.unifiedCore.showMessage('Error cargando biblioteca de YouTube', 'error');
+        
+        // Si es error de autorización, limpiar token
+        if (error.result?.error?.code === 401 || error.result?.error?.code === 403) {
+            console.log('🔄 Token expirado, limpiando...');
+            localStorage.removeItem('google_token');
+            isAuthorized = false;
+            window.isAuthorized = false;
+            gapi.client.setToken('');
+            updateAuthUI();
+            
+            if (window.unifiedCore) {
+                window.unifiedCore.showMessage('Sesión expirada. Vuelve a conectarte.', 'warning');
+            }
+        } else {
+            if (window.unifiedCore) {
+                window.unifiedCore.showMessage('Error cargando biblioteca de YouTube', 'error');
+            }
         }
     }
 }
@@ -570,6 +621,8 @@ async function fetchAllPlaylists() {
 
     try {
         do {
+            console.log(`📄 Obteniendo página de playlists... ${nextPageToken ? `(token: ${nextPageToken.substring(0, 10)}...)` : '(primera página)'}`);
+            
             const response = await gapi.client.youtube.playlists.list({
                 part: ['snippet', 'contentDetails'],
                 mine: true,
@@ -577,15 +630,27 @@ async function fetchAllPlaylists() {
                 pageToken: nextPageToken
             });
 
+            console.log(`✅ Respuesta recibida:`, {
+                items: response.result.items?.length || 0,
+                nextPageToken: response.result.nextPageToken ? 'Sí' : 'No'
+            });
+
             if (response.result.items) {
                 // Filtrar playlists válidas
                 const validPlaylists = response.result.items.filter(playlist => {
-                    return playlist.snippet &&
-                           playlist.snippet.title &&
-                           playlist.contentDetails &&
-                           playlist.contentDetails.itemCount > 0;
+                    const isValid = playlist.snippet &&
+                                   playlist.snippet.title &&
+                                   playlist.contentDetails &&
+                                   playlist.contentDetails.itemCount > 0;
+                    
+                    if (!isValid) {
+                        console.log(`⚠️ Playlist omitida: ${playlist.snippet?.title || 'Sin título'} (${playlist.contentDetails?.itemCount || 0} videos)`);
+                    }
+                    
+                    return isValid;
                 });
 
+                console.log(`📊 ${validPlaylists.length} playlists válidas de ${response.result.items.length} total`);
                 allPlaylists.push(...validPlaylists);
             }
 
@@ -593,7 +658,7 @@ async function fetchAllPlaylists() {
             
         } while (nextPageToken);
 
-        console.log(`📊 Total de playlists válidas: ${allPlaylists.length}`);
+        console.log(`📊 Total de playlists válidas obtenidas: ${allPlaylists.length}`);
         return allPlaylists;
 
     } catch (error) {
@@ -608,6 +673,12 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
         throw new Error('No autorizado para acceder a la biblioteca');
     }
 
+    // CORREGIDO: Verificar token antes de hacer la llamada
+    const currentToken = gapi.client.getToken();
+    if (!currentToken || !currentToken.access_token) {
+        throw new Error('Token no configurado');
+    }
+
     console.log(`🎵 Cargando videos de playlist: ${playlistId}`);
     
     try {
@@ -615,6 +686,8 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
         let nextPageToken = null;
 
         do {
+            console.log(`📄 Obteniendo videos... ${nextPageToken ? `(página siguiente)` : '(primera página)'}`);
+            
             const response = await gapi.client.youtube.playlistItems.list({
                 'part': ['snippet', 'contentDetails'],
                 'playlistId': playlistId,
@@ -623,6 +696,11 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
             });
 
             const result = response.result;
+            console.log(`✅ Respuesta de videos:`, {
+                items: result.items?.length || 0,
+                nextPageToken: result.nextPageToken ? 'Sí' : 'No'
+            });
+
             if (result.items) {
                 const formattedVideos = result.items
                     .map(item => {
@@ -631,31 +709,47 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
                         const title = item?.snippet?.title;
                         const highThumb = thumbnails?.high?.url;
                         const defaultThumb = thumbnails?.default?.url;
+                        const mediumThumb = thumbnails?.medium?.url;
                         
-                        if (!videoId || (!highThumb && !defaultThumb)) {
-                            console.warn('Item omitido por falta de datos:', item);
+                        if (!videoId || (!highThumb && !defaultThumb && !mediumThumb)) {
+                            console.warn('Item omitido por falta de datos:', {
+                                title: title?.substring(0, 50),
+                                videoId,
+                                hasThumbnail: !!(highThumb || defaultThumb || mediumThumb)
+                            });
                             return null;
                         }
                         
                         return {
                             videoId,
                             title: title || 'Sin título',
-                            thumbnail: highThumb || defaultThumb,
+                            thumbnail: highThumb || mediumThumb || defaultThumb,
                             duration: 0, // YouTube API v3 no proporciona duración en playlistItems
                         };
                     })
                     .filter(v => v !== null && v.videoId);
 
+                console.log(`📊 ${formattedVideos.length} videos válidos de ${result.items.length} items`);
                 allVideos = allVideos.concat(formattedVideos);
             }
             nextPageToken = result.nextPageToken;
         } while (nextPageToken);
 
-        console.log(`✅ ${allVideos.length} videos cargados de playlist ${playlistId}`);
+        console.log(`✅ Total: ${allVideos.length} videos cargados de playlist ${playlistId}`);
         return allVideos;
 
     } catch (error) {
         console.error(`❌ Error cargando videos de playlist ${playlistId}:`, error);
+        
+        // Manejar errores específicos
+        if (error.result?.error?.code === 404) {
+            throw new Error("Playlist no encontrada");
+        } else if (error.result?.error?.code === 403) {
+            throw new Error("Sin permisos para acceder a esta playlist");
+        } else if (error.result?.error?.code === 401) {
+            throw new Error("Token expirado. Vuelve a conectarte.");
+        }
+        
         throw new Error(error.result?.error?.message || "No se pudieron cargar los videos");
     }
 }
@@ -694,7 +788,21 @@ window.testOAuthConfig = function() {
     
     console.log('APIs:', apisAvailable);
     
-    // Test 3: Simular click si todo está listo
+    // Test 3: Verificar token guardado
+    const storedToken = localStorage.getItem('google_token');
+    console.log('Token guardado:', !!storedToken);
+    
+    if (storedToken) {
+        try {
+            const tokenData = JSON.parse(storedToken);
+            const age = Date.now() - tokenData.timestamp;
+            console.log('Edad del token:', Math.round(age / 1000 / 60), 'minutos');
+        } catch (e) {
+            console.log('Token corrupto');
+        }
+    }
+    
+    // Test 4: Simular click si todo está listo
     if (gapiReady && gisReady && tokenClient) {
         console.log('🚀 Todo listo, probando autenticación...');
         
@@ -748,6 +856,13 @@ window.debugAuth = function() {
         signInBtn: !!document.getElementById('googleSignInButton'),
         signOutBtn: !!document.getElementById('googleSignOutButton')
     });
+    
+    // NUEVO: Verificar estado del token
+    console.log('Token state:', {
+        localStorage: !!localStorage.getItem('google_token'),
+        gapiToken: !!gapi?.client?.getToken?.()?.access_token,
+        globalAuth: window.isAuthorized
+    });
 };
 
 // =============================================
@@ -756,6 +871,7 @@ window.debugAuth = function() {
 window.signIn = signIn;
 window.signOut = signOut;
 window.getYouTubeLibraryPlaylistItems = getYouTubeLibraryPlaylistItems;
+window.loadUserPlaylists = loadUserPlaylists; // NUEVO: Exportar para uso manual
 
 // =============================================
 // AUTO-INICIALIZACIÓN
