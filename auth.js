@@ -343,9 +343,14 @@ function signOut() {
         if (window.unifiedCore) {
             window.unifiedCore.showMessage('Sesión cerrada (con advertencias)', 'warning');
         }
+    }catch (error) {
+        // Handle the error
+        console.error("An error occurred:", error);
+    } finally {
+        // Code to be executed regardless of error
+        console.log("Cleanup operations completed.");
     }
 }
-
 // CORREGIDO: Verificar token guardado con validación mejorada
 function checkStoredToken() {
     console.log('🔍 Verificando token guardado...');
