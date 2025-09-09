@@ -474,29 +474,108 @@
                     </div>
                 </div>
 
-                <!-- Vista Búsqueda -->
-                <div class="content-view" id="searchView">
-                    <div class="search-results" id="searchResults" data-requires-unified>
-                        <div class="search-placeholder">
-                            <i class="fas fa-search"></i>
-                            <p>Busca música, artistas o playlists</p>
-                            <p><small>Sistema Unificado Activo</small></p>
-                        </div>
-                    </div>
+<!-- Vista Explorar con pestañas -->
+<div class="content-view" id="searchView">
+    <div class="explore-tabs">
+        <button class="explore-tab active" data-tab="music">
+            <i class="fas fa-music"></i> Música
+        </button>
+        <button class="explore-tab" data-tab="playlists">
+            <i class="fas fa-list"></i> Playlists
+        </button>
+        <button class="explore-tab" data-tab="recent">
+            <i class="fas fa-clock"></i> Recientes
+        </button>
+    </div>
+    
+    <div class="tab-content">
+        <div class="tab-pane active" id="musicTab">
+            <div class="search-results" id="searchResults" data-requires-unified>
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>Busca música, artistas o playlists</p>
+                    <p><small>Sistema Unificado Activo</small></p>
                 </div>
-
-                <!-- Vista Biblioteca -->
-                <div class="content-view" id="libraryView">
-                    <div id="playlistsGrid" class="playlists-grid" data-requires-unified>
-                        <div class="search-placeholder">
-                            <i class="fas fa-music"></i>
-                            <p><strong>¡Conecta tu cuenta de Google!</strong></p>
-                            <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
-                            <p><small>Powered by Sistema Unificado</small></p>
-                        </div>
-                    </div>
+            </div>
+        </div>
+        
+        <div class="tab-pane" id="playlistsTab">
+            <div class="trending-playlists">
+                <p>Playlists populares aparecerán aquí</p>
+            </div>
+        </div>
+        
+        <div class="tab-pane" id="recentTab">
+            <div class="recent-searches">
+                <p>Tus búsquedas recientes aparecerán aquí</p>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Vista Biblioteca con pestañas -->
+<div class="content-view" id="libraryView">
+    <div class="library-tabs">
+        <button class="library-tab active" data-tab="playlists">
+            <i class="fas fa-folder"></i> Playlists
+        </button>
+        <button class="library-tab" data-tab="debug">
+            <i class="fas fa-bug"></i> Debug
+        </button>
+        <button class="library-tab" data-tab="sync">
+            <i class="fas fa-sync"></i> Sync
+        </button>
+        <button class="library-tab" data-tab="connect">
+            <i class="fab fa-google"></i> Conectar
+        </button>
+    </div>
+    
+    <div class="tab-content">
+        <div class="tab-pane active" id="playlistsLibraryTab">
+            <div id="playlistsGrid" class="playlists-grid" data-requires-unified>
+                <div class="search-placeholder">
+                    <i class="fas fa-music"></i>
+                    <p><strong>¡Conecta tu cuenta de Google!</strong></p>
+                    <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
+                    <p><small>Powered by Sistema Unificado</small></p>
                 </div>
-
+            </div>
+        </div>
+        
+        <div class="tab-pane" id="debugLibraryTab">
+            <div class="debug-panel">
+                <button onclick="window.debugUnified?.()" class="debug-btn">
+                    <i class="fas fa-bug"></i> Debug Estado
+                </button>
+                <button onclick="window.resetUnified?.()" class="debug-btn">
+                    <i class="fas fa-refresh"></i> Reset Sistema
+                </button>
+                <button onclick="window.clearSponsorBlockCache?.()" class="debug-btn">
+                    <i class="fas fa-eraser"></i> Limpiar Cache SB
+                </button>
+            </div>
+        </div>
+        
+        <div class="tab-pane" id="syncLibraryTab">
+            <div class="sync-panel">
+                <button onclick="window.unifiedCore?.syncLibrary?.()" class="sync-btn">
+                    <i class="fas fa-sync"></i> Sincronizar Biblioteca
+                </button>
+                <p>Sincroniza tu biblioteca con la cuenta de Google</p>
+            </div>
+        </div>
+        
+        <div class="tab-pane" id="connectLibraryTab">
+            <div class="connect-panel">
+                <button onclick="window.signIn?.()" class="connect-btn">
+                    <i class="fab fa-google"></i> Conectar con Google
+                </button>
+                <button onclick="window.signOut?.()" class="disconnect-btn">
+                    <i class="fas fa-sign-out-alt"></i> Desconectar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Vista Reproduciendo -->
 <div class="content-view" id="playingView">
     <div class="now-playing-container">
