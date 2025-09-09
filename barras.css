@@ -1,4 +1,222 @@
+/* =============================================
+   PESTAÑAS PARA EXPLORAR Y BIBLIOTECA
+   ============================================= */
+.explore-tabs,
+.library-tabs {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 2px solid var(--surface-light);
+    background: var(--surface-color);
+    overflow-x: auto;
+}
 
+.explore-tab,
+.library-tab {
+    background: none;
+    border: 2px solid transparent;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    white-space: nowrap;
+    min-width: fit-content;
+}
+
+.explore-tab:hover,
+.library-tab:hover {
+    background: rgba(255, 107, 53, 0.1);
+    border-color: rgba(255, 107, 53, 0.3);
+    color: var(--primary-color);
+}
+
+.explore-tab.active,
+.library-tab.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+.tab-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.tab-pane {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* =============================================
+   CONTROLES DE COLA MEJORADOS
+   ============================================= */
+.queue-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    background: rgba(255, 107, 53, 0.05);
+    border-bottom: 2px solid rgba(255, 107, 53, 0.1);
+    margin-bottom: var(--spacing-sm);
+}
+
+.queue-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.queue-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.clear-queue-btn {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.clear-queue-btn:hover {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.queue-items {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* =============================================
+   BOTÓN ELIMINAR PLAYLIST
+   ============================================= */
+.delete-playlist-btn {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    width: 32px;
+    height: 32px;
+    background: rgba(244, 67, 54, 0.9);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.playlist-card:hover .delete-playlist-btn {
+    opacity: 1;
+}
+
+.delete-playlist-btn:hover {
+    background: #d32f2f;
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.4);
+}
+
+.playlist-card {
+    position: relative;
+}
+
+/* =============================================
+   PANELES DE PESTAÑAS
+   ============================================= */
+.debug-panel,
+.sync-panel,
+.connect-panel {
+    padding: var(--spacing-xl);
+    text-align: center;
+}
+
+.debug-btn,
+.sync-btn,
+.connect-btn,
+.disconnect-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.debug-btn:hover,
+.sync-btn:hover,
+.connect-btn:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+}
+
+.disconnect-btn {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+}
+
+.disconnect-btn:hover {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (max-width: 768px) {
+    .explore-tabs,
+    .library-tabs {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-xs);
+    }
+    
+    .explore-tab,
+    .library-tab {
+        font-size: 12px;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .queue-controls {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: stretch;
+    }
+    
+    .clear-queue-btn {
+        align-self: center;
+    }
+}
 /* =============================================
    BARRA DE VOLUMEN MEJORADA
    ============================================= */
