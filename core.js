@@ -1503,20 +1503,7 @@ removeVideoFromQueue(videoId) {
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
-           // función de debug para verificar estado:
-window.debugQueue = function() {
-    const queuePlaylist = playlistsData.find(p => p.id === 'queue');
-    console.log('🔍 Debug Cola:', {
-        queueExists: !!queuePlaylist,
-        queueVideos: queuePlaylist?.videos?.length || 0,
-        allPlaylists: playlistsData.map(p => ({ id: p.id, name: p.name, videos: p.videos.length })),
-        flatList: window.unifiedCore?.getFlattenedPlaylist()?.length || 0
-    });
-    
-    if (queuePlaylist) {
-        console.log('🎵 Videos en cola:', queuePlaylist.videos.map(v => v.title));
-    }
-};
+       
 getFlattenedPlaylist() {
     // Solo mostrar videos de la cola de reproducción
     const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
@@ -2291,7 +2278,7 @@ window.debugUnified = function() {
     });
     updateDebugInfo();
 };
-
+// función de debug para verificar estado:
 window.resetUnified = function() {
     if (confirm('¿Resetear completamente el sistema?')) {
         localStorage.removeItem('ytcm_playlists');
