@@ -1260,38 +1260,69 @@ async playNextVideo() {
     try {
         console.log(`🎬 Preparando video en player${currentPlayer === 1 ? 2 : 1}`);
         
-        // Preparar siguiente reproductor
+        // Preparar siguiente reproductor con Promise para esperar carga
         await new Promise((resolve, reject) => {
-            // Timeout para evitar cuelgues
+            // Timeout de seguridad
             const timeout = setTimeout(() => {
                 reject(new Error('Timeout cargando video'));
-            }, 100);
+            }, 8000); // Aumentado a 8 segundos
 
-            const onReady = () => {
-                clearTimeout(timeout);
-                resolve();
+            let hasResolved = false;
+            
+            const resolveOnce = () => {
+                if (!hasResolved) {
+                    hasResolved = true;
+                    clearTimeout(timeout);
+                    resolve();
+                }
             };
 
-            // Cargar video
-            nextPlayerInstance.cueVideoById({
-                videoId: nextVideo.videoId,
-                startSeconds: 0
-            });
+            // Listener para cuando el video esté listo
+            const onStateChange = (event) => {
+                if (event.target === nextPlayerInstance) {
+                    const state = event.data;
+                    // Cuando el video esté cued o buffering, está listo para reproducir
+                    if (state === YT.PlayerState.CUED || 
+                        state === YT.PlayerState.BUFFERING || 
+                        state === YT.PlayerState.PLAYING) {
+                        nextPlayerInstance.removeEventListener?.('onStateChange', onStateChange);
+                        resolveOnce();
+                    }
+                }
+            };
 
-            // Configurar volumen inicial y reproducir
-            nextPlayerInstance.setVolume(0);
-            nextPlayerInstance.playVideo()
-            // Mostrar elemento si estaba oculto
-            if (nextPlayerElement) {
-                nextPlayerElement.classList.remove('hidden');
-                nextPlayerElement.style.display = 'block';
+            // Agregar listener temporal
+            if (nextPlayerInstance.addEventListener) {
+                nextPlayerInstance.addEventListener('onStateChange', onStateChange);
             }
 
-            // Resolver inmediatamente para continuar - el video se cargará en background
-            setTimeout(onReady, 100);
+            try {
+                // Cargar video
+                nextPlayerInstance.loadVideoById({
+                    videoId: nextVideo.videoId,
+                    startSeconds: 0
+                });
+
+                // Mostrar elemento si estaba oculto
+                if (nextPlayerElement) {
+                    nextPlayerElement.classList.remove('hidden');
+                    nextPlayerElement.style.display = 'block';
+                }
+
+                // Resolver después de un tiempo mínimo para dar chance de carga
+                setTimeout(resolveOnce, 1500);
+                
+            } catch (loadError) {
+                console.error('Error cargando video:', loadError);
+                reject(loadError);
+            }
         });
 
-        console.log(`▶️ Iniciando reproducción en player${currentPlayer === 1 ? 2 : 1}`);        
+        console.log(`▶️ Video cargado, iniciando crossfade`);
+        
+        // Configurar volumen inicial del próximo reproductor
+        nextPlayerInstance.setVolume(0);
+        
         // CAMBIAR currentPlayer ANTES del crossfade
         const previousPlayer = currentPlayer;
         currentPlayer = currentPlayer === 1 ? 2 : 1;
@@ -1301,12 +1332,12 @@ async playNextVideo() {
         // Iniciar crossfade visual y de audio
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
         
-        // Actualizar UI final después de un breve delay
+        // Actualizar UI final después del crossfade
         setTimeout(() => {
             this.updateNowPlaying();
             this.updatePlaylistsUI();
+            this.updateQueuePopup(); // Si el popup está abierto
             
-            // Verificar que la información sea correcta
             console.log(`✅ Reproducción actualizada: ${currentPlayingInfo.videoId} en player${currentPlayer}`);
         }, 200);
         
@@ -1317,17 +1348,42 @@ async playNextVideo() {
         console.error("❌ Error en playNextVideo:", error);
         this.showMessage(`Error cambiando video: ${error.message}`, 'error');
         
-        // En caso de error, intentar reproducción directa
+        // En caso de error, intentar reproducción directa como fallback
         try {
             console.log("🔄 Intentando reproducción directa como fallback...");
-            this.playVideoAtIndex(nextIndex);
+            
+            // Restaurar currentPlayer original para el fallback
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            
+            // Reproducción directa sin crossfade
+            nextPlayerInstance.loadVideoById(nextVideo.videoId);
+            nextPlayerInstance.setVolume(100);
+            
+            // Detener el reproductor anterior
+            currentPlayerInstance.stopVideo();
+            
+            // Mostrar el nuevo reproductor
+            if (nextPlayerElement) {
+                nextPlayerElement.classList.remove('hidden', 'fade-out');
+                nextPlayerElement.classList.add('fade-in');
+            }
+            
+            // Ocultar el reproductor anterior
+            const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+            if (prevElement) {
+                prevElement.classList.add('hidden');
+            }
+            
+            // Cambiar currentPlayer para el fallback
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            
         } catch (fallbackError) {
             console.error("❌ Error en fallback:", fallbackError);
+            this.showMessage("Error crítico en reproducción", 'error');
             this.handleEmptyPlaylist();
         }
     }
 }
-
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) return;
     
