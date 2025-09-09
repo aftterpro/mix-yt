@@ -192,22 +192,33 @@ class UnifiedCore {
             this.clearYouTubeLibraryPlaylists();
         });
     }
-
-    initializeUI() {
-        // Asegurar que existe la playlist manual
-        if (!playlistsData.some(p => p.id === 'manual')) {
-            playlistsData.push({
-                id: 'manual',
-                name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true
-            });
-        }
-
-        this.updatePlaylistsUI();
-        this.updateOverviewStats();
+initializeUI() {
+    // Asegurar que existe la cola de reproducción
+    if (!playlistsData.some(p => p.id === 'queue')) {
+        playlistsData.push({
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
+        });
     }
+
+    // Asegurar que existe la playlist manual (opcional)
+    if (!playlistsData.some(p => p.id === 'manual')) {
+        playlistsData.push({
+            id: 'manual',
+            name: 'Mis Vídeos Añadidos',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true
+        });
+    }
+
+    this.updatePlaylistsUI();
+    this.updateOverviewStats();
+}
 // Nuevas tabs
 setupContentTabs() {
     // Tabs para vista Explorar
@@ -588,37 +599,58 @@ createPlaylistCard(playlist) {
     `;
 
     // Event listener para reproducir playlist - CORREGIDO
-    const playBtn = card.querySelector('.play-playlist-btn');
-    playBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const playlistId = e.target.dataset.playlistId;
-        
-        // Cargar videos si es necesario
-        if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
-            await this.loadPlaylistVideos(playlistId);
-        }
-        
-        // CORREGIDO: Reproducir directamente el primer video
-        const updatedPlaylist = playlistsData.find(p => p.id === playlistId);
-        if (updatedPlaylist?.videos?.length > 0) {
-            // Añadir toda la playlist a la cola
-            this.addPlaylistToQueue(updatedPlaylist);
+const playBtn = card.querySelector('.play-playlist-btn');
+playBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const playlistId = e.target.dataset.playlistId;
+    
+    // Cargar videos si es necesario
+    if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+        await this.loadPlaylistVideos(playlistId);
+    }
+    
+    // CORREGIDO: Añadir toda la playlist a la cola
+    const updatedPlaylist = playlistsData.find(p => p.id === playlistId);
+    if (updatedPlaylist?.videos?.length > 0) {
+        // Añadir toda la playlist a la cola
+        let addedCount = 0;
+        updatedPlaylist.videos.forEach(video => {
+            // Formatear el video correctamente
+            const videoData = {
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                duration: video.duration,
+                uploaderName: video.uploaderName || video.author || 'YouTube',
+                author: video.author || video.uploaderName || 'YouTube'
+            };
             
-            // Reproducir el primer video de esta playlist
+            // Verificar si ya está en cola antes de añadir
+            const queuePlaylist = playlistsData.find(p => p.id === 'queue');
+            const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
+            
+            if (!isDuplicate) {
+                this.addVideoToQueue(videoData);
+                addedCount++;
+            }
+        });
+        
+        if (addedCount > 0) {
+            this.showMessage(`${addedCount} videos de "${updatedPlaylist.name}" añadidos a cola`, 'success');
+            
+            // Reproducir el primer video añadido
             const flatList = this.getFlattenedPlaylist();
-            const firstVideoIndex = flatList.findIndex(v => 
-                v.sourcePlaylistId === playlistId || 
-                updatedPlaylist.videos.some(pv => pv.videoId === v.videoId)
-            );
-            
-            if (firstVideoIndex !== -1) {
-                this.playVideoAtIndex(firstVideoIndex);
+            if (flatList.length > 0 && !reproduccionIniciada) {
+                this.playVideoAtIndex(0);
                 this.switchView('playing');
             }
         } else {
-            this.showMessage('La playlist está vacía', 'warning');
+            this.showMessage(`Todos los videos de "${updatedPlaylist.name}" ya están en la cola`, 'info');
         }
-    });
+    } else {
+        this.showMessage('La playlist está vacía', 'warning');
+    }
+});
 
     // Event listener para eliminar playlist
     const deleteBtn = card.querySelector('.delete-playlist-btn');
@@ -764,32 +796,30 @@ async createPlaylistPopup(playlist) {
 }
 // Función helper para añadir playlist completa a la cola
 addPlaylistToQueue(playlist) {
-    let manualPlaylist = playlistsData.find(p => p.id === 'manual');
-    
-    if (!manualPlaylist) {
-        manualPlaylist = {
-            id: 'manual',
-            name: 'Mis Vídeos Añadidos',
-            thumbnailUrl: './electronic.ico',
-            videos: [],
-            isExpanded: true
-        };
-        playlistsData.unshift(manualPlaylist);
-    }
-
     let addedCount = 0;
+    
     playlist.videos.forEach(video => {
-        const isDuplicate = manualPlaylist.videos.some(v => v.videoId === video.videoId);
+        const videoData = {
+            videoId: video.videoId,
+            title: video.title,
+            thumbnail: video.thumbnail,
+            duration: video.duration,
+            uploaderName: video.uploaderName || video.author || 'YouTube',
+            author: video.author || video.uploaderName || 'YouTube'
+        };
+        
+        // Verificar duplicados antes de añadir
+        const queuePlaylist = playlistsData.find(p => p.id === 'queue');
+        const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
+        
         if (!isDuplicate) {
-            manualPlaylist.videos.push({ ...video });
+            this.addVideoToQueue(videoData);
             addedCount++;
         }
     });
 
     if (addedCount > 0) {
         this.showMessage(`${addedCount} videos añadidos de "${playlist.name}"`, 'success');
-        this.updatePlaylistsUI();
-        this.enablePlayButton();
     } else {
         this.showMessage(`Todos los videos de "${playlist.name}" ya están en la cola`, 'info');
     }
@@ -813,20 +843,34 @@ showVideoMenu(video, buttonElement) {
     menu.style.left = `${rect.left - 100}px`;
     menu.style.zIndex = '10000';
 
-    // Event listeners
+    // CORRECCIÓN: Event listeners
     menu.querySelectorAll('.context-menu-item').forEach(item => {
         item.addEventListener('click', (e) => {
             const action = e.target.dataset.action;
+            
+            // Formatear video data correctamente
+            const videoData = {
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                duration: video.duration,
+                uploaderName: video.uploaderName || video.author || 'YouTube',
+                author: video.author || video.uploaderName || 'YouTube'
+            };
+            
             if (action === 'queue') {
-                this.addVideoToManualPlaylist(video);
+                this.addVideoToQueue(videoData); // CAMBIO AQUÍ
             } else if (action === 'play') {
-                this.addVideoToManualPlaylist(video);
+                this.addVideoToQueue(videoData); // CAMBIO AQUÍ
                 // Reproducir inmediatamente
-                const flatList = this.getFlattenedPlaylist();
-                const index = flatList.findIndex(v => v.videoId === video.videoId);
-                if (index !== -1) {
-                    this.playVideoAtIndex(index);
-                }
+                setTimeout(() => {
+                    const flatList = this.getFlattenedPlaylist();
+                    const index = flatList.findIndex(v => v.videoId === video.videoId);
+                    if (index !== -1) {
+                        this.playVideoAtIndex(index);
+                        this.switchView('playing');
+                    }
+                }, 100);
             }
             menu.remove();
         });
@@ -915,10 +959,10 @@ updateQueueDisplay() {
 // Nueva función para borrar toda la cola
 clearQueue() {
     if (confirm('¿Estás seguro de que quieres borrar toda la cola?')) {
-        // Solo limpiar playlist manual
-        const manualPlaylist = playlistsData.find(p => p.id === 'manual');
-        if (manualPlaylist) {
-            manualPlaylist.videos = [];
+        // Limpiar playlist de cola
+        const queuePlaylist = playlistsData.find(p => p.id === 'queue');
+        if (queuePlaylist) {
+            queuePlaylist.videos = [];
         }
         
         this.updatePlaylistsUI();
@@ -1340,45 +1384,46 @@ startCrossfade(prevPlayer, nextPlayer) {
         return grid;
     }
 
-    createSearchResultCard(video, videoId) {
-        const card = document.createElement('div');
-        card.className = 'search-result-card';
-        card.dataset.videoId = videoId;
+createSearchResultCard(video, videoId) {
+    const card = document.createElement('div');
+    card.className = 'search-result-card';
+    card.dataset.videoId = videoId;
 
-        const duration = video.duration ? this.formatDuration(video.duration) : '';
-        const author = video.uploaderName || 'Autor Desconocido';
+    const duration = video.duration ? this.formatDuration(video.duration) : '';
+    const author = video.uploaderName || 'Autor Desconocido';
 
-        card.innerHTML = `
-            <div class="search-result-thumbnail">
-                <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
-                ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
-            </div>
-            <div class="search-result-info">
-                <h3 class="search-result-title">${video.title}</h3>
-                <p class="search-result-author">${author}</p>
-                <button class="search-result-add-btn" data-video-id="${videoId}" 
-                        data-title="${video.title}" data-thumbnail="${video.thumbnail}"
-                        data-duration="${video.duration || 0}">
-                    <i class="fas fa-plus"></i>
-                    Añadir
-                </button>
-            </div>
-        `;
-        // Event listener para añadir
-const addBtn = card.querySelector('.search-result-add-btn');
-addBtn.addEventListener('click', (e) => {
-    const videoData = {
-        videoId: e.target.dataset.videoId,
-        title: e.target.dataset.title,
-        thumbnail: e.target.dataset.thumbnail,
-        duration: parseInt(e.target.dataset.duration) || 0,
-        uploaderName: author, // Agregar esta línea
-        author: author // Y esta también como fallback
-    };
-    this.addVideoToManualPlaylist(videoData);
-});
-        return card;
-    }
+    card.innerHTML = `
+        <div class="search-result-thumbnail">
+            <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
+            ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
+        </div>
+        <div class="search-result-info">
+            <h3 class="search-result-title">${video.title}</h3>
+            <p class="search-result-author">${author}</p>
+            <button class="search-result-add-btn" data-video-id="${videoId}" 
+                    data-title="${video.title}" data-thumbnail="${video.thumbnail}"
+                    data-duration="${video.duration || 0}"
+                    data-author="${author}">
+                <i class="fas fa-plus"></i>
+                Añadir a Cola
+            </button>
+        </div>
+    `;
+    const addBtn = card.querySelector('.search-result-add-btn');
+    addBtn.addEventListener('click', (e) => {
+        const videoData = {
+            videoId: e.target.dataset.videoId,
+            title: e.target.dataset.title,
+            thumbnail: e.target.dataset.thumbnail,
+            duration: parseInt(e.target.dataset.duration) || 0,
+            uploaderName: e.target.dataset.author,
+            author: e.target.dataset.author
+        };
+        this.addVideoToQueue(videoData); // CAMBIO AQUÍ
+    });
+    
+    return card;
+}
 
     clearSearchResults() {
         const searchResults = document.getElementById('searchResults');
@@ -1398,40 +1443,6 @@ addBtn.addEventListener('click', (e) => {
     // =============================================
     // GESTIÓN DE VIDEOS
     // =============================================
-    addVideoToManualPlaylist(videoData) {
-        let manualPlaylist = playlistsData.find(p => p.id === 'manual');
-        
-        if (!manualPlaylist) {
-            manualPlaylist = {
-                id: 'manual',
-                name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true
-            };
-            playlistsData.unshift(manualPlaylist);
-        }
-
-        // Verificar duplicados
-        const isDuplicate = manualPlaylist.videos.some(v => v.videoId === videoData.videoId);
-        if (isDuplicate) {
-            this.showMessage(`"${videoData.title}" ya está en la lista`, 'warning');
-            return;
-        }
-
-        const videoObject = {
-            videoId: videoData.videoId,
-            title: videoData.title || "Título no disponible",
-            thumbnail: videoData.thumbnail || './electronic.ico',
-            duration: videoData.duration || 0
-        };
-
-        manualPlaylist.videos.push(videoObject);
-        this.showMessage(`Añadido: ${videoObject.title}`, 'success');
-        
-        this.updatePlaylistsUI();
-        this.enablePlayButton();
-    }
 addVideoToQueue(videoData) {
     let queuePlaylist = playlistsData.find(p => p.id === 'queue');
     
@@ -1442,7 +1453,7 @@ addVideoToQueue(videoData) {
             thumbnailUrl: './electronic.ico',
             videos: [],
             isExpanded: true,
-            isQueue: true // Marcar como cola especial
+            isQueue: true
         };
         playlistsData.unshift(queuePlaylist);
     }
@@ -1469,25 +1480,43 @@ addVideoToQueue(videoData) {
     
     this.updatePlaylistsUI();
     this.enablePlayButton();
+    
+    console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
 }
 
-    removeVideoFromQueue(videoId) {
-        // Encontrar y eliminar video de las playlists
-        playlistsData.forEach(playlist => {
-            const index = playlist.videos.findIndex(v => v.videoId === videoId);
-            if (index !== -1) {
-                const removedVideo = playlist.videos.splice(index, 1)[0];
-                this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
-            }
-        });
-
-        this.updatePlaylistsUI();
-        this.updateCurrentPlayingIndex();
+removeVideoFromQueue(videoId) {
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue');
+    if (queuePlaylist) {
+        const index = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
+        if (index !== -1) {
+            const removedVideo = queuePlaylist.videos.splice(index, 1)[0];
+            this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+            
+            this.updatePlaylistsUI();
+            this.updateCurrentPlayingIndex();
+            
+            console.log(`🗑️ Video eliminado de cola. Total: ${queuePlaylist.videos.length} videos`);
+        }
     }
+}
 
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
+           // función de debug para verificar estado:
+window.debugQueue = function() {
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue');
+    console.log('🔍 Debug Cola:', {
+        queueExists: !!queuePlaylist,
+        queueVideos: queuePlaylist?.videos?.length || 0,
+        allPlaylists: playlistsData.map(p => ({ id: p.id, name: p.name, videos: p.videos.length })),
+        flatList: window.unifiedCore?.getFlattenedPlaylist()?.length || 0
+    });
+    
+    if (queuePlaylist) {
+        console.log('🎵 Videos en cola:', queuePlaylist.videos.map(v => v.title));
+    }
+};
 getFlattenedPlaylist() {
     // Solo mostrar videos de la cola de reproducción
     const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
