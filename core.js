@@ -208,7 +208,96 @@ class UnifiedCore {
         this.updatePlaylistsUI();
         this.updateOverviewStats();
     }
-
+// Nuevas tabs
+setupContentTabs() {
+    // Tabs para vista Explorar
+    const exploreTabs = `
+        <div class="explore-tabs">
+            <button class="explore-tab active" data-tab="music">
+                <i class="fas fa-music"></i> Música
+            </button>
+            <button class="explore-tab" data-tab="playlists">
+                <i class="fas fa-list"></i> Playlists
+            </button>
+            <button class="explore-tab" data-tab="recent">
+                <i class="fas fa-clock"></i> Recientes
+            </button>
+        </div>
+    `;
+    
+    // Tabs para vista Biblioteca
+    const libraryTabs = `
+        <div class="library-tabs">
+            <button class="library-tab active" data-tab="playlists">
+                <i class="fas fa-folder"></i> Playlists
+            </button>
+            <button class="library-tab" data-tab="debug">
+                <i class="fas fa-bug"></i> Debug
+            </button>
+            <button class="library-tab" data-tab="sync">
+                <i class="fas fa-sync"></i> Sync
+            </button>
+            <button class="library-tab" data-tab="connect">
+                <i class="fab fa-google"></i> Conectar
+            </button>
+        </div>
+    `;
+    
+    // Event listeners para tabs
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('.explore-tab')) {
+            const tab = e.target.closest('.explore-tab');
+            const tabType = tab.dataset.tab;
+            this.switchExploreTab(tabType);
+        }
+        
+        if (e.target.closest('.library-tab')) {
+            const tab = e.target.closest('.library-tab');
+            const tabType = tab.dataset.tab;
+            this.switchLibraryTab(tabType);
+        }
+    });
+}
+    
+switchExploreTab(tabType) {
+    // Actualizar tabs activos
+    document.querySelectorAll('.explore-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabType}"]`).classList.add('active');
+    
+    // Lógica según tab
+    switch(tabType) {
+        case 'music':
+            // Mostrar búsqueda de música
+            break;
+        case 'playlists':
+            // Mostrar playlists trending
+            break;
+        case 'recent':
+            // Mostrar búsquedas recientes
+            break;
+    }
+}
+switchLibraryTab(tabType) {
+    // Actualizar tabs activos
+    document.querySelectorAll('.library-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabType}"]`).classList.add('active');
+    
+    switch(tabType) {
+        case 'debug':
+            window.debugUnified?.();
+            break;
+        case 'sync':
+            this.syncLibrary();
+            break;
+        case 'connect':
+            window.signIn?.();
+            break;
+    }
+}
     setupEventListeners() {
         // Navegación
         document.querySelectorAll('[data-view]').forEach(btn => {
@@ -470,43 +559,108 @@ switchView(viewName) {
 
         this.updateOverviewStats();
     }
+createPlaylistCard(playlist) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card';
+    card.dataset.playlistId = playlist.id;
 
-    createPlaylistCard(playlist) {
-        const card = document.createElement('div');
-        card.className = 'playlist-card';
-        card.dataset.playlistId = playlist.id;
-
-        card.innerHTML = `
-            <div class="playlist-card-image">
-                <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
-                <div class="playlist-card-overlay">
-                    <button class="play-playlist-btn" data-playlist-id="${playlist.id}">
-                        <i class="fas fa-play"></i>
-                    </button>
-                </div>
+    card.innerHTML = `
+        <div class="playlist-card-image">
+            <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
+            <div class="playlist-card-overlay">
+                <button class="play-playlist-btn" data-playlist-id="${playlist.id}">
+                    <i class="fas fa-play"></i>
+                </button>
             </div>
-            <div class="playlist-card-info">
-                <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
-                <p class="playlist-card-count">${playlist.videos.length} videos</p>
-                ${playlist.source === YOUTUBE_LIBRARY_SOURCE_ID ? 
-                    '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
-                    '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
-                }
-            </div>
-        `;
+        </div>
+        <div class="playlist-card-info">
+            <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
+            <p class="playlist-card-count">${playlist.videos.length} videos</p>
+            ${playlist.source === YOUTUBE_LIBRARY_SOURCE_ID ? 
+                '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
+                '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
+            }
+            <!-- NUEVO: Botón eliminar playlist -->
+            ${playlist.source !== YOUTUBE_LIBRARY_SOURCE_ID ? 
+                '<button class="delete-playlist-btn" data-playlist-id="' + playlist.id + '"><i class="fas fa-trash"></i></button>' : ''
+            }
+        </div>
+    `;
 
-        // Event listener para reproducir playlist
-const playBtn = card.querySelector('.play-playlist-btn');
+    // Event listener para reproducir playlist - CORREGIDO
+    const playBtn = card.querySelector('.play-playlist-btn');
+    playBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const playlistId = e.target.dataset.playlistId;
+        
+        // Cargar videos si es necesario
+        if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+            await this.loadPlaylistVideos(playlistId);
+        }
+        
+        // CORREGIDO: Reproducir directamente el primer video
+        const updatedPlaylist = playlistsData.find(p => p.id === playlistId);
+        if (updatedPlaylist?.videos?.length > 0) {
+            // Añadir toda la playlist a la cola
+            this.addPlaylistToQueue(updatedPlaylist);
+            
+            // Reproducir el primer video de esta playlist
+            const flatList = this.getFlattenedPlaylist();
+            const firstVideoIndex = flatList.findIndex(v => 
+                v.sourcePlaylistId === playlistId || 
+                updatedPlaylist.videos.some(pv => pv.videoId === v.videoId)
+            );
+            
+            if (firstVideoIndex !== -1) {
+                this.playVideoAtIndex(firstVideoIndex);
+                this.switchView('playing');
+            }
+        } else {
+            this.showMessage('La playlist está vacía', 'warning');
+        }
+    });
 
-// Agregar click en toda la card para popup
-card.addEventListener('click', (e) => {
-    if (!e.target.closest('.play-playlist-btn')) {
-        this.createPlaylistPopup(playlist);
+    // Event listener para eliminar playlist
+    const deleteBtn = card.querySelector('.delete-playlist-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const playlistId = e.target.dataset.playlistId;
+            this.deletePlaylist(playlistId);
+        });
     }
-});
 
-        return card;
+    // Click en card para popup
+    card.addEventListener('click', (e) => {
+        if (!e.target.closest('.play-playlist-btn') && !e.target.closest('.delete-playlist-btn')) {
+            this.createPlaylistPopup(playlist);
+        }
+    });
+
+    return card;
+}
+
+// Nueva función para eliminar playlist
+deletePlaylist(playlistId) {
+    const playlist = playlistsData.find(p => p.id === playlistId);
+    if (!playlist) return;
+    
+    if (confirm(`¿Eliminar la playlist "${playlist.name}"?`)) {
+        // Eliminar de playlistsData
+        playlistsData = playlistsData.filter(p => p.id !== playlistId);
+        
+        this.updatePlaylistsUI();
+        this.showMessage(`Playlist "${playlist.name}" eliminada`, 'success');
+        
+        // Actualizar cola si es necesario
+        const flatList = this.getFlattenedPlaylist();
+        if (flatList.length === 0) {
+            this.handleEmptyPlaylist();
+        } else {
+            this.updateCurrentPlayingIndex();
+        }
     }
+}
 async createPlaylistPopup(playlist) {
     // Si es una playlist de YouTube Library y no está cargada, cargarla primero
     if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded && playlist.videos.length === 0) {
@@ -685,30 +839,98 @@ showVideoMenu(video, buttonElement) {
 
     document.body.appendChild(menu);
 }
-    updateQueueDisplay() {
-        const queueContainer = document.getElementById('playlistContainer');
-        if (!queueContainer) return;
+updateQueueDisplay() {
+    const queueContainer = document.getElementById('playlistContainer');
+    if (!queueContainer) return;
 
-        const flatList = this.getFlattenedPlaylist();
-        
-        if (flatList.length === 0) {
-            queueContainer.innerHTML = `
-                <div class="empty-queue-message">
-                    <i class="fas fa-music"></i>
-                    <p>La cola está vacía</p>
-                    <p>Añade música desde la biblioteca o búsqueda</p>
-                </div>
-            `;
-            return;
-        }
-
-        queueContainer.innerHTML = '';
-        
-        flatList.forEach((video, index) => {
-            const item = this.createQueueItem(video, index);
-            queueContainer.appendChild(item);
-        });
+    const flatList = this.getFlattenedPlaylist();
+    
+    if (flatList.length === 0) {
+        queueContainer.innerHTML = `
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
+            </div>
+        `;
+        return;
     }
+
+    // NUEVO: Agregar header con botón borrar todo
+    let queueHTML = `
+        <div class="queue-controls">
+            <div class="queue-info">
+                <span class="queue-count">${flatList.length} videos en cola</span>
+            </div>
+            <button class="clear-queue-btn" onclick="window.unifiedCore.clearQueue()">
+                <i class="fas fa-trash"></i>
+                Borrar todo
+            </button>
+        </div>
+        <div class="queue-items">
+    `;
+    
+    flatList.forEach((video, index) => {
+        const isPlaying = video.videoId === currentPlayingInfo.videoId;
+        queueHTML += `
+            <div class="queue-item ${isPlaying ? 'playing' : ''}" 
+                 data-video-id="${video.videoId}" 
+                 data-flat-index="${index}">
+                <div class="queue-item-number">${index + 1}</div>
+                <img src="${video.thumbnail}" alt="${video.title}" class="queue-item-thumbnail">
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${video.title}</div>
+                    <div class="queue-item-duration">${this.formatDuration(video.duration)}</div>
+                </div>
+                ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
+                <button class="queue-item-remove" data-video-id="${video.videoId}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    });
+    
+    queueHTML += '</div>';
+    queueContainer.innerHTML = queueHTML;
+    
+    // Event listeners
+    queueContainer.querySelectorAll('.queue-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.queue-item-remove')) {
+                const index = parseInt(item.dataset.flatIndex);
+                this.playVideoAtIndex(index);
+            }
+        });
+    });
+    
+    queueContainer.querySelectorAll('.queue-item-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const videoId = btn.dataset.videoId;
+            this.removeVideoFromQueue(videoId);
+        });
+    });
+}
+
+// Nueva función para borrar toda la cola
+clearQueue() {
+    if (confirm('¿Estás seguro de que quieres borrar toda la cola?')) {
+        // Solo limpiar playlist manual
+        const manualPlaylist = playlistsData.find(p => p.id === 'manual');
+        if (manualPlaylist) {
+            manualPlaylist.videos = [];
+        }
+        
+        this.updatePlaylistsUI();
+        this.showMessage('Cola limpiada', 'success');
+        
+        // Si no hay más videos, detener reproducción
+        const flatList = this.getFlattenedPlaylist();
+        if (flatList.length === 0) {
+            this.handleEmptyPlaylist();
+        }
+    }
+}
 
     createQueueItem(video, index) {
         const item = document.createElement('div');
@@ -773,7 +995,6 @@ showVideoMenu(video, buttonElement) {
             }
         }
     }
-
 handleNext() {
     if (!reproduccionIniciada) {
         this.showMessage("Inicia la reproducción primero", 'warning');
@@ -786,9 +1007,6 @@ handleNext() {
         return;
     }
     
-    // Detener monitoreo temporalmente
-    this.stopMonitoring();
-    
     // Obtener índice siguiente
     let nextIndex = currentPlayingInfo.flattenedIndex + 1;
     if (nextIndex >= flatList.length) {
@@ -798,8 +1016,9 @@ handleNext() {
     const nextVideo = flatList[nextIndex];
     console.log(`⏭️ Botón Next: Saltando a ${nextVideo.title} (índice ${nextIndex})`);
     
-    // Reproducir directamente
-    this.playVideoAtIndex(nextIndex);
+    // CAMBIO: Usar playNextVideo en lugar de playVideoAtIndex para crossfade suave
+    hasOutroCrossfadeStarted = true; // Forzar inicio de crossfade
+    this.playNextVideo();
 }
 
     handlePrevious() {
@@ -1213,6 +1432,44 @@ addBtn.addEventListener('click', (e) => {
         this.updatePlaylistsUI();
         this.enablePlayButton();
     }
+addVideoToQueue(videoData) {
+    let queuePlaylist = playlistsData.find(p => p.id === 'queue');
+    
+    if (!queuePlaylist) {
+        queuePlaylist = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true // Marcar como cola especial
+        };
+        playlistsData.unshift(queuePlaylist);
+    }
+
+    // Verificar duplicados
+    const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
+    if (isDuplicate) {
+        this.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
+        return;
+    }
+
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || "Título no disponible",
+        thumbnail: videoData.thumbnail || './electronic.ico',
+        duration: videoData.duration || 0,
+        uploaderName: videoData.uploaderName || videoData.author || 'Desconocido',
+        author: videoData.author || videoData.uploaderName || 'Desconocido',
+        sourcePlaylistId: 'queue'
+    };
+
+    queuePlaylist.videos.push(videoObject);
+    this.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
+    
+    this.updatePlaylistsUI();
+    this.enablePlayButton();
+}
 
     removeVideoFromQueue(videoId) {
         // Encontrar y eliminar video de las playlists
@@ -1232,25 +1489,25 @@ addBtn.addEventListener('click', (e) => {
     // UTILIDADES Y HELPERS
     // =============================================
 getFlattenedPlaylist() {
-    let flatList = [];
-    playlistsData.forEach(playlist => {
-        playlist.videos.forEach(video => {
-            // Unificar formato de datos independientemente del origen
-            const unifiedVideo = {
-                videoId: video.videoId,
-                title: video.title || "Título Desconocido",
-                thumbnail: video.thumbnail || './electronic.ico',
-                duration: this.parseDuration(video.duration) || 0, // Asegurar que duration sea número
-                uploaderName: video.uploaderName || video.author || this.extractArtistFromTitle(video.title),
-                author: video.author || video.uploaderName || this.extractArtistFromTitle(video.title),
-                sourcePlaylistId: playlist.id,
-                source: video.source || playlist.source || 'manual'
-            };
-            flatList.push(unifiedVideo);
-        });
-    });
+    // Solo mostrar videos de la cola de reproducción
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
-    console.log(`📊 Lista plana: ${flatList.length} videos total`);
+    if (!queuePlaylist) {
+        return [];
+    }
+    
+    const flatList = queuePlaylist.videos.map(video => ({
+        videoId: video.videoId,
+        title: video.title || "Título Desconocido",
+        thumbnail: video.thumbnail || './electronic.ico',
+        duration: this.parseDuration(video.duration) || 0,
+        uploaderName: video.uploaderName || video.author || this.extractArtistFromTitle(video.title),
+        author: video.author || video.uploaderName || this.extractArtistFromTitle(video.title),
+        sourcePlaylistId: 'queue',
+        source: 'queue'
+    }));
+    
+    console.log(`📊 Cola de reproducción: ${flatList.length} videos`);
     return flatList;
 }
 
@@ -2050,11 +2307,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // Preservar datos al cambiar tamaño de ventana
 window.addEventListener('resize', () => {
     // Debounce para evitar múltiples llamadas
-    clearTimeout(this.resizeTimeout);
-    this.resizeTimeout = setTimeout(() => {
+    clearTimeout(window.resizeTimeout); // CAMBIO: usar window.resizeTimeout
+    window.resizeTimeout = setTimeout(() => { // CAMBIO: usar window.resizeTimeout
         console.log('🖥️ Redimensionando ventana, preservando datos...');
-        this.updatePlaylistsUI();
-        this.updateNowPlaying();
+        if (window.unifiedCore) {
+            window.unifiedCore.updatePlaylistsUI();
+            window.unifiedCore.updateNowPlaying();
+        }
         
         // Forzar actualización de auth UI
         setTimeout(() => {
