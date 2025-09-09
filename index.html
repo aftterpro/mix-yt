@@ -396,37 +396,6 @@
 
         <!-- Contenido Principal -->
         <div class="main-content">
-            <!-- Top Bar -->
-            <header class="top-bar">
-                <div class="content-tabs">
-                    <a href="#" class="tab active">Música</a>
-                    <a href="#" class="tab">Playlists</a>
-                    <a href="#" class="tab">Recientes</a>
-                </div>
-                
-                <div class="user-actions">
-                    <!-- ✅ CONTROLES DEBUG UNIFICADO -->
-                    <button class="control-btn" id="unifiedDebugToggle" title="Debug Unificado" onclick="toggleUnifiedDebug()" style="display: none;">
-                        <i class="fas fa-bug"></i>
-                    </button>
-                    
-                    <button class="control-btn" id="debugButton" title="Debug" onclick="window.debugUnified?.()">
-                        <i class="fas fa-bug"></i>
-                    </button>
-                    <button class="control-btn" id="resetButton" title="Reset" onclick="window.resetUnified?.()">
-                        <i class="fas fa-refresh"></i>
-                    </button>
-                    <button class="auth-btn" id="googleSignInButton" title="Cargar mi Biblioteca" data-requires-unified>
-                        <i class="fab fa-google"></i>
-                        Conectar
-                    </button>
-                    <button class="auth-btn hidden" id="googleSignOutButton" title="Cerrar Sesión" data-requires-unified>
-                        <i class="fas fa-sign-out-alt"></i>
-                        Cerrar Sesión
-                    </button>
-                </div>
-            </header>
-
             <!-- Área de Contenido -->
             <div class="content-area">
                 <!-- Vista Inicio -->
@@ -524,8 +493,14 @@
         <button class="library-tab" data-tab="sync">
             <i class="fas fa-sync"></i> Sync
         </button>
-        <button class="library-tab" data-tab="connect">
-            <i class="fab fa-google"></i> Conectar
+            <button class="auth-btn" id="googleSignInButton" title="Cargar mi Biblioteca" data-requires-unified>
+                        <i class="fab fa-google"></i>
+                        Conectar
+                    </button>
+                    <button class="auth-btn hidden" id="googleSignOutButton" title="Cerrar Sesión" data-requires-unified>
+                        <i class="fas fa-sign-out-alt"></i>
+                        Cerrar Sesión
+                    </button>
         </button>
     </div>
     
