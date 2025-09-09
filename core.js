@@ -1265,7 +1265,7 @@ async playNextVideo() {
             // Timeout para evitar cuelgues
             const timeout = setTimeout(() => {
                 reject(new Error('Timeout cargando video'));
-            }, 10000);
+            }, 100);
 
             const onReady = () => {
                 clearTimeout(timeout);
