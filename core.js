@@ -862,12 +862,7 @@ class UnifiedCore {
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
-                        </div>
-                    `).join('')
-                }
-            </div>
-        </div>
-    `;
+                        `;
        // Event listeners
         popup.querySelector('.playlist-popup-close').addEventListener('click', () => {
             popup.remove();
