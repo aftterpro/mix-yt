@@ -1278,9 +1278,9 @@ async playNextVideo() {
                 startSeconds: 0
             });
 
-            // Configurar volumen inicial
+            // Configurar volumen inicial y reproducir
             nextPlayerInstance.setVolume(0);
-            
+            nextPlayerInstance.playVideo()
             // Mostrar elemento si estaba oculto
             if (nextPlayerElement) {
                 nextPlayerElement.classList.remove('hidden');
