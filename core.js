@@ -1291,11 +1291,7 @@ async playNextVideo() {
             setTimeout(onReady, 100);
         });
 
-        console.log(`▶️ Iniciando reproducción en player${currentPlayer === 1 ? 2 : 1}`);
-        
-        // Iniciar reproducción del siguiente
-        await nextPlayerInstance.playVideo();
-        
+        console.log(`▶️ Iniciando reproducción en player${currentPlayer === 1 ? 2 : 1}`);        
         // CAMBIAR currentPlayer ANTES del crossfade
         const previousPlayer = currentPlayer;
         currentPlayer = currentPlayer === 1 ? 2 : 1;
