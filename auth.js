@@ -97,9 +97,7 @@ function waitForAPIs() {
         const checkAPIs = () => {
             const gapiAvailable = typeof gapi !== 'undefined';
             const gisAvailable = typeof google !== 'undefined' && google?.accounts?.oauth2;
-            
-            console.log('🔍 Verificando APIs:', { gapiAvailable, gisAvailable });
-            
+           
             if (gapiAvailable && gisAvailable) {
                 resolve();
             } else {
@@ -154,8 +152,6 @@ async function initializeGoogleAPIs() {
             auto_select: false,
             cancel_on_tap_outside: false
         };
-        
-        console.log('🔑 Config TokenClient:', tokenClientConfig);
         
         tokenClient = google.accounts.oauth2.initTokenClient(tokenClientConfig);
         
@@ -445,15 +441,7 @@ async function testTokenValidity() {
 function updateAuthUI() {
     const signInBtn = document.getElementById('googleSignInButton');
     const signOutBtn = document.getElementById('googleSignOutButton');
-    
-    console.log('🔄 Actualizando UI auth:', { 
-        gapiReady, 
-        gisReady, 
-        isAuthorized,
-        signInButton: !!signInBtn,
-        signOutButton: !!signOutBtn
-    });
-    
+        
     if (!signInBtn || !signOutBtn) {
         console.warn('⚠️ Botones no encontrados, reintentando...');
         setTimeout(updateAuthUI, 1000);
