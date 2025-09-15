@@ -1,4 +1,4 @@
-console.log('🔐 Cargando módulo OAUTH');
+console.log('🔐 Cargando módulo OAUTH .');
 
 // =============================================
 // CONFIGURACIÓN OAUTH CON DETECCIÓN DE DOMINIO
@@ -770,9 +770,7 @@ function updateOverviewAuthStatus() {
                     statusText += ` (${daysRemaining} días)`;
                 } catch (e) {
                     statusText += ' (persistente)';
-                } catch (e) {
-                    statusText += ' (persistente)';
-                }
+                } 
             }
             
             authStatus.textContent = statusText;
