@@ -158,7 +158,7 @@ function loadQueuePersistent() {
         return null;
     }
 }
-setupAutomaticSaving() {
+function setupAutomaticSaving() {
     // Guardar cada 30 segundos
     setInterval(() => {
         if (this.state.initialized) {
