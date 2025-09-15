@@ -59,7 +59,7 @@ const PERSISTENCE_CONFIG = {
 // =============================================
 
 // FUNCIONES DE PERSISTENCIA
-saveAllData() {
+function saveAllData() {
     try {
         // Guardar playlists (excluyendo YouTube Library)
         const playlistsToSave = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
