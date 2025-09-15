@@ -193,7 +193,7 @@ window.debugOAuth = function() {
         persistenceDays: PERSISTENCE_CONFIG.TOKEN_DURATION / (24 * 60 * 60 * 1000)
     };
     
-    console.table(info);
+  //  console.table(info);
     
     // Verificar tokens almacenados
     const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
@@ -202,12 +202,7 @@ window.debugOAuth = function() {
             const tokenData = JSON.parse(storedToken);
             const timeRemaining = tokenData.custom_expiry - Date.now();
             const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
-            
-            console.log('🔐 Token info:', {
-                valid: timeRemaining > 0,
-                daysRemaining: Math.max(0, daysRemaining),
-                savedAt: new Date(tokenData.timestamp).toLocaleString()
-            });
+        
         } catch (e) {
             console.error('❌ Token corrupto:', e);
         }
