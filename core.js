@@ -59,20 +59,6 @@ const PERSISTENCE_CONFIG = {
 // =============================================
 
 // FUNCIONES DE PERSISTENCIA
-function saveAllData() {
-    try {
-        // Guardar playlists (excluyendo YouTube Library)
-        const playlistsToSave = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
-        savePlaylistsDataPersistent(playlistsToSave);
-        
-        // Guardar cola
-        saveQueuePersistent();
-        
-        console.log('💾 Datos guardados automáticamente');
-    } catch (error) {
-        console.error('❌ Error en guardado automático:', error);
-    }
-}
 function savePlaylistsDataPersistent(playlists) {
     try {
         const dataToSave = {
@@ -158,7 +144,16 @@ function loadQueuePersistent() {
         return null;
     }
 }
-function setupAutomaticSaving() {
+class UnifiedCore {
+    constructor() {
+        this.state = unifiedState;
+        this.views = ['home', 'search', 'library', 'playing'];
+        this.currentView = 'home';
+        this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
+        this.init();
+        this.setupAutomaticSaving();
+    }
+     setupAutomaticSaving() {
     // Guardar cada 30 segundos
     setInterval(() => {
         if (this.state.initialized) {
@@ -172,17 +167,21 @@ function setupAutomaticSaving() {
     });
     
     console.log('💾 Guardado automático configurado');
-}
-class UnifiedCore {
-    constructor() {
-        this.state = unifiedState;
-        this.views = ['home', 'search', 'library', 'playing'];
-        this.currentView = 'home';
-        this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
-        this.init();
-        this.setupAutomaticSaving();
     }
-
+ saveAllData() {
+    try {
+        // Guardar playlists (excluyendo YouTube Library)
+        const playlistsToSave = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
+        savePlaylistsDataPersistent(playlistsToSave);
+        
+        // Guardar cola
+        saveQueuePersistent();
+        
+        console.log('💾 Datos guardados automáticamente');
+    } catch (error) {
+        console.error('❌ Error en guardado automático:', error);
+        }
+    }
     async init() {
         console.log('🔧 Inicializando Sistema Unificado...');
         this.updateStatusIndicator('Inicializando...', 'loading');
