@@ -1,4 +1,4 @@
-console.log('🔐 Cargando módulo de autenticación simple...');
+console.log('🔐 Cargando módulo OAUTH');
 
 // =============================================
 // CONFIGURACIÓN OAUTH CON DETECCIÓN DE DOMINIO
