@@ -45,6 +45,17 @@ const GOOGLE_CONFIG = {
     SCOPES: 'https://www.googleapis.com/auth/youtube.readonly'
 };
 
+// NUEVA CONFIGURACIÓN DE PERSISTENCIA
+const PERSISTENCE_CONFIG = {
+    TOKEN_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días en millisegundos
+    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días en millisegundos
+    STORAGE_KEYS: {
+        TOKEN: 'ytcm_google_token',
+        PLAYLISTS: 'ytcm_youtube_playlists',
+        USER_INFO: 'ytcm_user_info'
+    }
+};
+
 // Estado de autenticación
 let gapiReady = false;
 let gisReady = false;
@@ -53,7 +64,120 @@ let isAuthorized = false;
 const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library';
 
 // =============================================
-// FUNCIÓN DE DEBUGGING OAUTH
+// FUNCIONES DE PERSISTENCIA MEJORADAS
+// =============================================
+
+function saveTokenWithExpiration(tokenData) {
+    try {
+        const tokenToSave = {
+            access_token: tokenData.access_token,
+            token_type: tokenData.token_type || 'Bearer',
+            expires_in: tokenData.expires_in || 3600,
+            scope: tokenData.scope || GOOGLE_CONFIG.SCOPES,
+            timestamp: Date.now(),
+            // NUEVO: Fecha de expiración personalizada (7 días)
+            custom_expiry: Date.now() + PERSISTENCE_CONFIG.TOKEN_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN, JSON.stringify(tokenToSave));
+        
+        console.log('💾 Token guardado con expiración extendida:', {
+            expires_in_hours: tokenData.expires_in / 3600,
+            custom_expiry_days: PERSISTENCE_CONFIG.TOKEN_DURATION / (24 * 60 * 60 * 1000),
+            saved_at: new Date().toLocaleString()
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando token:', error);
+        return false;
+    }
+}
+
+function savePlaylistsWithExpiration(playlists) {
+    try {
+        const playlistsToSave = {
+            data: playlists,
+            timestamp: Date.now(),
+            expires_at: Date.now() + PERSISTENCE_CONFIG.PLAYLISTS_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS, JSON.stringify(playlistsToSave));
+        console.log(`💾 ${playlists.length} playlists guardadas con expiración de 7 días`);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando playlists:', error);
+        return false;
+    }
+}
+
+function getStoredPlaylists() {
+    try {
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        if (!storedData) return null;
+        
+        const parsed = JSON.parse(storedData);
+        const now = Date.now();
+        
+        // Verificar si han expirado
+        if (now > parsed.expires_at) {
+            console.log('📅 Playlists guardadas han expirado, eliminando...');
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+            return null;
+        }
+        
+        const daysRemaining = Math.ceil((parsed.expires_at - now) / (24 * 60 * 60 * 1000));
+        console.log(`📚 Playlists cargadas desde almacenamiento (${daysRemaining} días restantes)`);
+        
+        return parsed.data;
+    } catch (error) {
+        console.error('❌ Error cargando playlists guardadas:', error);
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        return null;
+    }
+}
+
+function saveUserInfo(userInfo) {
+    try {
+        const userToSave = {
+            ...userInfo,
+            timestamp: Date.now(),
+            expires_at: Date.now() + PERSISTENCE_CONFIG.TOKEN_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(userToSave));
+        console.log('👤 Información de usuario guardada');
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando info de usuario:', error);
+        return false;
+    }
+}
+
+function getStoredUserInfo() {
+    try {
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO);
+        if (!storedData) return null;
+        
+        const parsed = JSON.parse(storedData);
+        
+        if (Date.now() > parsed.expires_at) {
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO);
+            return null;
+        }
+        
+        return parsed;
+    } catch (error) {
+        console.error('❌ Error cargando info de usuario:', error);
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO);
+        return null;
+    }
+}
+
+// =============================================
+// FUNCIÓN DE DEBUGGING OAUTH - ACTUALIZADA
 // =============================================
 window.debugOAuth = function() {    
     const info = {
@@ -62,12 +186,34 @@ window.debugOAuth = function() {
         protocol: window.location.protocol,
         clientId: GOOGLE_CONFIG.CLIENT_ID,
         apiKey: GOOGLE_CONFIG.API_KEY,
-        scopes: GOOGLE_CONFIG.SCOPES
+        scopes: GOOGLE_CONFIG.SCOPES,
+        // NUEVO: Info de persistencia
+        tokenStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN),
+        playlistsStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS),
+        persistenceDays: PERSISTENCE_CONFIG.TOKEN_DURATION / (24 * 60 * 60 * 1000)
     };
     
-   // console.table(info);
+    console.table(info);
     
-    // Verificar si el origen está en la lista de permitidos
+    // Verificar tokens almacenados
+    const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
+    if (storedToken) {
+        try {
+            const tokenData = JSON.parse(storedToken);
+            const timeRemaining = tokenData.custom_expiry - Date.now();
+            const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+            
+            console.log('🔐 Token info:', {
+                valid: timeRemaining > 0,
+                daysRemaining: Math.max(0, daysRemaining),
+                savedAt: new Date(tokenData.timestamp).toLocaleString()
+            });
+        } catch (e) {
+            console.error('❌ Token corrupto:', e);
+        }
+    }
+    
+    // Verificar origen permitido
     const allowedOrigins = [
         'https://mix-yt.netlify.app',
         'http://localhost:3000',
@@ -109,11 +255,11 @@ function waitForAPIs() {
 }
 
 // =============================================
-// INICIALIZAR GOOGLE APIS
+// INICIALIZAR GOOGLE APIS - MEJORADO
 // =============================================
 async function initializeGoogleAPIs() {
     try {
-        console.log('🚀 Inicializando Google APIs de forma simple...');
+        console.log('🚀 Inicializando Google APIs con persistencia de 7 días...');
         
         // Verificar configuración antes de continuar
         window.debugOAuth();
@@ -162,7 +308,7 @@ async function initializeGoogleAPIs() {
         console.log('✅ GIS inicializado correctamente');
         gisReady = true;
         
-        // CORREGIDO: Marcar APIs como listas en el estado global
+        // Marcar APIs como listas en el estado global
         if (window.ytCrossMixAPIs) {
             window.ytCrossMixAPIs.gapi = true;
             window.ytCrossMixAPIs.gis = true;
@@ -171,8 +317,11 @@ async function initializeGoogleAPIs() {
         // Actualizar UI
         updateAuthUI();
         
-        // CORREGIDO: Verificar token guardado DESPUÉS de que todo esté listo
-        setTimeout(checkStoredToken, 1000);
+        // MEJORADO: Verificar token guardado Y playlists guardadas
+        setTimeout(() => {
+            checkStoredToken();
+            loadStoredPlaylistsIfAvailable();
+        }, 1000);
         
     } catch (error) {
         console.error('❌ Error inicializando APIs:', error);
@@ -189,7 +338,32 @@ async function initializeGoogleAPIs() {
 }
 
 // =============================================
-// MANEJAR RESPUESTA DE AUTENTICACIÓN
+// NUEVA FUNCIÓN: CARGAR PLAYLISTS ALMACENADAS
+// =============================================
+function loadStoredPlaylistsIfAvailable() {
+    const storedPlaylists = getStoredPlaylists();
+    
+    if (storedPlaylists && Array.isArray(storedPlaylists) && storedPlaylists.length > 0) {
+        console.log(`📚 Cargando ${storedPlaylists.length} playlists desde almacenamiento local`);
+        
+        // Disparar evento inmediatamente con playlists guardadas
+        const event = new CustomEvent('playlistsFetched', {
+            detail: storedPlaylists
+        });
+        document.dispatchEvent(event);
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage(`${storedPlaylists.length} playlists cargadas desde almacenamiento`, 'success');
+        }
+        
+        return true;
+    }
+    
+    return false;
+}
+
+// =============================================
+// MANEJAR RESPUESTA DE AUTENTICACIÓN - MEJORADO
 // =============================================
 function handleAuthResponse(response) {
     console.log('🔐 Respuesta completa de auth:', response);
@@ -222,46 +396,38 @@ function handleAuthResponse(response) {
     }
     
     if (response.access_token) {
-        console.log('✅ Token recibido exitosamente');
+        console.log('✅ Token recibido exitosamente - Guardando con expiración extendida');
         isAuthorized = true;
         
-        // CORREGIDO: Configurar el token en gapi.client inmediatamente
+        // Configurar el token en gapi.client inmediatamente
         gapi.client.setToken({
             access_token: response.access_token
         });
         
-        // Guardar token con más información
-        try {
-            const tokenData = {
-                access_token: response.access_token,
-                timestamp: Date.now(),
-                expires_in: response.expires_in || 3600,
-                scope: response.scope || GOOGLE_CONFIG.SCOPES
-            };
-            
-            localStorage.setItem('google_token', JSON.stringify(tokenData));
-            console.log('💾 Token guardado:', {
-                expires_in: tokenData.expires_in,
-                scope: tokenData.scope,
-                timestamp: new Date(tokenData.timestamp).toLocaleString()
-            });
-        } catch (e) {
-            console.warn('⚠️ No se pudo guardar token:', e);
+        // MEJORADO: Guardar token con expiración extendida
+        const tokenSaved = saveTokenWithExpiration(response);
+        
+        if (tokenSaved) {
+            console.log('💾 Token guardado correctamente con duración de 7 días');
         }
         
         updateAuthUI();
         
-        // CORREGIDO: Cargar playlists inmediatamente después de autenticar
-        setTimeout(() => {
-            loadUserPlaylists();
+        // MEJORADO: Cargar playlists y guardarlas automáticamente
+        setTimeout(async () => {
+            console.log('🔄 Cargando y guardando playlists del usuario...');
+            await loadUserPlaylistsAndStore();
         }, 500);
         
         if (window.unifiedCore) {
-            window.unifiedCore.showMessage('¡Conectado exitosamente!', 'success');
+            window.unifiedCore.showMessage('¡Conectado exitosamente por 7 días!', 'success');
         }
         
         // Exponer estado globalmente para otras funciones
         window.isAuthorized = true;
+        
+        // NUEVO: Obtener y guardar información básica del usuario
+        getUserInfoAndStore();
         
     } else {
         console.warn('⚠️ Respuesta sin token:', response);
@@ -270,7 +436,34 @@ function handleAuthResponse(response) {
 }
 
 // =============================================
-// GESTIÓN DE SESIÓN
+// NUEVA FUNCIÓN: OBTENER INFO DE USUARIO
+// =============================================
+async function getUserInfoAndStore() {
+    try {
+        const response = await gapi.client.youtube.channels.list({
+            part: ['snippet'],
+            mine: true
+        });
+        
+        if (response.result.items?.length > 0) {
+            const channel = response.result.items[0];
+            const userInfo = {
+                channelId: channel.id,
+                title: channel.snippet.title,
+                thumbnail: channel.snippet.thumbnails?.default?.url,
+                description: channel.snippet.description
+            };
+            
+            saveUserInfo(userInfo);
+            console.log('👤 Información de usuario guardada:', userInfo.title);
+        }
+    } catch (error) {
+        console.error('❌ Error obteniendo info de usuario:', error);
+    }
+}
+
+// =============================================
+// GESTIÓN DE SESIÓN - MEJORADA
 // =============================================
 
 // Iniciar sesión
@@ -308,9 +501,9 @@ function signIn() {
     }
 }
 
-// Cerrar sesión
+// Cerrar sesión - MEJORADO
 function signOut() {
-    console.log('👋 Cerrando sesión...');
+    console.log('👋 Cerrando sesión y limpiando almacenamiento persistente...');
     
     try {
         // Obtener token actual
@@ -326,32 +519,43 @@ function signOut() {
             gapi.client.setToken('');
         }
 
-        // Limpiar almacenamiento local
-        localStorage.removeItem('google_token');
+        // MEJORADO: Limpiar TODO el almacenamiento persistente
+        Object.values(PERSISTENCE_CONFIG.STORAGE_KEYS).forEach(key => {
+            localStorage.removeItem(key);
+        });
+        
+        // También limpiar cualquier otro dato relacionado
+        localStorage.removeItem('google_token'); // Token antiguo
+        localStorage.removeItem('ytcm_playlists'); // Playlists del core
+        
+        console.log('🧹 Almacenamiento completamente limpiado');
         
         isAuthorized = false;
-        window.isAuthorized = false; // Limpiar estado global
+        window.isAuthorized = false;
         updateAuthUI();
         
         // Disparar evento de logout
         document.dispatchEvent(new CustomEvent('userLoggedOut'));
         
         if (window.unifiedCore) {
-            window.unifiedCore.showMessage('Sesión cerrada (con advertencias)', 'warning');
+            window.unifiedCore.showMessage('Sesión cerrada completamente', 'success');
+            
+            // Limpiar playlists de YouTube del sistema unificado
+            window.unifiedCore.clearYouTubeLibraryPlaylists();
         }
-    }catch (error) {
-        // Handle the error
-        console.error("An error occurred:", error);
+        
+    } catch (error) {
+        console.error("❌ Error cerrando sesión:", error);
     } finally {
-        // Code to be executed regardless of error
-        console.log("Cleanup operations completed.");
+        console.log("🧹 Limpieza de sesión completada");
     }
 }
-// CORREGIDO: Verificar token guardado con validación mejorada
+
+// MEJORADO: Verificar token guardado con validación de expiración extendida
 function checkStoredToken() {
-    console.log('🔍 Verificando token guardado...');
+    console.log('🔍 Verificando token guardado con persistencia extendida...');
     
-    const storedToken = localStorage.getItem('google_token');
+    const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
     if (!storedToken) {
         console.log('📱 No hay token guardado');
         return false;
@@ -359,45 +563,45 @@ function checkStoredToken() {
 
     try {
         const tokenData = JSON.parse(storedToken);
-        const tokenAge = Date.now() - tokenData.timestamp;
-        const expirationTime = (tokenData.expires_in || 3600) * 1000; // Convertir a ms
+        const now = Date.now();
         
-        console.log('📱 Token encontrado:', {
-            edad: Math.round(tokenAge / 1000 / 60) + ' minutos',
-            expira_en: Math.round((expirationTime - tokenAge) / 1000 / 60) + ' minutos',
-            scope: tokenData.scope
-        });
-
-        // Verificar si el token ha expirado (con 5 minutos de margen)
-        const marginTime = 5 * 60 * 1000; // 5 minutos en ms
-        if (tokenAge >= (expirationTime - marginTime)) {
-            console.log('⏰ Token expirado o próximo a expirar, eliminando...');
-            localStorage.removeItem('google_token');
+        // MEJORADO: Verificar expiración personalizada (7 días)
+        if (now >= tokenData.custom_expiry) {
+            console.log('⏰ Token expirado después de 7 días, eliminando...');
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
             return false;
         }
+        
+        const timeRemaining = tokenData.custom_expiry - now;
+        const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+        
+        console.log('📱 Token válido encontrado:', {
+            days_remaining: daysRemaining,
+            saved_at: new Date(tokenData.timestamp).toLocaleString()
+        });
 
         if (tokenData.access_token && gapiReady) {
             console.log('📱 Configurando token en gapi.client...');
             
-            // CORREGIDO: Configurar token en gapi.client
+            // Configurar token en gapi.client
             gapi.client.setToken({
                 access_token: tokenData.access_token
             });
             
-            // Verificar si el token sigue siendo válido
+            // Verificar si el token sigue siendo válido con Google
             return testTokenValidity();
         }
     } catch (error) {
         console.error('❌ Error procesando token guardado:', error);
-        localStorage.removeItem('google_token');
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
         return false;
     }
 }
 
-// CORREGIDO: Probar validez del token con mejor manejo de errores
+// MEJORADO: Probar validez del token
 async function testTokenValidity() {
     try {
-        console.log('🔍 Verificando validez del token...');
+        console.log('🔍 Verificando validez del token con Google...');
         
         // Hacer una llamada simple para verificar el token
         const response = await gapi.client.youtube.channels.list({
@@ -407,24 +611,31 @@ async function testTokenValidity() {
         });
         
         if (response.result) {
-            console.log('✅ Token válido, usuario autenticado');
+            console.log('✅ Token válido, usuario autenticado persistentemente');
             isAuthorized = true;
-            window.isAuthorized = true; // Configurar estado global
+            window.isAuthorized = true;
             updateAuthUI();
             
-            // CORREGIDO: Cargar playlists automáticamente después de validar token
-            setTimeout(() => {
-                console.log('🔄 Cargando playlists automáticamente...');
-                loadUserPlaylists();
+            // MEJORADO: Cargar playlists guardadas O obtenerlas de nuevo
+            setTimeout(async () => {
+                const playlistsLoaded = loadStoredPlaylistsIfAvailable();
+                
+                if (!playlistsLoaded) {
+                    console.log('🔄 No hay playlists guardadas, obteniendo de YouTube...');
+                    await loadUserPlaylistsAndStore();
+                }
             }, 1000);
             
             return true;
         }
     } catch (error) {
-        console.log('❌ Token inválido o expirado:', error.result?.error || error);
+        console.log('❌ Token inválido o expirado en Google:', error.result?.error || error);
         
         // Limpiar token inválido
-        localStorage.removeItem('google_token');
+        Object.values(PERSISTENCE_CONFIG.STORAGE_KEYS).forEach(key => {
+            localStorage.removeItem(key);
+        });
+        
         if (gapi.client.getToken()) {
             gapi.client.setToken('');
         }
@@ -436,7 +647,7 @@ async function testTokenValidity() {
 }
 
 // =============================================
-// ACTUALIZAR INTERFAZ DE USUARIO
+// ACTUALIZAR INTERFAZ DE USUARIO - MEJORADA
 // =============================================
 function updateAuthUI() {
     const signInBtn = document.getElementById('googleSignInButton');
@@ -460,12 +671,25 @@ function updateAuthUI() {
         signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span> Cerrar Sesión</span>';
         signOutBtn.onclick = signOut;
         
+        // NUEVO: Mostrar información de persistencia
+        const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
+        if (storedToken) {
+            try {
+                const tokenData = JSON.parse(storedToken);
+                const daysRemaining = Math.ceil((tokenData.custom_expiry - Date.now()) / (24 * 60 * 60 * 1000));
+                signOutBtn.title = `Conectado por ${daysRemaining} días más`;
+            } catch (e) {
+                signOutBtn.title = 'Conectado';
+            }
+        }
+        
     } else if (gapiReady && gisReady && tokenClient) {
         // TODO listo para autenticar
         signInBtn.classList.remove('hidden');
         signOutBtn.classList.add('hidden');
-        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
+        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar por 7 días</span>';
         signInBtn.disabled = false;
+        signInBtn.title = 'Conectarse y mantener sesión por 7 días';
         
         // ASIGNAR EL LISTENER CRÍTICO
         signInBtn.onclick = function(e) {
@@ -476,7 +700,7 @@ function updateAuthUI() {
         
         console.log('✅ Botón listo para autenticación');
     } else {
-        // Estados de carga mejorados
+        // Estados de carga
         signInBtn.classList.remove('hidden');
         signOutBtn.classList.add('hidden');
         
@@ -498,13 +722,17 @@ function updateAuthUI() {
     // Actualizar estado en overview
     updateOverviewAuthStatus();
     
-    // ARREGLO MÓVIL: Asegurar que los botones móviles también se actualicen
+    // Sincronizar botones móviles
+    syncMobileAuthButtons();
+}
+
+// NUEVA FUNCIÓN: Sincronizar botones móviles
+function syncMobileAuthButtons() {
     const mobileAuthElements = {
-        mobileSignIn: document.querySelector('.mobile-user-actions .auth-btn'),
+        mobileSignIn: document.querySelector('.mobile-user-actions .auth-btn:not(.hidden)'),
         mobileSignOut: document.querySelector('.mobile-user-actions .auth-btn.hidden')
     };
 
-    // Si hay elementos móviles, sincronizar con desktop
     if (mobileAuthElements.mobileSignIn || mobileAuthElements.mobileSignOut) {
         if (isAuthorized) {
             if (mobileAuthElements.mobileSignIn) {
@@ -532,7 +760,22 @@ function updateOverviewAuthStatus() {
     const authStatus = document.getElementById('unifiedSystemStatus');
     if (authStatus) {
         if (isAuthorized) {
-            authStatus.textContent = 'Sistema: ✅ Conectado a Google';
+            const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
+            let statusText = 'Sistema: ✅ Conectado a Google';
+            
+            if (storedToken) {
+                try {
+                    const tokenData = JSON.parse(storedToken);
+                    const daysRemaining = Math.ceil((tokenData.custom_expiry - Date.now()) / (24 * 60 * 60 * 1000));
+                    statusText += ` (${daysRemaining} días)`;
+                } catch (e) {
+                    statusText += ' (persistente)';
+                } catch (e) {
+                    statusText += ' (persistente)';
+                }
+            }
+            
+            authStatus.textContent = statusText;
         } else if (gapiReady && gisReady) {
             authStatus.textContent = 'Sistema: ⏸️ No conectado';
         } else {
@@ -542,25 +785,25 @@ function updateOverviewAuthStatus() {
 }
 
 // =============================================
-// CARGAR PLAYLISTS DEL USUARIO - CORREGIDO
+// CARGAR PLAYLISTS DEL USUARIO Y ALMACENAR - NUEVA
 // =============================================
-async function loadUserPlaylists() {
+async function loadUserPlaylistsAndStore() {
     if (!isAuthorized) {
         console.warn('⚠️ No autorizado para cargar playlists');
         return;
     }
     
-    // CORREGIDO: Verificar que gapi.client tenga el token configurado
+    // Verificar que gapi.client tenga el token configurado
     const currentToken = gapi.client.getToken();
     if (!currentToken || !currentToken.access_token) {
         console.warn('⚠️ No hay token configurado en gapi.client');
         return;
     }
     
-    console.log('📁 Cargando playlists del usuario...');
+    console.log('📁 Cargando playlists del usuario y guardando...');
     
     if (window.unifiedCore) {
-        window.unifiedCore.showMessage('Cargando tu biblioteca...', 'info');
+        window.unifiedCore.showMessage('Sincronizando tu biblioteca...', 'info');
     }
     
     try {
@@ -569,6 +812,13 @@ async function loadUserPlaylists() {
         if (playlists.length > 0) {
             console.log(`📚 ${playlists.length} playlists encontradas`);
             
+            // NUEVO: Guardar playlists en almacenamiento persistente
+            const playlistsSaved = savePlaylistsWithExpiration(playlists);
+            
+            if (playlistsSaved) {
+                console.log('💾 Playlists guardadas en almacenamiento persistente');
+            }
+            
             // Disparar evento con las playlists
             const event = new CustomEvent('playlistsFetched', {
                 detail: playlists
@@ -576,7 +826,7 @@ async function loadUserPlaylists() {
             document.dispatchEvent(event);
             
             if (window.unifiedCore) {
-                window.unifiedCore.showMessage(`${playlists.length} playlists cargadas`, 'success');
+                window.unifiedCore.showMessage(`${playlists.length} playlists sincronizadas y guardadas`, 'success');
             }
         } else {
             console.log('📭 No se encontraron playlists');
@@ -589,8 +839,10 @@ async function loadUserPlaylists() {
         
         // Si es error de autorización, limpiar token
         if (error.result?.error?.code === 401 || error.result?.error?.code === 403) {
-            console.log('🔄 Token expirado, limpiando...');
-            localStorage.removeItem('google_token');
+            console.log('🔄 Token expirado, limpiando almacenamiento...');
+            Object.values(PERSISTENCE_CONFIG.STORAGE_KEYS).forEach(key => {
+                localStorage.removeItem(key);
+            });
             isAuthorized = false;
             window.isAuthorized = false;
             gapi.client.setToken('');
@@ -601,10 +853,15 @@ async function loadUserPlaylists() {
             }
         } else {
             if (window.unifiedCore) {
-                window.unifiedCore.showMessage('Error cargando biblioteca de YouTube', 'error');
+                window.unifiedCore.showMessage('Error sincronizando biblioteca de YouTube', 'error');
             }
         }
     }
+}
+
+// FUNCIÓN ORIGINAL: Cargar playlists (mantener por compatibilidad)
+async function loadUserPlaylists() {
+    return await loadUserPlaylistsAndStore();
 }
 
 // Obtener todas las playlists del usuario
@@ -666,7 +923,7 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
         throw new Error('No autorizado para acceder a la biblioteca');
     }
 
-    // CORREGIDO: Verificar token antes de hacer la llamada
+    // Verificar token antes de hacer la llamada
     const currentToken = gapi.client.getToken();
     if (!currentToken || !currentToken.access_token) {
         throw new Error('Token no configurado');
@@ -748,6 +1005,113 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 }
 
 // =============================================
+// FUNCIONES DE LIMPIEZA Y MANTENIMIENTO
+// =============================================
+
+// NUEVA: Limpiar datos expirados automáticamente
+function cleanupExpiredData() {
+    try {
+        const keysToCheck = Object.values(PERSISTENCE_CONFIG.STORAGE_KEYS);
+        let cleanedItems = 0;
+        
+        keysToCheck.forEach(key => {
+            const storedData = localStorage.getItem(key);
+            if (storedData) {
+                try {
+                    const parsed = JSON.parse(storedData);
+                    const now = Date.now();
+                    
+                    // Verificar diferentes tipos de expiración
+                    let isExpired = false;
+                    
+                    if (parsed.custom_expiry && now >= parsed.custom_expiry) {
+                        isExpired = true;
+                    } else if (parsed.expires_at && now >= parsed.expires_at) {
+                        isExpired = true;
+                    }
+                    
+                    if (isExpired) {
+                        localStorage.removeItem(key);
+                        cleanedItems++;
+                        console.log(`🧹 Datos expirados eliminados: ${key}`);
+                    }
+                } catch (e) {
+                    // Si no se puede parsear, eliminar
+                    localStorage.removeItem(key);
+                    cleanedItems++;
+                    console.log(`🧹 Datos corruptos eliminados: ${key}`);
+                }
+            }
+        });
+        
+        if (cleanedItems > 0) {
+            console.log(`🧹 Limpieza completada: ${cleanedItems} items eliminados`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en limpieza automática:', error);
+    }
+}
+
+// NUEVA: Obtener estadísticas de almacenamiento
+window.getStorageStats = function() {
+    const stats = {
+        token: null,
+        playlists: null,
+        userInfo: null,
+        totalSize: 0
+    };
+    
+    try {
+        // Token
+        const tokenData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
+        if (tokenData) {
+            const parsed = JSON.parse(tokenData);
+            const timeRemaining = Math.max(0, parsed.custom_expiry - Date.now());
+            stats.token = {
+                exists: true,
+                daysRemaining: Math.ceil(timeRemaining / (24 * 60 * 60 * 1000)),
+                size: tokenData.length
+            };
+        }
+        
+        // Playlists
+        const playlistsData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        if (playlistsData) {
+            const parsed = JSON.parse(playlistsData);
+            const timeRemaining = Math.max(0, parsed.expires_at - Date.now());
+            stats.playlists = {
+                exists: true,
+                count: parsed.data?.length || 0,
+                daysRemaining: Math.ceil(timeRemaining / (24 * 60 * 60 * 1000)),
+                size: playlistsData.length
+            };
+        }
+        
+        // User Info
+        const userInfoData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO);
+        if (userInfoData) {
+            const parsed = JSON.parse(userInfoData);
+            const timeRemaining = Math.max(0, parsed.expires_at - Date.now());
+            stats.userInfo = {
+                exists: true,
+                daysRemaining: Math.ceil(timeRemaining / (24 * 60 * 60 * 1000)),
+                size: userInfoData.length,
+                userName: parsed.title
+            };
+        }
+        
+        stats.totalSize = (stats.token?.size || 0) + (stats.playlists?.size || 0) + (stats.userInfo?.size || 0);
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo estadísticas:', error);
+    }
+    
+    console.table(stats);
+    return stats;
+};
+
+// =============================================
 // UTILIDADES
 // =============================================
 
@@ -760,12 +1124,12 @@ function showError(message) {
 }
 
 // =============================================
-// FUNCIONES DE TESTING Y DEBUG
+// FUNCIONES DE TESTING Y DEBUG - MEJORADAS
 // =============================================
 
-// Testing específico para OAuth
+// Testing específico para OAuth con persistencia
 window.testOAuthConfig = function() {
-    console.log('🧪 === TEST CONFIGURACIÓN OAUTH ===');
+    console.log('🧪 === TEST CONFIGURACIÓN OAUTH CON PERSISTENCIA ===');
     
     // Test 1: Verificar configuración
     const config = window.debugOAuth();
@@ -781,21 +1145,34 @@ window.testOAuthConfig = function() {
     
     console.log('APIs:', apisAvailable);
     
-    // Test 3: Verificar token guardado
-    const storedToken = localStorage.getItem('google_token');
-    console.log('Token guardado:', !!storedToken);
+    // Test 3: Verificar datos persistentes
+    const persistentData = {
+        tokenStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN),
+        playlistsStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS),
+        userInfoStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO)
+    };
     
-    if (storedToken) {
+    console.log('Datos persistentes:', persistentData);
+    
+    // Test 4: Detalles de expiración
+    if (persistentData.tokenStored) {
         try {
-            const tokenData = JSON.parse(storedToken);
-            const age = Date.now() - tokenData.timestamp;
-            console.log('Edad del token:', Math.round(age / 1000 / 60), 'minutos');
+            const tokenData = JSON.parse(localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN));
+            const timeRemaining = tokenData.custom_expiry - Date.now();
+            const daysRemaining = Math.ceil(timeRemaining / (24 * 60 * 60 * 1000));
+            
+            console.log('🔐 Estado del token:', {
+                valid: timeRemaining > 0,
+                daysRemaining: Math.max(0, daysRemaining),
+                savedAt: new Date(tokenData.timestamp).toLocaleString(),
+                expiresAt: new Date(tokenData.custom_expiry).toLocaleString()
+            });
         } catch (e) {
-            console.log('Token corrupto');
+            console.log('❌ Token corrupto');
         }
     }
     
-    // Test 4: Simular click si todo está listo
+    // Test 5: Simular click si todo está listo
     if (gapiReady && gisReady && tokenClient) {
         console.log('🚀 Todo listo, probando autenticación...');
         
@@ -807,7 +1184,7 @@ window.testOAuthConfig = function() {
         console.log('❌ No está listo para autenticación');
     }
     
-    return { config, apis: apisAvailable };
+    return { config, apis: apisAvailable, persistence: persistentData };
 };
 
 // Testing simple del botón
@@ -817,7 +1194,8 @@ window.testAuthSimple = function() {
         gisReady,
         tokenClient: !!tokenClient,
         isAuthorized,
-        button: !!document.getElementById('googleSignInButton')
+        button: !!document.getElementById('googleSignInButton'),
+        persistentToken: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN)
     });
     
     const btn = document.getElementById('googleSignInButton');
@@ -832,13 +1210,14 @@ window.testAuthSimple = function() {
 
 // Debug completo del estado de autenticación
 window.debugAuth = function() {
-    console.log('🐛 === ESTADO COMPLETO AUTH ===');
+    console.log('🐛 === ESTADO COMPLETO AUTH CON PERSISTENCIA ===');
     console.log('Variables globales:', {
         gapiReady,
         gisReady,
         tokenClient: !!tokenClient,
         isAuthorized,
-        GOOGLE_CONFIG
+        GOOGLE_CONFIG,
+        PERSISTENCE_CONFIG
     });
     console.log('Window objects:', {
         gapi: typeof gapi,
@@ -850,12 +1229,34 @@ window.debugAuth = function() {
         signOutBtn: !!document.getElementById('googleSignOutButton')
     });
     
-    // NUEVO: Verificar estado del token
-    console.log('Token state:', {
-        localStorage: !!localStorage.getItem('google_token'),
+    // Estado de persistencia
+    console.log('Estado de persistencia:', {
+        tokenStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN),
+        playlistsStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS),
+        userInfoStored: !!localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.USER_INFO),
         gapiToken: !!gapi?.client?.getToken?.()?.access_token,
         globalAuth: window.isAuthorized
     });
+    
+    // Mostrar estadísticas detalladas
+    window.getStorageStats();
+};
+
+// NUEVA: Función para forzar sincronización
+window.forceSyncLibrary = function() {
+    if (!isAuthorized) {
+        console.log('❌ No autorizado para sincronizar');
+        return;
+    }
+    
+    console.log('🔄 Forzando sincronización de biblioteca...');
+    loadUserPlaylistsAndStore();
+};
+
+// NUEVA: Función para limpiar solo datos expirados
+window.cleanExpiredData = function() {
+    cleanupExpiredData();
+    console.log('🧹 Limpieza de datos expirados completada');
 };
 
 // =============================================
@@ -864,18 +1265,25 @@ window.debugAuth = function() {
 window.signIn = signIn;
 window.signOut = signOut;
 window.getYouTubeLibraryPlaylistItems = getYouTubeLibraryPlaylistItems;
-window.loadUserPlaylists = loadUserPlaylists; // NUEVO: Exportar para uso manual
+window.loadUserPlaylists = loadUserPlaylists;
+window.loadUserPlaylistsAndStore = loadUserPlaylistsAndStore; // NUEVA
 
 // =============================================
-// AUTO-INICIALIZACIÓN
+// AUTO-INICIALIZACIÓN CON LIMPIEZA AUTOMÁTICA
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 DOM listo para auth simple');
+    console.log('🎯 DOM listo para auth con persistencia');
+    
+    // Limpiar datos expirados al inicio
+    cleanupExpiredData();
     
     // Esperar un poco para que los scripts de Google se carguen
     setTimeout(() => {
         initializeGoogleAPIs();
     }, 2000);
+    
+    // Limpieza automática cada hora
+    setInterval(cleanupExpiredData, 60 * 60 * 1000);
 });
 
-console.log('✅ Módulo de autenticación simple cargado');
+console.log('✅ Módulo de autenticación con persistencia de 7 días cargado');
