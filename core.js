@@ -44,10 +44,135 @@ const unifiedState = {
     authReady: false,
     playersReady: false
 };
-
+// CONFIGURACIÓN DE PERSISTENCIA
+const PERSISTENCE_CONFIG = {
+    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días
+    QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días para cola
+    STORAGE_KEYS: {
+        PLAYLISTS: 'ytcm_playlists_persistent',
+        QUEUE: 'ytcm_queue_persistent',
+        PLAYING_STATE: 'ytcm_playing_state'
+    }
+};
 // =============================================
 // SISTEMA UNIFICADO - CORE
 // =============================================
+
+// FUNCIONES DE PERSISTENCIA
+saveAllData() {
+    try {
+        // Guardar playlists (excluyendo YouTube Library)
+        const playlistsToSave = playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
+        savePlaylistsDataPersistent(playlistsToSave);
+        
+        // Guardar cola
+        saveQueuePersistent();
+        
+        console.log('💾 Datos guardados automáticamente');
+    } catch (error) {
+        console.error('❌ Error en guardado automático:', error);
+    }
+}
+function savePlaylistsDataPersistent(playlists) {
+    try {
+        const dataToSave = {
+            playlists: playlists || playlistsData,
+            timestamp: Date.now(),
+            expires_at: Date.now() + PERSISTENCE_CONFIG.PLAYLISTS_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS, JSON.stringify(dataToSave));
+        console.log(`💾 ${dataToSave.playlists.length} playlists guardadas por 7 días`);
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando playlists:', error);
+        return false;
+    }
+}
+
+function loadPlaylistsDataPersistent() {
+    try {
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        if (!storedData) return null;
+        
+        const parsed = JSON.parse(storedData);
+        const now = Date.now();
+        
+        if (now > parsed.expires_at) {
+            console.log('📅 Playlists expiradas, eliminando...');
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+            return null;
+        }
+        
+        const daysRemaining = Math.ceil((parsed.expires_at - now) / (24 * 60 * 60 * 1000));
+        console.log(`📚 ${parsed.playlists.length} playlists cargadas (${daysRemaining} días restantes)`);
+        
+        return parsed.playlists;
+    } catch (error) {
+        console.error('❌ Error cargando playlists:', error);
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        return null;
+    }
+}
+
+function saveQueuePersistent() {
+    try {
+        const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        if (!queuePlaylist) return false;
+        
+        const queueToSave = {
+            videos: queuePlaylist.videos,
+            currentPlayingInfo: currentPlayingInfo,
+            timestamp: Date.now(),
+            expires_at: Date.now() + PERSISTENCE_CONFIG.QUEUE_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE, JSON.stringify(queueToSave));
+        console.log(`💾 Cola guardada: ${queuePlaylist.videos.length} videos`);
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando cola:', error);
+        return false;
+    }
+}
+
+function loadQueuePersistent() {
+    try {
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+        if (!storedData) return null;
+        
+        const parsed = JSON.parse(storedData);
+        const now = Date.now();
+        
+        if (now > parsed.expires_at) {
+            console.log('📅 Cola expirada, eliminando...');
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+            return null;
+        }
+        
+        console.log(`📋 Cola cargada: ${parsed.videos.length} videos`);
+        return parsed;
+    } catch (error) {
+        console.error('❌ Error cargando cola:', error);
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+        return null;
+    }
+}
+setupAutomaticSaving() {
+    // Guardar cada 30 segundos
+    setInterval(() => {
+        if (this.state.initialized) {
+            this.saveAllData();
+        }
+    }, 30000);
+    
+    // Guardar antes de cerrar
+    window.addEventListener('beforeunload', () => {
+        this.saveAllData();
+    });
+    
+    console.log('💾 Guardado automático configurado');
+}
 class UnifiedCore {
     constructor() {
         this.state = unifiedState;
@@ -55,12 +180,14 @@ class UnifiedCore {
         this.currentView = 'home';
         this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
         this.init();
+        this.setupAutomaticSaving();
     }
 
     async init() {
         console.log('🔧 Inicializando Sistema Unificado...');
         this.updateStatusIndicator('Inicializando...', 'loading');
-        
+        // Cargar datos persistentes ANTES de inicializar
+        await this.loadPersistentData();
         // Configurar debug
         if (this.debugMode) {
             this.enableDebugMode();
@@ -81,7 +208,40 @@ class UnifiedCore {
         
         console.log('✅ Sistema Unificado Inicializado');
     }
-
+async loadPersistentData() {
+    console.log('📂 Cargando datos persistentes...');
+    
+    // Cargar playlists persistentes
+    const persistentPlaylists = loadPlaylistsDataPersistent();
+    if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
+        playlistsData = persistentPlaylists;
+        console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+    }
+    
+    // Cargar cola persistente
+    const persistentQueue = loadQueuePersistent();
+    if (persistentQueue) {
+        // Asegurar que existe la playlist de cola
+        let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        if (!queuePlaylist) {
+            queuePlaylist = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: './electronic.ico',
+                videos: [],
+                isExpanded: true,
+                isQueue: true
+            };
+            playlistsData.unshift(queuePlaylist);
+        }
+        
+        // Cargar videos de la cola
+        queuePlaylist.videos = persistentQueue.videos;
+        currentPlayingInfo = persistentQueue.currentPlayingInfo;
+        
+        console.log(`✅ Cola cargada: ${persistentQueue.videos.length} videos`);
+    }
+}
     async initializeComponents() {
         // Esperar a que las APIs estén disponibles
         if (!window.ytCrossMixAPIs?.ready) {
@@ -168,10 +328,12 @@ class UnifiedCore {
             console.log('📻 Video terminado, reproduciendo siguiente...');
             this.playNextVideo();
         } else if (state === YT.PlayerState.PLAYING) {
-            hasOutroCrossfadeStarted = false;
-            this.updateCurrentPlayingIndex();
-        }
-    }
+    hasOutroCrossfadeStarted = false;
+    this.updateCurrentPlayingIndex();
+    //  Guardar estado cuando se reproduce
+    setTimeout(() => this.saveAllData(), 1000);
+ }
+}
 
     onPlayerError(event) {
         console.error('❌ Error en reproductor:', event.data);
@@ -1648,6 +1810,7 @@ addVideoToQueue(videoData) {
     this.enablePlayButton();
     
     console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
+setTimeout(() => this.saveAllData(), 500);
 }
 
 removeVideoFromQueue(videoId) {
@@ -1664,6 +1827,7 @@ removeVideoFromQueue(videoId) {
             console.log(`🗑️ Video eliminado de cola. Total: ${queuePlaylist.videos.length} videos`);
         }
     }
+    setTimeout(() => this.saveAllData(), 500);
 }
 
     // =============================================
@@ -2204,21 +2368,23 @@ updateNowPlaying() {
         document.getElementById('unifiedControls')?.style.setProperty('display', 'flex');
     }
 
-    loadInitialData() {
-        // Cargar datos guardados del localStorage si los hay
+loadInitialData() {
+    // Solo cargar si NO hay datos persistentes ya cargados
+    if (playlistsData.length === 0) {
         try {
             const savedPlaylists = localStorage.getItem('ytcm_playlists');
             if (savedPlaylists) {
                 const parsed = JSON.parse(savedPlaylists);
                 if (Array.isArray(parsed)) {
                     playlistsData = parsed;
-                    console.log('📂 Datos cargados del localStorage');
+                    console.log('📂 Datos legacy cargados del localStorage');
                 }
             }
         } catch (e) {
-            console.warn('Error cargando datos guardados:', e);
+            console.warn('Error cargando datos legacy:', e);
         }
     }
+}
 
     saveData() {
         try {
