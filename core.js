@@ -350,15 +350,41 @@ class UnifiedCore {
         console.error('❌ Error en reproductor:', event.data);
         this.showMessage(`Error en reproductor: ${event.data}`, 'error');
     }
-
 initializeAuth() {
     // Configurar eventos de autenticación - DELEGANDO A PLAYLIST MANAGER
     document.addEventListener('playlistsFetched', (event) => {
-        console.log("📁 Playlists de biblioteca recibidas");
-        if (window.playlistManager) {
+        console.log("📁 Playlists de biblioteca recibidas:", event.detail.length);
+        
+        // CORREGIR: Verificar que playlistManager existe y funciona
+        if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
             window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+            console.log("✅ Playlists enviadas a playlistManager");
+        } else {
+            console.warn("⚠️ playlistManager no disponible, guardando en estado local");
+            // Fallback: guardar en estado local y procesar después
+            this.pendingYouTubePlaylists = event.detail;
+            
+            // Reintentar cada segundo hasta que playlistManager esté disponible
+            const retryInterval = setInterval(() => {
+                if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
+                    console.log("🔄 Reintentando con playlistManager ahora disponible");
+                    window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
+                    this.pendingYouTubePlaylists = null;
+                    clearInterval(retryInterval);
+                    this.updatePlaylistsUI();
+                }
+            }, 1000);
+            
+            // Timeout de seguridad
+            setTimeout(() => {
+                clearInterval(retryInterval);
+                if (this.pendingYouTubePlaylists) {
+                    console.error("❌ Timeout esperando playlistManager");
+                }
+            }, 10000);
         }
-        // AGREGAR: Forzar actualización de UI
+        
+        // Forzar actualización de UI
         setTimeout(() => {
             this.updatePlaylistsUI();
         }, 500);
@@ -366,10 +392,10 @@ initializeAuth() {
 
     document.addEventListener('userLoggedOut', () => {
         console.log("🚪 Usuario desconectado");
-        if (window.playlistManager) {
+        if (window.playlistManager && window.playlistManager.clearYouTubeLibraryPlaylists) {
             window.playlistManager.clearYouTubeLibraryPlaylists();
         }
-        // AGREGAR: Forzar actualización de UI
+        // Forzar actualización de UI
         setTimeout(() => {
             this.updatePlaylistsUI();
         }, 500);
@@ -404,15 +430,47 @@ initializeAuth() {
     }
 
     // Inicializar playlist manager
-    initializePlaylistManager() {
+initializePlaylistManager() {
+    console.log("🔧 Inicializando playlist manager...");
+    
+    const initManager = () => {
         if (typeof initializePlaylistManager === 'function') {
             initializePlaylistManager(this);
             this.syncPlaylistData();
-        } else {
-            // Reintentarlo después de un tiempo
-            setTimeout(() => this.initializePlaylistManager(), 500);
+            console.log("✅ Playlist manager inicializado");
+            
+            // Si hay playlists pendientes de YouTube, procesarlas ahora
+            if (this.pendingYouTubePlaylists) {
+                console.log("🔄 Procesando playlists de YouTube pendientes");
+                if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
+                    window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
+                    this.pendingYouTubePlaylists = null;
+                    this.updatePlaylistsUI();
+                }
+            }
+            return true;
         }
+        return false;
+    };
+    
+    // Intentar inicializar inmediatamente
+    if (!initManager()) {
+        console.log("⏳ Playlist manager no disponible, reintentando...");
+        // Reintentar cada 500ms hasta 10 segundos
+        let attempts = 0;
+        const maxAttempts = 20;
+        
+        const retryInterval = setInterval(() => {
+            attempts++;
+            if (initManager() || attempts >= maxAttempts) {
+                clearInterval(retryInterval);
+                if (attempts >= maxAttempts) {
+                    console.error("❌ No se pudo inicializar playlist manager después de 10 segundos");
+                }
+            }
+        }, 500);
     }
+}
 
     // Sincronizar datos de playlist
     syncPlaylistData() {
