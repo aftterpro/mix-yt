@@ -815,10 +815,26 @@ async function loadUserPlaylistsAndStore() {
             }
             
             // Disparar evento con las playlists
-            const event = new CustomEvent('playlistsFetched', {
-                detail: playlists
-            });
-            document.dispatchEvent(event);
+const event = new CustomEvent('playlistsFetched', {
+    detail: playlists
+});
+
+// AGREGAR DEBUGGING:
+console.log("🔥 DISPARANDO EVENTO playlistsFetched:", {
+    playlistCount: playlists.length,
+    unifiedCoreExists: !!window.unifiedCore,
+    playlistManagerExists: !!window.playlistManager
+});
+
+document.dispatchEvent(event);
+
+// AGREGAR: Verificación inmediata
+setTimeout(() => {
+    const playlistsGrid = document.getElementById('playlistsGrid');
+    if (playlistsGrid) {
+        console.log("📋 Estado actual de playlistsGrid:", playlistsGrid.innerHTML.substring(0, 100));
+    }
+}, 1000);
             
             if (window.unifiedCore) {
                 window.unifiedCore.showMessage(`${playlists.length} playlists sincronizadas y guardadas`, 'success');
