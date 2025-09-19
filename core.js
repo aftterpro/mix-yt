@@ -342,7 +342,7 @@ class UnifiedCore {
             hasOutroCrossfadeStarted = false;
             this.updateCurrentPlayingIndex();
             // Guardar estado cuando se reproduce
-            setTimeout(() => this.saveAllData(), 1000);
+            setTimeout(() => saveAllData(), 1000);
         }
     }
 
@@ -351,18 +351,30 @@ class UnifiedCore {
         this.showMessage(`Error en reproductor: ${event.data}`, 'error');
     }
 
-    initializeAuth() {
-        // Configurar eventos de autenticación - DELEGANDO A PLAYLIST MANAGER
-        document.addEventListener('playlistsFetched', (event) => {
-            console.log("📁 Playlists de biblioteca recibidas");
-            window.playlistManager?.addYouTubeLibraryPlaylists(event.detail);
-        });
+initializeAuth() {
+    // Configurar eventos de autenticación - DELEGANDO A PLAYLIST MANAGER
+    document.addEventListener('playlistsFetched', (event) => {
+        console.log("📁 Playlists de biblioteca recibidas");
+        if (window.playlistManager) {
+            window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+        }
+        // AGREGAR: Forzar actualización de UI
+        setTimeout(() => {
+            this.updatePlaylistsUI();
+        }, 500);
+    });
 
-        document.addEventListener('userLoggedOut', () => {
-            console.log("🚪 Usuario desconectado");
-            window.playlistManager?.clearYouTubeLibraryPlaylists();
-        });
-    }
+    document.addEventListener('userLoggedOut', () => {
+        console.log("🚪 Usuario desconectado");
+        if (window.playlistManager) {
+            window.playlistManager.clearYouTubeLibraryPlaylists();
+        }
+        // AGREGAR: Forzar actualización de UI
+        setTimeout(() => {
+            this.updatePlaylistsUI();
+        }, 500);
+    });
+}
 
     initializeUI() {
         // Asegurar que existe la cola de reproducción
@@ -604,7 +616,7 @@ class UnifiedCore {
                         </div>
                     </div>
                     ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
-                    <button class="queue-item-remove" onclick="event.stopPropagation(); window.unifiedCore.removeVideoFromQueue('${video.videoId}')">
+    <button class="queue-item-remove" onclick="event.stopPropagation(); window.unifiedCore.removeVideoFromQueue('${video.videoId}'); window.unifiedCore.updateQueuePopup();">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -1083,47 +1095,115 @@ class UnifiedCore {
         }
     }
 
-    displaySearchResults(results, append = false) {
-        const searchResults = document.getElementById('searchResults');
-        if (!searchResults) return;
+displaySearchResults(results, append = false) {
+    const searchResults = document.getElementById('searchResults');
+    if (!searchResults) return;
 
-        if (!append) {
-            searchResults.innerHTML = '';
+    if (!append) {
+        currentSearchQuery = results.query || currentSearchQuery;
+        nextPageContext = null;
+        searchResults.innerHTML = '';
+        // Remover listener anterior si existe
+        if (this.handleSearchScroll) {
+            searchResults.removeEventListener('scroll', this.handleSearchScroll);
         }
+    }
 
-        if (!results?.items?.length) {
-            if (!append) {
-                searchResults.innerHTML = `
-                    <div class="search-placeholder">
-                        <i class="fas fa-search"></i>
-                        <p>No se encontraron resultados</p>
-                    </div>
-                `;
-            }
+    if (!results?.items?.length) {
+        if (!append) {
+            searchResults.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>No se encontraron resultados</p>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    nextPageContext = results.nextpage || null;
+
+    let grid = searchResults.querySelector('.search-results-grid');
+    if (!grid) {
+        grid = this.createSearchGrid();
+        searchResults.appendChild(grid);
+    }
+
+    results.items.forEach(video => {
+        const videoId = video.videoId || video.url?.split('v=')[1];
+        if (!videoId) return;
+
+        // Evitar duplicados
+        if (grid.querySelector(`[data-video-id="${videoId}"]`)) {
             return;
         }
 
-        nextPageContext = results.nextpage || null;
+        const card = this.createSearchResultCard(video, videoId);
+        grid.appendChild(card);
+    });
 
-        const grid = append ? searchResults : this.createSearchGrid();
-        if (!append) {
-            searchResults.appendChild(grid);
-        }
-
-        results.items.forEach(video => {
-            const videoId = video.videoId || video.url?.split('v=')[1];
-            if (!videoId) return;
-
-            // Evitar duplicados
-            if (append && grid.querySelector(`[data-video-id="${videoId}"]`)) {
-                return;
-            }
-
-            const card = this.createSearchResultCard(video, videoId);
-            grid.appendChild(card);
-        });
+    // Remover spinner existente
+    const existingSpinner = searchResults.querySelector('.search-loading-more');
+    if (existingSpinner) {
+        existingSpinner.remove();
     }
 
+    // Configurar scroll infinito solo si hay más páginas
+    if (nextPageContext) {
+        // Crear y configurar el handler de scroll
+        this.handleSearchScroll = this.debounce(() => {
+            const scrollTop = searchResults.scrollTop;
+            const scrollHeight = searchResults.scrollHeight;
+            const clientHeight = searchResults.clientHeight;
+            
+            // Activar cuando esté cerca del final (100px antes)
+            if (scrollTop + clientHeight >= scrollHeight - 100) {
+                if (!isLoadingMore && nextPageContext) {
+                    this.loadMoreSearchResults();
+                }
+            }
+        }, 150);
+        
+        // Agregar el listener
+        searchResults.addEventListener('scroll', this.handleSearchScroll);
+        
+        console.log('📜 Scroll infinito configurado para búsqueda');
+    } else {
+        console.log('📄 No hay más resultados para cargar');
+    }
+}
+async loadMoreSearchResults() {
+    if (isLoadingMore || !nextPageContext) return;
+    
+    const searchResults = document.getElementById('searchResults');
+    if (!searchResults) return;
+    
+    // Mostrar spinner de carga
+    const spinner = document.createElement('div');
+    spinner.className = 'search-loading-more';
+    spinner.innerHTML = `
+        <div class="search-spinner">
+            <i class="fas fa-circle-notch fa-spin"></i>
+            <span>Cargando más resultados...</span>
+        </div>
+    `;
+    searchResults.appendChild(spinner);
+    
+    console.log('📜 Cargando más resultados de búsqueda...');
+    
+    try {
+        await this.performSearch(currentSearchQuery, nextPageContext);
+    } catch (error) {
+        console.error('❌ Error cargando más resultados:', error);
+        this.showMessage('Error cargando más resultados', 'error');
+        
+        // Remover spinner en caso de error
+        const errorSpinner = searchResults.querySelector('.search-loading-more');
+        if (errorSpinner) {
+            errorSpinner.remove();
+        }
+    }
+}
     createSearchGrid() {
         const grid = document.createElement('div');
         grid.className = 'search-results-grid';
