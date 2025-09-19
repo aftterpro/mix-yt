@@ -7,7 +7,8 @@ console.log('🎵 Cargando gestor de playlists...');
 // =============================================
 // VARIABLES GLOBALES ESPECÍFICAS DE PLAYLISTS
 // =============================================
-const YOUTUBE_LIBRARY_SOURCE_ID = 'youtube_library';
+// Usar la variable global definida en auth.js o definir si no existe
+const YOUTUBE_LIBRARY_SOURCE_ID = window.YOUTUBE_LIBRARY_SOURCE_ID || 'youtube_library';
 
 // =============================================
 // CLASE PRINCIPAL PARA GESTIÓN DE PLAYLISTS
