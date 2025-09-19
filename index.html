@@ -660,10 +660,16 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <script src="./playlist.js"></script>
+    <!-- 1. APIs y utilidades -->
+    <script src="init.js"></script>
+
+    <!-- 2. Autenticación (define YOUTUBE_LIBRARY_SOURCE_ID) -->
+    <script src="auth.js"></script>
+
+    <!-- 3. Playlist manager (usa YOUTUBE_LIBRARY_SOURCE_ID) -->
+    <script src="playlist.js"></script>
     <script type="module" src="./core.js"></script>
-    <script src="./auth.js"></script>
-    <script src="./init.js"></script>
+
     <script>
         // Script inline para manejar errores de carga
         window.addEventListener('error', function(e) {
