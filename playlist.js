@@ -799,4 +799,115 @@ function initializePlaylistManager(unifiedCore) {
     // Exponer globalmente para compatibilidad
     window.playlistManager = playlistManagerInstance;
     
-    console.log('✅ Playlist
+    console.log('✅ PlaylistManager inicializado y conectado con UnifiedCore');
+    return playlistManagerInstance;
+}
+
+// Función para configurar event listeners de playlist input (movida desde core.js)
+function setupPlaylistInput() {
+    const urlInput = document.getElementById('searchInput2');
+    const addBtn = document.getElementById('añadirUrlButton');
+
+    if (addBtn && urlInput) {
+        addBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            const playlistId = playlistManagerInstance?.extractPlaylistId(url);
+            if (!playlistId) {
+                window.unifiedCore?.showMessage('URL de playlist no válida', 'error');
+                return;
+            }
+
+            urlInput.value = '';
+            window.unifiedCore?.showMessage('Cargando playlist...', 'loading');
+
+            try {
+                const playlistInfo = await playlistManagerInstance?.getPlaylistInfo(playlistId);
+                if (playlistInfo) {
+                    playlistInfo.id = playlistId;
+                    await playlistManagerInstance?.handlePlaylistLoaded(playlistInfo);
+                }
+            } catch (error) {
+                console.error("Error cargando playlist:", error);
+                window.unifiedCore?.showMessage(`Error al cargar playlist: ${error.message}`, 'error');
+            }
+        });
+    }
+}
+
+// =============================================
+// INICIALIZACIÓN Y EVENTOS
+// =============================================
+
+// Configurar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📁 Playlist.js cargado, esperando inicialización...');
+    
+    // Configurar input de playlist URL
+    setTimeout(() => {
+        setupPlaylistInput();
+    }, 1000); // Esperar a que el DOM esté completamente cargado
+});
+
+// =============================================
+// FUNCIONES GLOBALES DE UTILIDAD
+// =============================================
+
+// Función para obtener la instancia del playlist manager
+window.getPlaylistManager = function() {
+    return playlistManagerInstance;
+};
+
+// Función para verificar si el playlist manager está listo
+window.isPlaylistManagerReady = function() {
+    return playlistManagerInstance !== null && playlistManagerInstance.core !== null;
+};
+
+// Función de debug específica para playlists
+window.debugPlaylists = function() {
+    if (!playlistManagerInstance) {
+        console.log('❌ PlaylistManager no inicializado');
+        return;
+    }
+    
+    console.log('🐛 Estado del PlaylistManager:', {
+        instance: playlistManagerInstance,
+        playlistsData: playlistManagerInstance.playlistsData,
+        coreConnection: !!playlistManagerInstance.core,
+        totalPlaylists: playlistManagerInstance.playlistsData.length,
+        queuePlaylist: playlistManagerInstance.playlistsData.find(p => p.id === 'queue'),
+        youtubeLibraryPlaylists: playlistManagerInstance.playlistsData.filter(p => p.source === 'youtube_library').length
+    });
+};
+
+// Función para forzar sincronización
+window.forcePlaylistSync = function() {
+    if (playlistManagerInstance && window.unifiedCore) {
+        playlistManagerInstance.syncWithCore();
+        playlistManagerInstance.updatePlaylistsUI();
+        console.log('🔄 Sincronización forzada completada');
+    } else {
+        console.warn('⚠️ No se puede sincronizar: faltan dependencias');
+    }
+};
+
+// =============================================
+// EXPORT PARA MÓDULOS ES6 (OPCIONAL)
+// =============================================
+
+// Si se usan módulos ES6
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        PlaylistManager,
+        initializePlaylistManager
+    };
+}
+
+// Si se usa como módulo ES6
+if (typeof window !== 'undefined') {
+    window.PlaylistManager = PlaylistManager;
+    window.initializePlaylistManager = initializePlaylistManager;
+}
+
+console.log('🎵 Playlist.js completamente cargado y listo');
