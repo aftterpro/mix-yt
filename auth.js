@@ -532,12 +532,14 @@ function signOut() {
         // Disparar evento de logout
         document.dispatchEvent(new CustomEvent('userLoggedOut'));
         
-        if (window.unifiedCore) {
-            window.unifiedCore.showMessage('Sesión cerrada completamente', 'success');
-            
-            // Limpiar playlists de YouTube del sistema unificado
-            window.unifiedCore.clearYouTubeLibraryPlaylists();
-        }
+if (window.unifiedCore) {
+    window.unifiedCore.showMessage('Sesión cerrada completamente', 'success');
+    
+    // Limpiar playlists de YouTube del sistema unificado
+    if (window.playlistManager) {
+        window.playlistManager.clearYouTubeLibraryPlaylists();
+    }
+}
         
     } catch (error) {
         console.error("❌ Error cerrando sesión:", error);
