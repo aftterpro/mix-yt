@@ -1,4 +1,4 @@
-console.log('🚀 Iniciando YT CrossMix');
+console.log('🚀 Iniciando YT CrossMix - Sistema Unificado');
 
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
@@ -60,7 +60,7 @@ const PERSISTENCE_CONFIG = {
 // =============================================
 
 // FUNCIONES DE PERSISTENCIA
-saveAllData() {
+function saveAllData() {
     try {
         // Guardar playlists (excluyendo YouTube Library)
         const playlistsToSave = playlistsData.filter(p => p.source !== 'youtube_library');
@@ -161,22 +161,6 @@ function loadQueuePersistent() {
     }
 }
 
-setupAutomaticSaving() {
-    // Guardar cada 30 segundos
-    setInterval(() => {
-        if (this.state.initialized) {
-            this.saveAllData();
-        }
-    }, 30000);
-    
-    // Guardar antes de cerrar
-    window.addEventListener('beforeunload', () => {
-        this.saveAllData();
-    });
-    
-    console.log('💾 Guardado automático configurado');
-}
-
 class UnifiedCore {
     constructor() {
         this.state = unifiedState;
@@ -185,6 +169,22 @@ class UnifiedCore {
         this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
         this.init();
         this.setupAutomaticSaving();
+    }
+
+    setupAutomaticSaving() {
+        // Guardar cada 30 segundos
+        setInterval(() => {
+            if (this.state.initialized) {
+                saveAllData(); // Llamar función global
+            }
+        }, 30000);
+        
+        // Guardar antes de cerrar
+        window.addEventListener('beforeunload', () => {
+            saveAllData(); // Llamar función global
+        });
+        
+        console.log('💾 Guardado automático configurado');
     }
 
     async init() {
