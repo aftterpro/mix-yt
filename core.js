@@ -441,38 +441,49 @@ initializePlaylistManager() {
     console.log("🔧 Inicializando playlist manager...");
     
     const initManager = () => {
-        if (typeof initializePlaylistManager === 'function') {
-            initializePlaylistManager(this);
-            this.syncPlaylistData();
-            console.log("✅ Playlist manager inicializado");
-            
-            // Si hay playlists pendientes de YouTube, procesarlas ahora
-            if (this.pendingYouTubePlaylists) {
-                console.log("🔄 Procesando playlists de YouTube pendientes");
-                if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
-                    window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
-                    this.pendingYouTubePlaylists = null;
-                    this.updatePlaylistsUI();
-                }
+        // CAMBIAR la verificación:
+        if (window.playlistManager || typeof initializePlaylistManager === 'function') {
+            if (typeof initializePlaylistManager === 'function') {
+                initializePlaylistManager(this);
+                console.log("✅ Función initializePlaylistManager ejecutada");
             }
-            return true;
+            if (window.playlistManager) {
+                this.syncPlaylistData();
+                console.log("✅ Playlist manager sincronizado");
+                
+                // Si hay playlists pendientes de YouTube, procesarlas ahora
+                if (this.pendingYouTubePlaylists) {
+                    console.log("🔄 Procesando playlists de YouTube pendientes");
+                    if (window.playlistManager.addYouTubeLibraryPlaylists) {
+                        window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
+                        this.pendingYouTubePlaylists = null;
+                        this.updatePlaylistsUI();
+                    }
+                }
+                return true;
+            }
         }
         return false;
     };
     
-    // Intentar inicializar inmediatamente
+    // Intentar inmediatamente
     if (!initManager()) {
-        console.log("⏳ Playlist manager no disponible, reintentando...");
-        // Reintentar cada 500ms hasta 10 segundos
+        console.log("⏳ Esperando playlist manager...");
         let attempts = 0;
-        const maxAttempts = 20;
+        const maxAttempts = 30; // Aumentar intentos
         
         const retryInterval = setInterval(() => {
             attempts++;
+            console.log(`🔄 Intento ${attempts}/${maxAttempts} de inicializar playlist manager`);
+            
             if (initManager() || attempts >= maxAttempts) {
                 clearInterval(retryInterval);
                 if (attempts >= maxAttempts) {
-                    console.error("❌ No se pudo inicializar playlist manager después de 10 segundos");
+                    console.error("❌ No se pudo inicializar playlist manager");
+                    // Crear UI básica como fallback
+                    this.createBasicPlaylistUI();
+                } else {
+                    console.log("✅ Playlist manager inicializado correctamente");
                 }
             }
         }, 500);
@@ -2134,5 +2145,5 @@ window.addEventListener('beforeunload', () => {
         clearInterval(monitorInterval);
     }
 });
-
-export default UnifiedCore;
+// Exponer UnifiedCore globalmente
+window.UnifiedCore = UnifiedCore;
