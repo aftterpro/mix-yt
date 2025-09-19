@@ -1,4 +1,4 @@
-console.log('🚀 Iniciando YT CrossMix - Sistema Unificado');
+console.log('🚀 Iniciando YT CrossMix');
 
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
