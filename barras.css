@@ -673,7 +673,59 @@
 .disconnect-btn:hover {
     background: linear-gradient(135deg, #d32f2f, #b71c1c);
 }
+/* ==
+Spinner
+== */
+.search-loading-more {
+    padding: var(--spacing-lg);
+    text-align: center;
+    margin-top: var(--spacing-md);
+}
 
+.search-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    color: var(--primary-color);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.search-spinner i {
+    font-size: 18px;
+    animation: spin 1s linear infinite;
+}
+
+.search-results {
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) var(--surface-light);
+}
+
+.search-results::-webkit-scrollbar {
+    width: 8px;
+}
+
+.search-results::-webkit-scrollbar-track {
+    background: var(--surface-light);
+    border-radius: 4px;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border-radius: 4px;
+}
+
+.search-results::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 /* =============================================
    RESPONSIVE
    ============================================= */
