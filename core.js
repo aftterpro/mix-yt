@@ -214,7 +214,14 @@ class UnifiedCore {
         this.state.initialized = true;
         this.updateStatusIndicator('Sistema Listo', 'success');
         this.enableUnifiedElements();
-        
+            setTimeout(() => {
+        if (!window.playlistManager) {
+            console.error("❌ CRÍTICO: playlistManager no está disponible después de la inicialización");
+            this.showMessage("Error: Gestor de playlists no disponible", 'error');
+        } else {
+            console.log("✅ playlistManager verificado y disponible");
+        }
+    }, 3000);
         console.log('✅ Sistema Unificado Inicializado');
     }
 
@@ -481,13 +488,42 @@ initializePlaylistManager() {
     }
 
     // Actualizar UI de playlists (delegado)
-    updatePlaylistsUI() {
-        if (window.playlistManager) {
-            window.playlistManager.playlistsData = playlistsData;
-            window.playlistManager.updatePlaylistsUI();
+updatePlaylistsUI() {
+    console.log("🔄 Actualizando UI de playlists...", {
+        playlistManagerExists: !!window.playlistManager,
+        playlistsCount: playlistsData.length
+    });
+    
+    if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
+        window.playlistManager.playlistsData = playlistsData;
+        window.playlistManager.updatePlaylistsUI();
+        console.log("✅ UI de playlists actualizada via playlistManager");
+    } else {
+        console.warn("⚠️ playlistManager no disponible para actualizar UI");
+        
+        // Fallback directo: mostrar algo en la UI mientras se resuelve
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        if (playlistsGrid && playlistsData.length > 0) {
+            playlistsGrid.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-sync fa-spin"></i>
+                    <p>Cargando playlists... (${playlistsData.length} encontradas)</p>
+                </div>
+            `;
         }
-        this.updateOverviewStats();
+        
+        // Reintentar después de un momento
+        setTimeout(() => {
+            if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
+                console.log("🔄 Reintentando actualización de UI");
+                window.playlistManager.playlistsData = playlistsData;
+                window.playlistManager.updatePlaylistsUI();
+            }
+        }, 2000);
     }
+    
+    this.updateOverviewStats();
+}
 
     setupEventListeners() {
         // Navegación
