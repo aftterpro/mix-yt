@@ -1503,28 +1503,6 @@ async loadMoreSearchResults() {
         console.log(`📊 Cola de reproducción: ${flatList.length} videos`);
         return flatList;
     }
-
-    // Función helper para extraer artista del título
-    extractArtistFromTitle(title) {
-        if (!title) return 'Artista Desconocido';
-        
-        // Patrones comunes: "Artista - Canción" o "Artista: Canción"
-        const patterns = [
-            /^([^-]+)\s*-\s*(.+)$/,
-            /^([^:]+)\s*:\s*(.+)$/,
-            /^([^|]+)\s*\|\s*(.+)$/
-        ];
-        
-        for (const pattern of patterns) {
-            const match = title.match(pattern);
-            if (match) {
-                return match[1].trim();
-            }
-        }
-        
-        return 'YT CrossMix';
-    }
-
     formatDuration(duration) {
         if (isNaN(duration) || duration < 0) return "0:00";
         const minutes = Math.floor(duration / 60);
