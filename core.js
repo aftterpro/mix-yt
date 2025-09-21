@@ -218,6 +218,44 @@ class UnifiedCore {
         console.log('✅ Sistema Unificado Inicializado');
     }
 
+async loadTrendingContent() {
+    try {
+        console.log('🔥 Cargando contenido trending...');
+        const trending = await window.youtubeJSClient.getTrending();
+        
+        // Mostrar en la pestaña de playlists de explorar
+        const trendingTab = document.getElementById('playlistsTab');
+        if (trendingTab && trending.items?.length > 0) {
+            trendingTab.innerHTML = `
+                <div class="trending-section">
+                    <h3>🔥 Trending en YouTube</h3>
+                    <div class="trending-grid">
+                        ${trending.items.slice(0, 12).map(video => `
+                            <div class="trending-card" onclick="window.unifiedCore.addVideoToQueue({
+                                videoId: '${video.videoId}',
+                                title: '${video.title.replace(/'/g, "\\'")}',
+                                thumbnail: '${video.thumbnail}',
+                                duration: ${video.duration},
+                                uploaderName: '${video.uploaderName}'
+                            })">
+                                <img src="${video.thumbnail}" alt="${video.title}">
+                                <div class="trending-info">
+                                    <h4>${video.title.substring(0, 60)}...</h4>
+                                    <p>${video.uploaderName}</p>
+                                    <span>${this.formatDuration(video.duration)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        this.showMessage('Contenido trending cargado', 'success');
+    } catch (error) {
+        console.error('❌ Error cargando trending:', error);
+    }
+}
     async loadPersistentData() {
         console.log('📂 Cargando datos persistentes...');
         
