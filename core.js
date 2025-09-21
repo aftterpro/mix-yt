@@ -1160,53 +1160,85 @@ updatePlaylistsUI() {
     // =============================================
     // BÚSQUEDA
     // =============================================
-    async performSearch(query, nextPage = null) {
-        const searchResults = document.getElementById('searchResults');
-        if (!searchResults) return;
+async performSearch(query, continuation = null) {
+    const searchResults = document.getElementById('searchResults');
+    if (!searchResults) return;
 
-        if (!nextPage) {
-            currentSearchQuery = query;
-            nextPageContext = null;
-            searchResults.innerHTML = '<div class="search-loading">Buscando...</div>';
-        }
-
-        isLoadingMore = true;
-
-        try {
-            let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}`;
-            if (nextPage) {
-                apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`;
-            }
-
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            this.displaySearchResults(data, !!nextPage);
-
-        } catch (error) {
-            console.error("Error en búsqueda:", error);
-            const errorMsg = error.message || "Error desconocido al buscar";
-            
-            if (!nextPage) {
-                searchResults.innerHTML = `<div class="search-error">${errorMsg}</div>`;
-            } else {
-                this.showMessage(errorMsg, 'error');
-            }
-        } finally {
-            isLoadingMore = false;
+    // Si es una nueva búsqueda
+    if (!continuation) {
+        currentSearchQuery = query;
+        nextPageContext = null;
+        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando con YouTube.js...</div>';
+        
+        // Remover listener anterior si existe
+        if (this.handleSearchScroll) {
+            searchResults.removeEventListener('scroll', this.handleSearchScroll);
         }
     }
 
+    isLoadingMore = true;
+
+    try {
+        // Usar YouTube.js en lugar de fetch
+        let results;
+        
+        if (!window.youtubeJSClient) {
+            throw new Error('YouTube.js client no disponible');
+        }
+        
+        results = await window.youtubeJSClient.search(currentSearchQuery, continuation);
+        this.displaySearchResults(results, !!continuation);
+
+    } catch (error) {
+        console.error("❌ Error con YouTube.js:", error);
+        
+        // Fallback al sistema anterior
+        console.log("🔄 Fallback al sistema Piped...");
+        await this.performSearchFallback(currentSearchQuery, continuation);
+        
+    } finally {
+        isLoadingMore = false;
+    }
+}
+
+// Método fallback usando el sistema anterior
+async performSearchFallback(query, nextPage) {
+    try {
+        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
+        if (nextPage) {
+            apiUrl += `&nextpage=${encodeURIComponent(nextPage)}`;
+        }
+
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        this.displaySearchResults(data, !!nextPage);
+        
+    } catch (error) {
+        console.error("❌ Error en fallback:", error);
+        const searchResults = document.getElementById('searchResults');
+        if (searchResults) {
+            searchResults.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error en búsqueda: ${error.message}</p>
+                    <button onclick="window.unifiedCore.clearSearchResults()" class="retry-search-btn">
+                        <i class="fas fa-redo"></i> Intentar de nuevo
+                    </button>
+                </div>
+            `;
+        }
+    }
+}
 displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
-        nextPageContext = null;
         searchResults.innerHTML = '';
         // Remover listener anterior si existe
         if (this.handleSearchScroll) {
@@ -1220,12 +1252,14 @@ displaySearchResults(results, append = false) {
                 <div class="search-placeholder">
                     <i class="fas fa-search"></i>
                     <p>No se encontraron resultados</p>
+                    <p><small>Intenta con otras palabras clave</small></p>
                 </div>
             `;
         }
         return;
     }
 
+    // Actualizar contexto de siguiente página
     nextPageContext = results.nextpage || null;
 
     let grid = searchResults.querySelector('.search-results-grid');
@@ -1234,6 +1268,7 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
+    // Agregar videos evitando duplicados
     results.items.forEach(video => {
         const videoId = video.videoId || video.url?.split('v=')[1];
         if (!videoId) return;
@@ -1247,41 +1282,49 @@ displaySearchResults(results, append = false) {
         grid.appendChild(card);
     });
 
-    // Remover spinner existente
+    // Remover spinner de carga si existe
     const existingSpinner = searchResults.querySelector('.search-loading-more');
     if (existingSpinner) {
         existingSpinner.remove();
     }
 
-    // Configurar scroll infinito solo si hay más páginas
-    if (nextPageContext) {
-        // Crear y configurar el handler de scroll
+    // ✅ CONFIGURAR SCROLL INFINITO
+    if (nextPageContext && !append) {
+        console.log('📜 Configurando scroll infinito...');
+        
         this.handleSearchScroll = this.debounce(() => {
             const scrollTop = searchResults.scrollTop;
             const scrollHeight = searchResults.scrollHeight;
             const clientHeight = searchResults.clientHeight;
             
-            // Activar cuando esté cerca del final (100px antes)
-            if (scrollTop + clientHeight >= scrollHeight - 100) {
-                if (!isLoadingMore && nextPageContext) {
-                    this.loadMoreSearchResults();
-                }
+            // Calcular si está cerca del final (150px antes)
+            const isNearBottom = scrollTop + clientHeight >= scrollHeight - 150;
+            
+            if (isNearBottom && !isLoadingMore && nextPageContext) {
+                console.log('📜 🔥 Activando carga infinita...');
+                this.loadMoreSearchResults();
             }
-        }, 150);
+        }, 200);
         
-        // Agregar el listener
-        searchResults.addEventListener('scroll', this.handleSearchScroll);
-        
-        console.log('📜 Scroll infinito configurado para búsqueda');
-    } else {
-        console.log('📄 No hay más resultados para cargar');
+        // Agregar listener de scroll
+        searchResults.addEventListener('scroll', this.handleSearchScroll, { passive: true });
+        console.log('✅ Scroll infinito activado');
     }
+
+    console.log(`✅ ${results.items.length} resultados mostrados${append ? ' (añadidos)' : ''}`);
 }
+
+// Método para cargar más resultados con spinner
 async loadMoreSearchResults() {
-    if (isLoadingMore || !nextPageContext) return;
+    if (isLoadingMore || !nextPageContext) {
+        console.log('⚠️ Ya cargando o no hay más páginas');
+        return;
+    }
     
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
+    
+    console.log('📜 ⏳ Cargando más resultados...');
     
     // Mostrar spinner de carga
     const spinner = document.createElement('div');
@@ -1294,10 +1337,11 @@ async loadMoreSearchResults() {
     `;
     searchResults.appendChild(spinner);
     
-    console.log('📜 Cargando más resultados de búsqueda...');
-    
     try {
+        // Cargar siguiente página
         await this.performSearch(currentSearchQuery, nextPageContext);
+        console.log('✅ Más resultados cargados');
+        
     } catch (error) {
         console.error('❌ Error cargando más resultados:', error);
         this.showMessage('Error cargando más resultados', 'error');
