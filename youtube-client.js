@@ -1,114 +1,36 @@
-// youtube-scraper.js - Sistema híbrido sin CORS
-console.log('🎵 Cargando YouTube Hybrid Client...');
+// youtube-scraper.js - Sistema simplificado sin CORS
+console.log('🎵 Cargando YouTube Simplified Client...');
 
-class YouTubeHybridClient {
+class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        this.sources = [
-            'invidious',
-            'piped',
-            'fallback'
-        ];
-        this.currentSourceIndex = 0;
     }
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Hybrid Client inicializado');
+        console.log('✅ YouTube Simplified Client inicializado');
         return true;
-    }
-
-    getCurrentSource() {
-        return this.sources[this.currentSourceIndex];
-    }
-
-    rotateSource() {
-        this.currentSourceIndex = (this.currentSourceIndex + 1) % this.sources.length;
-        console.log(`🔄 Rotando a fuente: ${this.getCurrentSource()}`);
     }
 
     async search(query, continuation = null) {
         if (!this.initialized) await this.init();
 
-        console.log(`🔍 Búsqueda híbrida: "${query}"${continuation ? ' (página siguiente)' : ''}`);
+        console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (página siguiente)' : ''}`);
 
-        // Intentar con diferentes fuentes
-        for (let attempt = 0; attempt < this.sources.length; attempt++) {
-            try {
-                const source = this.getCurrentSource();
-                console.log(`🔄 Intentando con fuente: ${source}`);
-                
-                let results;
-                switch (source) {
-                    case 'invidious':
-                        results = await this.searchInvidious(query, continuation);
-                        break;
-                    case 'piped':
-                        results = await this.searchPiped(query, continuation);
-                        break;
-                    case 'fallback':
-                        results = await this.searchFallback(query, continuation);
-                        break;
-                }
-
-                if (results && results.items && results.items.length > 0) {
-                    console.log(`✅ ${results.items.length} resultados desde ${source}`);
-                    return results;
-                }
-                
-            } catch (error) {
-                console.warn(`⚠️ Error con ${this.getCurrentSource()}:`, error.message);
-                this.rotateSource();
-            }
+        try {
+            // Intentar con Piped primero (tu sistema actual que funciona)
+            return await this.searchPiped(query, continuation);
+            
+        } catch (error) {
+            console.warn('⚠️ Error con Piped:', error.message);
+            
+            // Fallback a resultados generados
+            console.log('🔄 Usando fallback de resultados populares');
+            return this.searchFallback(query, continuation);
         }
-
-        throw new Error('Todas las fuentes de búsqueda fallaron');
-    }
-
-    async searchInvidious(query, continuation) {
-        const invidiousInstances = [
-            'https://inv.nadeko.net',
-            'https://invidious.nerdvpn.de',
-            'https://invidious.f5.si'
-        ];
-
-        for (const instance of invidiousInstances) {
-            try {
-                const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&sort_by=relevance`;
-                const response = await fetch(url);
-                
-                if (!response.ok) continue;
-                
-                const data = await response.json();
-                
-                return {
-                    items: data.map(video => ({
-                        videoId: video.videoId,
-                        title: video.title,
-                        thumbnail: `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`,
-                        duration: video.lengthSeconds || 0,
-                        uploaderName: video.author || 'Canal desconocido',
-                        author: video.author || 'Canal desconocido',
-                        url: `https://www.youtube.com/watch?v=${video.videoId}`,
-                        views: video.viewCount || '0',
-                        published: video.publishedText || ''
-                    })),
-                    nextpage: null, // Invidious no proporciona paginación fácil
-                    query: query,
-                    total: data.length
-                };
-                
-            } catch (error) {
-                console.warn(`⚠️ Instancia Invidious falló: ${instance}`);
-                continue;
-            }
-        }
-        
-        throw new Error('Todas las instancias de Invidious fallaron');
     }
 
     async searchPiped(query, continuation) {
-        // Tu sistema actual que ya funciona
         let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
         if (continuation) {
             apiUrl += `&nextpage=${encodeURIComponent(continuation)}`;
@@ -120,6 +42,9 @@ class YouTubeHybridClient {
         }
 
         const data = await response.json();
+        
+        console.log(`✅ ${data.items?.length || 0} resultados desde Piped`);
+        
         return {
             items: data.items || [],
             nextpage: data.nextpage || null,
@@ -128,42 +53,54 @@ class YouTubeHybridClient {
         };
     }
 
-    async searchFallback(query, continuation) {
-        // Sistema de búsqueda básico usando datos embebidos
-        const fallbackResults = this.generateFallbackResults(query);
-        
-        return {
-            items: fallbackResults,
-            nextpage: null,
-            query: query,
-            total: fallbackResults.length
-        };
-    }
-
-    generateFallbackResults(query) {
-        // Generar resultados de ejemplo basados en la búsqueda
-        const popularVideos = [
-            { artist: 'Selena Gomez', song: 'Lose You To Love Me', id: 'zlJDTxahav0' },
-            { artist: 'Selena Gomez', song: 'Look At Her Now', id: 'UWKaAfe2owo' },
-            { artist: 'Selena Gomez', song: 'Single Soon', id: 'bTtNV6yvCdI' },
-            { artist: 'Taylor Swift', song: 'Anti-Hero', id: 'b1kbLWvqugk' },
-            { artist: 'Ariana Grande', song: 'positions', id: 'tcYodQoapMg' },
-            { artist: 'Dua Lipa', song: 'Levitating', id: 'TUVcZfQe-Kw' },
-            { artist: 'Olivia Rodrigo', song: 'good 4 u', id: 'gNi_6U5Pm_o' },
-            { artist: 'Billie Eilish', song: 'bad guy', id: 'DyDfgMOUjCI' }
+    searchFallback(query, continuation) {
+        // Base de datos de videos populares expandida
+        const musicDatabase = [
+            // Selena Gomez
+            { artist: 'Selena Gomez', song: 'Lose You To Love Me', id: 'zlJDTxahav0', genre: 'pop' },
+            { artist: 'Selena Gomez', song: 'Look At Her Now', id: 'UWKaAfe2owo', genre: 'pop' },
+            { artist: 'Selena Gomez', song: 'Single Soon', id: 'bTtNV6yvCdI', genre: 'pop' },
+            { artist: 'Selena Gomez', song: 'Calm Down', id: 'WKlAKsUgOHY', genre: 'pop' },
+            { artist: 'Selena Gomez', song: 'Good For You', id: 'AmKoUmj-QcI', genre: 'pop' },
+            
+            // Artistas populares
+            { artist: 'Taylor Swift', song: 'Anti-Hero', id: 'b1kbLWvqugk', genre: 'pop' },
+            { artist: 'Taylor Swift', song: 'Shake It Off', id: 'nfWlot6h_JM', genre: 'pop' },
+            { artist: 'Ariana Grande', song: 'positions', id: 'tcYodQoapMg', genre: 'pop' },
+            { artist: 'Ariana Grande', song: 'thank u, next', id: 'gl1aHhXnN1k', genre: 'pop' },
+            { artist: 'Dua Lipa', song: 'Levitating', id: 'TUVcZfQe-Kw', genre: 'pop' },
+            { artist: 'Dua Lipa', song: 'Don\'t Start Now', id: 'oygrmJFKYZY', genre: 'pop' },
+            { artist: 'Olivia Rodrigo', song: 'good 4 u', id: 'gNi_6U5Pm_o', genre: 'pop' },
+            { artist: 'Olivia Rodrigo', song: 'drivers license', id: '8sUWjlMnfEs', genre: 'pop' },
+            { artist: 'Billie Eilish', song: 'bad guy', id: 'DyDfgMOUjCI', genre: 'alternative' },
+            { artist: 'Billie Eilish', song: 'Happier Than Ever', id: '5GJWxDKyk3A', genre: 'alternative' },
+            { artist: 'The Weeknd', song: 'Blinding Lights', id: 'fHI8X4OXluQ', genre: 'r&b' },
+            { artist: 'Harry Styles', song: 'As It Was', id: 'H5v3kku4y6Q', genre: 'pop' },
+            { artist: 'Ed Sheeran', song: 'Shape of You', id: 'JGwWNGJdvx8', genre: 'pop' },
+            { artist: 'Bad Bunny', song: 'Tití Me Preguntó', id: 'kGh_h2eKe8k', genre: 'reggaeton' },
+            { artist: 'Post Malone', song: 'Circles', id: 'wXhTHyIgQ_U', genre: 'hip-hop' }
         ];
 
         const queryLower = query.toLowerCase();
-        let matches = popularVideos.filter(video => 
-            video.artist.toLowerCase().includes(queryLower) || 
-            video.song.toLowerCase().includes(queryLower)
-        );
+        
+        // Buscar coincidencias inteligentes
+        let matches = musicDatabase.filter(video => {
+            const artistMatch = video.artist.toLowerCase().includes(queryLower);
+            const songMatch = video.song.toLowerCase().includes(queryLower);
+            const genreMatch = video.genre.toLowerCase().includes(queryLower);
+            
+            return artistMatch || songMatch || genreMatch;
+        });
 
+        // Si no hay coincidencias específicas, usar resultados populares
         if (matches.length === 0) {
-            matches = popularVideos.slice(0, 4); // Resultados genéricos
+            matches = musicDatabase.slice(0, 12);
         }
 
-        return matches.map(video => ({
+        // Mezclar resultados para variedad
+        matches = this.shuffleArray([...matches]).slice(0, 20);
+
+        const results = matches.map(video => ({
             videoId: video.id,
             title: `${video.artist} - ${video.song}`,
             thumbnail: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
@@ -171,9 +108,35 @@ class YouTubeHybridClient {
             uploaderName: video.artist,
             author: video.artist,
             url: `https://www.youtube.com/watch?v=${video.id}`,
-            views: Math.floor(Math.random() * 100000000).toString(),
-            published: '1 año atrás'
+            views: this.generateViews(),
+            published: this.generatePublishDate()
         }));
+
+        return {
+            items: results,
+            nextpage: null, // Sin paginación en fallback
+            query: query,
+            total: results.length
+        };
+    }
+
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    generateViews() {
+        const min = 1000000; // 1M
+        const max = 500000000; // 500M
+        return Math.floor(Math.random() * (max - min) + min).toLocaleString();
+    }
+
+    generatePublishDate() {
+        const dates = ['hace 1 semana', 'hace 2 semanas', 'hace 1 mes', 'hace 2 meses', 'hace 3 meses', 'hace 6 meses', 'hace 1 año'];
+        return dates[Math.floor(Math.random() * dates.length)];
     }
 
     isAvailable() {
@@ -181,11 +144,11 @@ class YouTubeHybridClient {
     }
 
     async getPlaylist(playlistId) {
-        throw new Error('Obtención de playlists no implementada en modo híbrido');
+        throw new Error('Obtención de playlists no implementada');
     }
 }
 
 // Crear instancia global
-window.youtubeJSClient = new YouTubeHybridClient();
+window.youtubeJSClient = new YouTubeSimplifiedClient();
 
-console.log('✅ YouTube Hybrid Client cargado (múltiples fuentes)');
+console.log('✅ YouTube Simplified Client cargado');
