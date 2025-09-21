@@ -403,54 +403,73 @@ async loadTrendingContent() {
     }
 
 initializeAuth() {
-    if (window.playlistsFetchedListenerAdded) {
+    console.log("🔧 Configurando eventos de autenticación...");
+    
+    // EVITAR LISTENERS DUPLICADOS
+    if (window.authEventsConfigured) {
+        console.log("⚠️ Eventos de auth ya configurados");
         return;
     }
-    window.playlistsFetchedListenerAdded = true;
+    window.authEventsConfigured = true;
     
-    // Configurar eventos de autenticación con lógica simplificada
+    // LISTENER PRINCIPAL para playlists
     document.addEventListener('playlistsFetched', (event) => {
-        console.log("📁 Playlists de biblioteca recibidas:", event.detail.length);
+        console.log("📁 Evento playlistsFetched recibido:", {
+            playlistsCount: event.detail.length,
+            playlistManagerReady: !!window.playlistManager,
+            firstPlaylist: event.detail[0]?.snippet?.title || 'Sin título'
+        });
         
-        // PROCESAR INMEDIATAMENTE SI TODO ESTÁ LISTO
-        if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
-            console.log("✅ Procesando playlists inmediatamente");
-            
-            // Limpiar playlists de YouTube existentes para evitar duplicados
-            window.playlistManager.clearYouTubeLibraryPlaylists();
-            
-            // Agregar las nuevas
-            window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
-            
-            // FORZAR ACTUALIZACIÓN MÚLTIPLE PARA ASEGURAR RENDERIZADO
-            setTimeout(() => {
-                this.updatePlaylistsUI();
-                console.log("🔄 Primera actualización UI");
-            }, 100);
-            
-            setTimeout(() => {
-                this.updatePlaylistsUI();
-                console.log("🔄 Segunda actualización UI (asegurar renderizado)");
-            }, 1000);
-            
-        } else {
-            console.warn('⚠️ playlistManager no listo para procesar playlists');
-            
-            // FALLBACK: Almacenar para procesar después
+        if (!window.playlistManager) {
+            console.error("❌ CRÍTICO: playlistManager no disponible para procesar playlists");
+            // Guardar para procesamiento posterior
             window.pendingYouTubePlaylists = event.detail;
+            return;
         }
+        
+        if (!window.playlistManager.addYouTubeLibraryPlaylists) {
+            console.error("❌ CRÍTICO: función addYouTubeLibraryPlaylists no disponible");
+            return;
+        }
+        
+        // LIMPIAR PLAYLISTS DE YOUTUBE EXISTENTES PARA EVITAR DUPLICADOS
+        console.log("🧹 Limpiando playlists de YouTube existentes...");
+        const beforeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
+        window.playlistManager.clearYouTubeLibraryPlaylists();
+        console.log(`🗑️ Eliminadas ${beforeCount} playlists de YouTube previas`);
+        
+        // PROCESAR NUEVAS PLAYLISTS
+        console.log("✅ Procesando", event.detail.length, "playlists de YouTube...");
+        window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+        
+        // VERIFICAR QUE SE AÑADIERON CORRECTAMENTE
+        setTimeout(() => {
+            const afterCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
+            console.log(`📊 Verificación: ${afterCount} playlists de YouTube en manager`);
+            
+            if (afterCount === 0) {
+                console.error("❌ CRÍTICO: No se añadieron playlists de YouTube al manager");
+                // REINTENTO DE EMERGENCIA
+                window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+            } else {
+                console.log(`✅ Éxito: ${afterCount} playlists de YouTube añadidas correctamente`);
+            }
+            
+            // FORZAR ACTUALIZACIÓN DE UI
+            this.updatePlaylistsUI();
+        }, 500);
     });
 
     // Listener para logout
     document.addEventListener('userLoggedOut', () => {
-        console.log("🚪 Usuario desconectado");
-        if (window.playlistManager && window.playlistManager.clearYouTubeLibraryPlaylists) {
+        console.log("🚪 Usuario desconectado, limpiando playlists de YouTube");
+        if (window.playlistManager?.clearYouTubeLibraryPlaylists) {
             window.playlistManager.clearYouTubeLibraryPlaylists();
         }
-        setTimeout(() => {
-            this.updatePlaylistsUI();
-        }, 500);
+        setTimeout(() => this.updatePlaylistsUI(), 500);
     });
+    
+    console.log("✅ Eventos de autenticación configurados");
 }
 
     initializeUI() {
