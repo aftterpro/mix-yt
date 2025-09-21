@@ -2243,3 +2243,36 @@ body {
     background-color: var(--surface-light);
     color: var(--text-primary);
 }
+/* Mejoras para duración de cola */
+.queue-duration {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Mejora para títulos largos en cola */
+.queue-item-title {
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+
+.queue-item:hover .queue-item-title {
+    color: var(--primary-color);
+}
+
+/* Indicador de carga para thumbnails */
+.queue-item-thumbnail {
+    background: linear-gradient(45deg, var(--surface-light), var(--surface-color));
+    background-size: 20px 20px;
+    animation: loading-bg 2s linear infinite;
+}
+
+@keyframes loading-bg {
+    0% { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+}
+
+.queue-item-thumbnail:not([src*="ytimg.com"]):not([src*="googleusercontent.com"]) {
+    animation: none;
+    background: var(--surface-light);
+}
