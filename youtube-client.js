@@ -1,116 +1,129 @@
-// youtube-direct.js - API directa de YouTube sin dependencias
-console.log('🎵 Cargando YouTube Direct API...');
+// youtube-scraper.js - Sistema sin API keys ni dependencias
+console.log('🎵 Cargando YouTube Scraper (sin API keys)...');
 
-class YouTubeDirectClient {
+class YouTubeScraper {
     constructor() {
         this.initialized = false;
-        this.apiKeys = [
-            'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', // Clave pública de YouTube
-            'AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc',
-            'AIzaSyCG-5uKBM8N8Kjb8vCzwqzJX8X5JzDyf6w'
+        this.corsProxy = 'https://api.allorigins.win/raw?url=';
+        // Fallback proxies
+        this.proxies = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://cors-anywhere.herokuapp.com/'
         ];
-        this.currentApiKeyIndex = 0;
-        this.baseUrl = 'https://www.googleapis.com/youtube/v3';
+        this.currentProxyIndex = 0;
     }
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Direct API inicializado');
+        console.log('✅ YouTube Scraper inicializado (sin API keys)');
         return true;
     }
 
-    getCurrentApiKey() {
-        return this.apiKeys[this.currentApiKeyIndex];
+    getCurrentProxy() {
+        return this.proxies[this.currentProxyIndex];
     }
 
-    rotateApiKey() {
-        this.currentApiKeyIndex = (this.currentApiKeyIndex + 1) % this.apiKeys.length;
-        console.log(`🔄 Rotando a API key ${this.currentApiKeyIndex + 1}`);
+    rotateProxy() {
+        this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
+        console.log(`🔄 Rotando proxy: ${this.getCurrentProxy()}`);
     }
 
-    async search(query, pageToken = null) {
+    async search(query, continuation = null) {
         if (!this.initialized) await this.init();
 
         try {
-            console.log(`🔍 Búsqueda directa YouTube: "${query}"${pageToken ? ' (página siguiente)' : ''}`);
+            console.log(`🔍 Buscando sin API: "${query}"${continuation ? ' (página siguiente)' : ''}`);
             
-            let url = `${this.baseUrl}/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=20&key=${this.getCurrentApiKey()}`;
+            // Usar el endpoint de búsqueda interna de YouTube
+            const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+            const proxiedUrl = this.getCurrentProxy() + encodeURIComponent(searchUrl);
             
-            if (pageToken) {
-                url += `&pageToken=${pageToken}`;
-            }
-
-            const response = await fetch(url);
-            
-            if (response.status === 403) {
-                // Cuota agotada, rotar clave
-                this.rotateApiKey();
-                throw new Error('Cuota agotada, intenta de nuevo');
-            }
+            const response = await fetch(proxiedUrl);
             
             if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
+                this.rotateProxy();
+                throw new Error(`Error de proxy: ${response.status}`);
             }
-
-            const data = await response.json();
             
-            // Obtener duraciones de videos (requiere llamada adicional)
-            const videoIds = data.items?.map(item => item.id.videoId).join(',');
-            const detailedVideos = videoIds ? await this.getVideoDetails(videoIds) : [];
+            const html = await response.text();
+            const videos = this.extractVideosFromHTML(html);
             
-            const formattedVideos = data.items?.map(item => {
-                const details = detailedVideos.find(d => d.id === item.id.videoId);
-                return this.formatVideo(item, details);
-            }) || [];
-
-            console.log(`📹 ${formattedVideos.length} videos encontrados`);
-
+            console.log(`📹 ${videos.length} videos extraídos`);
+            
             return {
-                items: formattedVideos,
-                nextpage: data.nextPageToken || null,
+                items: videos,
+                nextpage: null, // Por simplicidad, no implementamos paginación
                 query: query,
-                total: formattedVideos.length
+                total: videos.length
             };
 
         } catch (error) {
-            console.error('❌ Error en búsqueda YouTube Direct:', error);
+            console.error('❌ Error en scraping:', error);
+            // Fallback a tu sistema Piped actual
             throw error;
         }
     }
 
-    async getVideoDetails(videoIds) {
+    extractVideosFromHTML(html) {
         try {
-            const url = `${this.baseUrl}/videos?part=contentDetails,statistics&id=${videoIds}&key=${this.getCurrentApiKey()}`;
-            const response = await fetch(url);
+            const videos = [];
             
-            if (!response.ok) return [];
+            // Buscar el script con datos JSON
+            const scriptMatch = html.match(/var ytInitialData = ({.*?});/);
+            if (scriptMatch) {
+                const data = JSON.parse(scriptMatch[1]);
+                const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
+                
+                if (contents) {
+                    contents.forEach(section => {
+                        const items = section?.itemSectionRenderer?.contents || [];
+                        items.forEach(item => {
+                            const videoRenderer = item.videoRenderer;
+                            if (videoRenderer) {
+                                videos.push(this.formatScrapedVideo(videoRenderer));
+                            }
+                        });
+                    });
+                }
+            }
             
-            const data = await response.json();
-            return data.items || [];
+            // Fallback: usar regex para extraer datos básicos
+            if (videos.length === 0) {
+                videos.push(...this.extractWithRegex(html));
+            }
+            
+            return videos.slice(0, 20); // Limitar a 20 resultados
+            
         } catch (error) {
-            console.warn('⚠️ Error obteniendo detalles de videos:', error);
+            console.error('❌ Error extrayendo videos:', error);
             return [];
         }
     }
 
-    formatVideo(item, details = null) {
+    formatScrapedVideo(videoRenderer) {
         try {
+            const videoId = videoRenderer.videoId;
+            const title = videoRenderer.title?.runs?.[0]?.text || 'Título no disponible';
+            const thumbnail = videoRenderer.thumbnail?.thumbnails?.[0]?.url || './electronic.ico';
+            const duration = this.parseScrapedDuration(videoRenderer.lengthText?.simpleText);
+            const channel = videoRenderer.ownerText?.runs?.[0]?.text || 'Canal desconocido';
+            
             return {
-                videoId: item.id.videoId,
-                title: item.snippet.title,
-                thumbnail: this.getBestThumbnail(item.snippet.thumbnails),
-                duration: details ? this.parseDuration(details.contentDetails.duration) : 0,
-                uploaderName: item.snippet.channelTitle,
-                author: item.snippet.channelTitle,
-                url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-                views: details?.statistics?.viewCount || '0',
-                published: item.snippet.publishedAt
+                videoId,
+                title,
+                thumbnail,
+                duration,
+                uploaderName: channel,
+                author: channel,
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                views: videoRenderer.viewCountText?.simpleText || '0',
+                published: videoRenderer.publishedTimeText?.simpleText || ''
             };
         } catch (error) {
-            console.warn('⚠️ Error formateando video:', error);
             return {
-                videoId: item.id?.videoId || Math.random().toString(36),
-                title: 'Error al cargar video',
+                videoId: Math.random().toString(36),
+                title: 'Error extrayendo video',
                 thumbnail: './electronic.ico',
                 duration: 0,
                 uploaderName: 'Desconocido',
@@ -119,106 +132,56 @@ class YouTubeDirectClient {
         }
     }
 
-    getBestThumbnail(thumbnails) {
-        if (!thumbnails) return './electronic.ico';
+    extractWithRegex(html) {
+        const videos = [];
+        const videoRegex = /"videoId":"([^"]+)"/g;
+        const titleRegex = /"title":{"runs":\[{"text":"([^"]+)"/g;
         
-        // Priorizar calidad: maxres > high > medium > default
-        if (thumbnails.maxres) return thumbnails.maxres.url;
-        if (thumbnails.high) return thumbnails.high.url;
-        if (thumbnails.medium) return thumbnails.medium.url;
-        if (thumbnails.default) return thumbnails.default.url;
+        let match;
+        const videoIds = [];
         
-        return './electronic.ico';
-    }
-
-    parseDuration(duration) {
-        if (!duration) return 0;
-        
-        // Formato PT4M13S
-        const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-        if (!match) return 0;
-        
-        const hours = parseInt(match[1] || '0');
-        const minutes = parseInt(match[2] || '0');
-        const seconds = parseInt(match[3] || '0');
-        
-        return hours * 3600 + minutes * 60 + seconds;
-    }
-
-    async getPlaylist(playlistId) {
-        try {
-            console.log(`📋 Obteniendo playlist: ${playlistId}`);
-            
-            // Obtener información de la playlist
-            let url = `${this.baseUrl}/playlists?part=snippet&id=${playlistId}&key=${this.getCurrentApiKey()}`;
-            let response = await fetch(url);
-            let data = await response.json();
-            
-            const playlistInfo = data.items?.[0];
-            if (!playlistInfo) throw new Error('Playlist no encontrada');
-            
-            // Obtener videos de la playlist
-            url = `${this.baseUrl}/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${this.getCurrentApiKey()}`;
-            response = await fetch(url);
-            data = await response.json();
-            
-            const videos = data.items?.map(item => ({
-                videoId: item.snippet.resourceId.videoId,
-                title: item.snippet.title,
-                thumbnail: this.getBestThumbnail(item.snippet.thumbnails),
-                duration: 0, // Requeriría llamada adicional
-                uploaderName: item.snippet.channelTitle,
-                author: item.snippet.channelTitle
-            })) || [];
-            
-            return {
-                id: playlistId,
-                name: playlistInfo.snippet.title,
-                description: playlistInfo.snippet.description,
-                videoCount: videos.length,
-                videos: videos
-            };
-            
-        } catch (error) {
-            console.error('❌ Error obteniendo playlist:', error);
-            throw error;
+        while ((match = videoRegex.exec(html)) !== null) {
+            videoIds.push(match[1]);
         }
+        
+        videoIds.slice(0, 10).forEach((videoId, index) => {
+            videos.push({
+                videoId,
+                title: `Video ${index + 1}`,
+                thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                duration: 0,
+                uploaderName: 'YouTube',
+                author: 'YouTube'
+            });
+        });
+        
+        return videos;
+    }
+
+    parseScrapedDuration(durationText) {
+        if (!durationText) return 0;
+        
+        const parts = durationText.split(':').reverse();
+        let seconds = 0;
+        
+        parts.forEach((part, index) => {
+            seconds += parseInt(part) * Math.pow(60, index);
+        });
+        
+        return seconds || 0;
     }
 
     isAvailable() {
         return this.initialized;
     }
 
-    // Método para obtener tendencias
-    async getTrending(regionCode = 'US') {
-        try {
-            const url = `${this.baseUrl}/videos?part=snippet,contentDetails,statistics&chart=mostPopular&regionCode=${regionCode}&maxResults=20&key=${this.getCurrentApiKey()}`;
-            const response = await fetch(url);
-            
-            if (!response.ok) throw new Error('Error obteniendo tendencias');
-            
-            const data = await response.json();
-            
-            return {
-                items: data.items?.map(item => ({
-                    videoId: item.id,
-                    title: item.snippet.title,
-                    thumbnail: this.getBestThumbnail(item.snippet.thumbnails),
-                    duration: this.parseDuration(item.contentDetails.duration),
-                    uploaderName: item.snippet.channelTitle,
-                    author: item.snippet.channelTitle,
-                    views: item.statistics.viewCount,
-                    published: item.snippet.publishedAt
-                })) || []
-            };
-        } catch (error) {
-            console.error('❌ Error obteniendo tendencias:', error);
-            throw error;
-        }
+    async getPlaylist(playlistId) {
+        // Implementar scraping de playlists si es necesario
+        throw new Error('Scraping de playlists no implementado aún');
     }
 }
 
 // Crear instancia global
-window.youtubeJSClient = new YouTubeDirectClient();
+window.youtubeJSClient = new YouTubeScraper();
 
-console.log('✅ YouTube Direct Client cargado (sin dependencias externas)');
+console.log('✅ YouTube Scraper cargado');
