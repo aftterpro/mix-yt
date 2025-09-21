@@ -403,58 +403,50 @@ async loadTrendingContent() {
     }
 
 initializeAuth() {
-    // Configurar eventos de autenticación
+    if (window.playlistsFetchedListenerAdded) {
+        return;
+    }
+    window.playlistsFetchedListenerAdded = true;
+    
+    // Configurar eventos de autenticación con lógica simplificada
     document.addEventListener('playlistsFetched', (event) => {
         console.log("📁 Playlists de biblioteca recibidas:", event.detail.length);
         
-        // ESPERAR a que playlistManager esté completamente listo
-        const processPlaylists = () => {
-            if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
-                console.log("✅ Procesando playlists con playlistManager disponible");
-                window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
-                
-                // Forzar actualización inmediata
-                setTimeout(() => {
-                    this.updatePlaylistsUI();
-                    console.log("🔄 UI actualizada después de agregar playlists");
-                }, 500);
-                
-                return true;
-            }
-            return false;
-        };
-        
-        // Intentar procesar inmediatamente
-        if (!processPlaylists()) {
-            console.log("⏳ playlistManager no listo, esperando...");
-            // Guardar para procesar después
-            this.pendingYouTubePlaylists = event.detail;
+        // PROCESAR INMEDIATAMENTE SI TODO ESTÁ LISTO
+        if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
+            console.log("✅ Procesando playlists inmediatamente");
             
-            // Reintentar cada 500ms hasta 10 segundos
-            let attempts = 0;
-            const maxAttempts = 20;
+            // Limpiar playlists de YouTube existentes para evitar duplicados
+            window.playlistManager.clearYouTubeLibraryPlaylists();
             
-            const retryInterval = setInterval(() => {
-                attempts++;
-                if (processPlaylists() || attempts >= maxAttempts) {
-                    clearInterval(retryInterval);
-                    if (attempts >= maxAttempts) {
-                        console.error("❌ Timeout procesando playlists de YouTube");
-                    } else {
-                        this.pendingYouTubePlaylists = null;
-                        console.log("✅ Playlists procesadas exitosamente");
-                    }
-                }
-            }, 500);
+            // Agregar las nuevas
+            window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+            
+            // FORZAR ACTUALIZACIÓN MÚLTIPLE PARA ASEGURAR RENDERIZADO
+            setTimeout(() => {
+                this.updatePlaylistsUI();
+                console.log("🔄 Primera actualización UI");
+            }, 100);
+            
+            setTimeout(() => {
+                this.updatePlaylistsUI();
+                console.log("🔄 Segunda actualización UI (asegurar renderizado)");
+            }, 1000);
+            
+        } else {
+            console.warn('⚠️ playlistManager no listo para procesar playlists');
+            
+            // FALLBACK: Almacenar para procesar después
+            window.pendingYouTubePlaylists = event.detail;
         }
     });
 
+    // Listener para logout
     document.addEventListener('userLoggedOut', () => {
         console.log("🚪 Usuario desconectado");
         if (window.playlistManager && window.playlistManager.clearYouTubeLibraryPlaylists) {
             window.playlistManager.clearYouTubeLibraryPlaylists();
         }
-        // Forzar actualización de UI
         setTimeout(() => {
             this.updatePlaylistsUI();
         }, 500);
