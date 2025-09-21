@@ -1164,13 +1164,11 @@ async performSearch(query, continuation = null) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
-    // Si es una nueva búsqueda
     if (!continuation) {
         currentSearchQuery = query;
         nextPageContext = null;
-        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando con YouTube.js...</div>';
+        searchResults.innerHTML = '<div class="search-loading">🔍 Inicializando YouTube.js...</div>';
         
-        // Remover listener anterior si existe
         if (this.handleSearchScroll) {
             searchResults.removeEventListener('scroll', this.handleSearchScroll);
         }
@@ -1179,28 +1177,36 @@ async performSearch(query, continuation = null) {
     isLoadingMore = true;
 
     try {
-        // Usar YouTube.js en lugar de fetch
-        let results;
-        
+        // Verificar e inicializar YouTube.js bajo demanda
         if (!window.youtubeJSClient) {
-            throw new Error('YouTube.js client no disponible');
+            throw new Error('YouTube.js client no encontrado');
+        }
+
+        // Inicializar si no está listo
+        if (!window.youtubeJSClient.isAvailable()) {
+            if (!continuation) {
+                searchResults.innerHTML = '<div class="search-loading">🚀 Inicializando YouTube.js por primera vez...</div>';
+            }
+            const initSuccess = await window.youtubeJSClient.init();
+            if (!initSuccess) {
+                throw new Error('No se pudo inicializar YouTube.js');
+            }
         }
         
-        results = await window.youtubeJSClient.search(currentSearchQuery, continuation);
+        const results = await window.youtubeJSClient.search(currentSearchQuery, continuation);
         this.displaySearchResults(results, !!continuation);
 
     } catch (error) {
         console.error("❌ Error con YouTube.js:", error);
         
-        // Fallback al sistema anterior
-        console.log("🔄 Fallback al sistema Piped...");
+        // Fallback inmediato al sistema anterior
+        console.log("🔄 Usando sistema Piped como fallback...");
         await this.performSearchFallback(currentSearchQuery, continuation);
         
     } finally {
         isLoadingMore = false;
     }
 }
-
 // Método fallback usando el sistema anterior
 async performSearchFallback(query, nextPage) {
     try {
