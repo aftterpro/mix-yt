@@ -335,17 +335,29 @@ async function initializeGoogleAPIs() {
 // =============================================
 // NUEVA FUNCIÓN: CARGAR PLAYLISTS ALMACENADAS
 // =============================================
+
 function loadStoredPlaylistsIfAvailable() {
     const storedPlaylists = getStoredPlaylists();
     
     if (storedPlaylists && Array.isArray(storedPlaylists) && storedPlaylists.length > 0) {
         console.log(`📚 Cargando ${storedPlaylists.length} playlists desde almacenamiento local`);
         
-        // Disparar evento inmediatamente con playlists guardadas
-        const event = new CustomEvent('playlistsFetched', {
-            detail: storedPlaylists
-        });
-        document.dispatchEvent(event);
+        // CORREGIR: Agregar playlists al sistema unificado correctamente
+        if (window.unifiedCore) {
+            // Disparar evento para que core.js las procese
+            const event = new CustomEvent('playlistsFetched', {
+                detail: storedPlaylists
+            });
+            document.dispatchEvent(event);
+            
+            // TAMBIÉN actualizar directamente el estado si está disponible
+            setTimeout(() => {
+                if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
+                    window.playlistManager.addYouTubeLibraryPlaylists(storedPlaylists);
+                    console.log('🔄 Playlists restauradas en playlistManager');
+                }
+            }, 1000);
+        }
         
         if (window.unifiedCore) {
             window.unifiedCore.showMessage(`${storedPlaylists.length} playlists cargadas desde almacenamiento`, 'success');
