@@ -1,28 +1,31 @@
-// youtube-client.js - Cliente YouTube.js con scroll infinito
-console.log('🎵 Cargando YouTube.js Client...');
+// youtube-client.js - Cliente YouTube.js v1.4.5 con scroll infinito
+console.log('🎵 Cargando YouTube.js Client v1.4.5...');
 
 class YouTubeJSClient {
     constructor() {
         this.youtube = null;
         this.initialized = false;
-        // No inicializar automáticamente para evitar errores en carga
     }
 
     async init() {
         if (this.initialized) return true;
         
         try {
-            console.log('🚀 Inicializando YouTube.js...');
+            console.log('🚀 Inicializando YouTube.js v1.4.5...');
             
-            // Cargar YouTube.js desde CDN si no está disponible
+            // Cargar YouTube.js desde CDN correcto
             if (!window.Innertube) {
                 await this.loadYouTubeJS();
             }
             
-            // Crear instancia de Innertube
-            this.youtube = await window.Innertube.create();
+            // SINTAXIS CORRECTA para v1.4.5
+            this.youtube = await new window.Innertube({ 
+                gl: 'US', // Geo location
+                visitor_data: undefined // Opcional
+            });
+            
             this.initialized = true;
-            console.log('✅ YouTube.js inicializado correctamente');
+            console.log('✅ YouTube.js v1.4.5 inicializado correctamente');
             return true;
             
         } catch (error) {
@@ -35,10 +38,16 @@ class YouTubeJSClient {
     async loadYouTubeJS() {
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/youtubei.js@10.3.0/dist/bundle.js';
+            // URL CORRECTA para v1.4.5
+            script.src = 'https://cdn.jsdelivr.net/npm/youtubei.js@1.4.5/dist/innertube.umd.js';
             script.onload = () => {
-                console.log('📦 YouTube.js CDN cargado desde unpkg');
-                resolve();
+                console.log('📦 YouTube.js v1.4.5 CDN cargado');
+                // Verificar que se cargó correctamente
+                if (window.Innertube) {
+                    resolve();
+                } else {
+                    reject(new Error('Innertube no disponible después de cargar'));
+                }
             };
             script.onerror = () => {
                 console.error('❌ Error cargando YouTube.js desde CDN');
@@ -49,7 +58,6 @@ class YouTubeJSClient {
     }
 
     async search(query, continuation = null) {
-        // Asegurar inicialización
         const initSuccess = await this.init();
         if (!initSuccess) {
             throw new Error('YouTube.js no pudo inicializarse');
@@ -63,15 +71,16 @@ class YouTubeJSClient {
                 // Continuar búsqueda existente
                 search = await continuation.getContinuation();
             } else {
-                // Nueva búsqueda
+                // Nueva búsqueda con opciones correctas para v1.4.5
                 search = await this.youtube.search(query, { 
-                    type: 'video',
-                    sort_by: 'relevance'
+                    client: 'YOUTUBE',
+                    type: 'video' // Solo videos
                 });
             }
             
-            const videos = search.videos || [];
-            console.log(`📹 ${videos.length} videos encontrados con YouTube.js`);
+            // La estructura de respuesta en v1.4.5
+            const videos = search.videos || search.results || [];
+            console.log(`📹 ${videos.length} videos encontrados con YouTube.js v1.4.5`);
             
             return {
                 items: videos.map(video => this.formatVideo(video)),
@@ -81,23 +90,24 @@ class YouTubeJSClient {
             };
             
         } catch (error) {
-            console.error('❌ Error en búsqueda YouTube.js:', error);
+            console.error('❌ Error en búsqueda YouTube.js v1.4.5:', error);
             throw error;
         }
     }
 
     formatVideo(video) {
         try {
+            // Estructura para v1.4.5
             return {
-                videoId: video.id,
-                title: video.title?.text || video.title || 'Título no disponible',
+                videoId: video.id || video.video_id,
+                title: video.title || video.text || 'Título no disponible',
                 thumbnail: this.getBestThumbnail(video),
                 duration: this.getDuration(video),
-                uploaderName: video.author?.name || video.channel?.name || 'Canal desconocido',
-                author: video.author?.name || video.channel?.name || 'Canal desconocido',
-                url: `https://www.youtube.com/watch?v=${video.id}`,
-                views: video.view_count?.text || video.views?.text || '0',
-                published: video.published?.text || video.published_time?.text || ''
+                uploaderName: this.getChannelName(video),
+                author: this.getChannelName(video),
+                url: `https://www.youtube.com/watch?v=${video.id || video.video_id}`,
+                views: this.getViews(video),
+                published: this.getPublished(video)
             };
         } catch (error) {
             console.warn('⚠️ Error formateando video:', error);
@@ -114,13 +124,14 @@ class YouTubeJSClient {
 
     getBestThumbnail(video) {
         try {
+            // Diferentes estructuras posibles en v1.4.5
             if (video.thumbnails && video.thumbnails.length > 0) {
-                // Buscar la mejor calidad disponible
-                const thumbnail = video.thumbnails.find(t => t.width >= 320) || video.thumbnails[0];
-                return thumbnail.url;
+                const best = video.thumbnails.find(t => t.width >= 320) || video.thumbnails[0];
+                return best.url;
             }
-            if (video.thumbnail?.url) return video.thumbnail.url;
-            return './electronic.ico';
+            if (video.thumbnail) return video.thumbnail;
+            if (video.snippet?.thumbnails?.high?.url) return video.snippet.thumbnails.high.url;
+            return `https://i.ytimg.com/vi/${video.id || video.video_id}/hqdefault.jpg`;
         } catch (e) {
             return './electronic.ico';
         }
@@ -128,15 +139,48 @@ class YouTubeJSClient {
 
     getDuration(video) {
         try {
-            if (video.duration?.seconds_total) {
-                return video.duration.seconds_total;
-            }
-            if (video.duration?.text) {
-                return this.parseDurationText(video.duration.text);
-            }
+            // Diferentes formas de obtener duración en v1.4.5
+            if (video.duration?.seconds) return video.duration.seconds;
+            if (video.duration?.text) return this.parseDurationText(video.duration.text);
+            if (video.lengthSeconds) return parseInt(video.lengthSeconds);
+            if (video.snippet?.duration) return this.parseDurationText(video.snippet.duration);
             return 0;
         } catch (e) {
             return 0;
+        }
+    }
+
+    getChannelName(video) {
+        try {
+            if (video.author) return video.author;
+            if (video.channel?.name) return video.channel.name;
+            if (video.snippet?.channelTitle) return video.snippet.channelTitle;
+            if (video.uploader) return video.uploader;
+            return 'Canal desconocido';
+        } catch (e) {
+            return 'Canal desconocido';
+        }
+    }
+
+    getViews(video) {
+        try {
+            if (video.view_count) return video.view_count;
+            if (video.views) return video.views;
+            if (video.snippet?.viewCount) return video.snippet.viewCount;
+            return '0';
+        } catch (e) {
+            return '0';
+        }
+    }
+
+    getPublished(video) {
+        try {
+            if (video.published) return video.published;
+            if (video.publishedAt) return video.publishedAt;
+            if (video.snippet?.publishedAt) return video.snippet.publishedAt;
+            return '';
+        } catch (e) {
+            return '';
         }
     }
 
@@ -144,6 +188,21 @@ class YouTubeJSClient {
         if (!durationText || typeof durationText !== 'string') return 0;
         
         try {
+            // PT1M30S format
+            if (durationText.startsWith('PT')) {
+                let totalSeconds = 0;
+                const hoursMatch = durationText.match(/(\d+)H/);
+                const minutesMatch = durationText.match(/(\d+)M/);
+                const secondsMatch = durationText.match(/(\d+)S/);
+                
+                if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
+                if (minutesMatch) totalSeconds += parseInt(minutesMatch[1]) * 60;
+                if (secondsMatch) totalSeconds += parseInt(secondsMatch[1]);
+                
+                return totalSeconds;
+            }
+            
+            // MM:SS or HH:MM:SS format
             const parts = durationText.split(':').reverse();
             let seconds = 0;
             
@@ -160,13 +219,35 @@ class YouTubeJSClient {
         }
     }
 
-    // Método para verificar si está disponible
     isAvailable() {
         return this.initialized && this.youtube !== null;
     }
+
+    async getPlaylist(playlistId) {
+        const initSuccess = await this.init();
+        if (!initSuccess) {
+            throw new Error('YouTube.js no pudo inicializarse');
+        }
+
+        try {
+            console.log(`📋 Obteniendo playlist: ${playlistId}`);
+            const playlist = await this.youtube.getPlaylist(playlistId, { client: 'YOUTUBE' });
+            
+            return {
+                id: playlistId,
+                name: playlist.title || 'Playlist sin título',
+                description: playlist.description || '',
+                videoCount: playlist.video_count || playlist.videos?.length || 0,
+                videos: playlist.videos?.map(video => this.formatVideo(video)) || []
+            };
+        } catch (error) {
+            console.error('❌ Error obteniendo playlist:', error);
+            throw error;
+        }
+    }
 }
 
-// Crear instancia global pero no inicializar automáticamente
+// Crear instancia global
 window.youtubeJSClient = new YouTubeJSClient();
 
-console.log('✅ YouTube.js Client cargado (inicialización bajo demanda)');
+console.log('✅ YouTube.js Client v1.4.5 cargado');
