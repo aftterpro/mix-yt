@@ -1524,25 +1524,57 @@ async loadMoreSearchResults() {
         this.enablePlayButton();
         
         console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
-        setTimeout(() => this.saveAllData(), 500);
+        setTimeout(() => saveAllData(), 500);
     }
 
-    removeVideoFromQueue(videoId) {
-        const queuePlaylist = playlistsData.find(p => p.id === 'queue');
-        if (queuePlaylist) {
-            const index = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
-            if (index !== -1) {
-                const removedVideo = queuePlaylist.videos.splice(index, 1)[0];
-                this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
-                
-                this.updatePlaylistsUI();
-                this.updateCurrentPlayingIndex();
-                
-                console.log(`🗑️ Video eliminado de cola. Total: ${queuePlaylist.videos.length} videos`);
-            }
-        }
-        setTimeout(() => this.saveAllData(), 500);
+removeVideoFromQueue(videoId) {
+    console.log(`🗑️ Eliminando video de cola: ${videoId}`);
+    
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    if (!queuePlaylist) {
+        console.warn('⚠️ No se encontró playlist de cola');
+        return;
     }
+    
+    const initialLength = queuePlaylist.videos.length;
+    const index = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
+    
+    if (index !== -1) {
+        const removedVideo = queuePlaylist.videos.splice(index, 1)[0];
+        console.log(`✅ Video eliminado: ${removedVideo.title}`);
+        console.log(`📊 Cola: ${initialLength} → ${queuePlaylist.videos.length} videos`);
+        
+        // FORZAR ACTUALIZACIÓN INMEDIATA
+        this.updatePlaylistsUI();
+        
+        // Actualizar índice de reproducción si es necesario
+        if (currentPlayingInfo.flattenedIndex > index) {
+            currentPlayingInfo.flattenedIndex--;
+            console.log(`🔄 Índice de reproducción actualizado: ${currentPlayingInfo.flattenedIndex}`);
+        } else if (currentPlayingInfo.flattenedIndex === index) {
+            // Si eliminamos el video que se está reproduciendo
+            this.updateCurrentPlayingIndex();
+        }
+        
+        // ACTUALIZAR POPUP DE COLA SI ESTÁ ABIERTO
+        this.updateQueuePopup();
+        
+        this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+        
+        // VERIFICAR SI LA COLA QUEDÓ VACÍA
+        if (queuePlaylist.videos.length === 0) {
+            console.log('📭 Cola vacía, deteniendo reproducción');
+            this.handleEmptyPlaylist();
+        }
+        
+        // GUARDAR CAMBIOS
+        setTimeout(() => saveAllData(), 100);
+        
+    } else {
+        console.warn(`⚠️ Video ${videoId} no encontrado en cola`);
+        this.showMessage('Video no encontrado en la cola', 'warning');
+    }
+}
 
     // =============================================
     // UTILIDADES Y HELPERS
