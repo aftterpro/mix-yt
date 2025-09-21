@@ -336,43 +336,85 @@ async function initializeGoogleAPIs() {
 // NUEVA FUNCIÓN: CARGAR PLAYLISTS ALMACENADAS
 // =============================================
 
-// En la función loadStoredPlaylistsIfAvailable:
 function loadStoredPlaylistsIfAvailable() {
     const storedPlaylists = getStoredPlaylists();
     
     if (storedPlaylists && Array.isArray(storedPlaylists) && storedPlaylists.length > 0) {
         console.log(`📚 Cargando ${storedPlaylists.length} playlists desde almacenamiento local`);
         
-        // EVITAR MÚLTIPLES DISPAROS
-        if (window.playlistsAlreadyLoaded) {
-            console.log('⚠️ Playlists ya cargadas, evitando duplicado');
+        // CAMBIO CRÍTICO: NO usar flag global que bloquea
+        // if (window.playlistsAlreadyLoaded) {
+        //     console.log('⚠️ Playlists ya cargadas, evitando duplicado');
+        //     return true;
+        // }
+        // window.playlistsAlreadyLoaded = true;
+        
+        // NUEVA LÓGICA: Verificar si ya están en playlistManager
+        const checkIfAlreadyInManager = () => {
+            if (window.playlistManager && window.playlistManager.playlistsData) {
+                const youtubePlaylists = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library');
+                if (youtubePlaylists.length >= storedPlaylists.length) {
+                    console.log(`✅ ${youtubePlaylists.length} playlists de YouTube ya están en manager`);
+                    return true;
+                }
+            }
+            return false;
+        };
+        
+        if (checkIfAlreadyInManager()) {
+            console.log('⚠️ Playlists ya procesadas en manager, saltando');
             return true;
         }
-        window.playlistsAlreadyLoaded = true;
         
-        // DISPARAR UNA SOLA VEZ CON VERIFICACIÓN DE READINESS
-        setTimeout(() => {
-            if (window.unifiedCore && window.playlistManager) {
-                console.log("🔥 Disparando evento playlistsFetched con", storedPlaylists.length, "playlists");
+        // ESPERAR A QUE EL SISTEMA ESTÉ COMPLETAMENTE LISTO
+        const dispatchWhenReady = () => {
+            const isSystemReady = window.unifiedCore && 
+                                window.playlistManager && 
+                                window.unifiedCore.state && 
+                                window.unifiedCore.state.initialized;
+                                
+            console.log(`🔍 Verificando sistema listo:`, {
+                unifiedCore: !!window.unifiedCore,
+                playlistManager: !!window.playlistManager,
+                initialized: window.unifiedCore?.state?.initialized
+            });
+            
+            if (isSystemReady) {
+                console.log("🔥 Sistema listo, disparando evento playlistsFetched con", storedPlaylists.length, "playlists");
+                
                 const event = new CustomEvent('playlistsFetched', {
                     detail: storedPlaylists
                 });
                 document.dispatchEvent(event);
                 
-                // FORZAR ACTUALIZACIÓN INMEDIATA
-                setTimeout(() => {
-                    if (window.playlistManager) {
-                        window.playlistManager.updatePlaylistsUI();
-                        console.log('🔄 UI forzada después de cargar playlists');
-                    }
-                }, 500);
-                
+                return true;
             } else {
-                console.warn('⚠️ Sistema no listo, reintentando...');
-                // Reintentar si el sistema no está listo
-                setTimeout(() => loadStoredPlaylistsIfAvailable(), 1000);
+                console.log('⏳ Sistema no completamente listo, esperando...');
+                return false;
             }
-        }, 1500); // Reducir delay
+        };
+        
+        // INTENTAR INMEDIATAMENTE
+        if (!dispatchWhenReady()) {
+            // REINTENTAR HASTA 20 VECES CON INTERVALOS DE 500ms
+            let attempts = 0;
+            const maxAttempts = 20;
+            
+            const retryInterval = setInterval(() => {
+                attempts++;
+                console.log(`🔄 Intento ${attempts}/${maxAttempts} de disparar evento`);
+                
+                if (dispatchWhenReady() || attempts >= maxAttempts) {
+                    clearInterval(retryInterval);
+                    if (attempts >= maxAttempts) {
+                        console.error("❌ TIMEOUT: No se pudo disparar evento después de", maxAttempts, "intentos");
+                        // FALLBACK DE EMERGENCIA
+                        window.emergencyLoadYouTubePlaylists = storedPlaylists;
+                        console.log("💾 Playlists guardadas en emergencyLoadYouTubePlaylists para recuperación manual");
+                    }
+                }
+            }, 500);
+        }
         
         return true;
     }
