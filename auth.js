@@ -343,25 +343,42 @@ function loadStoredPlaylistsIfAvailable() {
     if (storedPlaylists && Array.isArray(storedPlaylists) && storedPlaylists.length > 0) {
         console.log(`📚 Cargando ${storedPlaylists.length} playlists desde almacenamiento local`);
         
-        // RETRASAR el disparo del evento para asegurar que core.js esté listo
-        setTimeout(() => {
-            console.log("🔥 Disparando evento playlistsFetched con", storedPlaylists.length, "playlists");
-            const event = new CustomEvent('playlistsFetched', {
-                detail: storedPlaylists
-            });
-            document.dispatchEvent(event);
-        }, 2000); // Aumentar delay a 2 segundos
-        
-        if (window.unifiedCore) {
-            window.unifiedCore.showMessage(`${storedPlaylists.length} playlists cargadas desde almacenamiento`, 'success');
+        // EVITAR MÚLTIPLES DISPAROS
+        if (window.playlistsAlreadyLoaded) {
+            console.log('⚠️ Playlists ya cargadas, evitando duplicado');
+            return true;
         }
+        window.playlistsAlreadyLoaded = true;
+        
+        // DISPARAR UNA SOLA VEZ CON VERIFICACIÓN DE READINESS
+        setTimeout(() => {
+            if (window.unifiedCore && window.playlistManager) {
+                console.log("🔥 Disparando evento playlistsFetched con", storedPlaylists.length, "playlists");
+                const event = new CustomEvent('playlistsFetched', {
+                    detail: storedPlaylists
+                });
+                document.dispatchEvent(event);
+                
+                // FORZAR ACTUALIZACIÓN INMEDIATA
+                setTimeout(() => {
+                    if (window.playlistManager) {
+                        window.playlistManager.updatePlaylistsUI();
+                        console.log('🔄 UI forzada después de cargar playlists');
+                    }
+                }, 500);
+                
+            } else {
+                console.warn('⚠️ Sistema no listo, reintentando...');
+                // Reintentar si el sistema no está listo
+                setTimeout(() => loadStoredPlaylistsIfAvailable(), 1000);
+            }
+        }, 1500); // Reducir delay
         
         return true;
     }
     
     return false;
 }
-
 // =============================================
 // MANEJAR RESPUESTA DE AUTENTICACIÓN - MEJORADO
 // =============================================
