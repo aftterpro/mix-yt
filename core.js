@@ -405,14 +405,12 @@ async loadTrendingContent() {
 initializeAuth() {
     console.log("🔧 Configurando eventos de autenticación...");
     
-    // EVITAR LISTENERS DUPLICADOS
     if (window.authEventsConfigured) {
         console.log("⚠️ Eventos de auth ya configurados");
         return;
     }
     window.authEventsConfigured = true;
     
-    // LISTENER PRINCIPAL para playlists
     document.addEventListener('playlistsFetched', (event) => {
         console.log("📁 Evento playlistsFetched recibido:", {
             playlistsCount: event.detail.length,
@@ -421,46 +419,38 @@ initializeAuth() {
         });
         
         if (!window.playlistManager) {
-            console.error("❌ CRÍTICO: playlistManager no disponible para procesar playlists");
-            // Guardar para procesamiento posterior
+            console.error("❌ CRÍTICO: playlistManager no disponible");
             window.pendingYouTubePlaylists = event.detail;
             return;
         }
         
-        if (!window.playlistManager.addYouTubeLibraryPlaylists) {
-            console.error("❌ CRÍTICO: función addYouTubeLibraryPlaylists no disponible");
+        // MEJORADO: Solo limpiar si hay playlists duplicadas
+        const currentYouTubeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
+        
+        if (currentYouTubeCount > 0 && currentYouTubeCount < event.detail.length) {
+            console.log(`🧹 Limpiando ${currentYouTubeCount} playlists de YouTube duplicadas...`);
+            window.playlistManager.clearYouTubeLibraryPlaylists();
+        } else if (currentYouTubeCount >= event.detail.length) {
+            console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube, no es necesario actualizar`);
             return;
         }
         
-        // LIMPIAR PLAYLISTS DE YOUTUBE EXISTENTES PARA EVITAR DUPLICADOS
-        console.log("🧹 Limpiando playlists de YouTube existentes...");
-        const beforeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
-        window.playlistManager.clearYouTubeLibraryPlaylists();
-        console.log(`🗑️ Eliminadas ${beforeCount} playlists de YouTube previas`);
-        
-        // PROCESAR NUEVAS PLAYLISTS
         console.log("✅ Procesando", event.detail.length, "playlists de YouTube...");
         window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
         
-        // VERIFICAR QUE SE AÑADIERON CORRECTAMENTE
+        // MOSTRAR MENSAJE DE ÉXITO CON CONTEO CORRECTO
         setTimeout(() => {
-            const afterCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
-            console.log(`📊 Verificación: ${afterCount} playlists de YouTube en manager`);
+            const finalCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
+            console.log(`📊 Verificación final: ${finalCount} playlists de YouTube en manager`);
             
-            if (afterCount === 0) {
-                console.error("❌ CRÍTICO: No se añadieron playlists de YouTube al manager");
-                // REINTENTO DE EMERGENCIA
-                window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
-            } else {
-                console.log(`✅ Éxito: ${afterCount} playlists de YouTube añadidas correctamente`);
+            if (finalCount > 0) {
+                this.showMessage(`${finalCount} playlists de YouTube sincronizadas`, 'success');
             }
             
-            // FORZAR ACTUALIZACIÓN DE UI
             this.updatePlaylistsUI();
         }, 500);
     });
 
-    // Listener para logout
     document.addEventListener('userLoggedOut', () => {
         console.log("🚪 Usuario desconectado, limpiando playlists de YouTube");
         if (window.playlistManager?.clearYouTubeLibraryPlaylists) {
@@ -468,8 +458,6 @@ initializeAuth() {
         }
         setTimeout(() => this.updatePlaylistsUI(), 500);
     });
-    
-    console.log("✅ Eventos de autenticación configurados");
 }
 
     initializeUI() {
@@ -737,72 +725,119 @@ updatePlaylistsUI() {
         }
     }
 
-    renderQueueContent() {
-        const flatList = this.getFlattenedPlaylist();
-        
-        if (flatList.length === 0) {
-            return `
-                <div class="empty-queue-message">
-                    <i class="fas fa-music"></i>
-                    <p>La cola está vacía</p>
-                    <p>Añade música desde la biblioteca o búsqueda</p>
-                </div>
-            `;
-        }
+renderQueueContent() {
+    const flatList = this.getFlattenedPlaylist();
+    
+    if (flatList.length === 0) {
+        return `
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
+            </div>
+        `;
+    }
 
-        let html = `
-            <div class="queue-controls">
-                <div class="queue-info">
-                    <span class="queue-count">${flatList.length} videos en cola</span>
+    let html = `
+        <div class="queue-controls">
+            <div class="queue-info">
+                <span class="queue-count">${flatList.length} videos en cola</span>
+                <span class="queue-duration">Duración estimada: ${this.formatTotalDuration(flatList)}</span>
+            </div>
+            <button class="clear-queue-btn" onclick="window.unifiedCore.clearQueue()">
+                <i class="fas fa-trash"></i>
+                Borrar todo
+            </button>
+        </div>
+        <div class="queue-items">
+    `;
+    
+    flatList.forEach((video, index) => {
+        const isPlaying = video.videoId === currentPlayingInfo.videoId;
+        const duration = video.duration && video.duration > 0 
+            ? this.formatDuration(video.duration) 
+            : '--:--';
+            
+        html += `
+            <div class="queue-item ${isPlaying ? 'playing' : ''}" 
+                 data-video-id="${video.videoId}" 
+                 data-flat-index="${index}">
+                <div class="queue-item-number">${index + 1}</div>
+                <img src="${video.thumbnail}" alt="${video.title}" class="queue-item-thumbnail" loading="lazy">
+                <div class="queue-item-info">
+                    <div class="queue-item-title" title="${video.title}">${video.title}</div>
+                    <div class="queue-item-meta">
+                        <span class="queue-item-duration">${duration}</span>
+                        <span class="queue-item-author" title="${video.uploaderName || 'YouTube'}">${video.uploaderName || 'YouTube'}</span>
+                    </div>
                 </div>
-                <button class="clear-queue-btn" onclick="window.unifiedCore.clearQueue()">
-                    <i class="fas fa-trash"></i>
-                    Borrar todo
+                ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
+                <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-            <div class="queue-items">
         `;
-        
-        flatList.forEach((video, index) => {
-            const isPlaying = video.videoId === currentPlayingInfo.videoId;
-            const duration = video.duration && video.duration > 0 
-                ? this.formatDuration(video.duration) 
-                : '--:--';
-                
-            html += `
-                <div class="queue-item ${isPlaying ? 'playing' : ''}" 
-                     data-video-id="${video.videoId}" 
-                     data-flat-index="${index}"
-                     onclick="window.unifiedCore.playVideoAtIndex(${index})">
-                    <div class="queue-item-number">${index + 1}</div>
-                    <img src="${video.thumbnail}" alt="${video.title}" class="queue-item-thumbnail">
-                    <div class="queue-item-info">
-                        <div class="queue-item-title">${video.title}</div>
-                        <div class="queue-item-meta">
-                            <span class="queue-item-duration">${duration}</span>
-                            <span class="queue-item-author">${video.uploaderName || 'YouTube'}</span>
-                        </div>
-                    </div>
-                    ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
-    <button class="queue-item-remove" onclick="event.stopPropagation(); window.unifiedCore.removeVideoFromQueue('${video.videoId}'); window.unifiedCore.updateQueuePopup();">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-        });
-        
-        html += '</div>';
-        return html;
-    }
+    });
+    
+    html += '</div>';
+    return html;
+}
 
     // Actualizar contenido de popup de cola si está abierto
-    updateQueuePopup() {
-        const queuePopupContent = document.getElementById('queuePopupContent');
-        if (queuePopupContent) {
-            queuePopupContent.innerHTML = this.renderQueueContent();
-        }
+updateQueuePopup() {
+    const queuePopupContent = document.getElementById('queuePopupContent');
+    if (queuePopupContent) {
+        console.log('🔄 Actualizando popup de cola...');
+        queuePopupContent.innerHTML = this.renderQueueContent();
+        
+        // RECONFIGURAR EVENT LISTENERS después de actualizar
+        setTimeout(() => {
+            this.setupQueuePopupEventListeners(queuePopupContent);
+        }, 100);
     }
-
+}
+setupQueuePopupEventListeners(container) {
+    if (!container) return;
+    
+    // Event listeners para reproducir video
+    container.querySelectorAll('.queue-item').forEach(item => {
+        if (!item.dataset.eventConfigured) {
+            item.addEventListener('click', (e) => {
+                if (!e.target.closest('.queue-item-remove')) {
+                    const index = parseInt(item.dataset.flatIndex);
+                    console.log(`▶️ Reproducir video en índice ${index}`);
+                    this.playVideoAtIndex(index);
+                }
+            });
+            item.dataset.eventConfigured = 'true';
+        }
+    });
+    
+    // Event listeners para eliminar video
+    container.querySelectorAll('.queue-item-remove').forEach(btn => {
+        if (!btn.dataset.eventConfigured) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const videoId = btn.dataset.videoId;
+                console.log(`🗑️ Eliminar video: ${videoId}`);
+                this.removeVideoFromQueue(videoId);
+            });
+            btn.dataset.eventConfigured = 'true';
+        }
+    });
+}
+    // Función para calcular duración total
+formatTotalDuration(videos) {
+    const totalSeconds = videos.reduce((sum, video) => sum + (video.duration || 0), 0);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    } else {
+        return `${minutes}m`;
+    }
+}
     // Borrar toda la cola
     clearQueue() {
         if (confirm('¿Estás seguro de que quieres borrar toda la cola?')) {
