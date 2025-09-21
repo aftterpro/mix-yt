@@ -401,44 +401,52 @@ async loadTrendingContent() {
         console.error('❌ Error en reproductor:', event.data);
         this.showMessage(`Error en reproductor: ${event.data}`, 'error');
     }
+
 initializeAuth() {
-    // Configurar eventos de autenticación - DELEGANDO A PLAYLIST MANAGER
+    // Configurar eventos de autenticación
     document.addEventListener('playlistsFetched', (event) => {
         console.log("📁 Playlists de biblioteca recibidas:", event.detail.length);
         
-        // CORREGIR: Verificar que playlistManager existe y funciona
-        if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
-            window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
-            console.log("✅ Playlists enviadas a playlistManager");
-        } else {
-            console.warn("⚠️ playlistManager no disponible, guardando en estado local");
-            // Fallback: guardar en estado local y procesar después
+        // ESPERAR a que playlistManager esté completamente listo
+        const processPlaylists = () => {
+            if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
+                console.log("✅ Procesando playlists con playlistManager disponible");
+                window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
+                
+                // Forzar actualización inmediata
+                setTimeout(() => {
+                    this.updatePlaylistsUI();
+                    console.log("🔄 UI actualizada después de agregar playlists");
+                }, 500);
+                
+                return true;
+            }
+            return false;
+        };
+        
+        // Intentar procesar inmediatamente
+        if (!processPlaylists()) {
+            console.log("⏳ playlistManager no listo, esperando...");
+            // Guardar para procesar después
             this.pendingYouTubePlaylists = event.detail;
             
-            // Reintentar cada segundo hasta que playlistManager esté disponible
-            const retryInterval = setInterval(() => {
-                if (window.playlistManager && window.playlistManager.addYouTubeLibraryPlaylists) {
-                    console.log("🔄 Reintentando con playlistManager ahora disponible");
-                    window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
-                    this.pendingYouTubePlaylists = null;
-                    clearInterval(retryInterval);
-                    this.updatePlaylistsUI();
-                }
-            }, 1000);
+            // Reintentar cada 500ms hasta 10 segundos
+            let attempts = 0;
+            const maxAttempts = 20;
             
-            // Timeout de seguridad
-            setTimeout(() => {
-                clearInterval(retryInterval);
-                if (this.pendingYouTubePlaylists) {
-                    console.error("❌ Timeout esperando playlistManager");
+            const retryInterval = setInterval(() => {
+                attempts++;
+                if (processPlaylists() || attempts >= maxAttempts) {
+                    clearInterval(retryInterval);
+                    if (attempts >= maxAttempts) {
+                        console.error("❌ Timeout procesando playlists de YouTube");
+                    } else {
+                        this.pendingYouTubePlaylists = null;
+                        console.log("✅ Playlists procesadas exitosamente");
+                    }
                 }
-            }, 10000);
+            }, 500);
         }
-        
-        // Forzar actualización de UI
-        setTimeout(() => {
-            this.updatePlaylistsUI();
-        }, 500);
     });
 
     document.addEventListener('userLoggedOut', () => {
