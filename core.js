@@ -257,15 +257,28 @@ async loadTrendingContent() {
     }
 }
     async loadPersistentData() {
-        console.log('📂 Cargando datos persistentes...');
-        
-        // Cargar playlists persistentes
-        const persistentPlaylists = loadPlaylistsDataPersistent();
-        if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
-            playlistsData = persistentPlaylists;
-            console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+    console.log('📂 Cargando datos persistentes...');
+    
+    // Cargar playlists persistentes
+    const persistentPlaylists = loadPlaylistsDataPersistent();
+    if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
+        playlistsData = persistentPlaylists;
+        console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+    }
+    
+    // AGREGAR: También verificar y cargar playlists de YouTube guardadas en auth.js
+    setTimeout(() => {
+        if (typeof getStoredPlaylists === 'function') {
+            const youtubeLibraryPlaylists = getStoredPlaylists();
+            if (youtubeLibraryPlaylists && youtubeLibraryPlaylists.length > 0) {
+                console.log('🎵 Restaurando playlists de YouTube Library guardadas');
+                const event = new CustomEvent('playlistsFetched', {
+                    detail: youtubeLibraryPlaylists
+                });
+                document.dispatchEvent(event);
+            }
         }
-        
+    }, 2000);
         // Cargar cola persistente
         const persistentQueue = loadQueuePersistent();
         if (persistentQueue) {
@@ -1270,6 +1283,7 @@ async performSearchFallback(query, nextPage) {
         }
     }
 }
+// En core.js, asegurar que displaySearchResults tenga scroll infinito:
 displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
@@ -1277,7 +1291,7 @@ displaySearchResults(results, append = false) {
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
-        // Remover listener anterior si existe
+        // Remover listener anterior
         if (this.handleSearchScroll) {
             searchResults.removeEventListener('scroll', this.handleSearchScroll);
         }
@@ -1296,7 +1310,6 @@ displaySearchResults(results, append = false) {
         return;
     }
 
-    // Actualizar contexto de siguiente página
     nextPageContext = results.nextpage || null;
 
     let grid = searchResults.querySelector('.search-results-grid');
@@ -1305,12 +1318,11 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
-    // Agregar videos evitando duplicados
+    // Agregar videos
     results.items.forEach(video => {
         const videoId = video.videoId || video.url?.split('v=')[1];
         if (!videoId) return;
 
-        // Evitar duplicados
         if (grid.querySelector(`[data-video-id="${videoId}"]`)) {
             return;
         }
@@ -1319,31 +1331,29 @@ displaySearchResults(results, append = false) {
         grid.appendChild(card);
     });
 
-    // Remover spinner de carga si existe
+    // Remover spinner existente
     const existingSpinner = searchResults.querySelector('.search-loading-more');
     if (existingSpinner) {
         existingSpinner.remove();
     }
 
-    // ✅ CONFIGURAR SCROLL INFINITO
-    if (nextPageContext && !append) {
-        console.log('📜 Configurando scroll infinito...');
+    // ✅ SCROLL INFINITO HABILITADO
+    if (nextPageContext) {
+        console.log('📜 Habilitando scroll infinito...');
         
         this.handleSearchScroll = this.debounce(() => {
             const scrollTop = searchResults.scrollTop;
             const scrollHeight = searchResults.scrollHeight;
             const clientHeight = searchResults.clientHeight;
             
-            // Calcular si está cerca del final (150px antes)
-            const isNearBottom = scrollTop + clientHeight >= scrollHeight - 150;
-            
-            if (isNearBottom && !isLoadingMore && nextPageContext) {
-                console.log('📜 🔥 Activando carga infinita...');
-                this.loadMoreSearchResults();
+            if (scrollTop + clientHeight >= scrollHeight - 100) {
+                if (!isLoadingMore && nextPageContext) {
+                    console.log('📜 🚀 Cargando más resultados automáticamente...');
+                    this.loadMoreSearchResults();
+                }
             }
-        }, 200);
+        }, 150);
         
-        // Agregar listener de scroll
         searchResults.addEventListener('scroll', this.handleSearchScroll, { passive: true });
         console.log('✅ Scroll infinito activado');
     }
