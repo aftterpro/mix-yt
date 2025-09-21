@@ -545,39 +545,115 @@ class PlaylistManager {
     /**
      * Añadir playlists de YouTube Library
      */
-    addYouTubeLibraryPlaylists(youtubePlaylists) {
-        if (!youtubePlaylists?.length) {
-            this.core?.showMessage("No se encontraron playlists en tu biblioteca", 'warning');
-            return;
-        }
-
-        const formattedPlaylists = youtubePlaylists.map(playlist => {
-            if (!playlist.snippet?.title || playlist.contentDetails?.itemCount === 0) {
-                return null;
-            }
-            return {
-                id: playlist.id,
-                name: playlist.snippet.title,
-                thumbnailUrl: playlist.snippet.thumbnails.high?.url || 
-                            playlist.snippet.thumbnails.default?.url || './electronic.ico',
-                videos: [],
-                isExpanded: false,
-                source: YOUTUBE_LIBRARY_SOURCE_ID,
-                isLoaded: false,
-            };
-        }).filter(p => p !== null);
-
-        this.playlistsData.unshift(...formattedPlaylists);
-        
-        // Actualizar también en el core si existe
-        if (this.core && this.core.playlistsData) {
-            this.core.playlistsData = this.playlistsData;
-        }
-        
-        this.core?.showMessage(`${formattedPlaylists.length} playlists de tu biblioteca añadidas`, 'success');
-        this.updatePlaylistsUI();
+addYouTubeLibraryPlaylists(youtubePlaylists) {
+    if (!youtubePlaylists?.length) {
+        console.warn("❌ No se recibieron playlists válidas");
+        this.core?.showMessage("No se encontraron playlists en tu biblioteca", 'warning');
+        return;
     }
 
+    console.log(`📥 Procesando ${youtubePlaylists.length} playlists de YouTube Library`);
+
+    const formattedPlaylists = youtubePlaylists.map(playlist => {
+        if (!playlist.snippet?.title || playlist.contentDetails?.itemCount === 0) {
+            console.log(`⚠️ Playlist omitida: ${playlist.snippet?.title || 'Sin título'} (${playlist.contentDetails?.itemCount || 0} videos)`);
+            return null;
+        }
+        return {
+            id: playlist.id,
+            name: playlist.snippet.title,
+            thumbnailUrl: playlist.snippet.thumbnails.high?.url || 
+                        playlist.snippet.thumbnails.default?.url || './electronic.ico',
+            videos: [],
+            isExpanded: false,
+            source: YOUTUBE_LIBRARY_SOURCE_ID,
+            isLoaded: false,
+        };
+    }).filter(p => p !== null);
+
+    console.log(`✅ ${formattedPlaylists.length} playlists válidas procesadas`);
+
+    // AGREGAR AL PRINCIPIO (DESPUÉS DE COLA)
+    const queueIndex = this.playlistsData.findIndex(p => p.id === 'queue');
+    if (queueIndex !== -1) {
+        this.playlistsData.splice(queueIndex + 1, 0, ...formattedPlaylists);
+    } else {
+        this.playlistsData.unshift(...formattedPlaylists);
+    }
+    
+    // SINCRONIZAR CON CORE INMEDIATAMENTE
+    if (this.core && this.core.playlistsData) {
+        this.core.playlistsData = this.playlistsData;
+    }
+    
+    // FORZAR MÚLTIPLES ACTUALIZACIONES PARA ASEGURAR RENDERIZADO
+    console.log("🔄 Actualizando UI inmediatamente...");
+    this.updatePlaylistsUI();
+    
+    setTimeout(() => {
+        console.log("🔄 Segunda actualización UI...");
+        this.updatePlaylistsUI();
+    }, 200);
+    
+    setTimeout(() => {
+        console.log("🔄 Actualización final UI...");
+        this.updatePlaylistsUI();
+        
+        // VERIFICAR QUE SE HAYAN RENDERIZADO
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        if (playlistsGrid) {
+            const renderedPlaylists = playlistsGrid.querySelectorAll('.playlist-card').length;
+            console.log(`📊 Playlists renderizadas en DOM: ${renderedPlaylists}`);
+            
+            if (renderedPlaylists === 0) {
+                console.error("❌ CRÍTICO: Playlists no se renderizaron, forzando recreación");
+                this.forceRecreatePlaylistsUI();
+            }
+        }
+    }, 1000);
+    
+    this.core?.showMessage(`${formattedPlaylists.length} playlists de YouTube añadidas`, 'success');
+}
+// Forzar recreación de UI:
+forceRecreatePlaylistsUI() {
+    console.log("🔄 Forzando recreación completa de UI de playlists");
+    
+    const container = document.getElementById('playlistsGrid');
+    if (!container) {
+        console.error("❌ Container playlistsGrid no encontrado");
+        return;
+    }
+    
+    // LIMPIAR COMPLETAMENTE
+    container.innerHTML = '';
+    
+    // RECREAR DESDE CERO
+    if (this.playlistsData.length === 0) {
+        container.innerHTML = `
+            <div class="search-placeholder">
+                <i class="fas fa-music"></i>
+                <p><strong>¡Conecta tu cuenta de Google!</strong></p>
+                <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
+                <p><small>Powered by Sistema Unificado</small></p>
+            </div>
+        `;
+    } else {
+        console.log(`📊 Recreando ${this.playlistsData.length} playlists en DOM`);
+        
+        this.playlistsData.forEach((playlist, index) => {
+            const card = this.createPlaylistCard(playlist);
+            container.appendChild(card);
+            console.log(`✅ Playlist ${index + 1} renderizada: ${playlist.name}`);
+        });
+        
+        // VERIFICAR RENDERIZADO FINAL
+        const finalCount = container.querySelectorAll('.playlist-card').length;
+        console.log(`🎯 Renderizado final: ${finalCount} de ${this.playlistsData.length} playlists`);
+    }
+    
+    // ACTUALIZAR ESTADÍSTICAS
+    this.core?.updateOverviewStats();
+}
     /**
      * Limpiar playlists de YouTube Library
      */
