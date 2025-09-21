@@ -41,18 +41,14 @@ const unifiedState = {
     authReady: false,
     playersReady: false
 };
-
-// CONFIGURACIÓN DE PERSISTENCIA
-const PERSISTENCE_CONFIG = {
-    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días
-    QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días para cola
-    STORAGE_KEYS: {
-        PLAYLISTS: 'ytcm_playlists_persistent',
-        QUEUE: 'ytcm_queue_persistent',
-        PLAYING_STATE: 'ytcm_playing_state'
-    }
+// EN SU LUGAR, crear las constantes específicas de core:
+const CORE_STORAGE_KEYS = {
+    PLAYLISTS: 'ytcm_playlists_persistent',
+    QUEUE: 'ytcm_queue_persistent', 
+    PLAYING_STATE: 'ytcm_playing_state'
 };
 
+const CORE_PERSISTENCE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
 // =============================================
 // SISTEMA UNIFICADO - CORE
 // =============================================
@@ -78,10 +74,10 @@ function savePlaylistsDataPersistent(playlists) {
         const dataToSave = {
             playlists: playlists || playlistsData,
             timestamp: Date.now(),
-            expires_at: Date.now() + PERSISTENCE_CONFIG.PLAYLISTS_DURATION
+            expires_at: Date.now() + CORE_PERSISTENCE_DURATION // Usar nueva constante
         };
         
-        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS, JSON.stringify(dataToSave));
+        localStorage.setItem(CORE_STORAGE_KEYS.PLAYLISTS, JSON.stringify(dataToSave)); // Usar nueva key
         console.log(`💾 ${dataToSave.playlists.length} playlists guardadas por 7 días`);
         return true;
     } catch (error) {
@@ -89,10 +85,9 @@ function savePlaylistsDataPersistent(playlists) {
         return false;
     }
 }
-
 function loadPlaylistsDataPersistent() {
     try {
-        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        const storedData = localStorage.getItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
         if (!storedData) return null;
         
         const parsed = JSON.parse(storedData);
@@ -100,7 +95,7 @@ function loadPlaylistsDataPersistent() {
         
         if (now > parsed.expires_at) {
             console.log('📅 Playlists expiradas, eliminando...');
-            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+            localStorage.removeItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
             return null;
         }
         
@@ -110,7 +105,7 @@ function loadPlaylistsDataPersistent() {
         return parsed.playlists;
     } catch (error) {
         console.error('❌ Error cargando playlists:', error);
-        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS);
+        localStorage.removeItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
         return null;
     }
 }
@@ -138,7 +133,7 @@ function saveQueuePersistent() {
 
 function loadQueuePersistent() {
     try {
-        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+        const storedData = localStorage.getItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
         if (!storedData) return null;
         
         const parsed = JSON.parse(storedData);
@@ -146,7 +141,7 @@ function loadQueuePersistent() {
         
         if (now > parsed.expires_at) {
             console.log('📅 Cola expirada, eliminando...');
-            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+            localStorage.removeItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
             return null;
         }
         
@@ -154,7 +149,7 @@ function loadQueuePersistent() {
         return parsed;
     } catch (error) {
         console.error('❌ Error cargando cola:', error);
-        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
+        localStorage.removeItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
         return null;
     }
 }
