@@ -424,7 +424,7 @@ initializeAuth() {
             return;
         }
         
-        // MEJORADO: Solo limpiar si hay playlists duplicadas
+        // Solo limpiar si hay playlists duplicadas
         const currentYouTubeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
         
         if (currentYouTubeCount > 0 && currentYouTubeCount < event.detail.length) {
@@ -438,7 +438,11 @@ initializeAuth() {
         console.log("✅ Procesando", event.detail.length, "playlists de YouTube...");
         window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
         
-        // MOSTRAR MENSAJE DE ÉXITO CON CONTEO CORRECTO
+        // NUEVO: Programar mejora de duraciones después de cargar
+        setTimeout(() => {
+            this.enhanceYouTubePlaylistsWithDurations();
+        }, 5000); // Esperar 5 segundos después de cargar playlists
+        
         setTimeout(() => {
             const finalCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
             console.log(`📊 Verificación final: ${finalCount} playlists de YouTube en manager`);
@@ -1520,48 +1524,106 @@ async loadMoreSearchResults() {
     // =============================================
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
-    addVideoToQueue(videoData) {
-        let queuePlaylist = playlistsData.find(p => p.id === 'queue');
-        
-        if (!queuePlaylist) {
-            queuePlaylist = {
-                id: 'queue',
-                name: 'Cola de Reproducción',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true,
-                isQueue: true
-            };
-            playlistsData.unshift(queuePlaylist);
-        }
-
-        // Verificar duplicados
-        const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
-        if (isDuplicate) {
-            this.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
-            return;
-        }
-
-        const videoObject = {
-            videoId: videoData.videoId,
-            title: videoData.title || "Título no disponible",
-            thumbnail: videoData.thumbnail || './electronic.ico',
-            duration: videoData.duration || 0,
-            uploaderName: videoData.uploaderName || videoData.author || 'Desconocido',
-            author: videoData.author || videoData.uploaderName || 'Desconocido',
-            sourcePlaylistId: 'queue'
+async addVideoToQueue(videoData) {
+    let queuePlaylist = playlistsData.find(p => p.id === 'queue');
+    
+    if (!queuePlaylist) {
+        queuePlaylist = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
         };
-
-        queuePlaylist.videos.push(videoObject);
-        this.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
-        
-        this.updatePlaylistsUI();
-        this.enablePlayButton();
-        
-        console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
-        setTimeout(() => saveAllData(), 500);
+        playlistsData.unshift(queuePlaylist);
     }
 
+    // Verificar duplicados
+    const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
+    if (isDuplicate) {
+        this.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
+        return;
+    }
+
+    // MEJORADO: Obtener duración si no la tiene
+    let duration = videoData.duration || 0;
+    
+    if (!duration && videoData.videoId && window.isAuthorized) {
+        try {
+            const durations = await this.getBatchVideoDurations([videoData.videoId]);
+            duration = durations[videoData.videoId] || 0;
+        } catch (error) {
+            console.warn('No se pudo obtener duración para', videoData.videoId);
+        }
+    }
+
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || "Título no disponible",
+        thumbnail: videoData.thumbnail || './electronic.ico',
+        duration: duration,
+        uploaderName: videoData.uploaderName || videoData.author || 'Desconocido',
+        author: videoData.author || videoData.uploaderName || 'Desconocido',
+        sourcePlaylistId: 'queue'
+    };
+
+    queuePlaylist.videos.push(videoObject);
+    this.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
+    
+    this.updatePlaylistsUI();
+    this.enablePlayButton();
+    
+    console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
+    setTimeout(() => saveAllData(), 500);
+}
+async enhanceYouTubePlaylistsWithDurations() {
+    if (!window.isAuthorized || !window.playlistManager) return;
+    
+    console.log('🕒 Mejorando playlists de YouTube con duraciones...');
+    
+    const youtubeLibraryPlaylists = window.playlistManager.playlistsData.filter(p => 
+        p.source === 'youtube_library' && p.isLoaded && p.videos.length > 0
+    );
+    
+    if (youtubeLibraryPlaylists.length === 0) {
+        console.log('📭 No hay playlists de YouTube cargadas para mejorar');
+        return;
+    }
+    
+    let totalVideosProcessed = 0;
+    
+    for (const playlist of youtubeLibraryPlaylists) {
+        const videosNeedingDuration = playlist.videos.filter(v => !v.duration || v.duration === 0);
+        
+        if (videosNeedingDuration.length > 0) {
+            console.log(`🔄 Mejorando ${videosNeedingDuration.length} videos de "${playlist.name}"`);
+            
+            const videoIds = videosNeedingDuration.map(v => v.videoId);
+            const durations = await this.getBatchVideoDurations(videoIds);
+            
+            // Aplicar duraciones obtenidas
+            videosNeedingDuration.forEach(video => {
+                if (durations[video.videoId]) {
+                    video.duration = durations[video.videoId];
+                    totalVideosProcessed++;
+                }
+            });
+            
+            // Delay entre playlists para no saturar API
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+    }
+    
+    if (totalVideosProcessed > 0) {
+        console.log(`✅ ${totalVideosProcessed} videos mejorados con duraciones`);
+        this.showMessage(`${totalVideosProcessed} videos actualizados con duraciones`, 'success');
+        
+        // Guardar cambios y actualizar UI
+        setTimeout(() => saveAllData(), 1000);
+        this.updatePlaylistsUI();
+    }
+}
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ Eliminando video de cola: ${videoId}`);
     
@@ -1614,28 +1676,78 @@ removeVideoFromQueue(videoId) {
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
-    getFlattenedPlaylist() {
-        // Solo mostrar videos de la cola de reproducción
-        const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+getFlattenedPlaylist() {
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    
+    if (!queuePlaylist) {
+        return [];
+    }
+    
+    const flatList = queuePlaylist.videos.map(video => {
+        // MEJORADO: Obtener duración correcta
+        let duration = 0;
         
-        if (!queuePlaylist) {
-            return [];
+        if (video.duration) {
+            duration = typeof video.duration === 'number' ? video.duration : this.parseDuration(video.duration);
+        } else if (video.contentDetails?.duration) {
+            duration = this.parseDuration(video.contentDetails.duration);
         }
         
-        const flatList = queuePlaylist.videos.map(video => ({
+        return {
             videoId: video.videoId,
             title: video.title || "Título Desconocido",
             thumbnail: video.thumbnail || './electronic.ico',
-            duration: this.parseDuration(video.duration) || 0,
+            duration: duration,
             uploaderName: video.uploaderName || video.author || this.extractArtistFromTitle(video.title),
             author: video.author || video.uploaderName || this.extractArtistFromTitle(video.title),
             sourcePlaylistId: 'queue',
             source: 'queue'
-        }));
+        };
+    });
+    
+    console.log(`📊 Cola de reproducción: ${flatList.length} videos`);
+    return flatList;
+}
+    async getBatchVideoDurations(videoIds) {
+    if (!videoIds || videoIds.length === 0) return {};
+    
+    const durations = {};
+    const batchSize = 50; // YouTube API permite max 50 IDs por request
+    
+    try {
+        // Dividir en lotes de 50
+        for (let i = 0; i < videoIds.length; i += batchSize) {
+            const batch = videoIds.slice(i, i + batchSize);
+            console.log(`🕒 Obteniendo duraciones para lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(videoIds.length/batchSize)}`);
+            
+            const response = await gapi.client.youtube.videos.list({
+                part: ['contentDetails'],
+                id: batch.join(',')
+            });
+            
+            if (response.result.items) {
+                response.result.items.forEach(video => {
+                    if (video.contentDetails?.duration) {
+                        durations[video.id] = this.parseDuration(video.contentDetails.duration);
+                    }
+                });
+            }
+            
+            // Pequeño delay entre requests para no saturar API
+            if (i + batchSize < videoIds.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
         
-        console.log(`📊 Cola de reproducción: ${flatList.length} videos`);
-        return flatList;
+        console.log(`✅ Duraciones obtenidas: ${Object.keys(durations).length}/${videoIds.length} videos`);
+        return durations;
+        
+    } catch (error) {
+        console.error('❌ Error obteniendo duraciones:', error);
+        return {};
     }
+}
+
     formatDuration(duration) {
         if (isNaN(duration) || duration < 0) return "0:00";
         const minutes = Math.floor(duration / 60);
@@ -1685,7 +1797,31 @@ removeVideoFromQueue(videoId) {
         console.warn(`⚠️ No se pudo parsear duración: "${durationInput}", usando 210s por defecto`);
         return 210;
     }
-
+extractArtistFromTitle(title) {
+    if (!title) return 'Artista Desconocido';
+    
+    const patterns = [
+        /^([^-]+)\s*-\s*(.+)$/,
+        /^([^:]+)\s*:\s*(.+)$/,
+        /^([^|]+)\s*\|\s*(.+)$/,
+        /^([^•]+)\s*•\s*(.+)$/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = title.match(pattern);
+        if (match) {
+            return match[1].trim();
+        }
+    }
+    
+    // Si no encuentra patrón, extraer primera palabra/palabras
+    const words = title.split(' ');
+    if (words.length > 1) {
+        return words.slice(0, 2).join(' '); // Primeras dos palabras
+    }
+    
+    return 'YT CrossMix';
+}
     // =============================================
     // MONITOREO Y ESTADO
     // =============================================
