@@ -144,10 +144,7 @@ setupAutomaticSaving() {
  async init() {
     console.log('🔧 Inicializando Sistema Unificado...');
     this.updateStatusIndicator('Inicializando...', 'loading');
-    
-    // Cargar datos persistentes ANTES de inicializar
-    await this.loadPersistentData();
-    
+       
     // Configurar debug
     if (this.debugMode) {
         this.enableDebugMode();
