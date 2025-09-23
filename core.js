@@ -81,14 +81,14 @@ function saveQueuePersistent() {
         if (!queuePlaylist) return false;
         
         const queueToSave = {
-            videos: queuePlaylist.videos,
+            videos: queuePlaylist.videos || [],
             currentPlayingInfo: currentPlayingInfo,
             timestamp: Date.now(),
             expires_at: Date.now() + PERSISTENCE_CONFIG.QUEUE_DURATION
         };
         
         localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE, JSON.stringify(queueToSave));
-        console.log(`💾 Cola guardada: ${queuePlaylist.videos.length} videos`);
+        console.log(`💾 Cola guardada: ${queuePlaylist.videos?.length || 0} videos`);
         return true;
     } catch (error) {
         console.error('❌ Error guardando cola:', error);
@@ -98,7 +98,7 @@ function saveQueuePersistent() {
 
 function loadQueuePersistent() {
     try {
-        const storedData = localStorage.getItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
         if (!storedData) return null;
         
         const parsed = JSON.parse(storedData);
@@ -106,19 +106,75 @@ function loadQueuePersistent() {
         
         if (now > parsed.expires_at) {
             console.log('📅 Cola expirada, eliminando...');
-            localStorage.removeItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
             return null;
         }
         
-        console.log(`📋 Cola cargada: ${parsed.videos.length} videos`);
+        console.log(`📋 Cola cargada: ${parsed.videos?.length || 0} videos`);
         return parsed;
     } catch (error) {
         console.error('❌ Error cargando cola:', error);
-        localStorage.removeItem(CORE_STORAGE_KEYS.QUEUE); // Usar nueva key
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.QUEUE);
         return null;
     }
 }
-
+/**
+ * Guardar playlists persistentes (core)
+ */
+function savePlaylistsDataPersistent(playlists) {
+    try {
+        if (!Array.isArray(playlists)) {
+            console.warn('⚠️ savePlaylistsDataPersistent: playlists no es un array');
+            return false;
+        }
+        
+        const playlistsToSave = {
+            data: playlists,
+            timestamp: Date.now(),
+            expires_at: Date.now() + PERSISTENCE_CONFIG.PLAYLISTS_DURATION
+        };
+        
+        localStorage.setItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS_CORE, JSON.stringify(playlistsToSave));
+        console.log(`💾 ${playlists.length} playlists core guardadas con expiración de 7 días`);
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando playlists persistentes:', error);
+        return false;
+    }
+}
+/**
+ * Cargar playlists persistentes (core)
+ */
+function loadPlaylistsDataPersistent() {
+    try {
+        const storedData = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS_CORE);
+        if (!storedData) {
+            console.log('📋 No hay playlists persistentes guardadas');
+            return null;
+        }
+        
+        const parsed = JSON.parse(storedData);
+        const now = Date.now();
+        
+        // Verificar si han expirado
+        if (now > parsed.expires_at) {
+            console.log('📅 Playlists persistentes han expirado, eliminando...');
+            localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS_CORE);
+            return null;
+        }
+        
+        const daysRemaining = Math.ceil((parsed.expires_at - now) / (24 * 60 * 60 * 1000));
+        console.log(`📋 Playlists core cargadas desde almacenamiento (${daysRemaining} días restantes)`);
+        
+        return Array.isArray(parsed.data) ? parsed.data : null;
+        
+    } catch (error) {
+        console.error('❌ Error cargando playlists persistentes:', error);
+        localStorage.removeItem(PERSISTENCE_CONFIG.STORAGE_KEYS.PLAYLISTS_CORE);
+        return null;
+    }
+}
 class UnifiedCore {
     constructor() {
         this.state = unifiedState;
@@ -2150,7 +2206,24 @@ function monitorPlayers() {
         console.error("❌ Error en monitorPlayers:", error);
     }
 }
-
+// Configuración de persistencia central
+const PERSISTENCE_CONFIG = {
+    TOKEN_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días
+    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000,
+    QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000,
+    STORAGE_KEYS: {
+        TOKEN: 'ytcm_google_token',
+        PLAYLISTS: 'ytcm_youtube_playlists',
+        PLAYLISTS_CORE: 'ytcm_playlists_persistent', 
+        QUEUE: 'ytcm_queue_persistent',
+        USER_INFO: 'ytcm_user_info'
+    }
+};
+// Exponer funciones globalmente para compatibilidad
+window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
+window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
+window.loadQueuePersistent = loadQueuePersistent;
+window.saveQueuePersistent = saveQueuePersistent;
 // =============================================
 // FUNCIONES DE DEBUG
 // =============================================
