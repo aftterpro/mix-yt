@@ -226,53 +226,6 @@ async loadTrendingContent() {
         console.error('❌ Error cargando trending:', error);
     }
 }
-    async loadPersistentData() {
-    console.log('📂 Cargando datos persistentes...');
-    
-    // Cargar playlists persistentes
-    const persistentPlaylists = loadPlaylistsDataPersistent();
-    if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
-        playlistsData = persistentPlaylists;
-        console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
-    }
-    
-    // AGREGAR: También verificar y cargar playlists de YouTube guardadas en auth.js
-    setTimeout(() => {
-        if (typeof getStoredPlaylists === 'function') {
-            const youtubeLibraryPlaylists = getStoredPlaylists();
-            if (youtubeLibraryPlaylists && youtubeLibraryPlaylists.length > 0) {
-                console.log('🎵 Restaurando playlists de YouTube Library guardadas');
-                const event = new CustomEvent('playlistsFetched', {
-                    detail: youtubeLibraryPlaylists
-                });
-                document.dispatchEvent(event);
-            }
-        }
-    }, 2000);
-        // Cargar cola persistente
-        const persistentQueue = loadQueuePersistent();
-        if (persistentQueue) {
-            // Asegurar que existe la playlist de cola
-            let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
-            if (!queuePlaylist) {
-                queuePlaylist = {
-                    id: 'queue',
-                    name: 'Cola de Reproducción',
-                    thumbnailUrl: './electronic.ico',
-                    videos: [],
-                    isExpanded: true,
-                    isQueue: true
-                };
-                playlistsData.unshift(queuePlaylist);
-            }
-            
-            // Cargar videos de la cola
-            queuePlaylist.videos = persistentQueue.videos;
-            currentPlayingInfo = persistentQueue.currentPlayingInfo;
-            
-            console.log(`✅ Cola cargada: ${persistentQueue.videos.length} videos`);
-        }
-    }
 
     async initializeComponents() {
         // Esperar a que las APIs estén disponibles
@@ -481,7 +434,7 @@ async initializePlaylistManager() {
         initializePlaylistManager(this);
         
         if (window.playlistManager) {
-            this.syncPlaylistData(); // Función existente
+            
             console.log("✅ Playlist manager inicializado correctamente");
             return true;
         }
