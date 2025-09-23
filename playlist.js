@@ -5,7 +5,7 @@ console.log('🎵 Cargando gestor de playlists...');
 class PlaylistManager {
 constructor(unifiedCore) {
     this.core = unifiedCore;
-    this.playlistsData = unifiedCore?.playlistsData || [];
+    this.playlistsData = unifiedCore.playlistsData;
 }
 
     // =============================================
