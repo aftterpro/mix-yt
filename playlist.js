@@ -60,18 +60,29 @@ constructor(unifiedCore) {
 async loadPersistentData() {
     console.log('📂 Cargando datos persistentes...');
     
-    // Verificar si las funciones existen antes de usarlas
-    if (typeof loadPlaylistsDataPersistent === 'function') {
-        const persistentPlaylists = loadPlaylistsDataPersistent();
+    // Esperar un momento para que las funciones de core.js se carguen
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Cargar playlists persistentes
+    if (typeof window.loadPlaylistsDataPersistent === 'function') {
+        const persistentPlaylists = window.loadPlaylistsDataPersistent();
         if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
-            // Actualizar la referencia global correctamente
-            this.playlistsData.length = 0; // Limpiar array
-            this.playlistsData.push(...persistentPlaylists); // Agregar datos
+            // Limpiar array existente y agregar datos cargados
+            this.playlistsData.splice(0, this.playlistsData.length);
+            this.playlistsData.push(...persistentPlaylists);
+            
+            // Actualizar también la referencia en core si existe
+            if (this.core && this.core.playlistsData) {
+                this.core.playlistsData = this.playlistsData;
+            }
+            
             console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
         }
+    } else {
+        console.log('⚠️ loadPlaylistsDataPersistent no disponible aún, usando datos vacíos');
     }
     
-    // Verificar playlists de YouTube guardadas en auth.js
+    // Verificar y cargar playlists de YouTube guardadas en auth.js
     setTimeout(() => {
         if (typeof getStoredPlaylists === 'function') {
             const youtubeLibraryPlaylists = getStoredPlaylists();
@@ -86,8 +97,8 @@ async loadPersistentData() {
     }, 2000);
 
     // Cargar cola persistente
-    if (typeof loadQueuePersistent === 'function') {
-        const persistentQueue = loadQueuePersistent();
+    if (typeof window.loadQueuePersistent === 'function') {
+        const persistentQueue = window.loadQueuePersistent();
         if (persistentQueue) {
             // Asegurar que existe la playlist de cola
             let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
@@ -105,53 +116,21 @@ async loadPersistentData() {
             
             // Cargar videos de la cola
             queuePlaylist.videos = persistentQueue.videos || [];
+            
+            // Restaurar estado de reproducción si el core está disponible
             if (this.core && persistentQueue.currentPlayingInfo) {
                 this.core.currentPlayingInfo = persistentQueue.currentPlayingInfo;
+                // También actualizar la variable global
+                if (typeof window.currentPlayingInfo !== 'undefined') {
+                    window.currentPlayingInfo = persistentQueue.currentPlayingInfo;
+                }
             }
             
             console.log(`✅ Cola cargada: ${persistentQueue.videos?.length || 0} videos`);
         }
-    }
-}
-    processYouTubePlaylists(playlists) {
-    if (!window.playlistManager) {
-        console.error("❌ playlistManager no disponible");
-        return;
-    }
-    
-    // Verificar duplicados de manera eficiente
-    const currentYouTubeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
-    
-    if (currentYouTubeCount >= playlists.length) {
-        console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
-        return;
-    }
-    
-    // Limpiar solo si hay conflicto
-    if (currentYouTubeCount > 0 && currentYouTubeCount < playlists.length) {
-        console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
-        window.playlistManager.clearYouTubeLibraryPlaylists();
-    }
-    
-    console.log("✅ Procesando", playlists.length, "playlists de YouTube...");
-    window.playlistManager.addYouTubeLibraryPlaylists(playlists);
-    
-    // Programar mejora de duraciones de forma no bloqueante
-    if (window.requestIdleCallback) {
-        requestIdleCallback(() => {
-            this.enhanceYouTubePlaylistsWithDurations();
-        }, { timeout: 5000 });
     } else {
-        setTimeout(() => {
-            this.enhanceYouTubePlaylistsWithDurations();
-        }, 5000);
+        console.log('⚠️ loadQueuePersistent no disponible aún');
     }
-    
-    // Actualizar UI después de un frame
-    requestAnimationFrame(() => {
-        this.showMessage(`${playlists.length} playlists de YouTube sincronizadas`, 'success');
-        this.updatePlaylistsUI();
-    });
 }
     /**
      * Actualizar UI de playlists
