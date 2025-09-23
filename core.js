@@ -1,3 +1,5 @@
+console.log('Core cargando...');
+
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
@@ -68,48 +70,6 @@ function saveAllData() {
         console.error('❌ Error en guardado automático:', error);
     }
 }
-
-function savePlaylistsDataPersistent(playlists) {
-    try {
-        const dataToSave = {
-            playlists: playlists || playlistsData,
-            timestamp: Date.now(),
-            expires_at: Date.now() + CORE_PERSISTENCE_DURATION // Usar nueva constante
-        };
-        
-        localStorage.setItem(CORE_STORAGE_KEYS.PLAYLISTS, JSON.stringify(dataToSave)); // Usar nueva key
-        console.log(`💾 ${dataToSave.playlists.length} playlists guardadas por 7 días`);
-        return true;
-    } catch (error) {
-        console.error('❌ Error guardando playlists:', error);
-        return false;
-    }
-}
-function loadPlaylistsDataPersistent() {
-    try {
-        const storedData = localStorage.getItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
-        if (!storedData) return null;
-        
-        const parsed = JSON.parse(storedData);
-        const now = Date.now();
-        
-        if (now > parsed.expires_at) {
-            console.log('📅 Playlists expiradas, eliminando...');
-            localStorage.removeItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
-            return null;
-        }
-        
-        const daysRemaining = Math.ceil((parsed.expires_at - now) / (24 * 60 * 60 * 1000));
-        console.log(`📚 ${parsed.playlists.length} playlists cargadas (${daysRemaining} días restantes)`);
-        
-        return parsed.playlists;
-    } catch (error) {
-        console.error('❌ Error cargando playlists:', error);
-        localStorage.removeItem(CORE_STORAGE_KEYS.PLAYLISTS); // Usar nueva key
-        return null;
-    }
-}
-
 function saveQueuePersistent() {
     try {
         const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
@@ -162,6 +122,7 @@ class UnifiedCore {
         this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
         this.init();
         this.setupAutomaticSaving();
+        this.playlistsData = playlistsData;
     }
 
 setupAutomaticSaving() {
@@ -1296,7 +1257,7 @@ async performSearchFallback(query, nextPage) {
         }
     }
 }
-// En core.js, asegurar que displaySearchResults tenga scroll infinito:
+// Asegurar que displaySearchResults tenga scroll infinito:
 displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
@@ -1531,53 +1492,6 @@ async addVideoToQueue(videoData) {
     
     console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
     setTimeout(() => saveAllData(), 500);
-}
-async enhanceYouTubePlaylistsWithDurations() {
-    if (!window.isAuthorized || !window.playlistManager) return;
-    
-    console.log('🕒 Mejorando playlists de YouTube con duraciones...');
-    
-    const youtubeLibraryPlaylists = window.playlistManager.playlistsData.filter(p => 
-        p.source === 'youtube_library' && p.isLoaded && p.videos.length > 0
-    );
-    
-    if (youtubeLibraryPlaylists.length === 0) {
-        console.log('📭 No hay playlists de YouTube cargadas para mejorar');
-        return;
-    }
-    
-    let totalVideosProcessed = 0;
-    
-    for (const playlist of youtubeLibraryPlaylists) {
-        const videosNeedingDuration = playlist.videos.filter(v => !v.duration || v.duration === 0);
-        
-        if (videosNeedingDuration.length > 0) {
-            console.log(`🔄 Mejorando ${videosNeedingDuration.length} videos de "${playlist.name}"`);
-            
-            const videoIds = videosNeedingDuration.map(v => v.videoId);
-            const durations = await this.getBatchVideoDurations(videoIds);
-            
-            // Aplicar duraciones obtenidas
-            videosNeedingDuration.forEach(video => {
-                if (durations[video.videoId]) {
-                    video.duration = durations[video.videoId];
-                    totalVideosProcessed++;
-                }
-            });
-            
-            // Delay entre playlists para no saturar API
-            await new Promise(resolve => setTimeout(resolve, 200));
-        }
-    }
-    
-    if (totalVideosProcessed > 0) {
-        console.log(`✅ ${totalVideosProcessed} videos mejorados con duraciones`);
-        this.showMessage(`${totalVideosProcessed} videos actualizados con duraciones`, 'success');
-        
-        // Guardar cambios y actualizar UI
-        setTimeout(() => saveAllData(), 1000);
-        this.updatePlaylistsUI();
-    }
 }
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ Eliminando video de cola: ${videoId}`);
