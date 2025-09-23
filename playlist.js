@@ -57,17 +57,21 @@ constructor(unifiedCore) {
             return playlist;
         }
     }
-    async loadPersistentData() {
+async loadPersistentData() {
     console.log('📂 Cargando datos persistentes...');
     
-    // Cargar playlists persistentes
-    const persistentPlaylists = loadPlaylistsDataPersistent();
-    if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
-        playlistsData = persistentPlaylists;
-        console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+    // Verificar si las funciones existen antes de usarlas
+    if (typeof loadPlaylistsDataPersistent === 'function') {
+        const persistentPlaylists = loadPlaylistsDataPersistent();
+        if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
+            // Actualizar la referencia global correctamente
+            this.playlistsData.length = 0; // Limpiar array
+            this.playlistsData.push(...persistentPlaylists); // Agregar datos
+            console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+        }
     }
     
-    // AGREGAR: También verificar y cargar playlists de YouTube guardadas en auth.js
+    // Verificar playlists de YouTube guardadas en auth.js
     setTimeout(() => {
         if (typeof getStoredPlaylists === 'function') {
             const youtubeLibraryPlaylists = getStoredPlaylists();
@@ -80,11 +84,13 @@ constructor(unifiedCore) {
             }
         }
     }, 2000);
-        // Cargar cola persistente
+
+    // Cargar cola persistente
+    if (typeof loadQueuePersistent === 'function') {
         const persistentQueue = loadQueuePersistent();
         if (persistentQueue) {
             // Asegurar que existe la playlist de cola
-            let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+            let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
             if (!queuePlaylist) {
                 queuePlaylist = {
                     id: 'queue',
@@ -94,16 +100,19 @@ constructor(unifiedCore) {
                     isExpanded: true,
                     isQueue: true
                 };
-                playlistsData.unshift(queuePlaylist);
+                this.playlistsData.unshift(queuePlaylist);
             }
             
             // Cargar videos de la cola
-            queuePlaylist.videos = persistentQueue.videos;
-            currentPlayingInfo = persistentQueue.currentPlayingInfo;
+            queuePlaylist.videos = persistentQueue.videos || [];
+            if (this.core && persistentQueue.currentPlayingInfo) {
+                this.core.currentPlayingInfo = persistentQueue.currentPlayingInfo;
+            }
             
-            console.log(`✅ Cola cargada: ${persistentQueue.videos.length} videos`);
+            console.log(`✅ Cola cargada: ${persistentQueue.videos?.length || 0} videos`);
         }
     }
+}
     processYouTubePlaylists(playlists) {
     if (!window.playlistManager) {
         console.error("❌ playlistManager no disponible");
