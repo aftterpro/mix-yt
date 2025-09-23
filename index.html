@@ -660,15 +660,18 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-<!-- . APIs y utilidades -->
+<!-- 1. Utilidades primero -->
 <script src="youtube-client.js"></script>
 <script src="init.js"></script>
-<!-- . Playlist manager (usa YOUTUBE_LIBRARY_SOURCE_ID) -->
-<script src="playlist.js" defer></script>
-<!-- . Autenticación (define YOUTUBE_LIBRARY_SOURCE_ID) -->
+
+<!-- 2. Auth (define funciones de persistencia) -->
 <script src="auth.js"></script>
-<!-- . Core del sistema   -->
-<script src="core.js" defer></script>
+
+<!-- 3. Core (usa y define más funciones de persistencia) -->  
+<script src="core.js"></script>
+
+<!-- 4. Playlist manager al final -->
+<script src="playlist.js" defer></script>
 
     <script>
         // Script inline para manejar errores de carga
