@@ -55,7 +55,93 @@ constructor(unifiedCore) {
             return playlist;
         }
     }
-
+    async loadPersistentData() {
+    console.log('📂 Cargando datos persistentes...');
+    
+    // Cargar playlists persistentes
+    const persistentPlaylists = loadPlaylistsDataPersistent();
+    if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
+        playlistsData = persistentPlaylists;
+        console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
+    }
+    
+    // AGREGAR: También verificar y cargar playlists de YouTube guardadas en auth.js
+    setTimeout(() => {
+        if (typeof getStoredPlaylists === 'function') {
+            const youtubeLibraryPlaylists = getStoredPlaylists();
+            if (youtubeLibraryPlaylists && youtubeLibraryPlaylists.length > 0) {
+                console.log('🎵 Restaurando playlists de YouTube Library guardadas');
+                const event = new CustomEvent('playlistsFetched', {
+                    detail: youtubeLibraryPlaylists
+                });
+                document.dispatchEvent(event);
+            }
+        }
+    }, 2000);
+        // Cargar cola persistente
+        const persistentQueue = loadQueuePersistent();
+        if (persistentQueue) {
+            // Asegurar que existe la playlist de cola
+            let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+            if (!queuePlaylist) {
+                queuePlaylist = {
+                    id: 'queue',
+                    name: 'Cola de Reproducción',
+                    thumbnailUrl: './electronic.ico',
+                    videos: [],
+                    isExpanded: true,
+                    isQueue: true
+                };
+                playlistsData.unshift(queuePlaylist);
+            }
+            
+            // Cargar videos de la cola
+            queuePlaylist.videos = persistentQueue.videos;
+            currentPlayingInfo = persistentQueue.currentPlayingInfo;
+            
+            console.log(`✅ Cola cargada: ${persistentQueue.videos.length} videos`);
+        }
+    }
+    processYouTubePlaylists(playlists) {
+    if (!window.playlistManager) {
+        console.error("❌ playlistManager no disponible");
+        return;
+    }
+    
+    // Verificar duplicados de manera eficiente
+    const currentYouTubeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
+    
+    if (currentYouTubeCount >= playlists.length) {
+        console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
+        return;
+    }
+    
+    // Limpiar solo si hay conflicto
+    if (currentYouTubeCount > 0 && currentYouTubeCount < playlists.length) {
+        console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
+        window.playlistManager.clearYouTubeLibraryPlaylists();
+    }
+    
+    console.log("✅ Procesando", playlists.length, "playlists de YouTube...");
+    window.playlistManager.addYouTubeLibraryPlaylists(playlists);
+    
+    // Programar mejora de duraciones de forma no bloqueante
+    if (window.requestIdleCallback) {
+        requestIdleCallback(() => {
+            this.enhanceYouTubePlaylistsWithDurations();
+        }, { timeout: 5000 });
+    } else {
+        setTimeout(() => {
+            this.enhanceYouTubePlaylistsWithDurations();
+        }, 5000);
+    }
+    
+    // Actualizar UI después de un frame
+    requestAnimationFrame(() => {
+        this.showMessage(`${playlists.length} playlists de YouTube sincronizadas`, 'success');
+        this.updatePlaylistsUI();
+    });
+}
     /**
      * Actualizar UI de playlists
      */
