@@ -58,12 +58,17 @@ const CORE_PERSISTENCE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
 // FUNCIONES DE PERSISTENCIA
 function saveAllData() {
     try {
-        // Guardar playlists (excluyendo YouTube Library)
-        const playlistsToSave = playlistsData.filter(p => p.source !== 'youtube_library');
-        savePlaylistsDataPersistent(playlistsToSave);
+        // Solo guardar si las funciones existen
+        if (typeof savePlaylistsDataPersistent === 'function') {
+            // Guardar playlists (excluyendo YouTube Library)
+            const playlistsToSave = playlistsData.filter(p => p.source !== 'youtube_library');
+            savePlaylistsDataPersistent(playlistsToSave);
+        }
         
         // Guardar cola
-        saveQueuePersistent();
+        if (typeof saveQueuePersistent === 'function') {
+            saveQueuePersistent();
+        }
         
         console.log('💾 Datos guardados automáticamente');
     } catch (error) {
@@ -184,7 +189,30 @@ setupAutomaticSaving() {
     
     console.log('✅ Sistema Unificado Inicializado');
 }
+processYouTubePlaylists(playlists) {
+    console.log(`📁 processYouTubePlaylists llamada con ${playlists?.length || 0} playlists`);
+    
+    if (!playlists || playlists.length === 0) {
+        console.warn("❌ No se recibieron playlists válidas");
+        return;
+    }
 
+    // Verificar que playlistManager esté disponible
+    if (!window.playlistManager) {
+        console.warn("⚠️ playlistManager no está disponible, programando para más tarde");
+        window.pendingYouTubePlaylists = playlists;
+        return;
+    }
+
+    // Delegar a playlistManager
+    try {
+        window.playlistManager.addYouTubeLibraryPlaylists(playlists);
+        console.log(`✅ ${playlists.length} playlists de YouTube procesadas exitosamente`);
+    } catch (error) {
+        console.error('❌ Error procesando playlists de YouTube:', error);
+        this.showMessage('Error procesando playlists de YouTube', 'error');
+    }
+}
 async loadTrendingContent() {
     try {
         console.log('🔥 Cargando contenido trending...');
