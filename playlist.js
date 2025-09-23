@@ -3,10 +3,10 @@ console.log('🎵 Cargando gestor de playlists...');
 // CLASE PRINCIPAL PARA GESTIÓN DE PLAYLISTS
 // =============================================
 class PlaylistManager {
-    constructor(unifiedCore) {
-        this.core = unifiedCore;
-        this.playlistsData = this.core ? this.core.playlistsData || [] : [];
-    }
+constructor(unifiedCore) {
+    this.core = unifiedCore;
+    this.playlistsData = unifiedCore?.playlistsData || [];
+}
 
     // =============================================
     // GESTIÓN DE PLAYLISTS - CORE
@@ -548,86 +548,67 @@ class PlaylistManager {
 addYouTubeLibraryPlaylists(youtubePlaylists) {
     console.log(`📥 addYouTubeLibraryPlaylists llamada con ${youtubePlaylists?.length || 0} playlists`);
     
+    // Validación rápida
     if (!youtubePlaylists?.length) {
         console.warn("❌ No se recibieron playlists válidas");
-        this.core?.showMessage("No se encontraron playlists en tu biblioteca", 'warning');
         return;
     }
 
-    console.log(`🔄 Procesando ${youtubePlaylists.length} playlists de YouTube Library...`);
+    // Verificar duplicados de manera eficiente - UNA SOLA VEZ
+    const currentYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
+    
+    if (currentYouTubeCount >= youtubePlaylists.length) {
+        console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
+        return;
+    }
 
-    // FORMATEAR PLAYLISTS
-    const formattedPlaylists = youtubePlaylists
-        .filter(playlist => {
-            const isValid = playlist.snippet?.title && playlist.contentDetails?.itemCount > 0;
-            if (!isValid) {
-                console.log(`⚠️ Playlist omitida: ${playlist.snippet?.title || 'Sin título'} (${playlist.contentDetails?.itemCount || 0} videos)`);
-            }
-            return isValid;
-        })
+    // Limpiar solo si hay conflicto real
+    if (currentYouTubeCount > 0) {
+        console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
+        this.playlistsData = this.playlistsData.filter(p => p.source !== 'youtube_library');
+    }
+
+    // Formatear playlists de manera eficiente
+    const validPlaylists = youtubePlaylists
+        .filter(playlist => playlist.snippet?.title && playlist.contentDetails?.itemCount > 0)
         .map(playlist => ({
             id: playlist.id,
             name: playlist.snippet.title,
             thumbnailUrl: playlist.snippet.thumbnails?.high?.url || 
-                        playlist.snippet.thumbnails?.default?.url || 
-                        './electronic.ico',
+                         playlist.snippet.thumbnails?.default?.url || 
+                         './electronic.ico',
             videos: [],
             isExpanded: false,
-            source: 'youtube_library', // CRÍTICO: Marcar correctamente la fuente
+            source: 'youtube_library',
             isLoaded: false
         }));
 
-    console.log(`✅ ${formattedPlaylists.length} playlists válidas procesadas de ${youtubePlaylists.length} total`);
-
-    if (formattedPlaylists.length === 0) {
+    if (validPlaylists.length === 0) {
         console.warn("❌ No hay playlists válidas para añadir");
         return;
     }
 
-    // AÑADIR AL ARRAY (DESPUÉS DE COLA PERO ANTES DE PERSONALES)
-    const beforeCount = this.playlistsData.length;
+    // Insertar de manera eficiente - encontrar índice UNA VEZ
+    const insertIndex = Math.max(
+        this.playlistsData.findIndex(p => p.id === 'manual'),
+        this.playlistsData.findIndex(p => p.id === 'queue') + 1,
+        0
+    );
     
-    // Encontrar índice donde insertar (después de cola, antes de personales)
-    let insertIndex = this.playlistsData.findIndex(p => p.id === 'manual');
-    if (insertIndex === -1) {
-        insertIndex = this.playlistsData.findIndex(p => p.id === 'queue');
-        insertIndex = insertIndex !== -1 ? insertIndex + 1 : 0;
-    }
+    // Insertar todas las playlists de una vez
+    this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
     
-    // INSERTAR PLAYLISTS DE YOUTUBE
-    this.playlistsData.splice(insertIndex, 0, ...formattedPlaylists);
-    const afterCount = this.playlistsData.length;
-    
-    console.log(`📊 Playlists en manager: ${beforeCount} → ${afterCount} (+${afterCount - beforeCount})`);
-    console.log(`🎯 Playlists de YouTube: ${this.playlistsData.filter(p => p.source === 'youtube_library').length}`);
-    
-    // SINCRONIZAR CON CORE INMEDIATAMENTE
-    if (this.core && this.core.playlistsData) {
-        this.core.playlistsData = this.playlistsData;
-        console.log("🔄 Datos sincronizados con core");
-    } else {
-        console.warn("⚠️ No se pudo sincronizar con core");
-    }
-    
-    // ACTUALIZAR UI
-    console.log("🖼️ Actualizando UI de playlists...");
-    this.updatePlaylistsUI();
-    
-    // VERIFICACIÓN POST-ACTUALIZACIÓN
-    setTimeout(() => {
-        const finalYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
-        const domCount = document.querySelectorAll('.playlist-card[data-playlist-id]').length;
+    console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
+
+    // Actualizar UI UNA SOLA VEZ - sin verificaciones redundantes
+    requestAnimationFrame(() => {
+        this.updatePlaylistsUI();
         
-        console.log(`✅ Verificación final:`, {
-            playlistsEnManager: this.playlistsData.length,
-            youTubeEnManager: finalYouTubeCount,
-            playlistsEnDOM: domCount
-        });
-        
-        if (finalYouTubeCount > 0) {
-            this.core?.showMessage(`${finalYouTubeCount} playlists de YouTube añadidas correctamente`, 'success');
+        // Mostrar mensaje al usuario
+        if (this.core?.showMessage) {
+            this.core.showMessage(`${validPlaylists.length} playlists de YouTube sincronizadas`, 'success');
         }
-    }, 1000);
+    });
 }
 // Forzar recreación de UI:
 forceRecreatePlaylistsUI() {
