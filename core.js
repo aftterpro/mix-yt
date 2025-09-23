@@ -164,59 +164,68 @@ class UnifiedCore {
         this.setupAutomaticSaving();
     }
 
-    setupAutomaticSaving() {
-        // Guardar cada 30 segundos
-        setInterval(() => {
-            if (this.state.initialized) {
-                saveAllData(); // Llamar función global
-            }
-        }, 30000);
-        
-        // Guardar antes de cerrar
-        window.addEventListener('beforeunload', () => {
-            saveAllData(); // Llamar función global
-        });
-        
-        console.log('💾 Guardado automático configurado');
-    }
-
-    async init() {
-        console.log('🔧 Inicializando Sistema Unificado...');
-        this.updateStatusIndicator('Inicializando...', 'loading');
-        
-        // Cargar datos persistentes ANTES de inicializar
-        await this.loadPersistentData();
-        
-        // Configurar debug
-        if (this.debugMode) {
-            this.enableDebugMode();
+setupAutomaticSaving() {
+    // Guardar cada 60 segundos en lugar de 30
+    this.saveInterval = setInterval(() => {
+        if (this.state.initialized) {
+            saveAllData();
         }
-        
-        // Inicializar componentes
-        await this.initializeComponents();
-        
-        // Configurar eventos
-        this.setupEventListeners();
-        
-        // Cargar datos iniciales
-        this.loadInitialData();
-        
-        // Inicializar playlist manager
-        this.initializePlaylistManager();
-        
-        this.state.initialized = true;
-        this.updateStatusIndicator('Sistema Listo', 'success');
-        this.enableUnifiedElements();
-            setTimeout(() => {
+    }, 60000);
+    
+    window.addEventListener('beforeunload', () => {
+        if (this.saveInterval) clearInterval(this.saveInterval);
+        saveAllData();
+    });
+    
+    console.log('💾 Guardado automático configurado (cada 60s)');
+}
+
+ async init() {
+    console.log('🔧 Inicializando Sistema Unificado...');
+    this.updateStatusIndicator('Inicializando...', 'loading');
+    
+    // Cargar datos persistentes ANTES de inicializar
+    await this.loadPersistentData();
+    
+    // Configurar debug
+    if (this.debugMode) {
+        this.enableDebugMode();
+    }
+    
+    // Inicializar componentes
+    await this.initializeComponents();
+    
+    // Configurar eventos
+    this.setupEventListeners();
+    
+    // Cargar datos iniciales
+    this.loadInitialData();
+    
+    // Inicializar playlist manager
+    this.initializePlaylistManager();
+    
+    this.state.initialized = true;
+    this.updateStatusIndicator('Sistema Listo', 'success');
+    this.enableUnifiedElements();
+    
+    // NUEVO: Procesar playlists pendientes si las hay
+    if (window.pendingYouTubePlaylists) {
+        console.log("🔄 Procesando playlists de YouTube pendientes");
+        this.processYouTubePlaylists(window.pendingYouTubePlaylists);
+        window.pendingYouTubePlaylists = null;
+    }
+    
+    setTimeout(() => {
         if (!window.playlistManager) {
             console.error("❌ CRÍTICO: playlistManager no está disponible después de la inicialización");
             this.showMessage("Error: Gestor de playlists no disponible", 'error');
         } else {
             console.log("✅ playlistManager verificado y disponible");
         }
-    }, 3000);
-        console.log('✅ Sistema Unificado Inicializado');
-    }
+    }, 1000); // Reducido de 3000ms a 1000ms
+    
+    console.log('✅ Sistema Unificado Inicializado');
+}
 
 async loadTrendingContent() {
     try {
@@ -403,7 +412,7 @@ async loadTrendingContent() {
     }
 
 initializeAuth() {
-    console.log("🔧 Configurando eventos de autenticación...");
+    console.log("🔧 Configurando eventos de autenticación optimizados...");
     
     if (window.authEventsConfigured) {
         console.log("⚠️ Eventos de auth ya configurados");
@@ -411,59 +420,50 @@ initializeAuth() {
     }
     window.authEventsConfigured = true;
     
-    document.addEventListener('playlistsFetched', (event) => {
-        console.log("📁 Evento playlistsFetched recibido:", {
-            playlistsCount: event.detail.length,
-            playlistManagerReady: !!window.playlistManager,
-            firstPlaylist: event.detail[0]?.snippet?.title || 'Sin título'
+    // Crear handler unificado pero mantener lógica específica
+    const playlistHandler = (event) => {
+        let playlists, source;
+        
+        // Determinar tipo de evento y extraer datos
+        if (event.type === 'youtubePlaylistsReady') {
+            ({ playlists, source } = event.detail);
+        } else if (event.type === 'playlistsFetched') {
+            playlists = event.detail;
+            source = 'realtime';
+        }
+        
+        if (!playlists || playlists.length === 0) return;
+        
+        console.log(`📁 Evento ${event.type} recibido:`, {
+            playlistsCount: playlists.length,
+            source,
+            systemReady: this.state.initialized
         });
         
-        if (!window.playlistManager) {
-            console.error("❌ CRÍTICO: playlistManager no disponible");
-            window.pendingYouTubePlaylists = event.detail;
+        // Verificar que el sistema esté listo
+        if (!this.state.initialized || !window.playlistManager) {
+            console.log("⏳ Sistema no listo, programando procesamiento diferido");
+            window.pendingYouTubePlaylists = playlists;
             return;
         }
         
-        // Solo limpiar si hay playlists duplicadas
-        const currentYouTubeCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
-        
-        if (currentYouTubeCount > 0 && currentYouTubeCount < event.detail.length) {
-            console.log(`🧹 Limpiando ${currentYouTubeCount} playlists de YouTube duplicadas...`);
-            window.playlistManager.clearYouTubeLibraryPlaylists();
-        } else if (currentYouTubeCount >= event.detail.length) {
-            console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube, no es necesario actualizar`);
-            return;
-        }
-        
-        console.log("✅ Procesando", event.detail.length, "playlists de YouTube...");
-        window.playlistManager.addYouTubeLibraryPlaylists(event.detail);
-        
-        // NUEVO: Programar mejora de duraciones después de cargar
-        setTimeout(() => {
-            this.enhanceYouTubePlaylistsWithDurations();
-        }, 5000); // Esperar 5 segundos después de cargar playlists
-        
-        setTimeout(() => {
-            const finalCount = window.playlistManager.playlistsData.filter(p => p.source === 'youtube_library').length;
-            console.log(`📊 Verificación final: ${finalCount} playlists de YouTube en manager`);
-            
-            if (finalCount > 0) {
-                this.showMessage(`${finalCount} playlists de YouTube sincronizadas`, 'success');
-            }
-            
-            this.updatePlaylistsUI();
-        }, 500);
-    });
+        this.processYouTubePlaylists(playlists);
+    };
+    
+    // Usar el mismo handler para ambos eventos
+    document.addEventListener('youtubePlaylistsReady', playlistHandler);
+    document.addEventListener('playlistsFetched', playlistHandler);
 
+    // Evento de logout (mantener separado porque es diferente)
     document.addEventListener('userLoggedOut', () => {
         console.log("🚪 Usuario desconectado, limpiando playlists de YouTube");
         if (window.playlistManager?.clearYouTubeLibraryPlaylists) {
             window.playlistManager.clearYouTubeLibraryPlaylists();
         }
+        window.playlistsAlreadyProcessed = false;
         setTimeout(() => this.updatePlaylistsUI(), 500);
     });
 }
-
     initializeUI() {
         // Asegurar que existe la cola de reproducción
         if (!playlistsData.some(p => p.id === 'queue')) {
@@ -490,105 +490,60 @@ initializeAuth() {
 
         this.updateOverviewStats();
     }
-
-    // Inicializar playlist manager
-initializePlaylistManager() {
+async initializePlaylistManager() {
     console.log("🔧 Inicializando playlist manager...");
     
-    const initManager = () => {
-        // CAMBIAR la verificación:
-        if (window.playlistManager || typeof initializePlaylistManager === 'function') {
-            if (typeof initializePlaylistManager === 'function') {
-                initializePlaylistManager(this);
-                console.log("✅ Función initializePlaylistManager ejecutada");
-            }
-            if (window.playlistManager) {
-                this.syncPlaylistData();
-                console.log("✅ Playlist manager sincronizado");
-                
-                // Si hay playlists pendientes de YouTube, procesarlas ahora
-                if (this.pendingYouTubePlaylists) {
-                    console.log("🔄 Procesando playlists de YouTube pendientes");
-                    if (window.playlistManager.addYouTubeLibraryPlaylists) {
-                        window.playlistManager.addYouTubeLibraryPlaylists(this.pendingYouTubePlaylists);
-                        this.pendingYouTubePlaylists = null;
-                        this.updatePlaylistsUI();
-                    }
-                }
-                return true;
-            }
+    // Crear promesa simple
+    const waitForPlaylistManager = new Promise((resolve, reject) => {
+        if (typeof initializePlaylistManager === 'function') {
+            resolve();
+            return;
         }
-        return false;
-    };
-    
-    // Intentar inmediatamente
-    if (!initManager()) {
-        console.log("⏳ Esperando playlist manager...");
-        let attempts = 0;
-        const maxAttempts = 30; // Aumentar intentos
         
-        const retryInterval = setInterval(() => {
-            attempts++;
-            console.log(`🔄 Intento ${attempts}/${maxAttempts} de inicializar playlist manager`);
-            
-            if (initManager() || attempts >= maxAttempts) {
-                clearInterval(retryInterval);
-                if (attempts >= maxAttempts) {
-                    console.error("❌ No se pudo inicializar playlist manager");
-                    // Crear UI básica como fallback
-                    this.createBasicPlaylistUI();
-                } else {
-                    console.log("✅ Playlist manager inicializado correctamente");
-                }
+        const timeout = setTimeout(() => {
+            reject(new Error('Timeout esperando initializePlaylistManager'));
+        }, 5000);
+        
+        const interval = setInterval(() => {
+            if (typeof initializePlaylistManager === 'function') {
+                clearInterval(interval);
+                clearTimeout(timeout);
+                resolve();
             }
-        }, 500);
-    }
-}
-
-    // Sincronizar datos de playlist
-    syncPlaylistData() {
-        if (window.playlistManager) {
-            window.playlistManager.playlistsData = playlistsData;
-            window.playlistManager.updatePlaylistsUI();
-        }
-    }
-
-    // Actualizar UI de playlists (delegado)
-updatePlaylistsUI() {
-    console.log("🔄 Actualizando UI de playlists...", {
-        playlistManagerExists: !!window.playlistManager,
-        playlistsCount: playlistsData.length
+        }, 100);
     });
     
-    if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
-        window.playlistManager.playlistsData = playlistsData;
-        window.playlistManager.updatePlaylistsUI();
-        console.log("✅ UI de playlists actualizada via playlistManager");
-    } else {
-        console.warn("⚠️ playlistManager no disponible para actualizar UI");
+    try {
+        await waitForPlaylistManager;
         
-        // Fallback directo: mostrar algo en la UI mientras se resuelve
-        const playlistsGrid = document.getElementById('playlistsGrid');
-        if (playlistsGrid && playlistsData.length > 0) {
-            playlistsGrid.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-sync fa-spin"></i>
-                    <p>Cargando playlists... (${playlistsData.length} encontradas)</p>
-                </div>
-            `;
+        // Ejecutar e inmediatamente sincronizar
+        initializePlaylistManager(this);
+        
+        if (window.playlistManager) {
+            this.syncPlaylistData(); // Función existente
+            console.log("✅ Playlist manager inicializado correctamente");
+            return true;
         }
         
-        // Reintentar después de un momento
-        setTimeout(() => {
-            if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
-                console.log("🔄 Reintentando actualización de UI");
-                window.playlistManager.playlistsData = playlistsData;
-                window.playlistManager.updatePlaylistsUI();
-            }
-        }, 2000);
+        throw new Error('PlaylistManager no se creó correctamente');
+        
+    } catch (error) {
+        console.error("❌ No se pudo inicializar playlist manager:", error);
+        this.showMessage("Funcionalidad de playlists limitada", 'warning');
+        return false;
     }
-    
-    this.updateOverviewStats();
+}
+    // Actualizar UI de playlists (delegado)
+updatePlaylistsUI() {
+    if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
+        // Solo actualizar UI, no duplicar datos
+        window.playlistManager.updatePlaylistsUI();
+        
+        // Actualizar stats solo después, no durante
+        requestAnimationFrame(() => {
+            this.updateOverviewStats();
+        });
+    }
 }
 
     setupEventListeners() {
