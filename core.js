@@ -43,14 +43,7 @@ const unifiedState = {
     authReady: false,
     playersReady: false
 };
-// EN SU LUGAR, crear las constantes específicas de core:
-const CORE_STORAGE_KEYS = {
-    PLAYLISTS: 'ytcm_playlists_persistent',
-    QUEUE: 'ytcm_queue_persistent', 
-    PLAYING_STATE: 'ytcm_playing_state'
-};
 
-const CORE_PERSISTENCE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
 // =============================================
 // SISTEMA UNIFICADO - CORE
 // =============================================
@@ -2207,18 +2200,13 @@ function monitorPlayers() {
     }
 }
 // Configuración de persistencia central
-const PERSISTENCE_CONFIG = {
-    TOKEN_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días
-    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000,
-    QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000,
-    STORAGE_KEYS: {
-        TOKEN: 'ytcm_google_token',
-        PLAYLISTS: 'ytcm_youtube_playlists',
-        PLAYLISTS_CORE: 'ytcm_playlists_persistent', 
-        QUEUE: 'ytcm_queue_persistent',
-        USER_INFO: 'ytcm_user_info'
-    }
+const CORE_STORAGE_KEYS = {
+    PLAYLISTS_CORE: 'ytcm_playlists_persistent',
+    QUEUE: 'ytcm_queue_persistent', 
+    PLAYING_STATE: 'ytcm_playing_state'
 };
+const CORE_PERSISTENCE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 días
+
 // Exponer funciones globalmente para compatibilidad
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
