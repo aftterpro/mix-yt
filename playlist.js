@@ -6,6 +6,8 @@ class PlaylistManager {
 constructor(unifiedCore) {
     this.core = unifiedCore;
     this.playlistsData = unifiedCore.playlistsData;
+    // Cargar datos persistentes ANTES de inicializar
+    await this.loadPersistentData();
 }
 
     // =============================================
