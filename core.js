@@ -1385,15 +1385,27 @@ displaySearchResults(results, append = false) {
         nextPageType: typeof results?.nextpage
     });
 
-    if (!append) {
-        currentSearchQuery = results.query || currentSearchQuery;
-        searchResults.innerHTML = '';
-        
-        if (this.scrollObserver) {
-            this.scrollObserver.disconnect();
-            this.scrollObserver = null;
-        }
+// Antes de filtrar, verifica si es una nueva búsqueda.
+let videoItems = results.items; // Por defecto, usa todos los ítems
+
+if (append) {
+    // SOLO aplicar el filtro si estamos en una PAGINACIÓN (append=true)
+    // Se recomienda obtener la grilla *antes* de este punto si no es global
+    let grid = searchResults.querySelector('.search-results-grid');
+    if (!grid) {
+        // Esto no debería pasar si append=true, pero es una protección
+        grid = this.createSearchGrid();
+        searchResults.appendChild(grid);
     }
+
+    // Filtrar duplicados solo si es una adición
+    videoItems = results.items.filter(video => {
+        const videoId = video.videoId || video.url?.split('v=')[1];
+        if (!videoId) return false;
+        // La condición de duplicado: ¿Ya existe una tarjeta con este ID?
+        return !grid.querySelector(`[data-video-id="${videoId}"]`);
+    });
+}
 
     if (!results?.items?.length) {
         if (!append) {
