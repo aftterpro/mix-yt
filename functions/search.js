@@ -43,34 +43,37 @@ exports.handler = async function(event, context) {
         };
         
         if (nextPageToken) {
-            console.log(`📄 Token recibido (longitud ${nextPageToken.length}): ${nextPageToken.substring(0, 50)}...`);
+            console.log(`📄 Token raw recibido (${nextPageToken.length} chars): ${nextPageToken.substring(0, 100)}...`);
             
-            // LOGGING DETALLADO DEL TOKEN
             let parsedToken;
             try {
                 const decoded = decodeURIComponent(nextPageToken);
-                console.log(`📄 Decodificado: ${decoded.substring(0, 100)}...`);
+                console.log(`📄 Token decodificado: ${decoded.substring(0, 100)}...`);
                 
-                // Limpiar comillas extras si existen
-                const cleaned = decoded.replace(/^"/, '').replace(/"$/, '');
-                console.log(`📄 Limpiado: ${cleaned.substring(0, 100)}...`);
-                
-                parsedToken = JSON.parse(cleaned);
-                console.log(`📄 Parseado exitosamente:`, {
+                parsedToken = JSON.parse(decoded);
+                console.log(`📄 Token parseado:`, {
                     type: typeof parsedToken,
                     keys: Object.keys(parsedToken || {}),
-                    hasUrl: !!parsedToken?.url,
-                    hasId: !!parsedToken?.id
+                    valid: !!(parsedToken?.url && parsedToken?.id)
                 });
+                
+                if (!parsedToken?.url || !parsedToken?.id) {
+                    throw new Error('Token incompleto - falta url o id');
+                }
+                
             } catch (parseError) {
-                console.error(`❌ Error parseando token:`, parseError);
-                console.error(`📄 Token problemático: ${nextPageToken}`);
+                console.error(`❌ Error parseando token:`, parseError.message);
                 return {
                     statusCode: 400,
                     headers: corsHeaders,
                     body: JSON.stringify({ 
                         error: 'Token de paginación inválido',
-                        details: parseError.message 
+                        details: parseError.message,
+                        debug: {
+                            tokenLength: nextPageToken.length,
+                            tokenStart: nextPageToken.substring(0, 50),
+                            decodedStart: decodeURIComponent(nextPageToken).substring(0, 50)
+                        }
                     })
                 };
             }
@@ -84,8 +87,7 @@ exports.handler = async function(event, context) {
                 query: query
             });
             
-            console.log(`📄 POST a: ${targetUrl}`);
-            console.log(`📄 Body enviado: nextpage object con keys: ${Object.keys(parsedToken || {})}`);
+            console.log(`📄 POST a: ${targetUrl} con token válido`);
             
         } else {
             // Primera búsqueda
@@ -94,7 +96,7 @@ exports.handler = async function(event, context) {
             console.log(`🔍 GET a: ${targetUrl}`);
         }
         
-        // Hacer la petición con timeout
+        // Hacer la petición
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         
@@ -107,7 +109,21 @@ exports.handler = async function(event, context) {
         
         if (!response.ok) {
             const errorText = await response.text();
-            console.error(`❌ Error ${response.status}: ${errorText.substring(0, 200)}`);
+            console.error(`❌ Error ${response.status}: ${errorText.substring(0, 500)}`);
+            
+            // Específico para error 404 en paginación
+            if (response.status === 404 && nextPageToken) {
+                return {
+                    statusCode: 400,
+                    headers: corsHeaders,
+                    body: JSON.stringify({
+                        error: 'Token de paginación expirado o inválido',
+                        details: 'El token de paginación ya no es válido',
+                        retryable: false
+                    })
+                };
+            }
+            
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
@@ -115,8 +131,7 @@ exports.handler = async function(event, context) {
         console.log(`📊 Datos recibidos:`, {
             itemsCount: data.items?.length || 0,
             hasNextpage: !!data.nextpage,
-            nextpageType: typeof data.nextpage,
-            nextpageKeys: data.nextpage ? Object.keys(data.nextpage) : null
+            nextpageType: typeof data.nextpage
         });
         
         // Normalizar respuesta
@@ -170,7 +185,7 @@ exports.handler = async function(event, context) {
                 error: 'Error procesando búsqueda',
                 details: error.message,
                 timestamp: new Date().toISOString(),
-                retryable: true
+                retryable: !error.message.includes('Token')
             })
         };
     }
