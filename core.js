@@ -1308,32 +1308,14 @@ async performSearch(query, continuation = null) {
     try {
         console.log(`🔍 Realizando búsqueda: "${query}"${continuation ? ' (página siguiente)' : ''}`);
         
-        // Construir URL de la API
-        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
-        
-        // Si hay continuación, agregarla como parámetro
-        if (continuation) {
-            apiUrl += `&nextpage=${encodeURIComponent(continuation)}`;
-        }
-        
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        // USAR DIRECTAMENTE EL CLIENTE DE PIPED
+        const data = await window.youtubeJSClient.search(query, continuation);
         
         console.log(`📊 Respuesta recibida:`, {
             items: data.items?.length || 0,
             hasNextPage: !!data.nextpage,
-            isNextPageRequest: !!continuation
+            isNextPageRequest: !!continuation,
+            source: data.metadata?.source || 'piped'
         });
         
         this.displaySearchResults(data, !!continuation);
@@ -1533,8 +1515,7 @@ async loadMoreSearchResults() {
     
     console.log('📜 ⏳ Cargando más resultados...', {
         currentQuery: currentSearchQuery,
-        nextPageType: typeof nextPageContext,
-        nextPageRaw: nextPageContext
+        nextPageType: typeof nextPageContext
     });
     
     isLoadingMore = true;
@@ -1553,74 +1534,8 @@ async loadMoreSearchResults() {
     }
     
     try {
-        // PROCESAMIENTO DEFINITIVO DEL TOKEN
-        let finalToken;
-        
-        if (typeof nextPageContext === 'string') {
-            // Si es string, verificar si es JSON stringificado
-            if (nextPageContext.startsWith('"') && nextPageContext.endsWith('"')) {
-                // Es un string dentro de otro string, hacer parse doble
-                try {
-                    const firstParse = JSON.parse(nextPageContext);
-                    finalToken = JSON.parse(firstParse);
-                    console.log('📜 Token: string doble parseado a objeto');
-                } catch (e) {
-                    finalToken = JSON.parse(nextPageContext.slice(1, -1).replace(/\\"/g, '"'));
-                    console.log('📜 Token: string limpiado manualmente');
-                }
-            } else {
-                try {
-                    finalToken = JSON.parse(nextPageContext);
-                    console.log('📜 Token: string parseado a objeto');
-                } catch (e) {
-                    finalToken = nextPageContext;
-                    console.log('📜 Token: string usado directamente');
-                }
-            }
-        } else if (typeof nextPageContext === 'object') {
-            finalToken = nextPageContext;
-            console.log('📜 Token: objeto usado directamente');
-        } else {
-            throw new Error('Tipo de token inválido');
-        }
-        
-        console.log('📜 Token final procesado:', {
-            type: typeof finalToken,
-            hasUrl: !!(finalToken?.url),
-            hasId: !!(finalToken?.id),
-            sample: JSON.stringify(finalToken).substring(0, 100)
-        });
-        
-        // ENVÍO SIMPLE SIN DOBLE ENCODING
-        const encodedToken = encodeURIComponent(JSON.stringify(finalToken));
-        const apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}&nextpage=${encodedToken}`;
-        
-        console.log('📜 URL final:', apiUrl.substring(0, 150) + '...');
-        
-        const response = await Promise.race([
-            fetch(apiUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Cache-Control': 'no-cache'
-                }
-            }),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 20000)
-            )
-        ]);
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('📜 Error response:', {
-                status: response.status,
-                statusText: response.statusText,
-                error: errorData
-            });
-            throw new Error(`Error ${response.status}: ${errorData.details || response.statusText}`);
-        }
-
-        const data = await response.json();
+        // USAR DIRECTAMENTE EL CLIENTE DE PIPED CON EL TOKEN
+        const data = await window.youtubeJSClient.search(currentSearchQuery, nextPageContext);
         
         console.log('📜 Respuesta exitosa:', {
             items: data.items?.length || 0,
@@ -1644,8 +1559,8 @@ async loadMoreSearchResults() {
             userMessage = 'Tiempo de espera agotado';
         } else if (error.message.includes('500')) {
             userMessage = 'Error del servidor';
-        } else if (error.message.includes('400')) {
-            userMessage = 'Error en formato de paginación';
+        } else if (error.message.includes('Token')) {
+            userMessage = 'Error de paginación';
         }
         
         this.showMessage(userMessage, 'error');
@@ -1663,7 +1578,7 @@ async loadMoreSearchResults() {
         }
         
         // Limpiar token en errores críticos
-        if (error.message.includes('400') || error.message.includes('Token')) {
+        if (error.message.includes('Token')) {
             console.log('🚫 Limpiando token por error crítico');
             nextPageContext = null;
         }
