@@ -5,7 +5,7 @@ class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
         // La función de Netlify actúa como nuestro proxy seguro para evitar problemas de CORS y formato.
-        this.netlifyFunction = '/.netlify/functions/piped-search';
+        this.netlifyFunction = '/.netlify/functions/search';
         // Instancias de Piped como fallback (último recurso).
         this.pipedInstances = [
             "https://api.piped.private.coffee"
