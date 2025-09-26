@@ -49,8 +49,8 @@ exports.handler = async function(event, context) {
         
         // Lista de instancias Piped actualizadas
         const pipedInstances = [
-            "https://api.piped.private.coffee",
-            "https://pipedapi.ducks.party"
+            "https://api.piped.private.coffee"
+           // "https://pipedapi.ducks.party"
         ];
         
         function getRandomPipedInstance() {
@@ -231,3 +231,4 @@ exports.handler = async function(event, context) {
         };
     }
 };
+
