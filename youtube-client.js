@@ -1,15 +1,33 @@
-// youtube-scraper.js - Sistema simplificado sin CORS
-console.log('🎵 Cargando YouTube Simplified Client...');
+// youtube-client.js - Sistema con Piped.coffee directo
+console.log('🎵 Cargando YouTube Client con Piped.coffee...');
 
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
+        // Instancias de Piped disponibles
+        this.pipedInstances = [
+            "https://api.piped.private.coffee"
+          //  "https://pipedapi.orangenet.cc",
+          //  "https://api.piped.adminforge.de"
+        ];
+        this.currentInstanceIndex = 0;
     }
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Simplified Client inicializado');
+        console.log('✅ YouTube Client inicializado con Piped.coffee');
         return true;
+    }
+
+    // Obtener instancia activa con rotación automática
+    getCurrentInstance() {
+        return this.pipedInstances[this.currentInstanceIndex];
+    }
+
+    // Rotar a siguiente instancia en caso de error
+    rotateInstance() {
+        this.currentInstanceIndex = (this.currentInstanceIndex + 1) % this.pipedInstances.length;
+        console.log(`🔄 Rotando a instancia: ${this.getCurrentInstance()}`);
     }
 
     async search(query, continuation = null) {
@@ -18,72 +36,226 @@ class YouTubeSimplifiedClient {
         console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (página siguiente)' : ''}`);
 
         try {
-            // Intentar con Piped primero (tu sistema actual que funciona)
             return await this.searchPiped(query, continuation);
-            
         } catch (error) {
             console.warn('⚠️ Error con Piped:', error.message);
             
-            // Fallback a resultados generados
-            console.log('🔄 Usando fallback de resultados populares');
-            return this.searchFallback(query, continuation);
+            // Intentar con siguiente instancia
+            this.rotateInstance();
+            
+            try {
+                console.log('🔄 Reintentando con otra instancia...');
+                return await this.searchPiped(query, continuation);
+            } catch (secondError) {
+                console.error('❌ Error con todas las instancias:', secondError.message);
+                // Fallback a resultados generados
+                return this.searchFallback(query, continuation);
+            }
         }
     }
 
     async searchPiped(query, continuation) {
-        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
-        if (continuation) {
-            apiUrl += `&nextpage=${encodeURIComponent(continuation)}`;
-        }
-
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`Piped API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        console.log(`✅ ${data.items?.length || 0} resultados desde Piped`);
-        
-        return {
-            items: data.items || [],
-            nextpage: data.nextpage || null,
-            query: query,
-            total: data.items?.length || 0
+        const instanceUrl = this.getCurrentInstance();
+        let targetUrl;
+        let fetchOptions = {
+            headers: {
+                'User-Agent': 'YT-CrossMix-Search/2.0',
+                'Accept': 'application/json'
+            }
         };
+
+        if (continuation) {
+            console.log(`📄 Búsqueda con paginación usando: ${instanceUrl}`);
+            
+            // Para paginación, usar POST con nextpage
+            targetUrl = `${instanceUrl}/nextpage/search`;
+            fetchOptions.method = 'POST';
+            fetchOptions.headers['Content-Type'] = 'application/json';
+            
+            // Procesar token de continuación
+            let nextPageData;
+            if (typeof continuation === 'string') {
+                try {
+                    // Si es string, intentar parsearlo
+                    nextPageData = JSON.parse(continuation);
+                } catch (e) {
+                    // Si no se puede parsear, usarlo directamente
+                    nextPageData = continuation;
+                }
+            } else if (typeof continuation === 'object') {
+                nextPageData = continuation;
+            } else {
+                throw new Error('Formato de token de paginación inválido');
+            }
+            
+            fetchOptions.body = JSON.stringify({
+                nextpage: nextPageData,
+                query: query
+            });
+            
+            console.log(`📄 POST a: ${targetUrl}`);
+        } else {
+            // Primera búsqueda
+            targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
+            fetchOptions.method = 'GET';
+            console.log(`🔍 GET a: ${targetUrl}`);
+        }
+
+        // Hacer la petición con timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        fetchOptions.signal = controller.signal;
+
+        try {
+            const response = await fetch(targetUrl, fetchOptions);
+            clearTimeout(timeoutId);
+            
+            console.log(`📊 Respuesta: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Error desconocido');
+                
+                // Manejar errores específicos
+                if (response.status === 404 && continuation) {
+                    throw new Error('Token de paginación expirado');
+                }
+                
+                throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
+            }
+
+            const data = await response.json();
+            
+            console.log(`📊 Datos recibidos:`, {
+                itemsCount: data.items?.length || 0,
+                hasNextpage: !!data.nextpage,
+                nextpageType: typeof data.nextpage,
+                instance: instanceUrl
+            });
+
+            // Normalizar respuesta
+            const items = (data.items || []).filter(item => 
+                item && 
+                item.title && 
+                (item.url || item.videoId) &&
+                item.thumbnail &&
+                !item.url?.includes('/channel/') &&
+                !item.url?.includes('/playlist/')
+            ).map(item => ({
+                videoId: item.videoId || this.extractVideoId(item.url),
+                title: item.title.trim(),
+                thumbnail: item.thumbnail,
+                duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
+                uploaderName: item.uploaderName?.trim() || 'Unknown',
+                url: item.url,
+                views: item.views || 0,
+                uploadedDate: item.uploadedDate || null
+            }));
+
+            console.log(`✅ ${items.length} videos válidos procesados desde ${instanceUrl}`);
+
+            return {
+                items: items,
+                nextpage: data.nextpage || null,
+                suggestion: data.suggestion || null,
+                corrected: data.corrected || false,
+                metadata: {
+                    query: query,
+                    instance: instanceUrl,
+                    timestamp: new Date().toISOString(),
+                    resultsCount: items.length,
+                    hasNextPage: !!data.nextpage,
+                    isNextPageRequest: !!continuation
+                }
+            };
+
+        } catch (error) {
+            clearTimeout(timeoutId);
+            
+            if (error.name === 'AbortError') {
+                throw new Error('Timeout de búsqueda (15s)');
+            }
+            
+            throw error;
+        }
+    }
+
+    // Extraer videoId de URL
+    extractVideoId(url) {
+        if (!url) return null;
+        
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            /^([a-zA-Z0-9_-]{11})$/ // ID directo
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) return match[1];
+        }
+        
+        return url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+    }
+
+    // Parsear duración de string a segundos
+    parseDurationString(duration) {
+        if (typeof duration === 'number') return duration;
+        if (!duration || typeof duration !== 'string') return 0;
+        
+        // Formato MM:SS o HH:MM:SS
+        const parts = duration.split(':').map(p => parseInt(p, 10));
+        
+        if (parts.length === 2) {
+            return parts[0] * 60 + parts[1];
+        } else if (parts.length === 3) {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+        
+        return 0;
     }
 
     searchFallback(query, continuation) {
-        // Base de datos de videos populares expandida
+        console.log('🔄 Usando fallback de resultados populares');
+        
+        // Base de datos expandida de música popular
         const musicDatabase = [
-            // Selena Gomez
-            { artist: 'Selena Gomez', song: 'Lose You To Love Me', id: 'zlJDTxahav0', genre: 'pop' },
-            { artist: 'Selena Gomez', song: 'Look At Her Now', id: 'UWKaAfe2owo', genre: 'pop' },
-            { artist: 'Selena Gomez', song: 'Single Soon', id: 'bTtNV6yvCdI', genre: 'pop' },
-            { artist: 'Selena Gomez', song: 'Calm Down', id: 'WKlAKsUgOHY', genre: 'pop' },
-            { artist: 'Selena Gomez', song: 'Good For You', id: 'AmKoUmj-QcI', genre: 'pop' },
-            
-            // Artistas populares
+            // Pop Internacional
             { artist: 'Taylor Swift', song: 'Anti-Hero', id: 'b1kbLWvqugk', genre: 'pop' },
             { artist: 'Taylor Swift', song: 'Shake It Off', id: 'nfWlot6h_JM', genre: 'pop' },
             { artist: 'Ariana Grande', song: 'positions', id: 'tcYodQoapMg', genre: 'pop' },
-            { artist: 'Ariana Grande', song: 'thank u, next', id: 'gl1aHhXnN1k', genre: 'pop' },
             { artist: 'Dua Lipa', song: 'Levitating', id: 'TUVcZfQe-Kw', genre: 'pop' },
-            { artist: 'Dua Lipa', song: 'Don\'t Start Now', id: 'oygrmJFKYZY', genre: 'pop' },
-            { artist: 'Olivia Rodrigo', song: 'good 4 u', id: 'gNi_6U5Pm_o', genre: 'pop' },
-            { artist: 'Olivia Rodrigo', song: 'drivers license', id: '8sUWjlMnfEs', genre: 'pop' },
-            { artist: 'Billie Eilish', song: 'bad guy', id: 'DyDfgMOUjCI', genre: 'alternative' },
-            { artist: 'Billie Eilish', song: 'Happier Than Ever', id: '5GJWxDKyk3A', genre: 'alternative' },
             { artist: 'The Weeknd', song: 'Blinding Lights', id: 'fHI8X4OXluQ', genre: 'r&b' },
             { artist: 'Harry Styles', song: 'As It Was', id: 'H5v3kku4y6Q', genre: 'pop' },
+            { artist: 'Billie Eilish', song: 'bad guy', id: 'DyDfgMOUjCI', genre: 'alternative' },
             { artist: 'Ed Sheeran', song: 'Shape of You', id: 'JGwWNGJdvx8', genre: 'pop' },
+            
+            // Reggaeton/Latino
             { artist: 'Bad Bunny', song: 'Tití Me Preguntó', id: 'kGh_h2eKe8k', genre: 'reggaeton' },
-            { artist: 'Post Malone', song: 'Circles', id: 'wXhTHyIgQ_U', genre: 'hip-hop' }
+            { artist: 'Bad Bunny', song: 'Me Porto Bonito', id: 'saGYMhApaH8', genre: 'reggaeton' },
+            { artist: 'Karol G', song: 'BICHOTA', id: 'RqrXhwS33yc', genre: 'reggaeton' },
+            { artist: 'J Balvin', song: 'Mi Gente', id: 'qqR8Q-wAW3E', genre: 'reggaeton' },
+            
+            // Rock/Alternative
+            { artist: 'Imagine Dragons', song: 'Believer', id: '7wtfhZwyrcc', genre: 'rock' },
+            { artist: 'OneRepublic', song: 'Counting Stars', id: 'hT_nvWreIhg', genre: 'pop-rock' },
+            { artist: 'Maroon 5', song: 'Sugar', id: '09R8_2nJtjg', genre: 'pop-rock' },
+            
+            // Hip-Hop/Rap
+            { artist: 'Post Malone', song: 'Circles', id: 'wXhTHyIgQ_U', genre: 'hip-hop' },
+            { artist: 'Drake', song: 'God\'s Plan', id: 'xpVfcZ0ZcFM', genre: 'hip-hop' },
+            
+            // Electrónica/Dance
+            { artist: 'David Guetta', song: 'Titanium', id: 'JRfuAukYTKg', genre: 'electronic' },
+            { artist: 'Calvin Harris', song: 'Feel So Close', id: 'dGghkjpNCQ8', genre: 'electronic' },
+            
+            // Clásicos
+            { artist: 'Queen', song: 'Bohemian Rhapsody', id: 'fJ9rUzIMcZQ', genre: 'rock' },
+            { artist: 'Michael Jackson', song: 'Billie Jean', id: 'Zi_XLOBDo_Y', genre: 'pop' }
         ];
 
         const queryLower = query.toLowerCase();
         
-        // Buscar coincidencias inteligentes
+        // Búsqueda inteligente
         let matches = musicDatabase.filter(video => {
             const artistMatch = video.artist.toLowerCase().includes(queryLower);
             const songMatch = video.song.toLowerCase().includes(queryLower);
@@ -92,13 +264,12 @@ class YouTubeSimplifiedClient {
             return artistMatch || songMatch || genreMatch;
         });
 
-        // Si no hay coincidencias específicas, usar resultados populares
+        // Si no hay coincidencias, usar resultados populares mezclados
         if (matches.length === 0) {
-            matches = musicDatabase.slice(0, 12);
+            matches = this.shuffleArray([...musicDatabase]).slice(0, 20);
+        } else {
+            matches = this.shuffleArray([...matches]).slice(0, 15);
         }
-
-        // Mezclar resultados para variedad
-        matches = this.shuffleArray([...matches]).slice(0, 20);
 
         const results = matches.map(video => ({
             videoId: video.id,
@@ -116,16 +287,22 @@ class YouTubeSimplifiedClient {
             items: results,
             nextpage: null, // Sin paginación en fallback
             query: query,
-            total: results.length
+            total: results.length,
+            metadata: {
+                source: 'fallback',
+                query: query,
+                timestamp: new Date().toISOString()
+            }
         };
     }
 
     shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
-        return array;
+        return shuffled;
     }
 
     generateViews() {
@@ -135,7 +312,10 @@ class YouTubeSimplifiedClient {
     }
 
     generatePublishDate() {
-        const dates = ['hace 1 semana', 'hace 2 semanas', 'hace 1 mes', 'hace 2 meses', 'hace 3 meses', 'hace 6 meses', 'hace 1 año'];
+        const dates = [
+            'hace 1 semana', 'hace 2 semanas', 'hace 1 mes', 
+            'hace 2 meses', 'hace 3 meses', 'hace 6 meses', 'hace 1 año'
+        ];
         return dates[Math.floor(Math.random() * dates.length)];
     }
 
@@ -143,12 +323,92 @@ class YouTubeSimplifiedClient {
         return this.initialized;
     }
 
+    // Método para obtener playlist (implementación básica)
     async getPlaylist(playlistId) {
-        throw new Error('Obtención de playlists no implementada');
+        const instanceUrl = this.getCurrentInstance();
+        const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
+        
+        try {
+            const response = await fetch(targetUrl, {
+                headers: {
+                    'User-Agent': 'YT-CrossMix-Search/2.0',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json();
+        } catch (error) {
+            console.error(`❌ Error obteniendo playlist ${playlistId}:`, error);
+            throw error;
+        }
+    }
+
+    // Método para testing de instancias
+    async testInstances() {
+        console.log('🧪 Probando instancias de Piped...');
+        
+        const testResults = [];
+        
+        for (let i = 0; i < this.pipedInstances.length; i++) {
+            const instance = this.pipedInstances[i];
+            console.log(`🔍 Probando: ${instance}`);
+            
+            try {
+                const start = Date.now();
+                const response = await fetch(`${instance}/search?q=test&filter=videos`, {
+                    headers: {
+                        'User-Agent': 'YT-CrossMix-Search/2.0',
+                        'Accept': 'application/json'
+                    },
+                    signal: AbortSignal.timeout(5000)
+                });
+                
+                const time = Date.now() - start;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    testResults.push({
+                        instance,
+                        status: 'OK',
+                        responseTime: `${time}ms`,
+                        itemsCount: data.items?.length || 0
+                    });
+                    console.log(`✅ ${instance}: OK (${time}ms, ${data.items?.length || 0} items)`);
+                } else {
+                    testResults.push({
+                        instance,
+                        status: `ERROR ${response.status}`,
+                        responseTime: `${time}ms`,
+                        itemsCount: 0
+                    });
+                    console.log(`❌ ${instance}: ERROR ${response.status}`);
+                }
+            } catch (error) {
+                testResults.push({
+                    instance,
+                    status: `FAILED: ${error.message}`,
+                    responseTime: 'N/A',
+                    itemsCount: 0
+                });
+                console.log(`❌ ${instance}: FAILED - ${error.message}`);
+            }
+        }
+        
+        console.table(testResults);
+        return testResults;
     }
 }
 
 // Crear instancia global
 window.youtubeJSClient = new YouTubeSimplifiedClient();
 
-console.log('✅ YouTube Simplified Client cargado');
+// Función global para testing
+window.testPipedInstances = function() {
+    return window.youtubeJSClient.testInstances();
+};
+
+console.log('✅ YouTube Client con Piped.coffee cargado');
