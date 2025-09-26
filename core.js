@@ -1292,6 +1292,7 @@ displaySearchResults(results, append = false) {
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
+        
         // Remover listener anterior
         if (this.handleSearchScroll) {
             searchResults.removeEventListener('scroll', this.handleSearchScroll);
@@ -1311,6 +1312,7 @@ displaySearchResults(results, append = false) {
         return;
     }
 
+    // Actualizar nextPageContext INMEDIATAMENTE
     nextPageContext = results.nextpage || null;
 
     let grid = searchResults.querySelector('.search-results-grid');
@@ -1319,50 +1321,89 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
-    // Agregar videos
-    results.items.forEach(video => {
+    // PROCESAR VIDEOS EN LOTES PARA MEJOR RENDIMIENTO
+    const batchSize = 6; // Procesar de 6 en 6
+    const videoItems = results.items.filter(video => {
         const videoId = video.videoId || video.url?.split('v=')[1];
-        if (!videoId) return;
-
-        if (grid.querySelector(`[data-video-id="${videoId}"]`)) {
-            return;
-        }
-
-        const card = this.createSearchResultCard(video, videoId);
-        grid.appendChild(card);
+        return videoId && !grid.querySelector(`[data-video-id="${videoId}"]`);
     });
 
-    // Remover spinner existente
-    const existingSpinner = searchResults.querySelector('.search-loading-more');
-    if (existingSpinner) {
-        existingSpinner.remove();
-    }
-
-    // ✅ SCROLL INFINITO HABILITADO
-    if (nextPageContext) {
-        console.log('📜 Habilitando scroll infinito...');
+    // Función para procesar lotes
+    const processBatch = (startIndex) => {
+        const endIndex = Math.min(startIndex + batchSize, videoItems.length);
+        const batch = videoItems.slice(startIndex, endIndex);
         
-        this.handleSearchScroll = this.debounce(() => {
-            const scrollTop = searchResults.scrollTop;
-            const scrollHeight = searchResults.scrollHeight;
-            const clientHeight = searchResults.clientHeight;
-            
-            if (scrollTop + clientHeight >= scrollHeight - 100) {
-                if (!isLoadingMore && nextPageContext) {
-                    console.log('📜 🚀 Cargando más resultados automáticamente...');
-                    this.loadMoreSearchResults();
-                }
+        // Crear cards del lote actual
+        const fragment = document.createDocumentFragment();
+        batch.forEach(video => {
+            const videoId = video.videoId || video.url?.split('v=')[1];
+            const card = this.createSearchResultCard(video, videoId);
+            fragment.appendChild(card);
+        });
+        
+        // Agregar al grid
+        grid.appendChild(fragment);
+        
+        console.log(`📄 Lote procesado: ${startIndex}-${endIndex-1} de ${videoItems.length}`);
+        
+        // Procesar siguiente lote si queda contenido
+        if (endIndex < videoItems.length) {
+            // Usar requestIdleCallback para no bloquear la UI
+            if (window.requestIdleCallback) {
+                requestIdleCallback(() => processBatch(endIndex));
+            } else {
+                setTimeout(() => processBatch(endIndex), 10);
             }
-        }, 150);
-        
-        searchResults.addEventListener('scroll', this.handleSearchScroll, { passive: true });
-        console.log('✅ Scroll infinito activado');
-    }
+        } else {
+            // Completado, configurar scroll infinito
+            this.setupImprovedInfiniteScroll(searchResults);
+            console.log(`✅ ${videoItems.length} resultados procesados${append ? ' (añadidos)' : ''}`);
+        }
+    };
 
-    console.log(`✅ ${results.items.length} resultados mostrados${append ? ' (añadidos)' : ''}`);
+    // Iniciar procesamiento por lotes
+    processBatch(0);
 }
 
-// Método para cargar más resultados con spinner
+// NUEVA FUNCIÓN: Scroll infinito mejorado
+setupImprovedInfiniteScroll(searchResults) {
+    if (!nextPageContext) {
+        console.log('📜 Sin más páginas disponibles');
+        return;
+    }
+
+    console.log('📜 Configurando scroll infinito mejorado...');
+    
+    // Crear elemento trigger más arriba del final
+    let trigger = searchResults.querySelector('.scroll-trigger');
+    if (!trigger) {
+        trigger = document.createElement('div');
+        trigger.className = 'scroll-trigger';
+        trigger.style.cssText = `
+            height: 20px;
+            margin: 20px 0;
+            visibility: hidden;
+        `;
+        searchResults.appendChild(trigger);
+    }
+
+    // Observer para intersección
+    if (!this.scrollObserver) {
+        this.scrollObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && nextPageContext && !isLoadingMore) {
+                    console.log('📜 🚀 Trigger activado, cargando más...');
+                    this.loadMoreSearchResults();
+                }
+            });
+        }, {
+            rootMargin: '100px' // Activar 100px antes de llegar al trigger
+        });
+    }
+
+    this.scrollObserver.observe(trigger);
+}
+
 async loadMoreSearchResults() {
     if (isLoadingMore || !nextPageContext) {
         console.log('⚠️ Ya cargando o no hay más páginas');
@@ -1372,33 +1413,64 @@ async loadMoreSearchResults() {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
     
-    console.log('📜 ⏳ Cargando más resultados...');
+    console.log('📜 ⏳ Cargando más resultados (optimizado)...');
+    isLoadingMore = true;
     
-    // Mostrar spinner de carga
-    const spinner = document.createElement('div');
-    spinner.className = 'search-loading-more';
-    spinner.innerHTML = `
-        <div class="search-spinner">
-            <i class="fas fa-circle-notch fa-spin"></i>
-            <span>Cargando más resultados...</span>
-        </div>
-    `;
-    searchResults.appendChild(spinner);
+    // Mostrar indicador de carga MÁS VISIBLE
+    let spinner = searchResults.querySelector('.search-loading-more');
+    if (!spinner) {
+        spinner = document.createElement('div');
+        spinner.className = 'search-loading-more';
+        spinner.innerHTML = `
+            <div class="search-spinner">
+                <i class="fas fa-circle-notch fa-spin"></i>
+                <span>Cargando más música...</span>
+                <div class="loading-dots">
+                    <span>.</span><span>.</span><span>.</span>
+                </div>
+            </div>
+        `;
+        searchResults.appendChild(spinner);
+    }
     
     try {
-        // Cargar siguiente página
-        await this.performSearch(currentSearchQuery, nextPageContext);
-        console.log('✅ Más resultados cargados');
+        // USAR TIMEOUT MÁS CORTO PARA BÚSQUEDA
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout')), 8000);
+        });
+        
+        const searchPromise = this.performSearch(currentSearchQuery, nextPageContext);
+        
+        // Cargar con timeout
+        await Promise.race([searchPromise, timeoutPromise]);
+        
+        console.log('✅ Más resultados cargados exitosamente');
         
     } catch (error) {
         console.error('❌ Error cargando más resultados:', error);
-        this.showMessage('Error cargando más resultados', 'error');
+        this.showMessage('Error cargando más resultados. Intenta de nuevo.', 'error');
         
-        // Remover spinner en caso de error
-        const errorSpinner = searchResults.querySelector('.search-loading-more');
-        if (errorSpinner) {
-            errorSpinner.remove();
+        // Mostrar botón de reintento
+        if (spinner) {
+            spinner.innerHTML = `
+                <div class="search-error-retry">
+                    <p>Error cargando más resultados</p>
+                    <button onclick="window.unifiedCore.loadMoreSearchResults()" class="retry-btn">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
         }
+    } finally {
+        isLoadingMore = false;
+        
+        // Remover spinner después de un momento
+        setTimeout(() => {
+            const existingSpinner = searchResults.querySelector('.search-loading-more');
+            if (existingSpinner && !existingSpinner.querySelector('.search-error-retry')) {
+                existingSpinner.remove();
+            }
+        }, 1000);
     }
 }
     createSearchGrid() {
@@ -1526,47 +1598,71 @@ removeVideoFromQueue(videoId) {
     const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
     if (!queuePlaylist) {
         console.warn('⚠️ No se encontró playlist de cola');
-        return;
+        return false;
     }
     
     const initialLength = queuePlaylist.videos.length;
-    const index = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
+    const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
     
-    if (index !== -1) {
-        const removedVideo = queuePlaylist.videos.splice(index, 1)[0];
-        console.log(`✅ Video eliminado: ${removedVideo.title}`);
-        console.log(`📊 Cola: ${initialLength} → ${queuePlaylist.videos.length} videos`);
-        
-        // FORZAR ACTUALIZACIÓN INMEDIATA
-        this.updatePlaylistsUI();
-        
-        // Actualizar índice de reproducción si es necesario
-        if (currentPlayingInfo.flattenedIndex > index) {
-            currentPlayingInfo.flattenedIndex--;
-            console.log(`🔄 Índice de reproducción actualizado: ${currentPlayingInfo.flattenedIndex}`);
-        } else if (currentPlayingInfo.flattenedIndex === index) {
-            // Si eliminamos el video que se está reproduciendo
-            this.updateCurrentPlayingIndex();
-        }
-        
-        // ACTUALIZAR POPUP DE COLA SI ESTÁ ABIERTO
-        this.updateQueuePopup();
-        
-        this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
-        
-        // VERIFICAR SI LA COLA QUEDÓ VACÍA
-        if (queuePlaylist.videos.length === 0) {
-            console.log('📭 Cola vacía, deteniendo reproducción');
-            this.handleEmptyPlaylist();
-        }
-        
-        // GUARDAR CAMBIOS
-        setTimeout(() => saveAllData(), 100);
-        
-    } else {
+    if (videoIndex === -1) {
         console.warn(`⚠️ Video ${videoId} no encontrado en cola`);
         this.showMessage('Video no encontrado en la cola', 'warning');
+        return false;
     }
+    
+    // OBTENER INFO DEL VIDEO ANTES DE ELIMINARLO
+    const removedVideo = queuePlaylist.videos[videoIndex];
+    const wasCurrentlyPlaying = currentPlayingInfo.videoId === videoId;
+    
+    // ELIMINAR EL VIDEO
+    queuePlaylist.videos.splice(videoIndex, 1);
+    
+    console.log(`✅ Video eliminado: ${removedVideo.title}`);
+    console.log(`📊 Cola: ${initialLength} → ${queuePlaylist.videos.length} videos`);
+    
+    // AJUSTAR ÍNDICES DESPUÉS DE LA ELIMINACIÓN
+    if (currentPlayingInfo.flattenedIndex > videoIndex) {
+        currentPlayingInfo.flattenedIndex--;
+        console.log(`🔄 Índice ajustado: ${currentPlayingInfo.flattenedIndex}`);
+    } else if (wasCurrentlyPlaying) {
+        // Si eliminamos el video que se está reproduciendo
+        console.log('⏭️ Video en reproducción eliminado, saltando al siguiente');
+        
+        if (queuePlaylist.videos.length > 0) {
+            // Ajustar índice para el siguiente video
+            if (currentPlayingInfo.flattenedIndex >= queuePlaylist.videos.length) {
+                currentPlayingInfo.flattenedIndex = 0; // Volver al inicio
+            }
+            
+            // Reproducir el siguiente video inmediatamente
+            setTimeout(() => {
+                const nextVideo = queuePlaylist.videos[currentPlayingInfo.flattenedIndex];
+                if (nextVideo) {
+                    this.playVideoAtIndex(currentPlayingInfo.flattenedIndex);
+                }
+            }, 100);
+        } else {
+            this.handleEmptyPlaylist();
+        }
+    }
+    
+    // FORZAR ACTUALIZACIÓN DE UI
+    this.updatePlaylistsUI();
+    this.updateQueuePopup();
+    
+    // GUARDAR CAMBIOS
+    setTimeout(() => saveAllData(), 100);
+    
+    this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+    
+    // VERIFICAR SI LA COLA QUEDÓ VACÍA
+    if (queuePlaylist.videos.length === 0) {
+        console.log('📭 Cola vacía después de eliminación');
+        this.handleEmptyPlaylist();
+        return true;
+    }
+    
+    return true;
 }
 
     // =============================================
@@ -1744,29 +1840,43 @@ extractArtistFromTitle(title) {
         }
     }
 
-    updateCurrentPlayingIndex() {
-        const flatList = this.getFlattenedPlaylist();
-        let playingVideoId = null;
-        let activePlayerNum = null;
+updateCurrentPlayingIndex() {
+    const flatList = this.getFlattenedPlaylist();
+    let playingVideoId = null;
+    let activePlayerNum = null;
 
-        try {
-            // Verificar cuál reproductor está activo
-            if (player1 && player1.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = player1.getVideoData()?.video_id;
-                activePlayerNum = 1;
-            } else if (player2 && player2.getPlayerState() === YT.PlayerState.PLAYING) {
-                playingVideoId = player2.getVideoData()?.video_id;
-                activePlayerNum = 2;
-            }
-            
-            if (!playingVideoId) return;
-            
-            console.log(`🔄 Video activo: ${playingVideoId} en player${activePlayerNum}`);
-            
-            // Buscar el índice correcto en la lista plana
+    // NO ACTUALIZAR SI HAY UNA TRANSICIÓN EN PROGRESO
+    if (crossfadeInProgress || isTransitioning) {
+        console.log('🔒 Evitando actualización durante transición');
+        return;
+    }
+
+    try {
+        // Verificar cuál reproductor está activo
+        if (player1 && player1.getPlayerState() === YT.PlayerState.PLAYING) {
+            playingVideoId = player1.getVideoData()?.video_id;
+            activePlayerNum = 1;
+        } else if (player2 && player2.getPlayerState() === YT.PlayerState.PLAYING) {
+            playingVideoId = player2.getVideoData()?.video_id;
+            activePlayerNum = 2;
+        }
+        
+        if (!playingVideoId) return;
+        
+        // VALIDAR QUE EL VIDEO COINCIDA CON EL ESPERADO
+        if (currentPlayingInfo.videoId && currentPlayingInfo.videoId !== playingVideoId) {
+            console.log(`⚠️ Mismatch detectado: esperado ${currentPlayingInfo.videoId}, actual ${playingVideoId}`);
+            // NO actualizar si hay discrepancia durante crossfade
+            return;
+        }
+        
+        console.log(`🔄 Video activo validado: ${playingVideoId} en player${activePlayerNum}`);
+        
+        // Buscar el índice correcto SOLO SI NO LO TENEMOS
+        if (currentPlayingInfo.videoId !== playingVideoId) {
             const newIndex = flatList.findIndex(v => v.videoId === playingVideoId);
             
-            if (newIndex !== -1 && currentPlayingInfo.flattenedIndex !== newIndex) {
+            if (newIndex !== -1) {
                 const videoObj = flatList[newIndex];
                 currentPlayingInfo = {
                     videoId: playingVideoId,
@@ -1774,17 +1884,17 @@ extractArtistFromTitle(title) {
                     flattenedIndex: newIndex
                 };
                 
-                // Actualizar currentPlayer al reproductor activo
                 currentPlayer = activePlayerNum;
                 
                 console.log(`📍 Índice actualizado: ${newIndex} (${playingVideoId}) en player${currentPlayer}`);
                 this.updateNowPlaying();
                 this.updatePlaylistsUI();
             }
-        } catch (e) {
-            console.error("Error obteniendo datos de reproducción:", e);
         }
+    } catch (e) {
+        console.error("Error obteniendo datos de reproducción:", e);
     }
+}
 
     // =============================================
     // UI UPDATES
