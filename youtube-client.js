@@ -5,7 +5,7 @@ class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
         // Usar la función específica de Piped en Netlify
-        this.netlifyFunction = '/.netlify/functions/piped-search';
+        this.netlifyFunction = '/.netlify/functions/search';
         // Instancias de Piped como fallback directo
         this.pipedInstances = [
             "https://api.piped.private.coffee"
