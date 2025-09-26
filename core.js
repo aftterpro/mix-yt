@@ -1396,21 +1396,17 @@ displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
-    console.log(`📊 displaySearchResults llamado:`, {
+    console.log(`📊 displaySearchResults:`, {
         itemsReceived: results?.items?.length || 0,
         append: append,
         hasNextPage: !!results?.nextpage,
-        nextPageType: typeof results?.nextpage,
-        nextPageValid: results?.nextpage && typeof results.nextpage === 'object'
+        nextPageType: typeof results?.nextpage
     });
 
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
         
-        if (this.handleSearchScroll) {
-            searchResults.removeEventListener('scroll', this.handleSearchScroll);
-        }
         if (this.scrollObserver) {
             this.scrollObserver.disconnect();
             this.scrollObserver = null;
@@ -1423,31 +1419,22 @@ displaySearchResults(results, append = false) {
                 <div class="search-placeholder">
                     <i class="fas fa-search"></i>
                     <p>No se encontraron resultados</p>
-                    <p><small>Intenta con otras palabras clave</small></p>
                 </div>
             `;
         }
-        console.log('❌ No hay items para mostrar');
         return;
     }
 
-    // ACTUALIZAR nextPageContext CON VALIDACIÓN ESTRICTA
-    const previousNextPage = nextPageContext;
-    
-    // VALIDAR QUE EL TOKEN SEA UN OBJETO VÁLIDO
-    if (results.nextpage && typeof results.nextpage === 'object') {
+    // ACTUALIZACIÓN SIMPLE DEL NEXTPAGE
+    if (results.nextpage) {
         nextPageContext = results.nextpage;
-        console.log('📄 NextPage actualizado correctamente:', {
-            hasUrl: !!results.nextpage.url,
-            hasId: !!results.nextpage.id,
-            type: typeof results.nextpage
+        console.log('📄 NextPage actualizado:', {
+            type: typeof nextPageContext,
+            valid: !!nextPageContext
         });
-    } else if (results.nextpage) {
-        console.warn('📄 NextPage en formato no reconocido:', typeof results.nextpage);
-        nextPageContext = results.nextpage; // Intentar usar de todas formas
     } else {
         nextPageContext = null;
-        console.log('📄 No hay más páginas disponibles');
+        console.log('📄 No hay más páginas');
     }
 
     let grid = searchResults.querySelector('.search-results-grid');
@@ -1456,72 +1443,37 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
-    // Filtrar duplicados y procesar videos
-    const currentCards = grid.querySelectorAll('.search-result-card').length;
-    console.log(`📊 Estado del grid: ${currentCards} cards existentes`);
-
-    const videoItems = results.items.filter((video, index) => {
+    // Filtrar duplicados
+    const videoItems = results.items.filter(video => {
         const videoId = video.videoId || video.url?.split('v=')[1];
-        
-        if (!videoId) {
-            console.warn(`⚠️ Item ${index} sin videoId: ${video.title}`);
-            return false;
-        }
-        
-        const existsInDOM = grid.querySelector(`[data-video-id="${videoId}"]`);
-        if (existsInDOM) {
-            console.log(`🔄 Duplicado: ${video.title} (${videoId})`);
-            return false;
-        }
-        
-        return true;
+        if (!videoId) return false;
+        return !grid.querySelector(`[data-video-id="${videoId}"]`);
     });
 
-    console.log(`📊 Filtrado completado: ${videoItems.length} nuevos de ${results.items.length} recibidos`);
+    console.log(`📊 Videos nuevos: ${videoItems.length} de ${results.items.length}`);
 
     if (videoItems.length === 0) {
         console.log('🚫 No hay videos nuevos para agregar');
-        if (!nextPageContext) {
-            console.log('📄 Y no hay más páginas, terminando búsqueda');
-        }
         return;
     }
 
-    // Procesar por lotes para mejor rendimiento
-    const batchSize = 8;
-    const processBatch = (startIndex) => {
-        const endIndex = Math.min(startIndex + batchSize, videoItems.length);
-        const batch = videoItems.slice(startIndex, endIndex);
-        
-        console.log(`📄 Procesando lote: ${startIndex}-${endIndex-1} de ${videoItems.length} videos`);
-        
-        const fragment = document.createDocumentFragment();
-        batch.forEach(video => {
-            const videoId = video.videoId || video.url?.split('v=')[1];
-            const card = this.createSearchResultCard(video, videoId);
-            fragment.appendChild(card);
-        });
-        
-        grid.appendChild(fragment);
-        
-        if (endIndex < videoItems.length) {
-            if (window.requestIdleCallback) {
-                requestIdleCallback(() => processBatch(endIndex), { timeout: 100 });
-            } else {
-                setTimeout(() => processBatch(endIndex), 16);
-            }
-        } else {
-            // Completado - configurar scroll infinito solo si hay más páginas
-            if (nextPageContext) {
-                this.setupImprovedInfiniteScroll(searchResults);
-                console.log(`✅ ${videoItems.length} videos procesados - Scroll infinito activo`);
-            } else {
-                console.log(`✅ ${videoItems.length} videos procesados - Sin más páginas`);
-            }
-        }
-    };
+    // Agregar videos
+    const fragment = document.createDocumentFragment();
+    videoItems.forEach(video => {
+        const videoId = video.videoId || video.url?.split('v=')[1];
+        const card = this.createSearchResultCard(video, videoId);
+        fragment.appendChild(card);
+    });
+    
+    grid.appendChild(fragment);
 
-    processBatch(0);
+    // Configurar scroll infinito si hay más páginas
+    if (nextPageContext) {
+        this.setupImprovedInfiniteScroll(searchResults);
+        console.log(`✅ ${videoItems.length} videos agregados - Scroll infinito activo`);
+    } else {
+        console.log(`✅ ${videoItems.length} videos agregados - Sin más páginas`);
+    }
 }
 
 setupImprovedInfiniteScroll(searchResults) {
@@ -1581,14 +1533,12 @@ async loadMoreSearchResults() {
     
     console.log('📜 ⏳ Cargando más resultados...', {
         currentQuery: currentSearchQuery,
-        nextPageExists: !!nextPageContext,
         nextPageType: typeof nextPageContext,
-        isLoading: isLoadingMore
+        nextPageSample: JSON.stringify(nextPageContext).substring(0, 100)
     });
     
     isLoadingMore = true;
     
-    // Mostrar indicador de carga
     let spinner = searchResults.querySelector('.search-loading-more');
     if (!spinner) {
         spinner = document.createElement('div');
@@ -1597,27 +1547,36 @@ async loadMoreSearchResults() {
             <div class="search-spinner">
                 <i class="fas fa-circle-notch fa-spin"></i>
                 <span>Cargando más música...</span>
-                <div class="loading-dots">
-                    <span>.</span><span>.</span><span>.</span>
-                </div>
             </div>
         `;
         searchResults.appendChild(spinner);
     }
     
     try {
-        // GUARDAR EL NEXTPAGE ACTUAL ANTES DE LA LLAMADA
-        const currentNextPage = nextPageContext;
-        console.log('📜 Preparando token para paginación:', {
-            tokenType: typeof currentNextPage,
-            tokenLength: JSON.stringify(currentNextPage).length
+        // PROCESAMIENTO SIMPLIFICADO DEL TOKEN
+        let tokenForUrl;
+        
+        if (typeof nextPageContext === 'object') {
+            // Si es objeto, convertir a string
+            tokenForUrl = JSON.stringify(nextPageContext);
+        } else if (typeof nextPageContext === 'string') {
+            // Si ya es string, usar directamente
+            tokenForUrl = nextPageContext;
+        } else {
+            throw new Error('Tipo de token de paginación no válido');
+        }
+        
+        console.log('📜 Token procesado:', {
+            originalType: typeof nextPageContext,
+            tokenLength: tokenForUrl.length,
+            tokenStart: tokenForUrl.substring(0, 50)
         });
         
-        // CONSTRUIR URL CON ENCODING CORRECTO
-        const encodedToken = encodeURIComponent(JSON.stringify(currentNextPage));
-        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}&nextpage=${encodedToken}`;
+        // ENCODING SIMPLE - UNA SOLA VEZ
+        const encodedToken = encodeURIComponent(tokenForUrl);
+        const apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}&nextpage=${encodedToken}`;
         
-        console.log('📜 URL de paginación construida:', apiUrl.substring(0, 100) + '...');
+        console.log('📜 URL construida (primeros 100 chars):', apiUrl.substring(0, 100));
         
         const response = await Promise.race([
             fetch(apiUrl, {
@@ -1627,19 +1586,24 @@ async loadMoreSearchResults() {
                     'Cache-Control': 'no-cache'
                 }
             }),
-            // Timeout de 20 segundos para paginación
             new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout en paginación')), 20000)
+                setTimeout(() => reject(new Error('Timeout')), 20000)
             )
         ]);
 
         if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({}));
+            console.error('📜 Error response:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData
+            });
+            throw new Error(`Error ${response.status}: ${errorData.details || response.statusText}`);
         }
 
         const data = await response.json();
         
-        console.log('📜 Respuesta de paginación recibida:', {
+        console.log('📜 Respuesta exitosa:', {
             items: data.items?.length || 0,
             hasNextPage: !!data.nextpage,
             error: data.error || 'none'
@@ -1649,28 +1613,26 @@ async loadMoreSearchResults() {
             throw new Error(data.details || data.error);
         }
         
-        // Procesar resultados con append = true
+        // Procesar resultados
         this.displaySearchResults(data, true);
-        
-        console.log('✅ Más resultados cargados exitosamente');
+        console.log('✅ Paginación completada exitosamente');
         
     } catch (error) {
-        console.error('❌ Error cargando más resultados:', error);
+        console.error('❌ Error en paginación:', error);
         
-        // Analizar tipo de error
         let userMessage = 'Error cargando más resultados';
         if (error.message.includes('Timeout')) {
-            userMessage = 'Tiempo de espera agotado. Intenta de nuevo.';
+            userMessage = 'Tiempo de espera agotado';
         } else if (error.message.includes('500')) {
-            userMessage = 'Error del servidor. Inténtalo en unos momentos.';
-        } else if (error.message.includes('Token')) {
-            userMessage = 'Error de paginación. Inicia una nueva búsqueda.';
+            userMessage = 'Error del servidor';
+        } else if (error.message.includes('400')) {
+            userMessage = 'Error en formato de paginación';
         }
         
         this.showMessage(userMessage, 'error');
         
-        // Mostrar botón de reintento solo para errores de red
-        if (spinner && (error.message.includes('fetch') || error.message.includes('Timeout'))) {
+        // Mostrar botón de reintento
+        if (spinner) {
             spinner.innerHTML = `
                 <div class="search-error-retry">
                     <p>${userMessage}</p>
@@ -1681,16 +1643,15 @@ async loadMoreSearchResults() {
             `;
         }
         
-        // LIMPIAR nextPageContext si es error crítico de paginación
-        if (error.message.includes('Token') || error.message.includes('500')) {
-            console.log('🚫 Limpiando token de paginación por error crítico');
+        // Limpiar token en errores críticos
+        if (error.message.includes('400') || error.message.includes('Token')) {
+            console.log('🚫 Limpiando token por error crítico');
             nextPageContext = null;
         }
         
     } finally {
         isLoadingMore = false;
         
-        // Remover spinner después de un momento (si no hay error)
         setTimeout(() => {
             const existingSpinner = searchResults.querySelector('.search-loading-more');
             if (existingSpinner && !existingSpinner.querySelector('.search-error-retry')) {
