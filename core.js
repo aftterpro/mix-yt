@@ -1385,7 +1385,7 @@ displaySearchResults(results, append = false) {
         nextPageType: typeof results?.nextpage
     });
 
-    // 1. LIMPIEZA INICIAL SI ES NUEVA BÚSQUEDA
+    // 1. LIMPIEZA INICIAL Y CONFIGURACIÓN
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
@@ -1429,11 +1429,10 @@ displaySearchResults(results, append = false) {
     }
 
     // 5. LÓGICA DE FILTRADO (SOLO EN PAGINACIÓN)
-    let videoItems = results.items; // Por defecto, usamos todos los items
+    let videoItems = results.items; // Por defecto, usamos todos los items (si append=false)
 
     if (append) {
         // Solo aplica el filtro si estamos en paginación (append=true)
-        // Esto evita que se filtre la primera página (que era el error original).
         videoItems = results.items.filter(video => {
             const videoId = video.videoId || video.url?.split('v=')[1];
             if (!videoId) return false;
@@ -1441,7 +1440,6 @@ displaySearchResults(results, append = false) {
             return !grid.querySelector(`[data-video-id="${videoId}"]`);
         });
     }
-    // Si append es false, videoItems = results.items (los 20 videos)
 
     console.log(`📊 Videos nuevos: ${videoItems.length} de ${results.items.length}`);
 
@@ -1545,8 +1543,20 @@ async loadMoreSearchResults() {
     }
     
     try {
-        // USAR DIRECTAMENTE EL CLIENTE DE PIPED CON EL TOKEN
-        const data = await window.youtubeJSClient.search(currentSearchQuery, nextPageContext);
+        // === CORRECCIÓN CLAVE: Preparar el token de continuación ===
+        let continuationToken = nextPageContext;
+        if (typeof continuationToken === 'string') {
+            try {
+                // Intenta parsear la cadena JSON a un objeto
+                continuationToken = JSON.parse(continuationToken);
+                console.log('✅ Token de paginación parseado a objeto.');
+            } catch (e) {
+                console.warn("⚠️ Error al parsear token, enviando cadena directamente:", e);
+            }
+        }
+        
+        // USAR DIRECTAMENTE EL CLIENTE DE PIPED CON EL TOKEN (ahora potencialmente parseado)
+        const data = await window.youtubeJSClient.search(currentSearchQuery, continuationToken);
         
         console.log('📜 Respuesta exitosa:', {
             items: data.items?.length || 0,
@@ -1568,8 +1578,8 @@ async loadMoreSearchResults() {
         let userMessage = 'Error cargando más resultados';
         if (error.message.includes('Timeout')) {
             userMessage = 'Tiempo de espera agotado';
-        } else if (error.message.includes('500')) {
-            userMessage = 'Error del servidor';
+        } else if (error.message.includes('500') || error.message.includes('400')) {
+            userMessage = 'Error del servidor o token inválido';
         } else if (error.message.includes('Token')) {
             userMessage = 'Error de paginación';
         }
@@ -1589,8 +1599,8 @@ async loadMoreSearchResults() {
         }
         
         // Limpiar token en errores críticos
-        if (error.message.includes('Token')) {
-            console.log('🚫 Limpiando token por error crítico');
+        if (error.message.includes('Token') || error.message.includes('400')) {
+            console.log('🚫 Limpiando token por error crítico o 400');
             nextPageContext = null;
         }
         
