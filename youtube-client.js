@@ -4,9 +4,9 @@ console.log('🎵 Cargando YouTube Client con proxy CORS...');
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        // Usar el proxy CORS que ya tienes configurado
-        this.baseUrl = '/.netlify/functions/cors-proxy';
-        // Instancias de Piped como fallback
+        // Usar la función específica de Piped en Netlify
+        this.netlifyFunction = '/.netlify/functions/piped-search';
+        // Instancias de Piped como fallback directo
         this.pipedInstances = [
             "https://api.piped.private.coffee"
          //   "https://pipedapi.orangenet.cc", 
@@ -53,34 +53,32 @@ class YouTubeSimplifiedClient {
     }
 
     async searchViaCorsProxy(query, continuation) {
-        console.log('📡 Usando proxy CORS de Netlify');
+        console.log('📡 Usando función Piped de Netlify');
         
-        let targetPath;
+        let targetUrl;
         let fetchOptions = {
             headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Accept': 'application/json'
             }
         };
 
         if (continuation) {
-            console.log(`📄 Paginación via proxy`);
+            console.log(`📄 Paginación via función Netlify`);
             
-            // Construir la ruta para el proxy
+            // Construir URL para paginación
             const encodedQuery = encodeURIComponent(query);
             const encodedToken = encodeURIComponent(JSON.stringify(continuation));
             
-            targetPath = `/nextpage/search?query=${encodedQuery}&nextpage=${encodedToken}`;
+            targetUrl = `/.netlify/functions/piped-search?q=${encodedQuery}&nextpage=${encodedToken}`;
             fetchOptions.method = 'GET';
             
         } else {
             // Primera búsqueda
-            targetPath = `/search?q=${encodeURIComponent(query)}&filter=videos`;
+            targetUrl = `/.netlify/functions/piped-search?q=${encodeURIComponent(query)}`;
             fetchOptions.method = 'GET';
         }
 
-        const proxyUrl = `${this.baseUrl}${targetPath}`;
-        console.log(`📡 Proxy URL: ${proxyUrl}`);
+        console.log(`📡 Netlify Function URL: ${targetUrl.substring(0, 80)}...`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -88,10 +86,10 @@ class YouTubeSimplifiedClient {
         fetchOptions.signal = controller.signal;
 
         try {
-            const response = await fetch(proxyUrl, fetchOptions);
+            const response = await fetch(targetUrl, fetchOptions);
             clearTimeout(timeoutId);
             
-            console.log(`📊 Respuesta proxy: ${response.status} ${response.statusText}`);
+            console.log(`📊 Respuesta Netlify: ${response.status} ${response.statusText}`);
             
             if (!response.ok) {
                 const errorText = await response.text().catch(() => 'Error desconocido');
@@ -348,15 +346,19 @@ class YouTubeSimplifiedClient {
         return this.initialized;
     }
 
-    // Método para obtener playlist via proxy
+    // Método para obtener playlist via función Netlify (implementación futura)
     async getPlaylist(playlistId) {
-        const proxyUrl = `${this.baseUrl}/playlists/${playlistId}`;
+        // Por ahora intentar acceso directo
+        const instanceUrl = this.getCurrentInstance();
+        const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
         
         try {
-            const response = await fetch(proxyUrl, {
+            const response = await fetch(targetUrl, {
                 headers: {
-                    'Accept': 'application/json'
-                }
+                    'Accept': 'application/json',
+                    'User-Agent': 'YT-CrossMix-Search/2.0'
+                },
+                mode: 'cors'
             });
             
             if (!response.ok) {
@@ -370,12 +372,12 @@ class YouTubeSimplifiedClient {
         }
     }
 
-    // Método para testing del proxy
-    async testCorsProxy() {
-        console.log('🧪 Probando proxy CORS...');
+    // Método para testing de la función Netlify
+    async testNetlifyFunction() {
+        console.log('🧪 Probando función Netlify piped-search...');
         
         try {
-            const testUrl = `${this.baseUrl}/search?q=test&filter=videos`;
+            const testUrl = `${this.netlifyFunction}?q=test`;
             console.log(`🔍 Probando: ${testUrl}`);
             
             const start = Date.now();
@@ -390,14 +392,15 @@ class YouTubeSimplifiedClient {
             
             if (response.ok) {
                 const data = await response.json();
-                console.log(`✅ Proxy CORS: OK (${time}ms, ${data.items?.length || 0} items)`);
+                console.log(`✅ Función Netlify: OK (${time}ms, ${data.items?.length || 0} items)`);
                 return {
                     status: 'OK',
                     responseTime: `${time}ms`,
-                    itemsCount: data.items?.length || 0
+                    itemsCount: data.items?.length || 0,
+                    instance: data.metadata?.instance || 'unknown'
                 };
             } else {
-                console.log(`❌ Proxy CORS: ERROR ${response.status}`);
+                console.log(`❌ Función Netlify: ERROR ${response.status}`);
                 return {
                     status: `ERROR ${response.status}`,
                     responseTime: `${time}ms`,
@@ -405,7 +408,7 @@ class YouTubeSimplifiedClient {
                 };
             }
         } catch (error) {
-            console.log(`❌ Proxy CORS: FAILED - ${error.message}`);
+            console.log(`❌ Función Netlify: FAILED - ${error.message}`);
             return {
                 status: `FAILED: ${error.message}`,
                 responseTime: 'N/A',
@@ -419,8 +422,8 @@ class YouTubeSimplifiedClient {
 window.youtubeJSClient = new YouTubeSimplifiedClient();
 
 // Función global para testing
-window.testCorsProxy = function() {
-    return window.youtubeJSClient.testCorsProxy();
+window.testNetlifyPipedFunction = function() {
+    return window.youtubeJSClient.testNetlifyFunction();
 };
 
-console.log('✅ YouTube Client con proxy CORS cargado');
+console.log('✅ YouTube Client con función Netlify piped-search cargado');
