@@ -1292,41 +1292,68 @@ async performSearch(query, continuation = null) {
     if (!continuation) {
         currentSearchQuery = query;
         nextPageContext = null;
-        searchResults.innerHTML = '<div class="search-loading">🔍 Inicializando YouTube.js...</div>';
+        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando música...</div>';
         
         if (this.handleSearchScroll) {
             searchResults.removeEventListener('scroll', this.handleSearchScroll);
+        }
+        if (this.scrollObserver) {
+            this.scrollObserver.disconnect();
+            this.scrollObserver = null;
         }
     }
 
     isLoadingMore = true;
 
     try {
-        // Verificar e inicializar YouTube.js bajo demanda
-        if (!window.youtubeJSClient) {
-            throw new Error('YouTube.js client no encontrado');
-        }
-
-        // Inicializar si no está listo
-        if (!window.youtubeJSClient.isAvailable()) {
-            if (!continuation) {
-                searchResults.innerHTML = '<div class="search-loading">🚀 Inicializando YouTube.js por primera vez...</div>';
-            }
-            const initSuccess = await window.youtubeJSClient.init();
-            if (!initSuccess) {
-                throw new Error('No se pudo inicializar YouTube.js');
-            }
+        console.log(`🔍 Realizando búsqueda: "${query}"${continuation ? ' (página siguiente)' : ''}`);
+        
+        // Construir URL de la API
+        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
+        
+        // Si hay continuación, agregarla como parámetro
+        if (continuation) {
+            apiUrl += `&nextpage=${encodeURIComponent(continuation)}`;
         }
         
-        const results = await window.youtubeJSClient.search(currentSearchQuery, continuation);
-        this.displaySearchResults(results, !!continuation);
+        const response = await fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        console.log(`📊 Respuesta recibida:`, {
+            items: data.items?.length || 0,
+            hasNextPage: !!data.nextpage,
+            isNextPageRequest: !!continuation
+        });
+        
+        this.displaySearchResults(data, !!continuation);
 
     } catch (error) {
-        console.error("❌ Error con YouTube.js:", error);
+        console.error("❌ Error en búsqueda:", error);
         
-        // Fallback inmediato al sistema anterior
-        console.log("🔄 Usando sistema Piped como fallback...");
-        await this.performSearchFallback(currentSearchQuery, continuation);
+        if (!continuation) {
+            searchResults.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error en búsqueda: ${error.message}</p>
+                    <button onclick="window.unifiedCore.performSearch('${query}')" class="retry-search-btn">
+                        <i class="fas fa-redo"></i> Intentar de nuevo
+                    </button>
+                </div>
+            `;
+        } else {
+            this.showMessage('Error cargando más resultados', 'error');
+        }
         
     } finally {
         isLoadingMore = false;
@@ -1369,16 +1396,20 @@ displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
+    console.log(`📊 displaySearchResults llamado:`, {
+        itemsReceived: results?.items?.length || 0,
+        append: append,
+        hasNextPage: !!results?.nextpage,
+        nextPageLength: results?.nextpage?.length || 0
+    });
+
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
         
-        // Remover listener anterior
         if (this.handleSearchScroll) {
             searchResults.removeEventListener('scroll', this.handleSearchScroll);
         }
-        
-        // RESET DEL OBSERVER ANTERIOR
         if (this.scrollObserver) {
             this.scrollObserver.disconnect();
             this.scrollObserver = null;
@@ -1395,13 +1426,19 @@ displaySearchResults(results, append = false) {
                 </div>
             `;
         }
-        console.log('❌ No hay items en los resultados');
+        console.log('❌ No hay items para mostrar');
         return;
     }
 
-    // Actualizar nextPageContext INMEDIATAMENTE
+    // ACTUALIZAR nextPageContext INMEDIATAMENTE Y CON LOGGING
+    const previousNextPage = nextPageContext;
     nextPageContext = results.nextpage || null;
-    console.log(`📄 NextPageContext actualizado:`, nextPageContext ? 'Disponible' : 'No disponible');
+    
+    console.log(`📄 NextPage actualizado:`, {
+        previous: previousNextPage ? `${previousNextPage.substring(0,50)}...` : 'null',
+        current: nextPageContext ? `${nextPageContext.substring(0,50)}...` : 'null',
+        hasMore: !!nextPageContext
+    });
 
     let grid = searchResults.querySelector('.search-results-grid');
     if (!grid) {
@@ -1409,108 +1446,71 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
-    // LOGGING DETALLADO ANTES DEL FILTRO
-    console.log(`🔍 Procesando ${results.items.length} items recibidos de la API`);
-    console.log(`📊 Grid actual tiene ${grid.querySelectorAll('.search-result-card').length} cards`);
+    // CONTAR ITEMS ANTES Y DESPUÉS DEL FILTRO
+    const currentCards = grid.querySelectorAll('.search-result-card').length;
+    console.log(`📊 Estado del grid: ${currentCards} cards existentes`);
 
-    // FILTRAR DUPLICADOS - VERSIÓN CORREGIDA
     const videoItems = results.items.filter((video, index) => {
         const videoId = video.videoId || video.url?.split('v=')[1];
         
-        // VALIDAR QUE TENGA VIDEO ID
         if (!videoId) {
-            console.warn(`⚠️ Item ${index} sin videoId:`, video.title);
+            console.warn(`⚠️ Item ${index} sin videoId: ${video.title}`);
             return false;
         }
         
-        // VERIFICAR DUPLICADOS EN EL DOM
         const existsInDOM = grid.querySelector(`[data-video-id="${videoId}"]`);
-        
         if (existsInDOM) {
-            console.log(`🔄 Duplicado encontrado: ${video.title} (${videoId})`);
+            console.log(`🔄 Duplicado: ${video.title} (${videoId})`);
             return false;
         }
         
-        console.log(`✅ Video válido: ${video.title} (${videoId})`);
         return true;
     });
 
-    console.log(`📊 Después del filtro: ${videoItems.length} videos válidos de ${results.items.length} originales`);
+    console.log(`📊 Filtrado completado: ${videoItems.length} nuevos de ${results.items.length} recibidos`);
 
-    // SI NO HAY VIDEOS NUEVOS, DETENER EL SCROLL INFINITO
     if (videoItems.length === 0) {
-        console.log('🚫 No hay videos nuevos, posiblemente hemos llegado al final');
-        
-        // MOSTRAR MENSAJE DE "NO MÁS RESULTADOS"
-        const existingMessage = searchResults.querySelector('.no-more-results');
-        if (!existingMessage && append) {
-            const noMoreMessage = document.createElement('div');
-            noMoreMessage.className = 'no-more-results';
-            noMoreMessage.innerHTML = `
-                <div style="
-                    text-align: center; 
-                    padding: 40px 20px; 
-                    color: var(--text-muted);
-                    font-size: 14px;
-                ">
-                    <i class="fas fa-check-circle" style="font-size: 24px; margin-bottom: 10px; color: var(--primary-color);"></i>
-                    <p>Has visto todos los resultados disponibles</p>
-                    <p><small>Intenta con una búsqueda diferente</small></p>
-                </div>
-            `;
-            searchResults.appendChild(noMoreMessage);
+        console.log('🚫 No hay videos nuevos para agregar');
+        if (!nextPageContext) {
+            console.log('📄 Y no hay más páginas, terminando búsqueda');
         }
-        
-        // DETENER EL SCROLL INFINITO
-        nextPageContext = null;
         return;
     }
 
-    // PROCESAR VIDEOS EN LOTES PARA MEJOR RENDIMIENTO
+    // Resto del procesamiento por lotes...
     const batchSize = 6;
-
-    // Función para procesar lotes
     const processBatch = (startIndex) => {
         const endIndex = Math.min(startIndex + batchSize, videoItems.length);
         const batch = videoItems.slice(startIndex, endIndex);
         
-        console.log(`📄 Procesando lote ${Math.floor(startIndex/batchSize) + 1}: videos ${startIndex}-${endIndex-1}`);
+        console.log(`📄 Procesando lote: ${startIndex}-${endIndex-1} de ${videoItems.length} videos`);
         
-        // Crear cards del lote actual
         const fragment = document.createDocumentFragment();
-        batch.forEach((video, batchIndex) => {
+        batch.forEach(video => {
             const videoId = video.videoId || video.url?.split('v=')[1];
             const card = this.createSearchResultCard(video, videoId);
             fragment.appendChild(card);
-            
-            console.log(`  ✅ Card ${startIndex + batchIndex}: ${video.title}`);
         });
         
-        // Agregar al grid
         grid.appendChild(fragment);
         
-        console.log(`📄 Lote procesado: ${startIndex}-${endIndex-1} de ${videoItems.length}`);
-        
-        // Procesar siguiente lote si queda contenido
         if (endIndex < videoItems.length) {
-            // Usar requestIdleCallback para no bloquear la UI
             if (window.requestIdleCallback) {
                 requestIdleCallback(() => processBatch(endIndex), { timeout: 100 });
             } else {
                 setTimeout(() => processBatch(endIndex), 10);
             }
         } else {
-            // Completado, configurar scroll infinito SOLO SI HAY NEXTPAGE
+            // Completado
             if (nextPageContext) {
                 this.setupImprovedInfiniteScroll(searchResults);
-                console.log(`✅ ${videoItems.length} resultados procesados${append ? ' (añadidos)' : ''} - Scroll infinito habilitado`);
+                console.log(`✅ ${videoItems.length} videos procesados - Scroll infinito activo`);
             } else {
-                console.log(`✅ ${videoItems.length} resultados procesados${append ? ' (añadidos)' : ''} - Sin más páginas`);
+                console.log(`✅ ${videoItems.length} videos procesados - Sin más páginas`);
             }
         }
     };
 
-    // Iniciar procesamiento por lotes
     processBatch(0);
 }
 
