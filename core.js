@@ -1400,7 +1400,8 @@ displaySearchResults(results, append = false) {
         itemsReceived: results?.items?.length || 0,
         append: append,
         hasNextPage: !!results?.nextpage,
-        nextPageLength: results?.nextpage?.length || 0
+        nextPageType: typeof results?.nextpage,
+        nextPageValid: results?.nextpage && typeof results.nextpage === 'object'
     });
 
     if (!append) {
@@ -1430,15 +1431,24 @@ displaySearchResults(results, append = false) {
         return;
     }
 
-    // ACTUALIZAR nextPageContext INMEDIATAMENTE Y CON LOGGING
+    // ACTUALIZAR nextPageContext CON VALIDACIÓN ESTRICTA
     const previousNextPage = nextPageContext;
-    nextPageContext = results.nextpage || null;
     
-    console.log(`📄 NextPage actualizado:`, {
-        previous: previousNextPage ? `${previousNextPage.substring(0,50)}...` : 'null',
-        current: nextPageContext ? `${nextPageContext.substring(0,50)}...` : 'null',
-        hasMore: !!nextPageContext
-    });
+    // VALIDAR QUE EL TOKEN SEA UN OBJETO VÁLIDO
+    if (results.nextpage && typeof results.nextpage === 'object') {
+        nextPageContext = results.nextpage;
+        console.log('📄 NextPage actualizado correctamente:', {
+            hasUrl: !!results.nextpage.url,
+            hasId: !!results.nextpage.id,
+            type: typeof results.nextpage
+        });
+    } else if (results.nextpage) {
+        console.warn('📄 NextPage en formato no reconocido:', typeof results.nextpage);
+        nextPageContext = results.nextpage; // Intentar usar de todas formas
+    } else {
+        nextPageContext = null;
+        console.log('📄 No hay más páginas disponibles');
+    }
 
     let grid = searchResults.querySelector('.search-results-grid');
     if (!grid) {
@@ -1446,7 +1456,7 @@ displaySearchResults(results, append = false) {
         searchResults.appendChild(grid);
     }
 
-    // CONTAR ITEMS ANTES Y DESPUÉS DEL FILTRO
+    // Filtrar duplicados y procesar videos
     const currentCards = grid.querySelectorAll('.search-result-card').length;
     console.log(`📊 Estado del grid: ${currentCards} cards existentes`);
 
@@ -1477,8 +1487,8 @@ displaySearchResults(results, append = false) {
         return;
     }
 
-    // Resto del procesamiento por lotes...
-    const batchSize = 6;
+    // Procesar por lotes para mejor rendimiento
+    const batchSize = 8;
     const processBatch = (startIndex) => {
         const endIndex = Math.min(startIndex + batchSize, videoItems.length);
         const batch = videoItems.slice(startIndex, endIndex);
@@ -1498,10 +1508,10 @@ displaySearchResults(results, append = false) {
             if (window.requestIdleCallback) {
                 requestIdleCallback(() => processBatch(endIndex), { timeout: 100 });
             } else {
-                setTimeout(() => processBatch(endIndex), 10);
+                setTimeout(() => processBatch(endIndex), 16);
             }
         } else {
-            // Completado
+            // Completado - configurar scroll infinito solo si hay más páginas
             if (nextPageContext) {
                 this.setupImprovedInfiniteScroll(searchResults);
                 console.log(`✅ ${videoItems.length} videos procesados - Scroll infinito activo`);
@@ -1569,15 +1579,16 @@ async loadMoreSearchResults() {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
     
-    console.log('📜 ⏳ Cargando más resultados (optimizado)...', {
+    console.log('📜 ⏳ Cargando más resultados...', {
         currentQuery: currentSearchQuery,
         nextPageExists: !!nextPageContext,
+        nextPageType: typeof nextPageContext,
         isLoading: isLoadingMore
     });
     
     isLoadingMore = true;
     
-    // Mostrar indicador de carga MÁS VISIBLE
+    // Mostrar indicador de carga
     let spinner = searchResults.querySelector('.search-loading-more');
     if (!spinner) {
         spinner = document.createElement('div');
@@ -1597,39 +1608,89 @@ async loadMoreSearchResults() {
     try {
         // GUARDAR EL NEXTPAGE ACTUAL ANTES DE LA LLAMADA
         const currentNextPage = nextPageContext;
-        console.log('📜 Usando nextpage:', currentNextPage ? 'Disponible' : 'No disponible');
-        
-        // USAR TIMEOUT MÁS CORTO PARA BÚSQUEDA
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Timeout')), 15000); // 15 segundos
+        console.log('📜 Preparando token para paginación:', {
+            tokenType: typeof currentNextPage,
+            tokenLength: JSON.stringify(currentNextPage).length
         });
         
-        const searchPromise = this.performSearch(currentSearchQuery, currentNextPage);
+        // CONSTRUIR URL CON ENCODING CORRECTO
+        const encodedToken = encodeURIComponent(JSON.stringify(currentNextPage));
+        let apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}&nextpage=${encodedToken}`;
         
-        // Cargar con timeout
-        await Promise.race([searchPromise, timeoutPromise]);
+        console.log('📜 URL de paginación construida:', apiUrl.substring(0, 100) + '...');
+        
+        const response = await Promise.race([
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            }),
+            // Timeout de 20 segundos para paginación
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout en paginación')), 20000)
+            )
+        ]);
+
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        console.log('📜 Respuesta de paginación recibida:', {
+            items: data.items?.length || 0,
+            hasNextPage: !!data.nextpage,
+            error: data.error || 'none'
+        });
+
+        if (data.error) {
+            throw new Error(data.details || data.error);
+        }
+        
+        // Procesar resultados con append = true
+        this.displaySearchResults(data, true);
         
         console.log('✅ Más resultados cargados exitosamente');
         
     } catch (error) {
         console.error('❌ Error cargando más resultados:', error);
-        this.showMessage('Error cargando más resultados. Intenta de nuevo.', 'error');
         
-        // Mostrar botón de reintento
-        if (spinner) {
+        // Analizar tipo de error
+        let userMessage = 'Error cargando más resultados';
+        if (error.message.includes('Timeout')) {
+            userMessage = 'Tiempo de espera agotado. Intenta de nuevo.';
+        } else if (error.message.includes('500')) {
+            userMessage = 'Error del servidor. Inténtalo en unos momentos.';
+        } else if (error.message.includes('Token')) {
+            userMessage = 'Error de paginación. Inicia una nueva búsqueda.';
+        }
+        
+        this.showMessage(userMessage, 'error');
+        
+        // Mostrar botón de reintento solo para errores de red
+        if (spinner && (error.message.includes('fetch') || error.message.includes('Timeout'))) {
             spinner.innerHTML = `
                 <div class="search-error-retry">
-                    <p>Error cargando más resultados</p>
+                    <p>${userMessage}</p>
                     <button onclick="window.unifiedCore.retryLoadMore()" class="retry-btn">
                         <i class="fas fa-redo"></i> Reintentar
                     </button>
                 </div>
             `;
         }
+        
+        // LIMPIAR nextPageContext si es error crítico de paginación
+        if (error.message.includes('Token') || error.message.includes('500')) {
+            console.log('🚫 Limpiando token de paginación por error crítico');
+            nextPageContext = null;
+        }
+        
     } finally {
         isLoadingMore = false;
         
-        // Remover spinner después de un momento
+        // Remover spinner después de un momento (si no hay error)
         setTimeout(() => {
             const existingSpinner = searchResults.querySelector('.search-loading-more');
             if (existingSpinner && !existingSpinner.querySelector('.search-error-retry')) {
@@ -1638,13 +1699,16 @@ async loadMoreSearchResults() {
         }, 1000);
     }
 }
-    retryLoadMore() {
+retryLoadMore() {
     console.log('🔄 Reintentando carga de más resultados...');
     const spinner = document.querySelector('.search-loading-more');
     if (spinner) {
         spinner.remove();
     }
-    this.loadMoreSearchResults();
+    // Pequeño delay antes de reintentar
+    setTimeout(() => {
+        this.loadMoreSearchResults();
+    }, 500);
 }
     createSearchGrid() {
         const grid = document.createElement('div');
