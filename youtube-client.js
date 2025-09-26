@@ -1,13 +1,15 @@
-// youtube-client.js - Sistema con Piped.coffee directo
-console.log('🎵 Cargando YouTube Client con Piped.coffee...');
+// youtube-client.js - Sistema con proxy CORS para Piped
+console.log('🎵 Cargando YouTube Client con proxy CORS...');
 
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        // Instancias de Piped disponibles
+        // Usar el proxy CORS que ya tienes configurado
+        this.baseUrl = '/.netlify/functions/cors-proxy';
+        // Instancias de Piped como fallback
         this.pipedInstances = [
             "https://api.piped.private.coffee"
-          //  "https://pipedapi.orangenet.cc",
+         //   "https://pipedapi.orangenet.cc", 
           //  "https://api.piped.adminforge.de"
         ];
         this.currentInstanceIndex = 0;
@@ -15,16 +17,14 @@ class YouTubeSimplifiedClient {
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Client inicializado con Piped.coffee');
+        console.log('✅ YouTube Client inicializado con proxy CORS');
         return true;
     }
 
-    // Obtener instancia activa con rotación automática
     getCurrentInstance() {
         return this.pipedInstances[this.currentInstanceIndex];
     }
 
-    // Rotar a siguiente instancia en caso de error
     rotateInstance() {
         this.currentInstanceIndex = (this.currentInstanceIndex + 1) % this.pipedInstances.length;
         console.log(`🔄 Rotando a instancia: ${this.getCurrentInstance()}`);
@@ -36,138 +36,70 @@ class YouTubeSimplifiedClient {
         console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (página siguiente)' : ''}`);
 
         try {
-            return await this.searchPiped(query, continuation);
+            return await this.searchViaCorsProxy(query, continuation);
         } catch (error) {
-            console.warn('⚠️ Error con Piped:', error.message);
+            console.warn('⚠️ Error con proxy CORS:', error.message);
             
-            // Intentar con siguiente instancia
-            this.rotateInstance();
-            
+            // Fallback directo (aunque tenga CORS)
             try {
-                console.log('🔄 Reintentando con otra instancia...');
-                return await this.searchPiped(query, continuation);
-            } catch (secondError) {
-                console.error('❌ Error con todas las instancias:', secondError.message);
+                console.log('🔄 Intentando acceso directo...');
+                return await this.searchDirect(query, continuation);
+            } catch (directError) {
+                console.error('❌ Error con acceso directo:', directError.message);
                 // Fallback a resultados generados
                 return this.searchFallback(query, continuation);
             }
         }
     }
 
-    async searchPiped(query, continuation) {
-        const instanceUrl = this.getCurrentInstance();
-        let targetUrl;
+    async searchViaCorsProxy(query, continuation) {
+        console.log('📡 Usando proxy CORS de Netlify');
+        
+        let targetPath;
         let fetchOptions = {
             headers: {
-                'User-Agent': 'YT-CrossMix-Search/2.0',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
             }
         };
 
         if (continuation) {
-            console.log(`📄 Búsqueda con paginación usando: ${instanceUrl}`);
+            console.log(`📄 Paginación via proxy`);
             
-            // Para paginación, usar POST con nextpage
-            targetUrl = `${instanceUrl}/nextpage/search`;
-            fetchOptions.method = 'POST';
-            fetchOptions.headers['Content-Type'] = 'application/json';
+            // Construir la ruta para el proxy
+            const encodedQuery = encodeURIComponent(query);
+            const encodedToken = encodeURIComponent(JSON.stringify(continuation));
             
-            // Procesar token de continuación
-            let nextPageData;
-            if (typeof continuation === 'string') {
-                try {
-                    // Si es string, intentar parsearlo
-                    nextPageData = JSON.parse(continuation);
-                } catch (e) {
-                    // Si no se puede parsear, usarlo directamente
-                    nextPageData = continuation;
-                }
-            } else if (typeof continuation === 'object') {
-                nextPageData = continuation;
-            } else {
-                throw new Error('Formato de token de paginación inválido');
-            }
+            targetPath = `/nextpage/search?query=${encodedQuery}&nextpage=${encodedToken}`;
+            fetchOptions.method = 'GET';
             
-            fetchOptions.body = JSON.stringify({
-                nextpage: nextPageData,
-                query: query
-            });
-            
-            console.log(`📄 POST a: ${targetUrl}`);
         } else {
             // Primera búsqueda
-            targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
+            targetPath = `/search?q=${encodeURIComponent(query)}&filter=videos`;
             fetchOptions.method = 'GET';
-            console.log(`🔍 GET a: ${targetUrl}`);
         }
 
-        // Hacer la petición con timeout
+        const proxyUrl = `${this.baseUrl}${targetPath}`;
+        console.log(`📡 Proxy URL: ${proxyUrl}`);
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         
         fetchOptions.signal = controller.signal;
 
         try {
-            const response = await fetch(targetUrl, fetchOptions);
+            const response = await fetch(proxyUrl, fetchOptions);
             clearTimeout(timeoutId);
             
-            console.log(`📊 Respuesta: ${response.status} ${response.statusText}`);
+            console.log(`📊 Respuesta proxy: ${response.status} ${response.statusText}`);
             
             if (!response.ok) {
                 const errorText = await response.text().catch(() => 'Error desconocido');
-                
-                // Manejar errores específicos
-                if (response.status === 404 && continuation) {
-                    throw new Error('Token de paginación expirado');
-                }
-                
                 throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
             }
 
             const data = await response.json();
-            
-            console.log(`📊 Datos recibidos:`, {
-                itemsCount: data.items?.length || 0,
-                hasNextpage: !!data.nextpage,
-                nextpageType: typeof data.nextpage,
-                instance: instanceUrl
-            });
-
-            // Normalizar respuesta
-            const items = (data.items || []).filter(item => 
-                item && 
-                item.title && 
-                (item.url || item.videoId) &&
-                item.thumbnail &&
-                !item.url?.includes('/channel/') &&
-                !item.url?.includes('/playlist/')
-            ).map(item => ({
-                videoId: item.videoId || this.extractVideoId(item.url),
-                title: item.title.trim(),
-                thumbnail: item.thumbnail,
-                duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
-                uploaderName: item.uploaderName?.trim() || 'Unknown',
-                url: item.url,
-                views: item.views || 0,
-                uploadedDate: item.uploadedDate || null
-            }));
-
-            console.log(`✅ ${items.length} videos válidos procesados desde ${instanceUrl}`);
-
-            return {
-                items: items,
-                nextpage: data.nextpage || null,
-                suggestion: data.suggestion || null,
-                corrected: data.corrected || false,
-                metadata: {
-                    query: query,
-                    instance: instanceUrl,
-                    timestamp: new Date().toISOString(),
-                    resultsCount: items.length,
-                    hasNextPage: !!data.nextpage,
-                    isNextPageRequest: !!continuation
-                }
-            };
+            return this.normalizeResponse(data, query, continuation);
 
         } catch (error) {
             clearTimeout(timeoutId);
@@ -178,6 +110,99 @@ class YouTubeSimplifiedClient {
             
             throw error;
         }
+    }
+
+    async searchDirect(query, continuation) {
+        const instanceUrl = this.getCurrentInstance();
+        let targetUrl;
+        let fetchOptions = {
+            headers: {
+                'User-Agent': 'YT-CrossMix-Search/2.0',
+                'Accept': 'application/json'
+            },
+            mode: 'cors'
+        };
+
+        if (continuation) {
+            // Para paginación directa, usar GET con parámetros
+            const encodedQuery = encodeURIComponent(query);
+            const encodedToken = encodeURIComponent(JSON.stringify(continuation));
+            
+            targetUrl = `${instanceUrl}/nextpage/search?query=${encodedQuery}&nextpage=${encodedToken}`;
+            fetchOptions.method = 'GET';
+            
+        } else {
+            targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
+            fetchOptions.method = 'GET';
+        }
+
+        console.log(`🔗 Directo: ${targetUrl}`);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        fetchOptions.signal = controller.signal;
+
+        try {
+            const response = await fetch(targetUrl, fetchOptions);
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                // Rotar instancia automáticamente si falla
+                this.rotateInstance();
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return this.normalizeResponse(data, query, continuation);
+
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
+    }
+
+    normalizeResponse(data, query, continuation) {
+        console.log(`📊 Datos recibidos:`, {
+            itemsCount: data.items?.length || 0,
+            hasNextpage: !!data.nextpage,
+            nextpageType: typeof data.nextpage
+        });
+
+        // Normalizar respuesta
+        const items = (data.items || []).filter(item => 
+            item && 
+            item.title && 
+            (item.url || item.videoId) &&
+            item.thumbnail &&
+            !item.url?.includes('/channel/') &&
+            !item.url?.includes('/playlist/')
+        ).map(item => ({
+            videoId: item.videoId || this.extractVideoId(item.url),
+            title: item.title.trim(),
+            thumbnail: item.thumbnail,
+            duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
+            uploaderName: item.uploaderName?.trim() || 'Unknown',
+            url: item.url,
+            views: item.views || 0,
+            uploadedDate: item.uploadedDate || null
+        }));
+
+        console.log(`✅ ${items.length} videos válidos procesados`);
+
+        return {
+            items: items,
+            nextpage: data.nextpage || null,
+            suggestion: data.suggestion || null,
+            corrected: data.corrected || false,
+            metadata: {
+                query: query,
+                timestamp: new Date().toISOString(),
+                resultsCount: items.length,
+                hasNextPage: !!data.nextpage,
+                isNextPageRequest: !!continuation
+            }
+        };
     }
 
     // Extraer videoId de URL
@@ -235,7 +260,7 @@ class YouTubeSimplifiedClient {
             { artist: 'Karol G', song: 'BICHOTA', id: 'RqrXhwS33yc', genre: 'reggaeton' },
             { artist: 'J Balvin', song: 'Mi Gente', id: 'qqR8Q-wAW3E', genre: 'reggaeton' },
             
-            // Rock/Alternative
+            // Rock/Alternative  
             { artist: 'Imagine Dragons', song: 'Believer', id: '7wtfhZwyrcc', genre: 'rock' },
             { artist: 'OneRepublic', song: 'Counting Stars', id: 'hT_nvWreIhg', genre: 'pop-rock' },
             { artist: 'Maroon 5', song: 'Sugar', id: '09R8_2nJtjg', genre: 'pop-rock' },
@@ -323,15 +348,13 @@ class YouTubeSimplifiedClient {
         return this.initialized;
     }
 
-    // Método para obtener playlist (implementación básica)
+    // Método para obtener playlist via proxy
     async getPlaylist(playlistId) {
-        const instanceUrl = this.getCurrentInstance();
-        const targetUrl = `${instanceUrl}/playlists/${playlistId}`;
+        const proxyUrl = `${this.baseUrl}/playlists/${playlistId}`;
         
         try {
-            const response = await fetch(targetUrl, {
+            const response = await fetch(proxyUrl, {
                 headers: {
-                    'User-Agent': 'YT-CrossMix-Search/2.0',
                     'Accept': 'application/json'
                 }
             });
@@ -347,59 +370,48 @@ class YouTubeSimplifiedClient {
         }
     }
 
-    // Método para testing de instancias
-    async testInstances() {
-        console.log('🧪 Probando instancias de Piped...');
+    // Método para testing del proxy
+    async testCorsProxy() {
+        console.log('🧪 Probando proxy CORS...');
         
-        const testResults = [];
-        
-        for (let i = 0; i < this.pipedInstances.length; i++) {
-            const instance = this.pipedInstances[i];
-            console.log(`🔍 Probando: ${instance}`);
+        try {
+            const testUrl = `${this.baseUrl}/search?q=test&filter=videos`;
+            console.log(`🔍 Probando: ${testUrl}`);
             
-            try {
-                const start = Date.now();
-                const response = await fetch(`${instance}/search?q=test&filter=videos`, {
-                    headers: {
-                        'User-Agent': 'YT-CrossMix-Search/2.0',
-                        'Accept': 'application/json'
-                    },
-                    signal: AbortSignal.timeout(5000)
-                });
-                
-                const time = Date.now() - start;
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    testResults.push({
-                        instance,
-                        status: 'OK',
-                        responseTime: `${time}ms`,
-                        itemsCount: data.items?.length || 0
-                    });
-                    console.log(`✅ ${instance}: OK (${time}ms, ${data.items?.length || 0} items)`);
-                } else {
-                    testResults.push({
-                        instance,
-                        status: `ERROR ${response.status}`,
-                        responseTime: `${time}ms`,
-                        itemsCount: 0
-                    });
-                    console.log(`❌ ${instance}: ERROR ${response.status}`);
-                }
-            } catch (error) {
-                testResults.push({
-                    instance,
-                    status: `FAILED: ${error.message}`,
-                    responseTime: 'N/A',
+            const start = Date.now();
+            const response = await fetch(testUrl, {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            const time = Date.now() - start;
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Proxy CORS: OK (${time}ms, ${data.items?.length || 0} items)`);
+                return {
+                    status: 'OK',
+                    responseTime: `${time}ms`,
+                    itemsCount: data.items?.length || 0
+                };
+            } else {
+                console.log(`❌ Proxy CORS: ERROR ${response.status}`);
+                return {
+                    status: `ERROR ${response.status}`,
+                    responseTime: `${time}ms`,
                     itemsCount: 0
-                });
-                console.log(`❌ ${instance}: FAILED - ${error.message}`);
+                };
             }
+        } catch (error) {
+            console.log(`❌ Proxy CORS: FAILED - ${error.message}`);
+            return {
+                status: `FAILED: ${error.message}`,
+                responseTime: 'N/A',
+                itemsCount: 0
+            };
         }
-        
-        console.table(testResults);
-        return testResults;
     }
 }
 
@@ -407,8 +419,8 @@ class YouTubeSimplifiedClient {
 window.youtubeJSClient = new YouTubeSimplifiedClient();
 
 // Función global para testing
-window.testPipedInstances = function() {
-    return window.youtubeJSClient.testInstances();
+window.testCorsProxy = function() {
+    return window.youtubeJSClient.testCorsProxy();
 };
 
-console.log('✅ YouTube Client con Piped.coffee cargado');
+console.log('✅ YouTube Client con proxy CORS cargado');
