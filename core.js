@@ -672,8 +672,11 @@ updatePlaylistsUI() {
         }
     }
 
+
 renderQueueContent() {
     const flatList = this.getFlattenedPlaylist();
+    
+    console.log(`📋 Renderizando contenido de cola: ${flatList.length} videos`);
     
     if (flatList.length === 0) {
         return `
@@ -705,10 +708,14 @@ renderQueueContent() {
             ? this.formatDuration(video.duration) 
             : '--:--';
             
+        // DEBUG: Agregar más información para debugging
+        console.log(`📋 Renderizando video ${index}: ${video.title} (${video.videoId})`);
+            
         html += `
             <div class="queue-item ${isPlaying ? 'playing' : ''}" 
                  data-video-id="${video.videoId}" 
-                 data-flat-index="${index}">
+                 data-flat-index="${index}"
+                 title="Click para reproducir">
                 <div class="queue-item-number">${index + 1}</div>
                 <img src="${video.thumbnail}" alt="${video.title}" class="queue-item-thumbnail" loading="lazy">
                 <div class="queue-item-info">
@@ -719,7 +726,9 @@ renderQueueContent() {
                     </div>
                 </div>
                 ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
-                <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
+                <button class="queue-item-remove" 
+                        data-video-id="${video.videoId}" 
+                        title="Eliminar de la cola">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -727,52 +736,123 @@ renderQueueContent() {
     });
     
     html += '</div>';
+    
+    console.log('📋 Contenido de cola renderizado completamente');
     return html;
 }
 
     // Actualizar contenido de popup de cola si está abierto
 updateQueuePopup() {
     const queuePopupContent = document.getElementById('queuePopupContent');
-    if (queuePopupContent) {
-        console.log('🔄 Actualizando popup de cola...');
-        queuePopupContent.innerHTML = this.renderQueueContent();
-        
-        // RECONFIGURAR EVENT LISTENERS después de actualizar
-        setTimeout(() => {
-            this.setupQueuePopupEventListeners(queuePopupContent);
-        }, 100);
+    if (!queuePopupContent) {
+        return; // No hay popup abierto
     }
+    
+    console.log('🔄 Actualizando popup de cola...');
+    
+    // Renderizar nuevo contenido
+    queuePopupContent.innerHTML = this.renderQueueContent();
+    
+    // RECONFIGURAR EVENT LISTENERS después de actualizar - CON DELAY
+    setTimeout(() => {
+        this.setupQueuePopupEventListeners(queuePopupContent);
+    }, 50); // Pequeño delay para asegurar que el DOM esté actualizado
+    
+    console.log('✅ Popup de cola actualizado y event listeners reconfigurados');
 }
 setupQueuePopupEventListeners(container) {
-    if (!container) return;
+    if (!container) {
+        console.warn('⚠️ Container no encontrado para event listeners');
+        return;
+    }
+    
+    console.log('🔧 Configurando event listeners de cola popup (core.js)');
+    
+    // LIMPIAR EVENT LISTENERS DUPLICADOS - MÉTODO MEJORADO
+    container.querySelectorAll('.queue-item').forEach(item => {
+        // Clonar el elemento para remover todos los listeners
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+    });
+    
+    // RECONFIGURAR EVENT LISTENERS EN LOS ELEMENTOS NUEVOS
+    const newItems = container.querySelectorAll('.queue-item');
+    console.log(`🔧 Configurando listeners para ${newItems.length} items de cola`);
     
     // Event listeners para reproducir video
-    container.querySelectorAll('.queue-item').forEach(item => {
-        if (!item.dataset.eventConfigured) {
-            item.addEventListener('click', (e) => {
-                if (!e.target.closest('.queue-item-remove')) {
-                    const index = parseInt(item.dataset.flatIndex);
-                    console.log(`▶️ Reproducir video en índice ${index}`);
-                    this.playVideoAtIndex(index);
+    newItems.forEach((item, index) => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.queue-item-remove')) {
+                const flatIndex = parseInt(item.dataset.flatIndex);
+                if (!isNaN(flatIndex)) {
+                    console.log(`▶️ Reproducir video en índice ${flatIndex}`);
+                    this.playVideoAtIndex(flatIndex);
+                    // Cerrar popup después de seleccionar
+                    this.closeQueuePopup();
+                } else {
+                    console.warn(`⚠️ Índice inválido en item ${index}`);
                 }
-            });
-            item.dataset.eventConfigured = 'true';
-        }
+            }
+        });
+        
+        console.log(`✅ Listener de reproducción configurado para item ${index}`);
     });
     
     // Event listeners para eliminar video
-    container.querySelectorAll('.queue-item-remove').forEach(btn => {
-        if (!btn.dataset.eventConfigured) {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const videoId = btn.dataset.videoId;
-                console.log(`🗑️ Eliminar video: ${videoId}`);
-                this.removeVideoFromQueue(videoId);
-            });
-            btn.dataset.eventConfigured = 'true';
-        }
+    const removeButtons = container.querySelectorAll('.queue-item-remove');
+    console.log(`🔧 Configurando ${removeButtons.length} botones de eliminación`);
+    
+    removeButtons.forEach((btn, index) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const videoId = btn.dataset.videoId;
+            
+            if (!videoId) {
+                console.warn(`⚠️ videoId no encontrado en botón ${index}`);
+                return;
+            }
+            
+            console.log(`🗑️ Solicitud de eliminación: ${videoId}`);
+            
+            // FEEDBACK VISUAL INMEDIATO
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            
+            // MARCAR ITEM COMO EN PROCESO DE ELIMINACIÓN
+            const queueItem = btn.closest('.queue-item');
+            if (queueItem) {
+                queueItem.classList.add('removing');
+            }
+            
+            // Ejecutar eliminación con pequeño delay para el feedback visual
+            setTimeout(() => {
+                const success = this.removeVideoFromQueue(videoId);
+                
+                if (success) {
+                    console.log(`✅ Video ${videoId} eliminado exitosamente`);
+                    // El popup se actualizará automáticamente por updateQueuePopup()
+                } else {
+                    console.error(`❌ Error eliminando video ${videoId}`);
+                    // Restaurar botón si falló
+                    btn.innerHTML = originalHTML;
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    if (queueItem) {
+                        queueItem.classList.remove('removing');
+                    }
+                    this.showMessage('Error eliminando video', 'error');
+                }
+            }, 150); // Pequeño delay para mostrar el spinner
+        });
+        
+        console.log(`✅ Listener de eliminación configurado para botón ${index}`);
     });
+    
+    console.log('✅ Todos los event listeners de cola configurados correctamente');
 }
+
     // Función para calcular duración total
 formatTotalDuration(videos) {
     const totalSeconds = videos.reduce((sum, video) => sum + (video.duration || 0), 0);
