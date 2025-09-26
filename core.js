@@ -1534,7 +1534,7 @@ async loadMoreSearchResults() {
     console.log('📜 ⏳ Cargando más resultados...', {
         currentQuery: currentSearchQuery,
         nextPageType: typeof nextPageContext,
-        nextPageSample: JSON.stringify(nextPageContext).substring(0, 100)
+        nextPageRaw: nextPageContext
     });
     
     isLoadingMore = true;
@@ -1553,30 +1553,49 @@ async loadMoreSearchResults() {
     }
     
     try {
-        // PROCESAMIENTO SIMPLIFICADO DEL TOKEN
-        let tokenForUrl;
+        // PROCESAMIENTO DEFINITIVO DEL TOKEN
+        let finalToken;
         
-        if (typeof nextPageContext === 'object') {
-            // Si es objeto, convertir a string
-            tokenForUrl = JSON.stringify(nextPageContext);
-        } else if (typeof nextPageContext === 'string') {
-            // Si ya es string, usar directamente
-            tokenForUrl = nextPageContext;
+        if (typeof nextPageContext === 'string') {
+            // Si es string, verificar si es JSON stringificado
+            if (nextPageContext.startsWith('"') && nextPageContext.endsWith('"')) {
+                // Es un string dentro de otro string, hacer parse doble
+                try {
+                    const firstParse = JSON.parse(nextPageContext);
+                    finalToken = JSON.parse(firstParse);
+                    console.log('📜 Token: string doble parseado a objeto');
+                } catch (e) {
+                    finalToken = JSON.parse(nextPageContext.slice(1, -1).replace(/\\"/g, '"'));
+                    console.log('📜 Token: string limpiado manualmente');
+                }
+            } else {
+                try {
+                    finalToken = JSON.parse(nextPageContext);
+                    console.log('📜 Token: string parseado a objeto');
+                } catch (e) {
+                    finalToken = nextPageContext;
+                    console.log('📜 Token: string usado directamente');
+                }
+            }
+        } else if (typeof nextPageContext === 'object') {
+            finalToken = nextPageContext;
+            console.log('📜 Token: objeto usado directamente');
         } else {
-            throw new Error('Tipo de token de paginación no válido');
+            throw new Error('Tipo de token inválido');
         }
         
-        console.log('📜 Token procesado:', {
-            originalType: typeof nextPageContext,
-            tokenLength: tokenForUrl.length,
-            tokenStart: tokenForUrl.substring(0, 50)
+        console.log('📜 Token final procesado:', {
+            type: typeof finalToken,
+            hasUrl: !!(finalToken?.url),
+            hasId: !!(finalToken?.id),
+            sample: JSON.stringify(finalToken).substring(0, 100)
         });
         
-        // ENCODING SIMPLE - UNA SOLA VEZ
-        const encodedToken = encodeURIComponent(tokenForUrl);
+        // ENVÍO SIMPLE SIN DOBLE ENCODING
+        const encodedToken = encodeURIComponent(JSON.stringify(finalToken));
         const apiUrl = `/.netlify/functions/search?q=${encodeURIComponent(currentSearchQuery)}&nextpage=${encodedToken}`;
         
-        console.log('📜 URL construida (primeros 100 chars):', apiUrl.substring(0, 100));
+        console.log('📜 URL final:', apiUrl.substring(0, 150) + '...');
         
         const response = await Promise.race([
             fetch(apiUrl, {
