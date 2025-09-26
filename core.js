@@ -1385,28 +1385,18 @@ displaySearchResults(results, append = false) {
         nextPageType: typeof results?.nextpage
     });
 
-// Antes de filtrar, verifica si es una nueva búsqueda.
-let videoItems = results.items; // Por defecto, usa todos los ítems
-
-if (append) {
-    // SOLO aplicar el filtro si estamos en una PAGINACIÓN (append=true)
-    // Se recomienda obtener la grilla *antes* de este punto si no es global
-    let grid = searchResults.querySelector('.search-results-grid');
-    if (!grid) {
-        // Esto no debería pasar si append=true, pero es una protección
-        grid = this.createSearchGrid();
-        searchResults.appendChild(grid);
+    // 1. LIMPIEZA INICIAL SI ES NUEVA BÚSQUEDA
+    if (!append) {
+        currentSearchQuery = results.query || currentSearchQuery;
+        searchResults.innerHTML = '';
+        
+        if (this.scrollObserver) {
+            this.scrollObserver.disconnect();
+            this.scrollObserver = null;
+        }
     }
 
-    // Filtrar duplicados solo si es una adición
-    videoItems = results.items.filter(video => {
-        const videoId = video.videoId || video.url?.split('v=')[1];
-        if (!videoId) return false;
-        // La condición de duplicado: ¿Ya existe una tarjeta con este ID?
-        return !grid.querySelector(`[data-video-id="${videoId}"]`);
-    });
-}
-
+    // 2. MANEJO DE RESULTADOS VACÍOS
     if (!results?.items?.length) {
         if (!append) {
             searchResults.innerHTML = `
@@ -1419,7 +1409,7 @@ if (append) {
         return;
     }
 
-    // ACTUALIZACIÓN SIMPLE DEL NEXTPAGE
+    // 3. ACTUALIZAR NEXTPAGE (PAGINACIÓN)
     if (results.nextpage) {
         nextPageContext = results.nextpage;
         console.log('📄 NextPage actualizado:', {
@@ -1431,18 +1421,27 @@ if (append) {
         console.log('📄 No hay más páginas');
     }
 
+    // 4. INICIALIZAR GRUPO DE RESULTADOS (GRID)
     let grid = searchResults.querySelector('.search-results-grid');
     if (!grid) {
         grid = this.createSearchGrid();
         searchResults.appendChild(grid);
     }
 
-    // Filtrar duplicados
-    const videoItems = results.items.filter(video => {
-        const videoId = video.videoId || video.url?.split('v=')[1];
-        if (!videoId) return false;
-        return !grid.querySelector(`[data-video-id="${videoId}"]`);
-    });
+    // 5. LÓGICA DE FILTRADO (SOLO EN PAGINACIÓN)
+    let videoItems = results.items; // Por defecto, usamos todos los items
+
+    if (append) {
+        // Solo aplica el filtro si estamos en paginación (append=true)
+        // Esto evita que se filtre la primera página (que era el error original).
+        videoItems = results.items.filter(video => {
+            const videoId = video.videoId || video.url?.split('v=')[1];
+            if (!videoId) return false;
+            // Solo se mantiene si NO existe una tarjeta con el mismo ID en el grid
+            return !grid.querySelector(`[data-video-id="${videoId}"]`);
+        });
+    }
+    // Si append es false, videoItems = results.items (los 20 videos)
 
     console.log(`📊 Videos nuevos: ${videoItems.length} de ${results.items.length}`);
 
@@ -1451,7 +1450,7 @@ if (append) {
         return;
     }
 
-    // Agregar videos
+    // 6. RENDERIZAR Y AÑADIR VIDEOS
     const fragment = document.createDocumentFragment();
     videoItems.forEach(video => {
         const videoId = video.videoId || video.url?.split('v=')[1];
@@ -1461,7 +1460,7 @@ if (append) {
     
     grid.appendChild(fragment);
 
-    // Configurar scroll infinito si hay más páginas
+    // 7. CONFIGURAR SCROLL INFINITO
     if (nextPageContext) {
         this.setupImprovedInfiniteScroll(searchResults);
         console.log(`✅ ${videoItems.length} videos agregados - Scroll infinito activo`);
