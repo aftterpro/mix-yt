@@ -1,10 +1,9 @@
-
 exports.handler = async function(event, context) {
     // Configurar CORS
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, User-Agent',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Cache-Control': 'public, max-age=60', // Cache reducido a 1 minuto
         'Content-Type': 'application/json'
     };
@@ -50,9 +49,8 @@ exports.handler = async function(event, context) {
         
         // Lista de instancias Piped actualizadas
         const pipedInstances = [
-            "https://api.piped.private.coffee"
-       //     "https://pipedapi.ducks.party",
-         //   "https://api-piped.shimul.me"
+            "https://api.piped.private.coffee",
+            "https://pipedapi.ducks.party"
         ];
         
         function getRandomPipedInstance() {
@@ -68,20 +66,7 @@ exports.handler = async function(event, context) {
             try {
                 const instanceUrl = getRandomPipedInstance();
                 
-                // CONSTRUIR URL CORRECTAMENTE PARA PAGINACIÓN
                 let targetUrl;
-                
-                if (nextPageToken) {
-                    // Para páginas siguientes, usar el endpoint de nextpage
-                    targetUrl = `${instanceUrl}/nextpage/search`;
-                    console.log(`📄 Usando nextpage endpoint: ${targetUrl}`);
-                } else {
-                    // Para primera búsqueda
-                    targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(trimmedQuery)}&filter=videos`;
-                    console.log(`🔍 Primera búsqueda: ${targetUrl}`);
-                }
-                
-                // Configurar la request
                 let fetchOptions = {
                     headers: {
                         'User-Agent': 'YT-CrossMix-Search/2.0',
@@ -89,25 +74,43 @@ exports.handler = async function(event, context) {
                     }
                 };
                 
-                // Si es paginación, enviar nextpage como POST body
                 if (nextPageToken) {
+                    // CORRECCIÓN CRÍTICA: Para paginación, usar POST con el token como cuerpo
+                    console.log(`📄 Usando nextpage endpoint: ${instanceUrl}/nextpage/search`);
+                    
+                    // Parsear el nextPageToken para verificar formato
+                    let parsedToken;
+                    try {
+                        parsedToken = JSON.parse(decodeURIComponent(nextPageToken));
+                        console.log(`📄 Token parseado exitosamente, tipo: ${typeof parsedToken}`);
+                    } catch (parseError) {
+                        console.error(`❌ Error parseando nextpage token:`, parseError);
+                        throw new Error('Token de paginación inválido');
+                    }
+                    
+                    targetUrl = `${instanceUrl}/nextpage/search`;
                     fetchOptions.method = 'POST';
                     fetchOptions.headers['Content-Type'] = 'application/json';
+                    
+                    // CORRECCIÓN: Enviar el token completo parseado como cuerpo
                     fetchOptions.body = JSON.stringify({
-                        query: trimmedQuery,
-                        nextpage: nextPageToken
+                        nextpage: parsedToken,
+                        query: trimmedQuery
                     });
                     
-                    console.log(`📄 Enviando nextpage token (longitud: ${nextPageToken.length})`);
+                    console.log(`📄 Enviando token de paginación completo`);
                 } else {
+                    // Para primera búsqueda
+                    targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(trimmedQuery)}&filter=videos`;
                     fetchOptions.method = 'GET';
+                    console.log(`🔍 Primera búsqueda: ${targetUrl}`);
                 }
                 
                 console.log(`🎯 Usando instancia: ${instanceUrl}`);
                 
                 // Realizar request con timeout
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
                 
                 fetchOptions.signal = controller.signal;
                 
@@ -128,6 +131,13 @@ exports.handler = async function(event, context) {
                 // Normalizar respuesta (algunas instancias devuelven array directo)
                 const items = Array.isArray(data) ? data : (data.items || []);
                 const nextpage = data.nextpage || null;
+                
+                // LOGGING MEJORADO para nextpage
+                if (nextpage) {
+                    console.log(`📄 Nextpage disponible para próxima paginación`);
+                } else {
+                    console.log(`📄 No hay más páginas disponibles`);
+                }
                 
                 // Filtrar solo videos válidos
                 const validItems = items.filter(item => {
@@ -162,7 +172,7 @@ exports.handler = async function(event, context) {
                 // Preparar respuesta final
                 const response_data = {
                     items: normalizedItems,
-                    nextpage: nextpage,
+                    nextpage: nextpage, // Mantener formato original de Piped
                     suggestion: data.suggestion || null,
                     corrected: data.corrected || false,
                     metadata: {
