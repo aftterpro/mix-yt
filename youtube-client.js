@@ -69,12 +69,12 @@ class YouTubeSimplifiedClient {
             const encodedQuery = encodeURIComponent(query);
             const encodedToken = encodeURIComponent(JSON.stringify(continuation));
             
-            targetUrl = `/.netlify/functions/piped-search?q=${encodedQuery}&nextpage=${encodedToken}`;
+            targetUrl = `/.netlify/functions/search?q=${encodedQuery}&nextpage=${encodedToken}`;
             fetchOptions.method = 'GET';
             
         } else {
             // Primera búsqueda
-            targetUrl = `/.netlify/functions/piped-search?q=${encodeURIComponent(query)}`;
+            targetUrl = `/.netlify/functions/search?q=${encodeURIComponent(query)}`;
             fetchOptions.method = 'GET';
         }
 
