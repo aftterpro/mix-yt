@@ -1,4 +1,3 @@
-// youtube-client.js - Sistema con proxy CORS para Piped
 console.log('🎵 Cargando YouTube Client con proxy CORS...');
 
 class YouTubeSimplifiedClient {
