@@ -1,6 +1,5 @@
-
 exports.handler = async function(event, context) {
-    // Headers para permitir el acceso desde cualquier origen (CORS)
+    // Headers para CORS
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -13,13 +12,35 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const query = event.queryStringParameters?.q;
-        const nextPageToken = event.queryStringParameters?.nextpage;
-        const isNextPage = !!nextPageToken;
+        let query, nextPageToken, isNextPage;
+
+        // CORRECCIÓN: Manejar tanto GET como POST
+        if (event.httpMethod === 'POST') {
+            // Paginación via POST
+            const body = JSON.parse(event.body || '{}');
+            query = body.query;
+            nextPageToken = body.nextpage;
+            isNextPage = !!nextPageToken;
+            
+            console.log('📄 POST recibido:', { query, hasToken: !!nextPageToken });
+        } else {
+            // Primera búsqueda via GET
+            query = event.queryStringParameters?.q;
+            nextPageToken = event.queryStringParameters?.nextpage;
+            isNextPage = !!nextPageToken;
+            
+            console.log('📡 GET recibido:', { query, hasToken: !!nextPageToken });
+        }
+
+        if (!query) {
+            return { 
+                statusCode: 400, 
+                headers: corsHeaders, 
+                body: JSON.stringify({ error: 'El parámetro "query" es requerido.' })
+            };
+        }
         
-        // Usamos una instancia de Piped como destino
         const instanceUrl = "https://api.piped.private.coffee";
-        
         let targetUrl;
         let fetchOptions = {
             headers: {
@@ -29,43 +50,24 @@ exports.handler = async function(event, context) {
         };
 
         if (isNextPage) {
-            // --- ESTA ES LA CORRECCIÓN CLAVE ---
-            // Si es una petición de paginación (contiene 'nextpage').
-            console.log('📄 Paginación detectada. Preparando petición POST...');
-
-            // 1. La API de Piped requiere un POST para la paginación.
+            // CORRECCIÓN CLAVE: POST para paginación
+            console.log('📄 Preparando POST para paginación...');
             targetUrl = `${instanceUrl}/nextpage/search`;
             fetchOptions.method = 'POST';
             fetchOptions.headers['Content-Type'] = 'application/json';
-
-            // 2. Decodificamos y parseamos el token que viene del cliente.
-            let decodedToken;
-            try {
-                // El token viene como una cadena JSON codificada, la revertimos a un objeto.
-                decodedToken = JSON.parse(decodeURIComponent(nextPageToken));
-            } catch (e) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Token de paginación inválido.' })};
-            }
-
-            // 3. Construimos el cuerpo del POST con el formato que Piped espera.
             fetchOptions.body = JSON.stringify({
-                nextpage: decodedToken, // El token como objeto
-                query: query             // La consulta original
+                nextpage: nextPageToken, // Debe ser un objeto, no string
+                query: query
             });
-            
-            console.log(`📡 Enviando POST a: ${targetUrl}`);
-
         } else {
-            // Si es una primera búsqueda, es un simple GET.
-            if (!query) {
-                return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'El parámetro de búsqueda "q" es requerido.' })};
-            }
+            // GET para primera búsqueda
             targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
             fetchOptions.method = 'GET';
-            console.log(`📡 Enviando GET a: ${targetUrl}`);
         }
         
-        // Realizamos la petición a la API de Piped con un timeout
+        console.log(`📡 Enviando ${fetchOptions.method} a: ${targetUrl}`);
+
+        // Realizar petición a Piped
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         fetchOptions.signal = controller.signal;
@@ -74,13 +76,18 @@ exports.handler = async function(event, context) {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Error de la API de Piped');
-            throw new Error(`Error de Piped ${response.status}: ${errorText}`);
+            const errorText = await response.text().catch(() => 'Error de Piped');
+            console.error(`❌ Error de Piped ${response.status}:`, errorText);
+            throw new Error(`Error de Piped ${response.status}: ${errorText.substring(0, 200)}`);
         }
 
         const data = await response.json();
         
-        // Devolvemos la respuesta de Piped al cliente del navegador.
+        console.log('✅ Respuesta de Piped exitosa:', {
+            items: data.items?.length || 0,
+            hasNextpage: !!data.nextpage
+        });
+        
         return {
             statusCode: 200,
             headers: corsHeaders,
@@ -88,7 +95,7 @@ exports.handler = async function(event, context) {
         };
         
     } catch (error) {
-        console.error('💥 Error en la función de Netlify:', error);
+        console.error('💥 Error en función search:', error);
         return {
             statusCode: 500,
             headers: corsHeaders,
