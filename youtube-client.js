@@ -52,57 +52,61 @@ class YouTubeSimplifiedClient {
         }
     }
 
-    async searchViaCorsProxy(query, continuation) {
-        console.log('📡 Usando la función de Netlify como proxy.');
-        
-        let targetUrl;
-        let fetchOptions = {
-            headers: { 'Accept': 'application/json' }
-        };
+async searchViaCorsProxy(query, continuation) {
+    console.log('📡 Usando la función de Netlify como proxy.');
+    
+    let targetUrl;
+    let fetchOptions = {
+        headers: { 
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    };
 
-        if (continuation) {
-            // CORRECCIÓN: Asegurar que el token JSON se codifique para la URL.
-            const encodedQuery = encodeURIComponent(query);
-            // Usamos JSON.stringify porque 'continuation' es un objeto (o cadena JSON)
-            // y necesitamos una representación en cadena segura para la URL.
-            const encodedToken = encodeURIComponent(JSON.stringify(continuation));
-            
-            targetUrl = `${this.netlifyFunction}?q=${encodedQuery}&nextpage=${encodedToken}`;
-            fetchOptions.method = 'GET';
-        } else {
-            // Para la primera búsqueda, solo enviamos la consulta.
-            targetUrl = `${this.netlifyFunction}?q=${encodeURIComponent(query)}`;
-            fetchOptions.method = 'GET';
-        }
+    if (continuation) {
+        // CORRECCIÓN: Para paginación, usar POST como espera Piped
+        console.log('📄 Preparando petición POST para paginación...');
+        
+        targetUrl = this.netlifyFunction;
+        fetchOptions.method = 'POST';
+        fetchOptions.body = JSON.stringify({
+            query: query,
+            nextpage: continuation // Enviar como objeto, no como string
+        });
+    } else {
+        // Para la primera búsqueda, mantener GET
+        targetUrl = `${this.netlifyFunction}?q=${encodeURIComponent(query)}`;
+        fetchOptions.method = 'GET';
+    }
 
-        console.log(`📡 URL del Proxy: ${targetUrl.substring(0, 100)}...`);
+    console.log(`📡 ${fetchOptions.method} a proxy:`, targetUrl.substring(0, 100));
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout de 15 segundos
-        fetchOptions.signal = controller.signal;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    fetchOptions.signal = controller.signal;
 
-        try {
-            const response = await fetch(targetUrl, fetchOptions);
-            clearTimeout(timeoutId);
-            
-            console.log(`📊 Respuesta del Proxy: ${response.status} ${response.statusText}`);
-            
-            if (!response.ok) {
-                const errorText = await response.text().catch(() => 'Error desconocido');
-                throw new Error(`Error HTTP ${response.status}: ${errorText.substring(0, 200)}`);
-            }
+    try {
+        const response = await fetch(targetUrl, fetchOptions);
+        clearTimeout(timeoutId);
+        
+        console.log(`📊 Respuesta del Proxy: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Error desconocido');
+            throw new Error(`Error HTTP ${response.status}: ${errorText.substring(0, 200)}`);
+        }
 
-            const data = await response.json();
-            return this.normalizeResponse(data, query, continuation);
+        const data = await response.json();
+        return this.normalizeResponse(data, query, continuation);
 
-        } catch (error) {
-            clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                throw new Error('La búsqueda excedió el tiempo límite (15s)');
-            }
-            throw error;
-        }
-    }
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('La búsqueda excedió el tiempo límite (15s)');
+        }
+        throw error;
+    }
+}
 
     async searchDirect(query, continuation) {
         // Este es un método de fallback y puede fallar por CORS.
