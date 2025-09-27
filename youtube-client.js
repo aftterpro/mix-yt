@@ -137,36 +137,99 @@ async searchViaCorsProxy(query, continuation) {
     
     // --- El resto de las funciones de ayuda (normalizeResponse, extractVideoId, etc.) ---
     
-    normalizeResponse(data, query, continuation) {
-        console.log(`📊 Datos recibidos:`, {
-            itemsCount: data.items?.length || 0,
-            hasNextpage: !!data.nextpage,
-        });
+normalizeResponse(data, query, continuation) {
+    console.log('📊 Normalizando respuesta de Piped:', {
+        itemsCount: data.items?.length || 0,
+        hasNextpage: !!data.nextpage,
+        firstItem: data.items?.[0] // Debug del primer item
+    });
 
-        const items = (data.items || []).filter(item =>
-            item && item.title && (item.url || item.videoId) && item.thumbnail
-        ).map(item => ({
-            videoId: item.videoId || this.extractVideoId(item.url),
-            title: item.title.trim(),
-            thumbnail: item.thumbnail,
-            duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
-            uploaderName: item.uploaderName?.trim() || 'Desconocido',
-        }));
+    const items = (data.items || []).map((item, index) => {
+        // CORRECCIÓN: Debug detallado para cada item
+        console.log(`📋 Procesando item ${index}:`, {
+            title: item.title?.substring(0, 50),
+            url: item.url,
+            hasUrl: !!item.url,
+            hasThumbnail: !!item.thumbnail
+        });
 
-        console.log(`✅ ${items.length} videos válidos procesados.`);
+        // Extraer videoId del campo url
+        const videoId = item.videoId || this.extractVideoId(item.url);
+        
+        if (!videoId) {
+            console.warn(`❌ Item ${index} descartado - no se pudo extraer videoId:`, {
+                url: item.url,
+                title: item.title?.substring(0, 30)
+            });
+            return null;
+        }
 
-        return {
-            items: items,
-            nextpage: data.nextpage || null,
-            suggestion: data.suggestion || null,
-        };
-    }
+        // Validar otros campos requeridos
+        if (!item.title || !item.thumbnail) {
+            console.warn(`❌ Item ${index} descartado - faltan datos:`, {
+                hasTitle: !!item.title,
+                hasThumbnail: !!item.thumbnail,
+                videoId
+            });
+            return null;
+        }
 
-    extractVideoId(url) {
-        if (!url) return null;
-        const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        return match ? match[1] : null;
-    }
+        const normalizedItem = {
+            videoId: videoId,
+            title: item.title.trim(),
+            thumbnail: item.thumbnail,
+            duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
+            uploaderName: item.uploaderName?.trim() || 'Desconocido',
+        };
+
+        console.log(`✅ Item ${index} procesado:`, {
+            videoId: normalizedItem.videoId,
+            title: normalizedItem.title.substring(0, 30),
+            duration: normalizedItem.duration
+        });
+
+        return normalizedItem;
+    }).filter(item => item !== null); // Filtrar items inválidos
+
+    console.log(`✅ Normalización completada: ${items.length} items válidos de ${data.items?.length || 0} total`);
+
+    return {
+        items: items,
+        nextpage: data.nextpage || null,
+        suggestion: data.suggestion || null,
+    };
+}
+
+extractVideoId(url) {
+    if (!url) return null;
+    
+    console.log('🔍 Extrayendo videoId de URL:', url);
+    
+    // CORRECCIÓN CRÍTICA: Manejar URLs relativas de Piped
+    const patterns = [
+        // URL relativa de Piped: "/watch?v=..."
+        /^\/watch\?v=([a-zA-Z0-9_-]{11})/,
+        // URL completa con watch?v=
+        /[?&]v=([a-zA-Z0-9_-]{11})/,
+        // URL de youtu.be
+        /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+        // URL de embed
+        /embed\/([a-zA-Z0-9_-]{11})/,
+        // Solo el ID (11 caracteres)
+        /^([a-zA-Z0-9_-]{11})$/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1] && match[1] !== 'undefined') {
+            console.log('✅ VideoId extraído:', match[1]);
+            return match[1];
+        }
+    }
+    
+    console.warn('❌ No se pudo extraer videoId de:', url);
+    return null;
+}
 
     parseDurationString(duration) {
         if (typeof duration === 'number') return duration;
