@@ -1632,47 +1632,75 @@ retryLoadMore() {
         return grid;
     }
 
-    createSearchResultCard(video, videoId) {
-        const card = document.createElement('div');
-        card.className = 'search-result-card';
-        card.dataset.videoId = videoId;
-
-        const duration = video.duration ? this.formatDuration(video.duration) : '';
-        const author = video.uploaderName || 'Autor Desconocido';
-
-        card.innerHTML = `
-            <div class="search-result-thumbnail">
-                <img src="${video.thumbnail}" alt="${video.title}" loading="lazy">
-                ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
-            </div>
-            <div class="search-result-info">
-                <h3 class="search-result-title">${video.title}</h3>
-                <p class="search-result-author">${author}</p>
-                <button class="search-result-add-btn" data-video-id="${videoId}" 
-                        data-title="${video.title}" data-thumbnail="${video.thumbnail}"
-                        data-duration="${video.duration || 0}"
-                        data-author="${author}">
-                    <i class="fas fa-plus"></i>
-                    Añadir a Cola
-                </button>
-            </div>
-        `;
-
-        const addBtn = card.querySelector('.search-result-add-btn');
-        addBtn.addEventListener('click', (e) => {
-            const videoData = {
-                videoId: e.target.dataset.videoId,
-                title: e.target.dataset.title,
-                thumbnail: e.target.dataset.thumbnail,
-                duration: parseInt(e.target.dataset.duration) || 0,
-                uploaderName: e.target.dataset.author,
-                author: e.target.dataset.author
-            };
-            this.addVideoToQueue(videoData);
-        });
-        
-        return card;
+ createSearchResultCard(video, videoId) {
+    // VALIDACIÓN CRÍTICA: Verificar videoId antes de crear la tarjeta
+    if (!videoId || videoId === 'undefined') {
+        console.error('❌ createSearchResultCard: videoId inválido:', { videoId, video });
+        return document.createElement('div'); // Retornar div vacío en lugar de fallar
     }
+
+    const card = document.createElement('div');
+    card.className = 'search-result-card';
+    card.dataset.videoId = videoId;
+
+    const duration = video.duration ? this.formatDuration(video.duration) : '';
+    const author = video.uploaderName || 'Autor Desconocido';
+
+    // VALIDACIÓN: Verificar datos antes de usar
+    const safeTitle = (video.title || 'Título Desconocido').replace(/'/g, "\\'");
+    const safeThumbnail = video.thumbnail || './electronic.ico';
+    const safeAuthor = author.replace(/'/g, "\\'");
+
+    card.innerHTML = `
+        <div class="search-result-thumbnail">
+            <img src="${safeThumbnail}" alt="${safeTitle}" loading="lazy" 
+                 onerror="this.src='./electronic.ico'">
+            ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
+        </div>
+        <div class="search-result-info">
+            <h3 class="search-result-title">${safeTitle}</h3>
+            <p class="search-result-author">${safeAuthor}</p>
+            <button class="search-result-add-btn" data-video-id="${videoId}" 
+                    data-title="${safeTitle}" data-thumbnail="${safeThumbnail}"
+                    data-duration="${video.duration || 0}"
+                    data-author="${safeAuthor}">
+                <i class="fas fa-plus"></i>
+                Añadir a Cola
+            </button>
+        </div>
+    `;
+
+    const addBtn = card.querySelector('.search-result-add-btn');
+    addBtn.addEventListener('click', (e) => {
+        // VALIDACIÓN FINAL en el evento click
+        const btnVideoId = e.target.dataset.videoId;
+        if (!btnVideoId || btnVideoId === 'undefined') {
+            console.error('❌ Click handler: videoId inválido');
+            this.showMessage('Error: Video inválido', 'error');
+            return;
+        }
+
+        const videoData = {
+            videoId: btnVideoId,
+            title: e.target.dataset.title,
+            thumbnail: e.target.dataset.thumbnail,
+            duration: parseInt(e.target.dataset.duration) || 0,
+            uploaderName: e.target.dataset.author,
+            author: e.target.dataset.author
+        };
+
+        // LOG DE DEBUG
+        console.log('🎵 Click en añadir video:', {
+            videoId: videoData.videoId,
+            title: videoData.title.substring(0, 50),
+            isValid: !!videoData.videoId && videoData.videoId !== 'undefined'
+        });
+
+        this.addVideoToQueue(videoData);
+    });
+    
+    return card;
+}
 
     clearSearchResults() {
         const searchResults = document.getElementById('searchResults');
@@ -1693,6 +1721,20 @@ retryLoadMore() {
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
 async addVideoToQueue(videoData) {
+    // VALIDACIÓN CRÍTICA: Verificar videoId antes de continuar
+    if (!videoData || !videoData.videoId) {
+        console.error('❌ addVideoToQueue: videoData o videoId inválido:', videoData);
+        this.showMessage('Error: Video inválido', 'error');
+        return;
+    }
+
+    // VALIDACIÓN ADICIONAL: Verificar que videoId no sea 'undefined'
+    if (videoData.videoId === 'undefined' || videoData.videoId === undefined) {
+        console.error('❌ addVideoToQueue: videoId es undefined');
+        this.showMessage('Error: ID de video no válido', 'error');
+        return;
+    }
+
     let queuePlaylist = playlistsData.find(p => p.id === 'queue');
     
     if (!queuePlaylist) {
@@ -1726,8 +1768,9 @@ async addVideoToQueue(videoData) {
         }
     }
 
+    // VALIDACIÓN FINAL: Verificar datos antes de crear el objeto
     const videoObject = {
-        videoId: videoData.videoId,
+        videoId: videoData.videoId, // Ya validado arriba
         title: videoData.title || "Título no disponible",
         thumbnail: videoData.thumbnail || './electronic.ico',
         duration: duration,
@@ -1736,13 +1779,20 @@ async addVideoToQueue(videoData) {
         sourcePlaylistId: 'queue'
     };
 
+    // LOG DE DEBUG para verificar datos
+    console.log('🎵 Video a añadir:', {
+        videoId: videoObject.videoId,
+        title: videoObject.title.substring(0, 50),
+        hasValidId: !!videoObject.videoId && videoObject.videoId !== 'undefined'
+    });
+
     queuePlaylist.videos.push(videoObject);
     this.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
     
     this.updatePlaylistsUI();
     this.enablePlayButton();
     
-    console.log(`🎵 Video añadido a cola. Total: ${queuePlaylist.videos.length} videos`);
+    console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
     setTimeout(() => saveAllData(), 500);
 }
 removeVideoFromQueue(videoId) {
