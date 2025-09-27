@@ -1,71 +1,84 @@
+// /.netlify/functions/search.js
+
+// Importa 'fetch' si usas una versión de Node que no lo tiene globalmente.
+// En Netlify, 'fetch' ya suele estar disponible.
+// const fetch = require('node-fetch');
+
 exports.handler = async function(event, context) {
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': '*', // O sé más específico: 'https://mix-yt.netlify.app'
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', // ¡Añadimos POST!
         'Content-Type': 'application/json'
     };
-    
+
+    // Manejo de la petición pre-vuelo (preflight) OPTIONS que hace el navegador
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 204, headers: corsHeaders, body: '' };
     }
 
-    // SOLO MANEJAR GET - NO POST para paginación
-    if (event.httpMethod !== 'GET') {
-        return { 
-            statusCode: 405, 
-            headers: corsHeaders, 
-            body: JSON.stringify({ error: 'Método no permitido. Solo GET.' })
-        };
-    }
-
-    console.log('🔍 Netlify Search - Primera búsqueda:', {
-        query: event.queryStringParameters?.q
-    });
-
+    const instanceUrl = "https://api.piped.private.coffee";
+    
     try {
-        const query = event.queryStringParameters?.q;
-
-        if (!query) {
-            return { 
-                statusCode: 400, 
-                headers: corsHeaders, 
-                body: JSON.stringify({ error: 'El parámetro "query" es requerido.' })
-            };
-        }
-        
-        // SOLO primera búsqueda a Piped
-        const instanceUrl = "https://api.piped.private.coffee";
-        const targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
-        
-        const fetchOptions = {
-            method: 'GET',
+        let targetUrl;
+        let fetchOptions = {
             headers: {
-                'User-Agent': 'YTCrossMix-Netlify/1.0',
-                'Accept': 'application/json'
+                'User-Agent': 'YTCrossMix-Netlify/1.1',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
             },
             signal: AbortSignal.timeout(15000)
         };
+
+        // --- LÓGICA PARA DISTINGUIR BÚSQUEDA INICIAL Y PAGINACIÓN ---
+
+        if (event.httpMethod === 'POST') {
+            // PAGINACIÓN: Se recibe por POST con un body
+            console.log('🔄 Netlify Search - Paginación:', event.body);
+            
+            const body = JSON.parse(event.body);
+            if (!body.nextpage || !body.query) {
+                throw new Error('Para paginación se requiere "nextpage" y "query" en el body.');
+            }
+
+            targetUrl = `${instanceUrl}/nextpage/search`;
+            fetchOptions.method = 'POST';
+            fetchOptions.body = JSON.stringify({
+                nextpage: body.nextpage,
+                query: body.query
+            });
+
+        } else if (event.httpMethod === 'GET') {
+            // BÚSQUEDA INICIAL: Se recibe por GET con un query param
+            const query = event.queryStringParameters?.q;
+            console.log('🔍 Netlify Search - Primera búsqueda:', { query });
+
+            if (!query) {
+                throw new Error('El parámetro "q" es requerido para la búsqueda inicial.');
+            }
+
+            targetUrl = `${instanceUrl}/search?q=${encodeURIComponent(query)}&filter=videos`;
+            fetchOptions.method = 'GET';
         
-        console.log(`📡 GET -> ${targetUrl}`);
+        } else {
+            // Método no soportado
+            return { 
+                statusCode: 405, 
+                headers: corsHeaders, 
+                body: JSON.stringify({ error: 'Método no permitido.' })
+            };
+        }
 
+        console.log(`📡 Proxying ${fetchOptions.method} -> ${targetUrl}`);
         const response = await fetch(targetUrl, fetchOptions);
-
-        console.log(`📊 Respuesta Piped: ${response.status} ${response.statusText}`);
+        console.log(`📊 Respuesta de Piped: ${response.status} ${response.statusText}`);
 
         if (!response.ok) {
             const errorText = await response.text().catch(() => 'Error desconocido');
-            console.error(`❌ Error ${response.status} de Piped:`, errorText.substring(0, 300));
-            
             throw new Error(`Error de Piped ${response.status}: ${errorText.substring(0, 200)}`);
         }
 
         const data = await response.json();
-        
-        console.log('✅ Primera búsqueda exitosa:', {
-            items: data.items?.length || 0,
-            hasNextpage: !!data.nextpage
-        });
         
         return {
             statusCode: 200,
@@ -74,8 +87,7 @@ exports.handler = async function(event, context) {
         };
         
     } catch (error) {
-        console.error('💥 Error en primera búsqueda:', error);
-        
+        console.error('💥 Error en la función de Netlify:', error);
         return {
             statusCode: 500,
             headers: corsHeaders,
