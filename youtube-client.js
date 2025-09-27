@@ -28,28 +28,61 @@ class YouTubeSimplifiedClient {
         console.log(`🔄 Rotando a instancia de Piped: ${this.getCurrentInstance()}`);
     }
 
-    async search(query, continuation = null) {
-        if (!this.initialized) await this.init();
+async search(query, continuation = null) {
+    if (!this.initialized) await this.init();
 
-        console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (cargando página siguiente)' : ''}`);
+    console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (paginación)' : ''}`);
 
-        try {
-            // **Paso 1: Intentar la búsqueda a través de nuestro proxy de Netlify.**
-            return await this.searchViaCorsProxy(query, continuation);
-        } catch (error) {
-            console.warn('⚠️ Error con el proxy de Netlify:', error.message);
-            
-            // **Paso 2: Fallback a un intento de conexión directa.**
-            try {
-                console.log('🔄 Intentando acceso directo a Piped...');
-                return await this.searchDirect(query, continuation);
-            } catch (directError) {
-                console.error('❌ Falló también el acceso directo:', directError.message);
-                // **Paso 3: Último recurso, mostrar resultados locales.**
-                return this.searchFallback(query, continuation);
-            }
-        }
-    }
+    try {
+        if (!continuation) {
+            // PRIMERA BÚSQUEDA: Usar función Netlify
+            return await this.searchViaCorsProxy(query, null);
+        } else {
+            // PAGINACIÓN: Ir directamente a Piped
+            return await this.searchDirectPagination(query, continuation);
+        }
+    } catch (error) {
+        console.error("❌ Error en búsqueda:", error);
+        return this.searchFallback(query, continuation);
+    }
+}
+
+// NUEVO MÉTODO: Paginación directa a Piped
+async searchDirectPagination(query, continuation) {
+    console.log('📄 Paginación directa a Piped...');
+    
+    const instanceUrl = this.getCurrentInstance();
+    const targetUrl = `${instanceUrl}/nextpage/search`;
+    
+    const fetchOptions = {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            nextpage: continuation,
+            query: query
+        }),
+        signal: AbortSignal.timeout(12000)
+    };
+
+    console.log('📡 POST directo a Piped:', targetUrl);
+    console.log('📤 Body:', JSON.stringify({
+        query: query,
+        nextpage: typeof continuation === 'string' ? continuation.substring(0, 100) + '...' : continuation
+    }));
+
+    const response = await fetch(targetUrl, fetchOptions);
+
+    if (!response.ok) {
+        this.rotateInstance();
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return this.normalizeResponse(data, query, continuation);
+}
 
 async searchViaCorsProxy(query, continuation) {
     console.log('📡 Usando la función de Netlify como proxy.');
@@ -137,60 +170,29 @@ async searchViaCorsProxy(query, continuation) {
     // --- El resto de las funciones de ayuda (normalizeResponse, extractVideoId, etc.) ---
     
 normalizeResponse(data, query, continuation) {
-    console.log('📊 Normalizando respuesta de Piped:', {
+    console.log('📊 Normalizando respuesta:', {
+        source: continuation ? 'paginación' : 'primera búsqueda',
         itemsCount: data.items?.length || 0,
-        hasNextpage: !!data.nextpage,
-        firstItem: data.items?.[0] // Debug del primer item
+        hasNextpage: !!data.nextpage
     });
 
     const items = (data.items || []).map((item, index) => {
-        // CORRECCIÓN: Debug detallado para cada item
-        console.log(`📋 Procesando item ${index}:`, {
-            title: item.title?.substring(0, 50),
-            url: item.url,
-            hasUrl: !!item.url,
-            hasThumbnail: !!item.thumbnail
-        });
-
-        // Extraer videoId del campo url
         const videoId = item.videoId || this.extractVideoId(item.url);
         
-        if (!videoId) {
-            console.warn(`❌ Item ${index} descartado - no se pudo extraer videoId:`, {
-                url: item.url,
-                title: item.title?.substring(0, 30)
-            });
+        if (!videoId || !item.title || !item.thumbnail) {
             return null;
         }
 
-        // Validar otros campos requeridos
-        if (!item.title || !item.thumbnail) {
-            console.warn(`❌ Item ${index} descartado - faltan datos:`, {
-                hasTitle: !!item.title,
-                hasThumbnail: !!item.thumbnail,
-                videoId
-            });
-            return null;
-        }
-
-        const normalizedItem = {
+        return {
             videoId: videoId,
             title: item.title.trim(),
             thumbnail: item.thumbnail,
             duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
             uploaderName: item.uploaderName?.trim() || 'Desconocido',
         };
+    }).filter(item => item !== null);
 
-        console.log(`✅ Item ${index} procesado:`, {
-            videoId: normalizedItem.videoId,
-            title: normalizedItem.title.substring(0, 30),
-            duration: normalizedItem.duration
-        });
-
-        return normalizedItem;
-    }).filter(item => item !== null); // Filtrar items inválidos
-
-    console.log(`✅ Normalización completada: ${items.length} items válidos de ${data.items?.length || 0} total`);
+    console.log(`✅ ${items.length} videos válidos procesados`);
 
     return {
         items: items,
