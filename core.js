@@ -1376,16 +1376,19 @@ async performSearchFallback(query, nextPage) {
 // Asegurar que displaySearchResults tenga scroll infinito:
 displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
-    if (!searchResults) return;
+    if (!searchResults) {
+        console.error('❌ Elemento searchResults no encontrado');
+        return;
+    }
 
-    console.log(`📊 displaySearchResults:`, {
+    console.log('📊 displaySearchResults:', {
         itemsReceived: results?.items?.length || 0,
         append: append,
         hasNextPage: !!results?.nextpage,
-        nextPageType: typeof results?.nextpage
+        firstItem: results?.items?.[0]
     });
 
-    // 1. LIMPIEZA INICIAL Y CONFIGURACIÓN
+    // Limpieza inicial
     if (!append) {
         currentSearchQuery = results.query || currentSearchQuery;
         searchResults.innerHTML = '';
@@ -1396,75 +1399,111 @@ displaySearchResults(results, append = false) {
         }
     }
 
-    // 2. MANEJO DE RESULTADOS VACÍOS
+    // Manejar resultados vacíos
     if (!results?.items?.length) {
         if (!append) {
             searchResults.innerHTML = `
                 <div class="search-placeholder">
                     <i class="fas fa-search"></i>
-                    <p>No se encontraron resultados</p>
+                    <p>No se encontraron resultados para "${currentSearchQuery}"</p>
+                    <p><small>Intenta con otros términos de búsqueda</small></p>
                 </div>
             `;
         }
         return;
     }
 
-    // 3. ACTUALIZAR NEXTPAGE (PAGINACIÓN)
+    // Actualizar nextPage
     if (results.nextpage) {
         nextPageContext = results.nextpage;
-        console.log('📄 NextPage actualizado:', {
-            type: typeof nextPageContext,
-            valid: !!nextPageContext
-        });
+        console.log('📄 NextPage actualizado');
     } else {
         nextPageContext = null;
         console.log('📄 No hay más páginas');
     }
 
-    // 4. INICIALIZAR GRUPO DE RESULTADOS (GRID)
+    // Crear/obtener grid
     let grid = searchResults.querySelector('.search-results-grid');
     if (!grid) {
         grid = this.createSearchGrid();
         searchResults.appendChild(grid);
     }
 
-    // 5. LÓGICA DE FILTRADO (SOLO EN PAGINACIÓN)
-    let videoItems = results.items; // Por defecto, usamos todos los items (si append=false)
-
+    // CORRECCIÓN: No filtrar en primera carga, solo en paginación
+    let videoItems = results.items;
+    
     if (append) {
-        // Solo aplica el filtro si estamos en paginación (append=true)
+        // Solo filtrar duplicados en paginación
         videoItems = results.items.filter(video => {
-            const videoId = video.videoId || video.url?.split('v=')[1];
+            const videoId = video.videoId;
             if (!videoId) return false;
-            // Solo se mantiene si NO existe una tarjeta con el mismo ID en el grid
             return !grid.querySelector(`[data-video-id="${videoId}"]`);
         });
     }
 
-    console.log(`📊 Videos nuevos: ${videoItems.length} de ${results.items.length}`);
+    console.log(`📊 Videos a renderizar: ${videoItems.length} de ${results.items.length}`);
 
-    if (videoItems.length === 0) {
+    if (videoItems.length === 0 && append) {
         console.log('🚫 No hay videos nuevos para agregar');
         return;
     }
 
-    // 6. RENDERIZAR Y AÑADIR VIDEOS
+    // Renderizar videos
     const fragment = document.createDocumentFragment();
-    videoItems.forEach(video => {
-        const videoId = video.videoId || video.url?.split('v=')[1];
-        const card = this.createSearchResultCard(video, videoId);
-        fragment.appendChild(card);
+    let renderedCount = 0;
+    
+    videoItems.forEach((video, index) => {
+        // VALIDACIÓN CRÍTICA antes de crear card
+        if (!video.videoId) {
+            console.warn(`❌ Video ${index} sin videoId, saltando:`, {
+                title: video.title?.substring(0, 30),
+                videoId: video.videoId
+            });
+            return;
+        }
+
+        try {
+            const card = this.createSearchResultCard(video, video.videoId);
+            if (card && card.children.length > 0) { // Verificar que la card se creó correctamente
+                fragment.appendChild(card);
+                renderedCount++;
+            }
+        } catch (error) {
+            console.error(`❌ Error creando card para video ${index}:`, error);
+        }
     });
     
-    grid.appendChild(fragment);
+    console.log(`✅ Cards creadas: ${renderedCount}`);
+    
+    if (renderedCount > 0) {
+        grid.appendChild(fragment);
+        console.log(`✅ ${renderedCount} cards añadidas al DOM`);
+    }
 
-    // 7. CONFIGURAR SCROLL INFINITO
+    // Configurar scroll infinito
     if (nextPageContext) {
         this.setupImprovedInfiniteScroll(searchResults);
-        console.log(`✅ ${videoItems.length} videos agregados - Scroll infinito activo`);
+        console.log(`✅ Renderizado completo - Scroll infinito activo`);
     } else {
-        console.log(`✅ ${videoItems.length} videos agregados - Sin más páginas`);
+        console.log(`✅ Renderizado completo - Sin más páginas`);
     }
+
+    // Debug final del DOM
+    setTimeout(() => {
+        const totalCards = grid.querySelectorAll('.search-result-card').length;
+        console.log(`🎯 Total de cards en DOM: ${totalCards}`);
+        
+        if (totalCards === 0 && results.items.length > 0) {
+            console.error('❌ PROBLEMA: Se recibieron items pero no hay cards en el DOM');
+            console.error('Debug info:', {
+                receivedItems: results.items.length,
+                processedItems: videoItems.length,
+                renderedCards: renderedCount,
+                gridExists: !!grid,
+                gridContent: grid.innerHTML.substring(0, 100)
+            });
+        }
+    }, 100);
 }
 
 setupImprovedInfiniteScroll(searchResults) {
@@ -1632,12 +1671,24 @@ retryLoadMore() {
         return grid;
     }
 
- createSearchResultCard(video, videoId) {
-    // VALIDACIÓN CRÍTICA: Verificar videoId antes de crear la tarjeta
-    if (!videoId || videoId === 'undefined') {
-        console.error('❌ createSearchResultCard: videoId inválido:', { videoId, video });
-        return document.createElement('div'); // Retornar div vacío en lugar de fallar
+createSearchResultCard(video, videoId) {
+    // VALIDACIÓN CRÍTICA
+    if (!videoId || videoId === 'undefined' || videoId === 'null') {
+        console.error('❌ createSearchResultCard: videoId inválido:', { 
+            videoId, 
+            title: video?.title?.substring(0, 30) 
+        });
+        // Retornar div vacío en lugar de null
+        const emptyCard = document.createElement('div');
+        emptyCard.style.display = 'none';
+        return emptyCard;
     }
+
+    console.log('🎵 Creando card para:', {
+        videoId,
+        title: video.title?.substring(0, 30),
+        hasThumbnail: !!video.thumbnail
+    });
 
     const card = document.createElement('div');
     card.className = 'search-result-card';
@@ -1646,22 +1697,25 @@ retryLoadMore() {
     const duration = video.duration ? this.formatDuration(video.duration) : '';
     const author = video.uploaderName || 'Autor Desconocido';
 
-    // VALIDACIÓN: Verificar datos antes de usar
-    const safeTitle = (video.title || 'Título Desconocido').replace(/'/g, "\\'");
+    // Escapar datos para HTML
+    const safeTitle = (video.title || 'Título Desconocido').replace(/'/g, "&#39;").replace(/"/g, "&quot;");
     const safeThumbnail = video.thumbnail || './electronic.ico';
-    const safeAuthor = author.replace(/'/g, "\\'");
+    const safeAuthor = author.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
 
     card.innerHTML = `
         <div class="search-result-thumbnail">
             <img src="${safeThumbnail}" alt="${safeTitle}" loading="lazy" 
-                 onerror="this.src='./electronic.ico'">
+                 onerror="this.src='./electronic.ico'; console.log('Error cargando imagen:', this.dataset.originalSrc);"
+                 data-original-src="${safeThumbnail}">
             ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
         </div>
         <div class="search-result-info">
-            <h3 class="search-result-title">${safeTitle}</h3>
+            <h3 class="search-result-title" title="${safeTitle}">${safeTitle}</h3>
             <p class="search-result-author">${safeAuthor}</p>
-            <button class="search-result-add-btn" data-video-id="${videoId}" 
-                    data-title="${safeTitle}" data-thumbnail="${safeThumbnail}"
+            <button class="search-result-add-btn" 
+                    data-video-id="${videoId}" 
+                    data-title="${safeTitle}" 
+                    data-thumbnail="${safeThumbnail}"
                     data-duration="${video.duration || 0}"
                     data-author="${safeAuthor}">
                 <i class="fas fa-plus"></i>
@@ -1670,15 +1724,25 @@ retryLoadMore() {
         </div>
     `;
 
+    // Event listener para el botón
     const addBtn = card.querySelector('.search-result-add-btn');
     addBtn.addEventListener('click', (e) => {
-        // VALIDACIÓN FINAL en el evento click
+        e.preventDefault();
+        e.stopPropagation();
+        
         const btnVideoId = e.target.dataset.videoId;
+        
+        // Validación final
         if (!btnVideoId || btnVideoId === 'undefined') {
-            console.error('❌ Click handler: videoId inválido');
+            console.error('❌ Click handler: videoId inválido en botón');
             this.showMessage('Error: Video inválido', 'error');
             return;
         }
+
+        console.log('🎵 Añadiendo video desde búsqueda:', {
+            videoId: btnVideoId,
+            title: e.target.dataset.title?.substring(0, 30)
+        });
 
         const videoData = {
             videoId: btnVideoId,
@@ -1689,16 +1753,10 @@ retryLoadMore() {
             author: e.target.dataset.author
         };
 
-        // LOG DE DEBUG
-        console.log('🎵 Click en añadir video:', {
-            videoId: videoData.videoId,
-            title: videoData.title.substring(0, 50),
-            isValid: !!videoData.videoId && videoData.videoId !== 'undefined'
-        });
-
         this.addVideoToQueue(videoData);
     });
     
+    console.log('✅ Card creada exitosamente:', videoId);
     return card;
 }
 
