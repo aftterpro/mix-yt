@@ -32,13 +32,17 @@ constructor(unifiedCore) {
             const videos = await getYouTubeLibraryPlaylistItems(playlistId);
             
             if (videos && videos.length > 0) {
+                // CORRECCIÓN: Obtener duraciones reales de videos
+                const videoIds = videos.map(v => v.videoId).filter(Boolean);
+                const durations = await this.core?.getBatchVideoDurations(videoIds) || {};
+                
                 playlist.videos = videos.map(video => ({
                     videoId: video.videoId,
-                    title: video.title,
+                    title: this.cleanVideoTitle(video.title),
                     thumbnail: video.thumbnail,
-                    duration: video.duration || 0,
-                    uploaderName: 'YouTube', // Fallback ya que YouTube Library no siempre tiene esta info
-                    author: 'YouTube'
+                    duration: durations[video.videoId] || video.duration || 0,
+                    uploaderName: this.extractArtistFromTitle(video.title),
+                    author: this.extractArtistFromTitle(video.title)
                 }));
                 playlist.isLoaded = true;
                 
@@ -57,6 +61,58 @@ constructor(unifiedCore) {
             return playlist;
         }
     }
+
+    /**
+     * NUEVA FUNCIÓN: Limpiar título de video
+     * Elimina: (Videoclip Oficial), [Remix], | Video Oficial, etc.
+     */
+    cleanVideoTitle(title) {
+        if (!title) return "Título Desconocido";
+        
+        let cleaned = title;
+        
+        // Eliminar patrones comunes al final o entre paréntesis/corchetes
+        const patternsToRemove = [
+            /\(Videoclip Oficial\)/gi,
+            /\(Video Oficial\)/gi,
+            /\| Video Oficial/gi,
+            /\[Video Oficial\]/gi,
+            /\(Official Video\)/gi,
+            /\[Official Video\]/gi,
+            /\(Official Music Video\)/gi,
+            /\[Official Music Video\]/gi,
+            /\(Lyric Video\)/gi,
+            /\[Lyric Video\]/gi,
+            /\(Audio Oficial\)/gi,
+            /\[Audio Oficial\]/gi,
+        ];
+        
+        patternsToRemove.forEach(pattern => {
+            cleaned = cleaned.replace(pattern, '');
+        });
+        
+        // Extraer solo el título si hay artista
+        // Patrones: "Artista - Título" o "Artista: Título"
+        const artistTitlePattern = /^(.+?)\s*[-:]\s*(.+?)(?:\s*\(.*?\)|\s*\[.*?\])*$/;
+        const match = cleaned.match(artistTitlePattern);
+        
+        if (match && match[2]) {
+            // Solo retornar el título, sin el artista
+            cleaned = match[2].trim();
+            
+            // Limpiar features y remix del título si están al final
+            cleaned = cleaned
+                .replace(/\s*\(feat\..*?\)/gi, '')
+                .replace(/\s*\[Remix\]/gi, '')
+                .replace(/\s*\(Remix\)/gi, '');
+        }
+        
+        // Limpiar espacios múltiples y trim final
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        return cleaned || title; // Fallback al título original si queda vacío
+    }
+
 async loadPersistentData() {
     console.log('📂 Cargando datos persistentes...');
     
@@ -179,6 +235,10 @@ async loadPersistentData() {
         card.className = 'playlist-card';
         card.dataset.playlistId = playlist.id;
 
+        // CORRECCIÓN: Mostrar contador correcto de videos
+        const videoCount = playlist.videos?.length || 0;
+        const isYouTubeLibrary = playlist.source === 'youtube_library';
+
         card.innerHTML = `
             <div class="playlist-card-image">
                 <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
@@ -190,14 +250,14 @@ async loadPersistentData() {
             </div>
             <div class="playlist-card-info">
                 <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
-                <p class="playlist-card-count">${playlist.videos.length} videos</p>
-                ${playlist.source === YOUTUBE_LIBRARY_SOURCE_ID ? 
+                <p class="playlist-card-count">${videoCount} videos</p>
+                ${isYouTubeLibrary ? 
                     '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
                     '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
                 }
-                ${playlist.source !== YOUTUBE_LIBRARY_SOURCE_ID ? 
-                    '<button class="delete-playlist-btn" data-playlist-id="' + playlist.id + '"><i class="fas fa-trash"></i></button>' : ''
-                }
+                <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Eliminar playlist">
+                    <i class="fas fa-trash"></i>
+                </button>
             </div>
         `;
 
@@ -205,18 +265,31 @@ async loadPersistentData() {
         const playBtn = card.querySelector('.play-playlist-btn');
         playBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            const playlistId = e.target.dataset.playlistId;
+            const playlistId = playBtn.dataset.playlistId;
             
-            // Cargar videos si es necesario
-            if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded) {
+            console.log(`🎵 Reproducir playlist: ${playlistId}`);
+            
+            // CORRECCIÓN: Cargar videos si es YouTube Library y no está cargada
+            if (isYouTubeLibrary && !playlist.isLoaded) {
+                console.log('📥 Cargando videos de YouTube Library...');
                 await this.loadPlaylistVideos(playlistId);
             }
             
-            // Añadir toda la playlist a la cola
+            // Obtener playlist actualizada
             const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
+            
+            console.log('📊 Playlist actualizada:', {
+                id: updatedPlaylist?.id,
+                name: updatedPlaylist?.name,
+                videosCount: updatedPlaylist?.videos?.length,
+                isLoaded: updatedPlaylist?.isLoaded
+            });
+            
+            // Añadir toda la playlist a la cola
             if (updatedPlaylist?.videos?.length > 0) {
                 let addedCount = 0;
-                updatedPlaylist.videos.forEach(video => {
+                
+                for (const video of updatedPlaylist.videos) {
                     const videoData = {
                         videoId: video.videoId,
                         title: video.title,
@@ -231,10 +304,10 @@ async loadPersistentData() {
                     const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
                     
                     if (!isDuplicate) {
-                        this.core?.addVideoToQueue(videoData);
+                        await this.core?.addVideoToQueue(videoData);
                         addedCount++;
                     }
-                });
+                }
                 
                 if (addedCount > 0) {
                     this.core?.showMessage(`${addedCount} videos de "${updatedPlaylist.name}" añadidos a cola`, 'success');
@@ -249,17 +322,32 @@ async loadPersistentData() {
                     this.core?.showMessage(`Todos los videos de "${updatedPlaylist.name}" ya están en la cola`, 'info');
                 }
             } else {
-                this.core?.showMessage('La playlist está vacía', 'warning');
+                console.error('❌ La playlist no tiene videos o no se cargaron correctamente');
+                this.core?.showMessage('No se pudieron cargar los videos de la playlist', 'error');
             }
         });
 
-        // Event listener para eliminar playlist
+        // CORRECCIÓN: Event listener para eliminar playlist (ahora funciona para TODAS)
         const deleteBtn = card.querySelector('.delete-playlist-btn');
         if (deleteBtn) {
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const playlistId = e.target.dataset.playlistId;
-                this.deletePlaylist(playlistId);
+                e.preventDefault();
+                const playlistId = deleteBtn.dataset.playlistId;
+                
+                console.log(`🗑️ Solicitud eliminar playlist: ${playlistId}`);
+                
+                // Confirmar antes de eliminar
+                const playlistToDelete = this.playlistsData.find(p => p.id === playlistId);
+                if (playlistToDelete) {
+                    const confirmMessage = isYouTubeLibrary 
+                        ? `¿Eliminar "${playlistToDelete.name}" de la biblioteca? (Solo se elimina de la app, no de YouTube)`
+                        : `¿Eliminar la playlist "${playlistToDelete.name}"?`;
+                    
+                    if (confirm(confirmMessage)) {
+                        this.deletePlaylist(playlistId);
+                    }
+                }
             });
         }
 
@@ -278,17 +366,30 @@ async loadPersistentData() {
      */
     deletePlaylist(playlistId) {
         const playlist = this.playlistsData.find(p => p.id === playlistId);
-        if (!playlist) return;
+        if (!playlist) {
+            console.warn(`⚠️ Playlist ${playlistId} no encontrada`);
+            return;
+        }
         
-        if (confirm(`¿Eliminar la playlist "${playlist.name}"?`)) {
-            // Eliminar de playlistsData
-            this.playlistsData = this.playlistsData.filter(p => p.id !== playlistId);
+        console.log(`🗑️ Eliminando playlist: ${playlist.name} (${playlistId})`);
+        
+        // NO permitir eliminar la cola
+        if (playlist.isQueue || playlistId === 'queue') {
+            this.core?.showMessage('No puedes eliminar la cola de reproducción', 'warning');
+            return;
+        }
+        
+        // Eliminar de playlistsData
+        const indexToRemove = this.playlistsData.findIndex(p => p.id === playlistId);
+        if (indexToRemove !== -1) {
+            this.playlistsData.splice(indexToRemove, 1);
             
             // Actualizar también en el core si existe
             if (this.core && this.core.playlistsData) {
                 this.core.playlistsData = this.playlistsData;
             }
             
+            console.log(`✅ Playlist "${playlist.name}" eliminada`);
             this.updatePlaylistsUI();
             this.core?.showMessage(`Playlist "${playlist.name}" eliminada`, 'success');
             
@@ -299,6 +400,8 @@ async loadPersistentData() {
             } else {
                 this.core?.updateCurrentPlayingIndex();
             }
+        } else {
+            console.error(`❌ No se pudo encontrar índice de playlist ${playlistId}`);
         }
     }
 
@@ -307,7 +410,7 @@ async loadPersistentData() {
      */
     async createPlaylistPopup(playlist) {
         // Si es una playlist de YouTube Library y no está cargada, cargarla primero
-        if (playlist.source === YOUTUBE_LIBRARY_SOURCE_ID && !playlist.isLoaded && playlist.videos.length === 0) {
+        if (playlist.source === 'youtube_library' && !playlist.isLoaded && playlist.videos.length === 0) {
             await this.loadPlaylistVideos(playlist.id);
             playlist = this.playlistsData.find(p => p.id === playlist.id); // Recargar datos actualizados
         }
@@ -351,14 +454,20 @@ async loadPersistentData() {
             </div>`;
         }
 
-        return playlist.videos.map((video, index) => `
+        return playlist.videos.map((video, index) => {
+            // CORRECCIÓN: Formatear duración correctamente
+            const formattedDuration = video.duration && video.duration > 0 
+                ? this.core?.formatDuration(video.duration) 
+                : '--:--';
+            
+            return `
             <div class="playlist-video-item" data-index="${index}">
                 <div class="video-number">${index + 1}</div>
                 <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
                 <div class="video-info">
                     <div class="video-title" title="${video.title}">${video.title}</div>
                     <div class="video-meta">
-                        <span class="video-duration">${this.core?.formatDuration(video.duration) || '--:--'}</span>
+                        <span class="video-duration">${formattedDuration}</span>
                         ${video.uploaderName ? `<span class="video-author">${video.uploaderName}</span>` : ''}
                     </div>
                 </div>
@@ -371,7 +480,8 @@ async loadPersistentData() {
                     </button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     }
 
     /**
@@ -553,6 +663,10 @@ async loadPersistentData() {
         
         flatList.forEach((video, index) => {
             const isPlaying = video.videoId === this.core?.currentPlayingInfo?.videoId;
+            const formattedDuration = video.duration && video.duration > 0 
+                ? this.core?.formatDuration(video.duration) 
+                : '--:--';
+            
             queueHTML += `
                 <div class="queue-item ${isPlaying ? 'playing' : ''}" 
                      data-video-id="${video.videoId}" 
@@ -561,10 +675,10 @@ async loadPersistentData() {
                     <img src="${video.thumbnail}" alt="${video.title}" class="queue-item-thumbnail">
                     <div class="queue-item-info">
                         <div class="queue-item-title">${video.title}</div>
-                        <div class="queue-item-duration">${this.core?.formatDuration(video.duration) || '--:--'}</div>
+                        <div class="queue-item-duration">${formattedDuration}</div>
                     </div>
                     ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
-                    <button class="queue-item-remove" data-video-id="${video.videoId}">
+                    <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -574,7 +688,7 @@ async loadPersistentData() {
         queueHTML += '</div>';
         queueContainer.innerHTML = queueHTML;
         
-        // Event listeners
+        // CORRECCIÓN: Event listeners mejorados para cola
         queueContainer.querySelectorAll('.queue-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 if (!e.target.closest('.queue-item-remove')) {
@@ -584,11 +698,38 @@ async loadPersistentData() {
             });
         });
         
+        // CORRECCIÓN CRÍTICA: Event listeners para eliminar de cola
         queueContainer.querySelectorAll('.queue-item-remove').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                e.preventDefault();
+                
                 const videoId = btn.dataset.videoId;
-                this.core?.removeVideoFromQueue(videoId);
+                console.log(`🗑️ Eliminando video de cola: ${videoId}`);
+                
+                if (!videoId || videoId === 'undefined') {
+                    console.error('❌ videoId inválido para eliminar');
+                    return;
+                }
+                
+                // Deshabilitar botón temporalmente
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                
+                // Eliminar video
+                const success = this.core?.removeVideoFromQueue(videoId);
+                
+                if (success) {
+                    // Actualizar display
+                    setTimeout(() => {
+                        this.updateQueueDisplay();
+                    }, 100);
+                } else {
+                    // Restaurar botón si falló
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    this.core?.showMessage('Error eliminando video', 'error');
+                }
             });
         });
     }
@@ -686,6 +827,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         }
     });
 }
+
 // Forzar recreación de UI:
 forceRecreatePlaylistsUI() {
     console.log("🔄 Forzando recreación completa de UI de playlists");
@@ -726,12 +868,13 @@ forceRecreatePlaylistsUI() {
     // ACTUALIZAR ESTADÍSTICAS
     this.core?.updateOverviewStats();
 }
+
     /**
      * Limpiar playlists de YouTube Library
      */
     clearYouTubeLibraryPlaylists() {
         const initialCount = this.playlistsData.length;
-        this.playlistsData = this.playlistsData.filter(p => p.source !== YOUTUBE_LIBRARY_SOURCE_ID);
+        this.playlistsData = this.playlistsData.filter(p => p.source !== 'youtube_library');
         const removedCount = initialCount - this.playlistsData.length;
         
         // Actualizar también en el core si existe
@@ -814,11 +957,11 @@ forceRecreatePlaylistsUI() {
             
             return {
                 videoId: videoId,
-                title: video.title || "Título Desconocido",
+                title: this.cleanVideoTitle(video.title),
                 thumbnail: video.thumbnail || './electronic.ico',
                 duration: duration,
-                uploaderName: video.uploaderName || this.extractArtistFromTitle(video.title),
-                author: video.uploaderName || this.extractArtistFromTitle(video.title),
+                uploaderName: this.extractArtistFromTitle(video.title),
+                author: this.extractArtistFromTitle(video.title),
                 source: 'url'
             };
         }).filter(v => v.videoId && v.title);
@@ -859,25 +1002,50 @@ forceRecreatePlaylistsUI() {
     // =============================================
 
     /**
-     * Extraer artista del título
+     * MEJORADO: Extraer artista del título con mejor formato
      */
     extractArtistFromTitle(title) {
         if (!title) return 'Artista Desconocido';
         
-        const patterns = [
-            /^([^-]+)\s*-\s*(.+)$/,
-            /^([^:]+)\s*:\s*(.+)$/,
-            /^([^|]+)\s*\|\s*(.+)$/
+        // Patrones para extraer artista - Formato: "Artista - Título" o "Artista: Título"
+        const artistPatterns = [
+            /^(.+?)\s*[-:]\s*(.+?)(?:\s*\(.*?\)|\s*\[.*?\])*$/,
+            /^(.+?)\s*\|\s*(.+?)$/
         ];
         
-        for (const pattern of patterns) {
+        for (const pattern of artistPatterns) {
             const match = title.match(pattern);
-            if (match) {
-                return match[1].trim();
+            if (match && match[1]) {
+                let artist = match[1].trim();
+                
+                // Limpiar features del artista pero mantener el artista principal
+                // Ejemplo: "Piso 21 - Me Llamas (feat. Maluma)" -> Artista: "Piso 21 feat. Maluma"
+                // Pero si está en el artista, mantenerlo
+                if (artist.includes('ft.') || artist.includes('feat.') || artist.includes('featuring')) {
+                    // Ya tiene features en el nombre del artista, mantener
+                    return artist;
+                }
+                
+                // Si el feature está en el título, extraerlo
+                const featureInTitle = title.match(/\(feat\.\s*([^)]+)\)|\(ft\.\s*([^)]+)\)|featuring\s+([^)]+)/i);
+                if (featureInTitle) {
+                    const featuredArtist = featureInTitle[1] || featureInTitle[2] || featureInTitle[3];
+                    if (featuredArtist) {
+                        return `${artist} feat. ${featuredArtist.trim()}`;
+                    }
+                }
+                
+                return artist;
             }
         }
         
-        return 'YT CrossMix';
+        // Si no encuentra patrón, extraer primera parte antes de paréntesis/corchetes
+        const beforeParenthesis = title.split(/[\(\[]/)[0].trim();
+        if (beforeParenthesis && beforeParenthesis.length > 0 && beforeParenthesis.length < title.length) {
+            return beforeParenthesis;
+        }
+        
+        return 'YouTube';
     }
 
     /**
