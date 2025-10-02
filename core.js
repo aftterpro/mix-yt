@@ -2410,6 +2410,9 @@ function obtenerSegmentosSponsorBlock(videoId) {
     .then(response => {
         if (response.ok) {
             return response.json();
+        } else if (response.status === 404) {
+            // 404 es normal, significa que no hay segmentos
+            return [];
         } else {
             throw new Error(`HTTP ${response.status}`);
         }
@@ -2417,8 +2420,34 @@ function obtenerSegmentosSponsorBlock(videoId) {
     .then(segments => {
         // VALIDACIÓN CRÍTICA: Asegurar que segments es un array válido
         if (Array.isArray(segments)) {
-            segmentosCache[videoId] = segments;
-            console.log(`✅ ${segments.length} segmentos SponsorBlock para ${videoId}`);
+            // Filtrar solo segmentos válidos
+            const validSegments = segments.filter(seg => {
+                // Validar estructura del segmento
+                if (!seg || typeof seg !== 'object') return false;
+                
+                // Debe tener segment array o startTime/endTime
+                const hasSegmentArray = Array.isArray(seg.segment) && seg.segment.length >= 2;
+                const hasTimeProps = typeof seg.startTime === 'number' && typeof seg.endTime === 'number';
+                
+                if (!hasSegmentArray && !hasTimeProps) return false;
+                
+                // Debe tener categoría
+                if (!seg.category) return false;
+                
+                return true;
+            });
+            
+            segmentosCache[videoId] = validSegments;
+            
+            if (validSegments.length > 0) {
+                console.log(`✅ ${validSegments.length} segmentos SponsorBlock válidos para ${videoId}`);
+                
+                // Log de categorías encontradas
+                const categories = validSegments.map(s => s.category);
+                console.log(`📊 Categorías: ${[...new Set(categories)].join(', ')}`);
+            } else {
+                console.log(`ℹ️ No hay segmentos válidos para ${videoId}`);
+            }
         } else {
             console.warn(`⚠️ Respuesta inválida para ${videoId}:`, segments);
             segmentosCache[videoId] = [];
@@ -2431,7 +2460,7 @@ function obtenerSegmentosSponsorBlock(videoId) {
 }
 
 /**
- * Verificar y saltar segmentos - COMPLETAMENTE CORREGIDO
+ * Verificar y saltar segmentos
  */
 function checkAndSkipSegment(player) {
     try {
@@ -2441,11 +2470,13 @@ function checkAndSkipSegment(player) {
         if (!videoId || isNaN(currentTime) || currentTime < 0) return;
 
         // CRITICAL: Evitar loop infinito - verificar si ya saltamos este segmento recientemente
-        const skipKey = `${videoId}_${Math.floor(currentTime)}`;
         const now = Date.now();
+        const skipKey = `${videoId}_${Math.floor(currentTime)}`;
         
-        // Si saltamos este mismo segundo en los últimos 2 segundos, no saltar de nuevo
-        if (lastSeekVideoId === videoId && Math.abs(currentTime - lastSeekEndTime) < 3) {
+        // Si saltamos este mismo video y tiempo en los últimos 3 segundos, no saltar de nuevo
+        if (lastSeekVideoId === videoId && 
+            lastSeekEndTime > 0 && 
+            Math.abs(currentTime - lastSeekEndTime) < 5) {
             return;
         }
 
@@ -2462,43 +2493,90 @@ function checkAndSkipSegment(player) {
         const segments = segmentosCache[videoId];
         if (!Array.isArray(segments) || segments.length === 0) return;
 
-        // Buscar segmento a saltar - SOLO music_offtopic para música
+        // CORRECCIÓN CRÍTICA: Buscar segmento a saltar
+        // Para música, solo saltar intros/outros largos (music_offtopic)
         const segmentToSkip = segments.find(segment => {
             if (!segment || typeof segment !== 'object') return false;
             
-            // FILTRAR: Solo saltar intros/outros muy largos, no música
-            if (segment.category === 'music_offtopic') {
-                const start = segment.startTime || segment.segment?.[0] || 0;
-                const end = segment.endTime || segment.segment?.[1] || 0;
-                
-                // Solo saltar si es intro/outro muy largo (más de 10 segundos)
-                if ((end - start) < 10) return false;
-                
-                return currentTime >= start && currentTime < end;
+            // Obtener tiempos del segmento
+            let start, end;
+            
+            if (segment.segment && Array.isArray(segment.segment)) {
+                start = segment.segment[0];
+                end = segment.segment[1];
+            } else if (segment.startTime !== undefined && segment.endTime !== undefined) {
+                start = segment.startTime;
+                end = segment.endTime;
+            } else {
+                return false;
             }
             
-            return false; // No saltar otros tipos de segmentos en música
+            // Validar que los tiempos sean números válidos
+            if (typeof start !== 'number' || typeof end !== 'number') return false;
+            if (isNaN(start) || isNaN(end)) return false;
+            if (end <= start) return false;
+            
+            // FILTRAR: Solo saltar music_offtopic (intros/outros)
+            if (segment.category === 'music_offtopic') {
+                const duration = end - start;
+                
+                // duracion para saltar
+                if (duration < 4) return false;
+                
+                // Verificar si el tiempo actual está dentro del segmento
+                // Dar un margen de 0.5 segundos para evitar saltos múltiples
+                return currentTime >= start && currentTime < (end - 0.5);
+            }
+            
+            return false;
         });
 
         if (segmentToSkip) {
-            const skipToTime = segmentToSkip.endTime || segmentToSkip.segment?.[1];
+            // Obtener tiempo de salto
+            let skipToTime;
             
-            if (skipToTime && typeof skipToTime === 'number' && skipToTime > currentTime) {
-                console.log(`⏭️ SponsorBlock: Saltando intro/outro de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s`);
+            if (segmentToSkip.segment && Array.isArray(segmentToSkip.segment)) {
+                skipToTime = segmentToSkip.segment[1];
+            } else if (segmentToSkip.endTime !== undefined) {
+                skipToTime = segmentToSkip.endTime;
+            }
+            
+            // Validar tiempo de salto
+            if (!skipToTime || typeof skipToTime !== 'number' || isNaN(skipToTime)) {
+                console.warn('⚠️ Tiempo de salto inválido:', skipToTime);
+                return;
+            }
+            
+            // Verificar que el salto sea hacia adelante
+            if (skipToTime <= currentTime) {
+                console.warn('⚠️ Tiempo de salto no es mayor al actual');
+                return;
+            }
+            
+            const segmentDuration = skipToTime - currentTime;
+            
+            console.log(`⏭️ SponsorBlock: Saltando intro/outro de ${currentTime.toFixed(1)}s a ${skipToTime.toFixed(1)}s (${segmentDuration.toFixed(1)}s)`);
+            
+            // Guardar información del salto ANTES de saltar
+            lastSeekVideoId = videoId;
+            lastSeekEndTime = skipToTime;
+            
+            try {
+                // Realizar el salto
+                player.seekTo(skipToTime, true);
                 
-                // Guardar información del salto para evitar loops
-                lastSeekVideoId = videoId;
-                lastSeekEndTime = skipToTime;
-                
-                try {
-                    player.seekTo(skipToTime, true);
-                    
-                    if (window.unifiedCore) {
-                        window.unifiedCore.showMessage(`Saltado intro/outro`, 'info', 2000);
-                    }
-                } catch (seekError) {
-                    console.error("❌ Error saltando segmento:", seekError);
+                // Mostrar notificación al usuario
+                if (window.unifiedCore) {
+                    window.unifiedCore.showMessage(`⏭️ Intro/outro saltado (${segmentDuration.toFixed(0)}s)`, 'info', 2000);
                 }
+                
+                console.log(`✅ Salto completado exitosamente`);
+                
+            } catch (seekError) {
+                console.error("❌ Error ejecutando salto:", seekError);
+                // Resetear variables si el salto falla
+                lastSeekVideoId = null;
+                lastSeekEndTime = -1;
             }
         }
         
@@ -2508,7 +2586,7 @@ function checkAndSkipSegment(player) {
 }
 
 /**
- * Monitorear reproductores - MEJORADO
+ * Monitorear reproductores
  */
 function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
@@ -2522,13 +2600,18 @@ function monitorPlayers() {
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        // SponsorBlock integrado aquí
-        if (videoId && playerState === YT.PlayerState.PLAYING && 
-            currentTime > 0 && !isNaN(currentTime)) {
+        // SponsorBlock: Solo verificar si está reproduciendo y tiene tiempo válido
+        if (videoId && 
+            playerState === YT.PlayerState.PLAYING && 
+            currentTime > 0 && 
+            !isNaN(currentTime) &&
+            videoDuration > 0) {
+            
+            // Verificar segmentos cada 300ms (intervalo del monitor)
             checkAndSkipSegment(activePlayer);
         }
 
-        // Lógica de crossfade - MEJORADA
+        // Lógica de crossfade - SIN CAMBIOS
         if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime > 0) {
             const timeRemaining = videoDuration - currentTime;
             
@@ -2551,6 +2634,22 @@ function monitorPlayers() {
         console.error("❌ Error en monitorPlayers:", error);
     }
 }
+// Función para forzar recarga de segmentos
+window.reloadSponsorBlockSegments = function(videoId) {
+    if (!videoId) {
+        const activePlayer = (currentPlayer === 1) ? player1 : player2;
+        videoId = activePlayer?.getVideoData()?.video_id;
+    }
+    
+    if (!videoId) {
+        console.log('❌ No hay video activo');
+        return;
+    }
+    
+    console.log('🔄 Recargando segmentos para:', videoId);
+    delete segmentosCache[videoId];
+    obtenerSegmentosSponsorBlock(videoId);
+};
 // Configuración de persistencia central
 const CORE_STORAGE_KEYS = {
     PLAYLISTS_CORE: 'ytcm_playlists_persistent',
