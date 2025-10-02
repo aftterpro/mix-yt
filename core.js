@@ -2797,36 +2797,3 @@ window.addEventListener('beforeunload', () => {
 });
 // Exponer UnifiedCore globalmente
 window.UnifiedCore = UnifiedCore;
-// Función de debug para verificar estado de playlists
-window.debugPlaylistsDOM = function() {
-    console.log("🐛 === DEBUG PLAYLISTS DOM ===");
-    
-    const container = document.getElementById('playlistsGrid');
-    const playlistManager = window.playlistManager;
-    const unifiedCore = window.unifiedCore;
-    
-    console.log("📊 Estado actual:", {
-        container: !!container,
-        containerHTML: container ? container.innerHTML.substring(0, 100) + "..." : "No encontrado",
-        renderedCards: container ? container.querySelectorAll('.playlist-card').length : 0,
-        playlistManagerExists: !!playlistManager,
-        playlistsData: playlistManager ? playlistManager.playlistsData.length : 0,
-        unifiedCoreExists: !!unifiedCore,
-        corePlaylistsData: unifiedCore ? unifiedCore.playlistsData?.length : 0,
-        currentView: unifiedCore ? unifiedCore.currentView : 'unknown'
-    });
-    
-    if (playlistManager && playlistManager.playlistsData.length > 0) {
-        console.log("📋 Playlists en memoria:");
-        playlistManager.playlistsData.forEach((p, i) => {
-            console.log(`  ${i + 1}. ${p.name} (${p.source || 'unknown'}) - ${p.videos.length} videos`);
-        });
-    }
-    
-    // FORZAR ACTUALIZACIÓN SI HAY PROBLEMAS
-    if (container && playlistManager && playlistManager.playlistsData.length > 0 && 
-        container.querySelectorAll('.playlist-card').length === 0) {
-        console.log("🔧 Detectado problema, forzando actualización...");
-        playlistManager.forceRecreatePlaylistsUI();
-    }
-};
