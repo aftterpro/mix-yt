@@ -43,56 +43,59 @@ class RealAudioManipulation {
         }
     }
     
-    async capturePlayerAudio(player, playerNum) {
-        try {
-            console.log(`🎤 Intentando capturar audio del player ${playerNum}...`);
-            
-            const iframe = player.getIframe();
-            if (!iframe) {
-                console.warn('⚠️ No se pudo obtener iframe');
-                return null;
-            }
-            
-            try {
-                const videoElement = iframe.contentWindow?.document?.querySelector('video');
-                
-                if (videoElement) {
-                    console.log('✅ Elemento video encontrado en iframe');
-                    
-                    if (this.players.has(playerNum)) {
-                        const existing = this.players.get(playerNum);
-                        if (existing.source) {
-                            console.log('ℹ️ Player ya conectado, reutilizando');
-                            return existing;
-                        }
-                    }
-                    
-                    const source = this.audioContext.createMediaElementSource(videoElement);
-                    const nodes = this.createEffectChain(playerNum);
-                    this.connectNodes(source, nodes);
-                    
-                    const playerData = {
-                        source,
-                        nodes,
-                        videoElement,
-                        connected: true
-                    };
-                    
-                    this.players.set(playerNum, playerData);
-                    console.log(`✅ Audio del player ${playerNum} capturado y conectado`);
-                    return playerData;
-                }
-            } catch (iframeError) {
-                console.warn('⚠️ No se puede acceder al video en iframe (CORS):', iframeError.message);
-            }
-            
-            return await this.requestTabCapture(playerNum);
-            
-        } catch (error) {
-            console.error(`❌ Error capturando audio player ${playerNum}:`, error);
+async capturePlayerAudio(player, playerNum) {
+    try {
+        console.log(`🎤 Intentando capturar audio del player ${playerNum}...`);
+        
+        // CORRECCIÓN: Obtener iframe correctamente
+        const iframe = document.getElementById(`player${playerNum}`);
+        if (!iframe) {
+            console.warn('⚠️ No se pudo obtener iframe');
             return null;
         }
+        
+        try {
+            // Intentar acceder al elemento video dentro del iframe
+            const videoElement = iframe.querySelector('video');
+            
+            if (videoElement) {
+                console.log('✅ Elemento video encontrado');
+                
+                if (this.players.has(playerNum)) {
+                    const existing = this.players.get(playerNum);
+                    if (existing.source) {
+                        console.log('ℹ️ Player ya conectado, reutilizando');
+                        return existing;
+                    }
+                }
+                
+                const source = this.audioContext.createMediaElementSource(videoElement);
+                const nodes = this.createEffectChain(playerNum);
+                this.connectNodes(source, nodes);
+                
+                const playerData = {
+                    source,
+                    nodes,
+                    videoElement,
+                    connected: true
+                };
+                
+                this.players.set(playerNum, playerData);
+                console.log(`✅ Audio del player ${playerNum} capturado y conectado`);
+                return playerData;
+            }
+        } catch (iframeError) {
+            console.warn('⚠️ No se puede acceder al video (CORS):', iframeError.message);
+        }
+        
+        // Si falla, intentar tab capture
+        return await this.requestTabCapture(playerNum);
+        
+    } catch (error) {
+        console.error(`❌ Error capturando audio player ${playerNum}:`, error);
+        return null;
     }
+}
     
     createEffectChain(playerNum) {
         console.log(`🔧 Creando cadena de efectos para player ${playerNum}`);
