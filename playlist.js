@@ -266,7 +266,99 @@ class PlaylistManager {
             }
         }, 500);
     }
-
+/**
+ * Cargar videos de una playlist de YouTube
+ */
+async loadPlaylistVideos(playlistId) {
+    console.log(`📥 Cargando videos de playlist: ${playlistId}`);
+    
+    const playlist = this.playlistsData.find(p => p.id === playlistId);
+    if (!playlist) {
+        console.error(`❌ Playlist ${playlistId} no encontrada`);
+        return false;
+    }
+    
+    // Si ya está cargada, no recargar
+    if (playlist.isLoaded && playlist.videos.length > 0) {
+        console.log(`✅ Playlist ya cargada con ${playlist.videos.length} videos`);
+        return true;
+    }
+    
+    try {
+        // Verificar que gapi esté disponible
+        if (!window.gapi?.client?.youtube) {
+            console.error('❌ Google API no está disponible');
+            this.core?.showMessage('Error: API de YouTube no disponible', 'error');
+            return false;
+        }
+        
+        this.core?.showMessage('Cargando videos de la playlist...', 'info');
+        
+        let allVideos = [];
+        let nextPageToken = null;
+        
+        do {
+            const response = await gapi.client.youtube.playlistItems.list({
+                part: ['snippet', 'contentDetails'],
+                playlistId: playlistId,
+                maxResults: 50,
+                pageToken: nextPageToken
+            });
+            
+            if (response.result.items) {
+                const videos = response.result.items.map(item => ({
+                    videoId: item.contentDetails?.videoId,
+                    title: item.snippet?.title || 'Sin título',
+                    thumbnail: item.snippet?.thumbnails?.high?.url || 
+                              item.snippet?.thumbnails?.default?.url || 
+                              './electronic.ico',
+                    duration: 0, // Se puede obtener después con batch
+                    uploaderName: item.snippet?.videoOwnerChannelTitle || 'YouTube',
+                    author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
+                    sourcePlaylistId: playlistId
+                })).filter(v => v.videoId); // Filtrar videos sin ID válido
+                
+                allVideos.push(...videos);
+            }
+            
+            nextPageToken = response.result.nextPageToken;
+            
+        } while (nextPageToken);
+        
+        console.log(`✅ ${allVideos.length} videos cargados de la playlist`);
+        
+        // Actualizar playlist
+        playlist.videos = allVideos;
+        playlist.isLoaded = true;
+        
+        // Obtener duraciones en lote (opcional pero recomendado)
+        if (allVideos.length > 0 && this.core?.getBatchVideoDurations) {
+            try {
+                const videoIds = allVideos.map(v => v.videoId);
+                const durations = await this.core.getBatchVideoDurations(videoIds);
+                
+                // Actualizar duraciones
+                allVideos.forEach(video => {
+                    if (durations[video.videoId]) {
+                        video.duration = durations[video.videoId];
+                    }
+                });
+                
+                console.log(`✅ Duraciones actualizadas para ${Object.keys(durations).length} videos`);
+            } catch (durationError) {
+                console.warn('⚠️ No se pudieron obtener duraciones:', durationError);
+            }
+        }
+        
+        this.core?.showMessage(`${allVideos.length} videos cargados`, 'success');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error cargando videos de playlist:', error);
+        this.core?.showMessage('Error cargando videos de la playlist', 'error');
+        return false;
+    }
+}
     /**
      * Eliminar video de la cola
      */
@@ -431,54 +523,57 @@ updatePlaylistsUI() {
     // =============================================
     // POPUP DE COLA
     // =============================================
+/**
+ * Mostrar popup de cola
+ */
+showQueuePopup() {
+    // Verificar si ya existe el popup
+    let existingPopup = document.querySelector('.queue-popup-overlay');
+    if (existingPopup) {
+        existingPopup.remove();
+    }
+
+    const flatList = this.core?.getFlattenedPlaylist() || [];
     
-    /**
-     * Mostrar popup de cola
-     */
-    showQueuePopup() {
-        // Verificar si ya existe el popup
-        let existingPopup = document.querySelector('.queue-popup-overlay');
-        if (existingPopup) {
-            existingPopup.remove();
-        }
-
-        const flatList = this.core?.getFlattenedPlaylist() || [];
-        
-        const popup = document.createElement('div');
-        popup.className = 'queue-popup-overlay';
-        popup.innerHTML = `
-            <div class="queue-popup">
-                <div class="queue-popup-header">
-                    <h3>Cola de Reproducción</h3>
-                    <button class="queue-popup-close">×</button>
-                </div>
-                <div class="queue-popup-content" id="queuePopupContent">
-                    ${this.renderQueueContent(flatList)}
-                </div>
+    const popup = document.createElement('div');
+    popup.className = 'queue-popup-overlay';
+    popup.innerHTML = `
+        <div class="queue-popup">
+            <div class="queue-popup-header">
+                <h3>Cola de Reproducción</h3>
+                <button class="queue-popup-close">×</button>
             </div>
-        `;
+            <div class="queue-popup-content" id="queuePopupContent">
+                ${this.renderQueueContent(flatList)}
+            </div>
+        </div>
+    `;
 
-        // Event listeners
-        popup.querySelector('.queue-popup-close').addEventListener('click', () => {
-            popup.remove();
-        });
+    // Event listeners para el popup
+    const closeBtn = popup.querySelector('.queue-popup-close');
+    closeBtn.addEventListener('click', () => {
+        popup.remove();
+    });
 
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) popup.remove();
-        });
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) popup.remove();
+    });
 
-        document.body.appendChild(popup);
+    document.body.appendChild(popup);
+    
+    // Configurar event listeners para los items DESPUÉS de añadir al DOM
+    setTimeout(() => {
+        this.setupQueueItemListeners();
         
         // Configurar drag & drop
-        setTimeout(() => {
-            if (window.queueDragDrop) {
-                window.queueDragDrop.attachDragListeners();
-            }
-        }, 100);
-        
-        // Animación de entrada
-        setTimeout(() => popup.classList.add('show'), 10);
-    }
+        if (window.queueDragDrop) {
+            window.queueDragDrop.attachDragListeners();
+        }
+    }, 50);
+    
+    // Animación de entrada
+    setTimeout(() => popup.classList.add('show'), 10);
+}
 
     /**
      * Actualizar contenido del popup de cola
@@ -497,95 +592,75 @@ updatePlaylistsUI() {
             }
         }, 50);
     }
-
+/**
+ * Escapar HTML para prevenir XSS
+ */
+escapeHTML(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
     /**
      * Renderizar contenido de la cola
      */
-    renderQueueContent(flatList) {
-        if (flatList.length === 0) {
-            return `
-                <div class="empty-queue-message">
-                    <i class="fas fa-music"></i>
-                    <p>La cola está vacía</p>
-                    <p>Añade música desde la biblioteca o búsqueda</p>
-                </div>
-            `;
-        }
-
-        let html = `
-            <div class="queue-controls">
-                <div class="queue-info">
-                    <span class="queue-count">${flatList.length} videos en cola</span>
-                </div>
-                <button class="clear-queue-btn" onclick="window.playlistManager?.clearQueue()">
-                    <i class="fas fa-trash"></i>
-                    Borrar todo
-                </button>
+renderQueueContent(flatList) {
+    if (flatList.length === 0) {
+        return `
+            <div class="empty-queue-message">
+                <i class="fas fa-music"></i>
+                <p>La cola está vacía</p>
+                <p>Añade música desde la biblioteca o búsqueda</p>
             </div>
-            <div class="queue-items">
         `;
-
-        flatList.forEach((video, index) => {
-            const isPlaying = video.videoId === window.currentPlayingInfo?.videoId;
-            const formattedDuration = video.duration && video.duration > 0 
-                ? this.core?.formatDuration(video.duration) 
-                : '--:--';
-            
-            html += `
-                <div class="queue-item ${isPlaying ? 'playing' : ''}" 
-                     data-video-id="${video.videoId}" 
-                     data-flat-index="${index}">
-                    <div class="queue-item-info">
-                        <div class="queue-item-title">${video.title}</div>
-                        <div class="queue-item-duration">${formattedDuration}</div>
-                    </div>
-                    ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
-                    <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            `;
-        });
-        
-        queueHTML += '</div>';
-        queueContainer.innerHTML = queueHTML;
-        
-        // Event listeners para cola
-        queueContainer.querySelectorAll('.queue-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (!e.target.closest('.queue-item-remove')) {
-                    const index = parseInt(item.dataset.flatIndex);
-                    this.core?.playVideoAtIndex(index);
-                }
-            });
-        });
-        
-        queueContainer.querySelectorAll('.queue-item-remove').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                
-                const videoId = btn.dataset.videoId;
-                console.log(`🗑️ Eliminando video de cola: ${videoId}`);
-                
-                if (!videoId || videoId === 'undefined') {
-                    console.error('❌ videoId inválido para eliminar');
-                    return;
-                }
-                
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                
-                const success = this.removeVideoFromQueue(videoId);
-                
-                if (!success) {
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                }
-            });
-        });
     }
 
+    let html = `
+        <div class="queue-controls">
+            <div class="queue-info">
+                <span class="queue-count">${flatList.length} videos en cola</span>
+            </div>
+            <button class="clear-queue-btn" onclick="window.playlistManager?.clearQueue()">
+                <i class="fas fa-trash"></i>
+                Borrar todo
+            </button>
+        </div>
+        <div class="queue-items">
+    `;
+
+    flatList.forEach((video, index) => {
+        const isPlaying = video.videoId === window.currentPlayingInfo?.videoId;
+        const formattedDuration = video.duration && video.duration > 0 
+            ? this.core?.formatDuration(video.duration) 
+            : '--:--';
+        
+        html += `
+            <div class="queue-item ${isPlaying ? 'playing' : ''}" 
+                 data-video-id="${video.videoId}" 
+                 data-flat-index="${index}"
+                 draggable="true">
+                <div class="queue-item-drag-handle">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${this.escapeHTML(video.title)}</div>
+                    <div class="queue-item-meta">
+                        <span class="queue-item-duration">${formattedDuration}</span>
+                        ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
+                    </div>
+                </div>
+                ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
+                <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    });
+    
+    html += '</div>'; // Cerrar queue-items
+    
+    return html;
+}
     /**
      * Crear tarjeta visual de playlist
      */
@@ -745,7 +820,51 @@ updatePlaylistsUI() {
             console.error(`❌ No se pudo encontrar índice de playlist ${playlistId}`);
         }
     }
-
+/**
+ * Configurar event listeners para items de la cola
+ */
+setupQueueItemListeners() {
+    const queueItems = document.querySelectorAll('.queue-item');
+    
+    queueItems.forEach(item => {
+        // Click en el item para reproducir
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.queue-item-remove')) {
+                const index = parseInt(item.dataset.flatIndex);
+                if (!isNaN(index)) {
+                    this.core?.playVideoAtIndex(index);
+                }
+            }
+        });
+    });
+    
+    // Listeners para botones de eliminar
+    const removeButtons = document.querySelectorAll('.queue-item-remove');
+    removeButtons.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const videoId = btn.dataset.videoId;
+            console.log(`🗑️ Eliminando video de cola: ${videoId}`);
+            
+            if (!videoId || videoId === 'undefined') {
+                console.error('❌ videoId inválido para eliminar');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            
+            const success = this.removeVideoFromQueue(videoId);
+            
+            if (!success) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        });
+    });
+}
     /**
      * Crear popup de playlist con detalles
      */
