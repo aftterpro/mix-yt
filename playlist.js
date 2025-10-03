@@ -602,8 +602,8 @@ escapeHTML(text) {
     return div.innerHTML;
 }
     /**
-     * Renderizar contenido de la cola
-     */
+ * Renderizar contenido de la cola
+ */
 renderQueueContent(flatList) {
     if (flatList.length === 0) {
         return `
@@ -629,7 +629,8 @@ renderQueueContent(flatList) {
     `;
 
     flatList.forEach((video, index) => {
-        const isPlaying = video.videoId === window.currentPlayingInfo?.videoId;
+        // CORRECCIÓN: Verificar correctamente si está reproduciendo
+        const isPlaying = window.currentPlayingInfo?.videoId === video.videoId;
         const formattedDuration = video.duration && video.duration > 0 
             ? this.core?.formatDuration(video.duration) 
             : '--:--';
@@ -649,7 +650,7 @@ renderQueueContent(flatList) {
                         ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
                     </div>
                 </div>
-                ${isPlaying ? '<i class="fas fa-volume-up queue-item-playing"></i>' : ''}
+                ${isPlaying ? '<div class="queue-item-playing-indicator"><i class="fas fa-volume-up"></i></div>' : ''}
                 <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
                     <i class="fas fa-times"></i>
                 </button>
@@ -1411,58 +1412,65 @@ class QueueDragDrop {
         item.classList.remove('drag-over');
     }
     
-    handleDrop(e, targetItem, targetIndex) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        targetItem.classList.remove('drag-over');
-        
-        if (this.draggedItem === targetItem) {
-            return false;
-        }
-        
-        console.log(`🎯 Drop: de ${this.draggedIndex} a ${targetIndex}`);
-        
-        const queuePlaylist = window.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-        if (!queuePlaylist) return;
-        
-        const [movedVideo] = queuePlaylist.videos.splice(this.draggedIndex, 1);
-        
-        let newIndex = targetIndex;
-        if (this.draggedIndex < targetIndex) {
-            newIndex--;
-        }
-        
-        queuePlaylist.videos.splice(newIndex, 0, movedVideo);
-        
-        if (window.currentPlayingInfo) {
-            if (window.currentPlayingInfo.flattenedIndex === this.draggedIndex) {
-                window.currentPlayingInfo.flattenedIndex = newIndex;
-            } else if (this.draggedIndex < window.currentPlayingInfo.flattenedIndex && 
-                       newIndex >= window.currentPlayingInfo.flattenedIndex) {
-                window.currentPlayingInfo.flattenedIndex--;
-            } else if (this.draggedIndex > window.currentPlayingInfo.flattenedIndex && 
-                       newIndex <= window.currentPlayingInfo.flattenedIndex) {
-                window.currentPlayingInfo.flattenedIndex++;
-            }
-        }
-        
-        if (window.playlistManager) {
-            window.playlistManager.updateQueuePopup();
-        }
-        
-        if (window.unifiedCore) {
-            window.unifiedCore.showMessage('Orden actualizado', 'success');
-        }
-        
-        setTimeout(() => {
-            if (typeof window.saveAllData === 'function') {
-                window.saveAllData();
-            }
-        }, 100);
-        
+handleDrop(e, targetItem, targetIndex) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    targetItem.classList.remove('drag-over');
+    
+    if (this.draggedItem === targetItem) {
         return false;
     }
+    
+    console.log(`🎯 Drop: de ${this.draggedIndex} a ${targetIndex}`);
+    
+    // CORRECCIÓN: Usar playlistManager en lugar de playlistsData directamente
+    const queuePlaylist = window.playlistManager?.playlistsData?.find(p => p.id === 'queue' || p.isQueue);
+    if (!queuePlaylist) {
+        console.error('❌ No se encontró playlist de cola');
+        return false;
+    }
+    
+    const [movedVideo] = queuePlaylist.videos.splice(this.draggedIndex, 1);
+    
+    let newIndex = targetIndex;
+    if (this.draggedIndex < targetIndex) {
+        newIndex--;
+    }
+    
+    queuePlaylist.videos.splice(newIndex, 0, movedVideo);
+    
+    // Ajustar índice de reproducción actual
+    if (window.currentPlayingInfo) {
+        if (window.currentPlayingInfo.flattenedIndex === this.draggedIndex) {
+            window.currentPlayingInfo.flattenedIndex = newIndex;
+        } else if (this.draggedIndex < window.currentPlayingInfo.flattenedIndex && 
+                   newIndex >= window.currentPlayingInfo.flattenedIndex) {
+            window.currentPlayingInfo.flattenedIndex--;
+        } else if (this.draggedIndex > window.currentPlayingInfo.flattenedIndex && 
+                   newIndex <= window.currentPlayingInfo.flattenedIndex) {
+            window.currentPlayingInfo.flattenedIndex++;
+        }
+    }
+    
+    // Actualizar UI
+    if (window.playlistManager) {
+        window.playlistManager.updateQueuePopup();
+    }
+    
+    if (window.unifiedCore) {
+        window.unifiedCore.showMessage('Orden actualizado', 'success');
+    }
+    
+    // Guardar cambios
+    setTimeout(() => {
+        if (typeof window.saveAllData === 'function') {
+            window.saveAllData();
+        }
+    }, 100);
+    
+    return false;
+}
     
     handleDragEnd(e) {
         console.log('🎯 Drag end');
