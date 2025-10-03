@@ -1664,14 +1664,13 @@ retryLoadMore() {
         return grid;
     }
 
-createSearchResultCard(video, videoId) {
+function createSearchResultCardImproved(video, videoId) {
     // VALIDACIÓN CRÍTICA
     if (!videoId || videoId === 'undefined' || videoId === 'null') {
         console.error('❌ createSearchResultCard: videoId inválido:', { 
             videoId, 
             title: video?.title?.substring(0, 30) 
         });
-        // Retornar div vacío en lugar de null
         const emptyCard = document.createElement('div');
         emptyCard.style.display = 'none';
         return emptyCard;
@@ -1687,18 +1686,20 @@ createSearchResultCard(video, videoId) {
     card.className = 'search-result-card';
     card.dataset.videoId = videoId;
 
-    const duration = video.duration ? this.formatDuration(video.duration) : '';
-    const author = video.uploaderName || 'Autor Desconocido';
+    // MEJORA: Limpiar y separar artista y título
+    const { artist, title } = extractArtistAndTitle(video.title);
+    const duration = video.duration ? window.unifiedCore?.formatDuration(video.duration) : '';
+    const authorFinal = artist || video.uploaderName || 'Autor Desconocido';
 
     // Escapar datos para HTML
-    const safeTitle = (video.title || 'Título Desconocido').replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
     const safeThumbnail = video.thumbnail || './electronic.ico';
-    const safeAuthor = author.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    const safeAuthor = authorFinal.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
 
     card.innerHTML = `
         <div class="search-result-thumbnail">
             <img src="${safeThumbnail}" alt="${safeTitle}" loading="lazy" 
-                 onerror="this.src='./electronic.ico'; console.log('Error cargando imagen:', this.dataset.originalSrc);"
+                 onerror="this.src='./electronic.ico'; console.log('Error cargando imagen');"
                  data-original-src="${safeThumbnail}">
             ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
         </div>
@@ -1723,30 +1724,30 @@ createSearchResultCard(video, videoId) {
         e.preventDefault();
         e.stopPropagation();
         
-        const btnVideoId = e.target.dataset.videoId;
+        const btnVideoId = e.target.closest('.search-result-add-btn').dataset.videoId;
         
-        // Validación final
         if (!btnVideoId || btnVideoId === 'undefined') {
             console.error('❌ Click handler: videoId inválido en botón');
-            this.showMessage('Error: Video inválido', 'error');
+            window.unifiedCore?.showMessage('Error: Video inválido', 'error');
             return;
         }
 
         console.log('🎵 Añadiendo video desde búsqueda:', {
             videoId: btnVideoId,
-            title: e.target.dataset.title?.substring(0, 30)
+            title: e.target.closest('.search-result-add-btn').dataset.title?.substring(0, 30)
         });
 
         const videoData = {
             videoId: btnVideoId,
-            title: e.target.dataset.title,
-            thumbnail: e.target.dataset.thumbnail,
-            duration: parseInt(e.target.dataset.duration) || 0,
-            uploaderName: e.target.dataset.author,
-            author: e.target.dataset.author
+            title: e.target.closest('.search-result-add-btn').dataset.title,
+            thumbnail: e.target.closest('.search-result-add-btn').dataset.thumbnail,
+            duration: parseInt(e.target.closest('.search-result-add-btn').dataset.duration) || 0,
+            uploaderName: e.target.closest('.search-result-add-btn').dataset.author,
+            author: e.target.closest('.search-result-add-btn').dataset.author
         };
 
-        this.addVideoToQueue(videoData);
+        // CORRECCIÓN: Añadir después del video actual
+        window.unifiedCore?.addVideoToQueueAfterCurrent(videoData);
     });
     
     console.log('✅ Card creada exitosamente:', videoId);
@@ -1932,8 +1933,8 @@ getFlattenedPlaylist() {
             title: video.title || "Título Desconocido",
             thumbnail: video.thumbnail || './electronic.ico',
             duration: duration,
-            uploaderName: video.uploaderName || video.author || this.extractArtistFromTitle(video.title),
-            author: video.author || video.uploaderName || this.extractArtistFromTitle(video.title),
+            uploaderName: video.uploaderName || video.author || this.extractArtistAndTitle(video.title),
+            author: video.author || video.uploaderName || this.extractArtistAndTitle(video.title),
             sourcePlaylistId: 'queue',
             source: 'queue'
         };
@@ -2031,30 +2032,77 @@ getFlattenedPlaylist() {
         console.warn(`⚠️ No se pudo parsear duración: "${durationInput}", usando 210s por defecto`);
         return 210;
     }
-extractArtistFromTitle(title) {
-    if (!title) return 'Artista Desconocido';
+extractArtistAndTitle(fullTitle) {
+    if (!fullTitle) return { artist: 'Desconocido', title: 'Título Desconocido' };
     
-    const patterns = [
-        /^([^-]+)\s*-\s*(.+)$/,
-        /^([^:]+)\s*:\s*(.+)$/,
-        /^([^|]+)\s*\|\s*(.+)$/,
-        /^([^•]+)\s*•\s*(.+)$/
+    let cleanTitle = fullTitle;
+    
+    // Eliminar patrones comunes de videos
+    const patternsToRemove = [
+        /\(Videoclip Oficial\)/gi,
+        /\(Video Oficial\)/gi,
+        /\| Video Oficial/gi,
+        /\[Video Oficial\]/gi,
+        /\(Official Video\)/gi,
+        /\[Official Video\]/gi,
+        /\(Official Music Video\)/gi,
+        /\[Official Music Video\]/gi,
+        /\(Lyric Video\)/gi,
+        /\[Lyric Video\]/gi,
+        /\(Audio Oficial\)/gi,
+        /\[Audio Oficial\]/gi,
+        /\(HD\)/gi,
+        /\[HD\]/gi,
+        /\(4K\)/gi,
+        /\[4K\]/gi,
     ];
     
-    for (const pattern of patterns) {
-        const match = title.match(pattern);
-        if (match) {
-            return match[1].trim();
+    patternsToRemove.forEach(pattern => {
+        cleanTitle = cleanTitle.replace(pattern, '');
+    });
+    
+    // Intentar extraer artista y título: "Artista - Título"
+    const separatorPatterns = [
+        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Guión
+        /^(.+?)\s*:\s*(.+?)$/,       // Dos puntos
+        /^(.+?)\s*\|\s*(.+?)$/,      // Pipe
+        /^(.+?)\s*•\s*(.+?)$/        // Punto medio
+    ];
+    
+    for (const pattern of separatorPatterns) {
+        const match = cleanTitle.match(pattern);
+        if (match && match[1] && match[2]) {
+            let artist = match[1].trim();
+            let title = match[2].trim();
+            
+            // Limpiar features y remixes del título
+            title = title
+                .replace(/\s*\(feat\..*?\)/gi, '')
+                .replace(/\s*\[feat\..*?\]/gi, '')
+                .replace(/\s*\(ft\..*?\)/gi, '')
+                .replace(/\s*\[ft\..*?\]/gi, '')
+                .replace(/\s*\(Remix\)/gi, '')
+                .replace(/\s*\[Remix\]/gi, '');
+            
+            // Limpiar espacios múltiples
+            artist = artist.replace(/\s+/g, ' ').trim();
+            title = title.replace(/\s+/g, ' ').trim();
+            
+            return { artist, title };
         }
     }
     
-    // Si no encuentra patrón, extraer primera palabra/palabras
-    const words = title.split(' ');
-    if (words.length > 1) {
-        return words.slice(0, 2).join(' '); // Primeras dos palabras
+    // Si no se encuentra separador, intentar extraer antes del primer paréntesis
+    const beforeParenthesis = cleanTitle.split(/[\(\[]/)[0].trim();
+    if (beforeParenthesis && beforeParenthesis.length < cleanTitle.length) {
+        return { 
+            artist: beforeParenthesis, 
+            title: cleanTitle.replace(beforeParenthesis, '').replace(/^[\s\-–—:\|\•]+/, '').trim() || beforeParenthesis
+        };
     }
     
-    return 'YT CrossMix';
+    // Fallback: retornar título completo
+    return { artist: 'YouTube', title: cleanTitle.trim() };
 }
     // =============================================
     // MONITOREO Y ESTADO
@@ -2758,6 +2806,86 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('ytcm_debug', 'true');
         setTimeout(() => window.unifiedCore?.enableDebugMode(), 1000);
     }
+    //Agregar video despues 
+    if (window.UnifiedCore && window.UnifiedCore.prototype) {
+    window.UnifiedCore.prototype.addVideoToQueueAfterCurrent = async function(videoData) {
+        // VALIDACIÓN CRÍTICA
+        if (!videoData || !videoData.videoId) {
+            console.error('❌ addVideoToQueueAfterCurrent: videoData o videoId inválido:', videoData);
+            this.showMessage('Error: Video inválido', 'error');
+            return;
+        }
+
+        if (videoData.videoId === 'undefined' || videoData.videoId === undefined) {
+            console.error('❌ addVideoToQueueAfterCurrent: videoId es undefined');
+            this.showMessage('Error: ID de video no válido', 'error');
+            return;
+        }
+
+        let queuePlaylist = playlistsData.find(p => p.id === 'queue');
+        
+        if (!queuePlaylist) {
+            queuePlaylist = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: './electronic.ico',
+                videos: [],
+                isExpanded: true,
+                isQueue: true
+            };
+            playlistsData.unshift(queuePlaylist);
+        }
+
+        // Verificar duplicados
+        const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
+        if (isDuplicate) {
+            this.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
+            return;
+        }
+
+        // Obtener duración si no la tiene
+        let duration = videoData.duration || 0;
+        
+        if (!duration && videoData.videoId && window.isAuthorized) {
+            try {
+                const durations = await this.getBatchVideoDurations([videoData.videoId]);
+                duration = durations[videoData.videoId] || 0;
+            } catch (error) {
+                console.warn('No se pudo obtener duración para', videoData.videoId);
+            }
+        }
+
+        const videoObject = {
+            videoId: videoData.videoId,
+            title: videoData.title || "Título no disponible",
+            thumbnail: videoData.thumbnail || './electronic.ico',
+            duration: duration,
+            uploaderName: videoData.uploaderName || videoData.author || 'Desconocido',
+            author: videoData.author || videoData.uploaderName || 'Desconocido',
+            sourcePlaylistId: 'queue'
+        };
+
+        // INSERTAR DESPUÉS DEL VIDEO ACTUAL
+        const currentIndex = currentPlayingInfo.flattenedIndex;
+        
+        if (currentIndex >= 0 && currentIndex < queuePlaylist.videos.length) {
+            // Insertar justo después del video actual
+            queuePlaylist.videos.splice(currentIndex + 1, 0, videoObject);
+            this.showMessage(`Añadido después de la canción actual: ${videoObject.title}`, 'success');
+            console.log(`🎵 Video insertado en posición ${currentIndex + 1}`);
+        } else {
+            // Si no hay reproducción, añadir al final
+            queuePlaylist.videos.push(videoObject);
+            this.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
+        }
+        
+        this.updatePlaylistsUI();
+        this.enablePlayButton();
+        
+        console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
+        setTimeout(() => saveAllData(), 500);
+    };
+}
 });
 
 // Preservar datos al cambiar tamaño de ventana
