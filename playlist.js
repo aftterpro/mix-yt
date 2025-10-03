@@ -165,7 +165,11 @@ class PlaylistManager {
         queuePlaylist.videos.push(videoObject);
         this.core?.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
         
-        this.updatePlaylistsUI();
+        if (this.updatePlaylistsUI) {
+            this.updatePlaylistsUI();
+            } else if (this.core?.updatePlaylistsUI) {
+                this.core.updatePlaylistsUI();
+            }
         this.core?.enablePlayButton();
         
         console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
