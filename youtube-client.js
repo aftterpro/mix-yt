@@ -1,21 +1,21 @@
-console.log('🎵 Cargando YouTube Client con proxy CORS...');
+console.log('🎵 Cargando YouTube Client con procesamiento backend...');
 
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        // La función de Netlify es nuestro ÚNICO punto de entrada para las búsquedas.
+        // La función de Netlify procesa los datos en el backend
         this.netlifyFunction = '/.netlify/functions/search';
     }
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Client inicializado con proxy CORS');
+        console.log('✅ YouTube Client inicializado con procesamiento backend');
         return true;
     }
 
     /**
-     * Método principal para buscar. Se encarga de decidir si es una
-     * búsqueda inicial o una paginación y siempre usa el proxy.
+     * Método principal para buscar
+     * Los datos ya vienen procesados del backend
      */
     async search(query, continuation = null) {
         if (!this.initialized) await this.init();
@@ -23,121 +23,136 @@ class YouTubeSimplifiedClient {
         console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (paginación)' : ''}`);
 
         try {
-            // ¡SIEMPRE usamos el proxy de Netlify para todo!
             return await this.searchViaCorsProxy(query, continuation);
         } catch (error) {
             console.error("❌ Error en búsqueda:", error);
-            // Devolvemos un objeto de fallback para que la UI no se rompa.
             return { items: [], nextpage: null, suggestion: "Error al buscar resultados." };
         }
     }
 
     /**
-     * Realiza la llamada a nuestra función de Netlify, que actúa como proxy.
-     * Usa GET para la primera búsqueda y POST para la paginación.
+     * Realiza la llamada al proxy de Netlify
+     * Backend procesa y limpia los datos automáticamente
      */
     async searchViaCorsProxy(query, continuation) {
-        console.log('📡 Usando la función de Netlify como proxy para todo.');
+        console.log('📡 Usando la función de Netlify (con procesamiento backend)');
         
-        let targetUrl = this.netlifyFunction; // La URL base siempre es la misma
+        let targetUrl = this.netlifyFunction;
         const fetchOptions = {
             headers: {    
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            signal: AbortSignal.timeout(15000) // Timeout de 15 segundos
+            signal: AbortSignal.timeout(15000)
         };
 
         if (continuation) {
-            // --- PAGINACIÓN: Usamos POST con un cuerpo JSON ---
-            console.log('📄 Preparando petición POST para paginación vía proxy...');
+            // PAGINACIÓN: POST
+            console.log('📄 Petición POST para paginación...');
             fetchOptions.method = 'POST';
             fetchOptions.body = JSON.stringify({
                 query: query,
-                nextpage: continuation // La función de Netlify espera esto en el body
+                nextpage: continuation
             });
         } else {
-            // --- BÚSQUEDA INICIAL: Usamos GET con un parámetro en la URL ---
-            console.log('📄 Preparando petición GET para primera búsqueda vía proxy...');
+            // BÚSQUEDA INICIAL: GET
+            console.log('📄 Petición GET para primera búsqueda...');
             fetchOptions.method = 'GET';
-            // Para GET, la URL debe llevar el parámetro
             targetUrl = `${this.netlifyFunction}?q=${encodeURIComponent(query)}`;
         }
 
-        console.log(`📡 ${fetchOptions.method} a proxy:`, targetUrl);
+        console.log(`📡 ${fetchOptions.method} a:`, targetUrl);
 
         try {
             const response = await fetch(targetUrl, fetchOptions);
             
-            console.log(`📊 Respuesta del Proxy: ${response.status} ${response.statusText}`);
+            console.log(`📊 Respuesta: ${response.status} ${response.statusText}`);
             
             if (!response.ok) {
-                // Intentamos leer el error como JSON, si falla, mostramos texto genérico.
-                const errorData = await response.json().catch(() => ({ details: 'Respuesta de error no es JSON' }));
-                throw new Error(`Error del Proxy ${response.status}: ${errorData.details || errorData.error}`);
+                const errorData = await response.json().catch(() => ({ 
+                    details: 'Respuesta de error no es JSON' 
+                }));
+                throw new Error(`Error ${response.status}: ${errorData.details || errorData.error}`);
             }
 
             const data = await response.json();
-            return this.normalizeResponse(data, query, continuation);
+            
+            // Los datos YA vienen procesados del backend
+            // Solo necesitamos validación final
+            return this.validateResponse(data, query, continuation);
 
         } catch (error) {
             if (error.name === 'AbortError') {
                 throw new Error('La búsqueda excedió el tiempo límite (15s)');
             }
-            throw error; // Propagamos otros errores para que sean capturados por el método search()
+            throw error;
         }
     }
 
-    // --- MÉTODOS DE AYUDA (HELPER METHODS) ---
-
     /**
-     * Unifica el formato de la respuesta recibida desde la API.
+     * Validar respuesta del backend
+     * El backend ya procesó los títulos, solo verificamos estructura
      */
-    normalizeResponse(data, query, continuation) {
-        console.log('📊 Normalizando respuesta:', {
+    validateResponse(data, query, continuation) {
+        console.log('📊 Validando respuesta del backend:', {
             source: continuation ? 'paginación' : 'primera búsqueda',
             itemsCount: data.items?.length || 0,
-            hasNextpage: !!data.nextpage
+            hasNextpage: !!data.nextpage,
+            backendProcessed: data.items?.[0]?.artist ? 'Yes' : 'No'
         });
 
-        const items = (data.items || []).map(item => {
-            const videoId = item.videoId || this.extractVideoId(item.url);
-            
-            if (!videoId || !item.title || !item.thumbnail) {
-                console.warn('❌ Item descartado por falta de datos:', item);
-                return null;
+        // Verificar que los items tengan la estructura esperada
+        const validItems = (data.items || []).filter(item => {
+            // Validación básica
+            if (!item.videoId || !item.title) {
+                console.warn('⚠️ Item sin videoId o title:', item);
+                return false;
             }
 
-            return {
-                videoId: videoId,
-                title: item.title.trim(),
-                thumbnail: item.thumbnail,
-                duration: typeof item.duration === 'number' ? item.duration : this.parseDurationString(item.duration),
-                uploaderName: item.uploaderName?.trim() || 'Desconocido',
-            };
-        }).filter(item => item !== null); // Filtramos los items nulos
+            // Validar videoId (11 caracteres)
+            if (!/^[a-zA-Z0-9_-]{11}$/.test(item.videoId)) {
+                console.warn('⚠️ VideoId inválido:', item.videoId);
+                return false;
+            }
 
-        console.log(`✅ ${items.length} videos válidos procesados`);
+            return true;
+        });
+
+        if (validItems.length < data.items?.length) {
+            console.warn(`⚠️ ${data.items.length - validItems.length} items descartados por validación`);
+        }
+
+        console.log(`✅ ${validItems.length} videos válidos`);
 
         return {
-            items: items,
+            items: validItems,
             nextpage: data.nextpage || null,
             suggestion: data.suggestion || null,
+            metadata: {
+                source: 'piped',
+                backendProcessed: true,
+                timestamp: Date.now()
+            }
         };
     }
 
     /**
-     * Extrae el ID de un video de diferentes formatos de URL de YouTube.
+     * Extraer videoId de URL (por si acaso, ya no debería ser necesario)
+     * @deprecated - El backend ya proporciona videoId limpio
      */
     extractVideoId(url) {
         if (!url) return null;
         
+        // Si ya es un videoId válido
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+            return url;
+        }
+        
         const patterns = [
-            /^\/watch\?v=([a-zA-Z0-9_-]{11})/,   // URL relativa de Piped: "/watch?v=..."
-            /[?&]v=([a-zA-Z0-9_-]{11})/,        // URL completa con watch?v=
-            /youtu\.be\/([a-zA-Z0-9_-]{11})/,   // URL de youtu.be
-            /embed\/([a-zA-Z0-9_-]{11})/,       // URL de embed
-            /^([a-zA-Z0-9_-]{11})$/             // Solo el ID
+            /^\/watch\?v=([a-zA-Z0-9_-]{11})/,
+            /[?&]v=([a-zA-Z0-9_-]{11})/,
+            /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+            /embed\/([a-zA-Z0-9_-]{11})/,
         ];
         
         for (const pattern of patterns) {
@@ -152,23 +167,164 @@ class YouTubeSimplifiedClient {
     }
 
     /**
-     * Convierte una duración en formato "HH:MM:SS" a segundos.
+     * Parsear duración (backup, el backend debería normalizarla)
+     * @deprecated - El backend normaliza duraciones
      */
     parseDurationString(duration) {
         if (typeof duration === 'number') return duration;
         if (!duration || typeof duration !== 'string') return 0;
 
         const parts = duration.split(':').map(p => parseInt(p, 10));
-        if (parts.length === 2) { // MM:SS
+        if (parts.length === 2) {
             return parts[0] * 60 + parts[1];
         }
-        if (parts.length === 3) { // HH:MM:SS
+        if (parts.length === 3) {
             return parts[0] * 3600 + parts[1] * 60 + parts[2];
         }
         return 0;
     }
+
+    /**
+     * NUEVO: Método para obtener trending (opcional)
+     */
+    async getTrending(region = 'US') {
+        console.log(`🔥 Obteniendo trending para región: ${region}`);
+        
+        try {
+            const pipedUrl = `https://api.piped.private.coffee/trending?region=${region}`;
+            const response = await fetch(pipedUrl, {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                signal: AbortSignal.timeout(10000)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            return {
+                items: data || [],
+                region: region,
+                timestamp: Date.now()
+            };
+            
+        } catch (error) {
+            console.error('❌ Error obteniendo trending:', error);
+            return { items: [], region, error: error.message };
+        }
+    }
+
+    /**
+     * NUEVO: Método para obtener info de un video específico
+     */
+    async getVideoInfo(videoId) {
+        console.log(`📹 Obteniendo info para video: ${videoId}`);
+        
+        try {
+            const pipedUrl = `https://api.piped.private.coffee/streams/${videoId}`;
+            const response = await fetch(pipedUrl, {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                signal: AbortSignal.timeout(10000)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            return {
+                videoId: videoId,
+                title: data.title,
+                description: data.description,
+                duration: data.duration,
+                views: data.views,
+                likes: data.likes,
+                uploader: data.uploader,
+                uploaderUrl: data.uploaderUrl,
+                thumbnail: data.thumbnailUrl,
+                category: data.category,
+                uploadDate: data.uploadDate
+            };
+            
+        } catch (error) {
+            console.error(`❌ Error obteniendo info de video ${videoId}:`, error);
+            return null;
+        }
+    }
 }
 
-// Crear instancia global para que sea accesible desde la aplicación
+// =============================================
+// FUNCIONES AUXILIARES Y UTILIDADES
+// =============================================
+
+/**
+ * Formatear duración a MM:SS o HH:MM:SS
+ */
+function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Validar estructura de video
+ */
+function isValidVideoStructure(video) {
+    return (
+        video &&
+        typeof video === 'object' &&
+        video.videoId &&
+        video.title &&
+        typeof video.videoId === 'string' &&
+        typeof video.title === 'string' &&
+        /^[a-zA-Z0-9_-]{11}$/.test(video.videoId)
+    );
+}
+
+/**
+ * Sanitizar texto para HTML
+ */
+function sanitizeForHTML(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// =============================================
+// EXPORTAR INSTANCIA GLOBAL
+// =============================================
+
+// Crear instancia global
 window.youtubeJSClient = new YouTubeSimplifiedClient();
-console.log('✅ YouTube Client listo para usar.');
+
+// Exponer utilidades
+window.youtubeClientUtils = {
+    formatDuration,
+    isValidVideoStructure,
+    sanitizeForHTML
+};
+
+console.log('✅ YouTube Client listo con procesamiento backend.');
+console.log('📝 Características:');
+console.log('  ✅ Títulos procesados en backend');
+console.log('  ✅ Artista y título separados');
+console.log('  ✅ Validación de videoId');
+console.log('  ✅ Normalización de duraciones');
+console.log('  ✅ Limpieza de patrones comunes');
