@@ -984,7 +984,72 @@ Spinner
     opacity: 1;
     transform: translateY(-50%) scale(1);
 }
-
+/*Drag y Drop
+*/
+ /* Estilos para Drag & Drop */
+    .queue-item[draggable="true"] {
+        cursor: move;
+        transition: all 0.2s ease;
+    }
+    
+    .queue-item.dragging {
+        opacity: 0.5 !important;
+        transform: scale(0.95);
+        box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+    }
+    
+    .queue-item.drag-over {
+        border-top: 3px solid var(--primary-color);
+        margin-top: 8px;
+        transform: translateY(4px);
+    }
+    
+    .queue-item:not(.dragging):hover {
+        background: linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(255, 107, 53, 0.06) 100%);
+        transform: translateY(-2px);
+    }
+    
+    /* Indicador visual de arrastre */
+    .queue-item::before {
+        content: '⋮⋮';
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 107, 53, 0.5);
+        font-size: 16px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .queue-item:hover::before {
+        opacity: 1;
+    }
+    
+    /* Ajustar padding para dar espacio al indicador */
+    .queue-item {
+        padding-left: 35px;
+        position: relative;
+    }
+    
+    /* Animación para items eliminados */
+    .queue-item.removing {
+        animation: slideOutLeft 0.3s ease forwards;
+    }
+    
+    @keyframes slideOutLeft {
+        0% {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        100% {
+            opacity: 0;
+            transform: translateX(-50px);
+            height: 0;
+            margin: 0;
+            padding: 0;
+        }
+    }
 /* =============================================
    BARRA DE PROGRESO DE VIDEO (si existe)
    ============================================= */
