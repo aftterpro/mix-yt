@@ -1567,117 +1567,10 @@ setupImprovedInfiniteScroll(searchResults) {
 }
 
 async loadMoreSearchResults() {
-    if (isLoadingMore || !nextPageContext) {
-        console.log('⚠️ Ya cargando o no hay más páginas');
-        return;
-    }
-    
-    const searchResults = document.getElementById('searchResults');
-    if (!searchResults) return;
-    
-    console.log('📜 ⏳ Cargando más resultados...', {
-        currentQuery: currentSearchQuery,
-        nextPageType: typeof nextPageContext
-    });
-    
-    isLoadingMore = true;
-    
-    let spinner = searchResults.querySelector('.search-loading-more');
-    if (!spinner) {
-        spinner = document.createElement('div');
-        spinner.className = 'search-loading-more';
-        spinner.innerHTML = `
-            <div class="search-spinner">
-                <i class="fas fa-circle-notch fa-spin"></i>
-                <span>Cargando más música...</span>
-            </div>
-        `;
-        searchResults.appendChild(spinner);
-    }
-    
-    try {
-        // === CORRECCIÓN CLAVE: Preparar el token de continuación ===
-        let continuationToken = nextPageContext;
-        if (typeof continuationToken === 'string') {
-            try {
-                // Intenta parsear la cadena JSON a un objeto
-                continuationToken = JSON.parse(continuationToken);
-                console.log('✅ Token de paginación parseado a objeto.');
-            } catch (e) {
-                console.warn("⚠️ Error al parsear token, enviando cadena directamente:", e);
-            }
-        }
-        
-        // USAR DIRECTAMENTE EL CLIENTE DE PIPED CON EL TOKEN (ahora potencialmente parseado)
-        const data = await window.youtubeJSClient.search(currentSearchQuery, continuationToken);
-        
-        console.log('📜 Respuesta exitosa:', {
-            items: data.items?.length || 0,
-            hasNextPage: !!data.nextpage,
-            error: data.error || 'none'
-        });
-
-        if (data.error) {
-            throw new Error(data.details || data.error);
-        }
-        
-        // Procesar resultados
-        this.displaySearchResults(data, true);
-        console.log('✅ Paginación completada exitosamente');
-        
-    } catch (error) {
-        console.error('❌ Error en paginación:', error);
-        
-        let userMessage = 'Error cargando más resultados';
-        if (error.message.includes('Timeout')) {
-            userMessage = 'Tiempo de espera agotado';
-        } else if (error.message.includes('500') || error.message.includes('400')) {
-            userMessage = 'Error del servidor o token inválido';
-        } else if (error.message.includes('Token')) {
-            userMessage = 'Error de paginación';
-        }
-        
-        this.showMessage(userMessage, 'error');
-        
-        // Mostrar botón de reintento
-        if (spinner) {
-            spinner.innerHTML = `
-                <div class="search-error-retry">
-                    <p>${userMessage}</p>
-                    <button onclick="window.unifiedCore.retryLoadMore()" class="retry-btn">
-                        <i class="fas fa-redo"></i> Reintentar
-                    </button>
-                </div>
-            `;
-        }
-        
-        // Limpiar token en errores críticos
-        if (error.message.includes('Token') || error.message.includes('400')) {
-            console.log('🚫 Limpiando token por error crítico o 400');
-            nextPageContext = null;
-        }
-        
-    } finally {
-        isLoadingMore = false;
-        
-        setTimeout(() => {
-            const existingSpinner = searchResults.querySelector('.search-loading-more');
-            if (existingSpinner && !existingSpinner.querySelector('.search-error-retry')) {
-                existingSpinner.remove();
-            }
-        }, 1000);
-    }
+        console.log('⚠️ En mantenimiento no hay más páginas');
 }
 retryLoadMore() {
     console.log('🔄 Reintentando carga de más resultados...');
-    const spinner = document.querySelector('.search-loading-more');
-    if (spinner) {
-        spinner.remove();
-    }
-    // Pequeño delay antes de reintentar
-    setTimeout(() => {
-        this.loadMoreSearchResults();
-    }, 500);
 }
     createSearchGrid() {
         const grid = document.createElement('div');
@@ -1685,7 +1578,7 @@ retryLoadMore() {
         return grid;
     }
 
-function createSearchResultCardImproved(video, videoId) {
+ createSearchResultCardImproved(video, videoId) {
     // VALIDACIÓN CRÍTICA
     if (!videoId || videoId === 'undefined' || videoId === 'null') {
         console.error('❌ createSearchResultCard: videoId inválido:', { 
