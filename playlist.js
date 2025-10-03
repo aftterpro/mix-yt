@@ -366,7 +366,47 @@ class PlaylistManager {
         console.log('✅ removeVideoFromQueue COMPLETADO');
         return true;
     }
-
+/**
+ * Actualizar UI de playlists
+ */
+updatePlaylistsUI() {
+    console.log('🔄 Actualizando UI de playlists...');
+    
+    const container = document.getElementById('playlistsGrid');
+    if (!container) {
+        console.error('❌ Container playlistsGrid no encontrado');
+        return;
+    }
+    
+    // Limpiar container
+    container.innerHTML = '';
+    
+    if (this.playlistsData.length === 0) {
+        container.innerHTML = `
+            <div class="search-placeholder">
+                <i class="fas fa-music"></i>
+                <p><strong>¡Conecta tu cuenta de Google!</strong></p>
+                <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
+                <p><small>Powered by Sistema Unificado</small></p>
+            </div>
+        `;
+        return;
+    }
+    
+    console.log(`📊 Renderizando ${this.playlistsData.length} playlists`);
+    
+    // Renderizar cada playlist
+    this.playlistsData.forEach((playlist, index) => {
+        const card = this.createPlaylistCard(playlist);
+        container.appendChild(card);
+    });
+    
+    const finalCount = container.querySelectorAll('.playlist-card').length;
+    console.log(`✅ ${finalCount} playlists renderizadas`);
+    
+    // Actualizar stats en core
+    this.core?.updateOverviewStats?.();
+}
     /**
      * Limpiar toda la cola
      */
