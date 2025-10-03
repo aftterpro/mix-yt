@@ -661,12 +661,12 @@ updatePlaylistsUI() {
         this.updatePlaylistsUI();
     }
 
-    refreshPlayingView() {
-        this.updateNowPlaying();
-        if (window.playlistManager) {
-            window.playlistManager.updateQueueDisplay();
-        }
+refreshPlayingView() {
+    this.updateNowPlaying();
+    if (window.playlistManager?.updateQueuePopup) {
+        window.playlistManager.updateQueuePopup();
     }
+}
 
     focusSearchInput() {
         const searchInput = document.getElementById('sidebarSearchInput') || 
