@@ -1470,6 +1470,7 @@ createSearchResultCard(video, videoId) {
     div.textContent = text;
     return div.innerHTML;
 }
+ getFlattenedPlaylist() {
  const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
     if (!queuePlaylist) {
