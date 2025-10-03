@@ -185,7 +185,7 @@ if (document.readyState === 'loading') {
                 // Continuar sin todas las APIs si es necesario
                 document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout'));
             }
-        }, 15000); // 15 segundos
+        }, 10000); // 10 segundos
     });
 } else {
     console.log('📄 DOM ya cargado, verificando APIs...');
