@@ -1104,6 +1104,62 @@ async performSearchFallback(query, nextPage) {
         }
     }
 }
+    // =============================================
+// DELEGACIÓN A PLAYLIST MANAGER
+// ==
+  async addVideoToQueue(videoData) {
+    if (!window.playlistManager) {
+        console.error('❌ PlaylistManager no disponible');
+        this.showMessage('Error: Gestor de playlists no disponible', 'error');
+        return;
+    }
+    
+    return await window.playlistManager.addVideoToQueue(videoData);
+}
+// Añadir video después del actual (DELEGADO)
+  async addVideoToQueueAfterCurrent(videoData) {
+    if (!window.playlistManager) {
+        console.error('❌ PlaylistManager no disponible');
+        this.showMessage('Error: Gestor de playlists no disponible', 'error');
+        return;
+    }
+    
+    return await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
+}  
+ async addVideoToQueueAfterCurrent(videoData) {
+    if (!window.playlistManager) {
+        console.error('❌ PlaylistManager no disponible');
+        this.showMessage('Error: Gestor de playlists no disponible', 'error');
+        return;
+    }
+    
+    return await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
+}
+  removeVideoFromQueue(videoId) {
+    if (!window.playlistManager) {
+        console.error('❌ PlaylistManager no disponible');
+        this.showMessage('Error: Gestor de playlists no disponible', 'error');
+        return false;
+    }
+    
+    return window.playlistManager.removeVideoFromQueue(videoId);
+}  
+   showQueuePopup() {
+    if (!window.playlistManager) {
+        console.error('❌ PlaylistManager no disponible');
+        this.showMessage('Error: Gestor de playlists no disponible', 'error');
+        return;
+    }
+    
+    window.playlistManager.showQueuePopup();
+} 
+  updateQueuePopup() {
+    if (!window.playlistManager) {
+        return; // No mostrar error, puede no estar abierto
+    }
+    
+    window.playlistManager.updateQueuePopup();
+}  
 // Asegurar que displaySearchResults tenga scroll infinito:
 displaySearchResults(results, append = false) {
     const searchResults = document.getElementById('searchResults');
@@ -1295,7 +1351,7 @@ retryLoadMore() {
         return grid;
     }
 
- createSearchResultCardImproved(video, videoId) {
+createSearchResultCard(video, videoId) {
     // VALIDACIÓN CRÍTICA
     if (!videoId || videoId === 'undefined' || videoId === 'null') {
         console.error('❌ createSearchResultCard: videoId inválido:', { 
@@ -1310,39 +1366,43 @@ retryLoadMore() {
     console.log('🎵 Creando card para:', {
         videoId,
         title: video.title?.substring(0, 30),
-        hasThumbnail: !!video.thumbnail
+        artist: video.artist,
+        backendProcessed: !!video.artist
     });
 
     const card = document.createElement('div');
     card.className = 'search-result-card';
     card.dataset.videoId = videoId;
 
-    // MEJORA: Limpiar y separar artista y título
-    const { artist, title } = extractArtistAndTitle(video.title);
-    const duration = video.duration ? window.unifiedCore?.formatDuration(video.duration) : '';
-    const authorFinal = artist || video.uploaderName || 'Autor Desconocido';
+    // ✅ SIMPLIFICADO: Los datos ya vienen procesados del backend
+    // El backend separó: video.title (limpio) y video.artist
+    const title = video.title || 'Título Desconocido';
+    const artist = video.artist || video.uploaderName || 'Autor Desconocido';
+    const duration = video.duration ? this.formatDuration(video.duration) : '';
+    const thumbnail = video.thumbnail || './electronic.ico';
 
-    // Escapar datos para HTML
-    const safeTitle = title.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-    const safeThumbnail = video.thumbnail || './electronic.ico';
-    const safeAuthor = authorFinal.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    // Escapar datos para HTML (seguridad)
+    const safeTitle = this.escapeHTML(title);
+    const safeArtist = this.escapeHTML(artist);
+    const safeThumbnail = thumbnail;
 
     card.innerHTML = `
         <div class="search-result-thumbnail">
-            <img src="${safeThumbnail}" alt="${safeTitle}" loading="lazy" 
-                 onerror="this.src='./electronic.ico'; console.log('Error cargando imagen');"
-                 data-original-src="${safeThumbnail}">
+            <img src="${safeThumbnail}" 
+                 alt="${safeTitle}" 
+                 loading="lazy" 
+                 onerror="this.src='./electronic.ico';">
             ${duration ? `<span class="search-result-duration">${duration}</span>` : ''}
         </div>
         <div class="search-result-info">
             <h3 class="search-result-title" title="${safeTitle}">${safeTitle}</h3>
-            <p class="search-result-author">${safeAuthor}</p>
+            <p class="search-result-author">${safeArtist}</p>
             <button class="search-result-add-btn" 
                     data-video-id="${videoId}" 
                     data-title="${safeTitle}" 
                     data-thumbnail="${safeThumbnail}"
                     data-duration="${video.duration || 0}"
-                    data-author="${safeAuthor}">
+                    data-author="${safeArtist}">
                 <i class="fas fa-plus"></i>
                 Añadir a Cola
             </button>
@@ -1355,30 +1415,31 @@ retryLoadMore() {
         e.preventDefault();
         e.stopPropagation();
         
-        const btnVideoId = e.target.closest('.search-result-add-btn').dataset.videoId;
+        const btn = e.target.closest('.search-result-add-btn');
+        const btnVideoId = btn.dataset.videoId;
         
         if (!btnVideoId || btnVideoId === 'undefined') {
             console.error('❌ Click handler: videoId inválido en botón');
-            window.unifiedCore?.showMessage('Error: Video inválido', 'error');
+            this.showMessage('Error: Video inválido', 'error');
             return;
         }
 
         console.log('🎵 Añadiendo video desde búsqueda:', {
             videoId: btnVideoId,
-            title: e.target.closest('.search-result-add-btn').dataset.title?.substring(0, 30)
+            title: btn.dataset.title?.substring(0, 30)
         });
 
         const videoData = {
             videoId: btnVideoId,
-            title: e.target.closest('.search-result-add-btn').dataset.title,
-            thumbnail: e.target.closest('.search-result-add-btn').dataset.thumbnail,
-            duration: parseInt(e.target.closest('.search-result-add-btn').dataset.duration) || 0,
-            uploaderName: e.target.closest('.search-result-add-btn').dataset.author,
-            author: e.target.closest('.search-result-add-btn').dataset.author
+            title: btn.dataset.title,
+            thumbnail: btn.dataset.thumbnail,
+            duration: parseInt(btn.dataset.duration) || 0,
+            uploaderName: btn.dataset.author,
+            author: btn.dataset.author
         };
 
-        // CORRECCIÓN: Añadir después del video actual
-        window.unifiedCore?.addVideoToQueueAfterCurrent(videoData);
+        // Añadir después del video actual
+        this.addVideoToQueueAfterCurrent(videoData);
     });
     
     console.log('✅ Card creada exitosamente:', videoId);
@@ -1402,36 +1463,98 @@ retryLoadMore() {
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
-getFlattenedPlaylist() {
-    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    escapeHTML(text) {
+    if (!text) return '';
+    
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+ const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
     if (!queuePlaylist) {
+        console.warn('⚠️ No se encontró playlist de cola');
         return [];
     }
     
-    const flatList = queuePlaylist.videos.map(video => {
+    if (!queuePlaylist.videos || !Array.isArray(queuePlaylist.videos)) {
+        console.warn('⚠️ Cola sin videos o estructura inválida');
+        return [];
+    }
+    
+    const flatList = queuePlaylist.videos.map((video, index) => {
+        // VALIDACIÓN: Asegurar que el video tiene videoId válido
+        if (!video.videoId || video.videoId === 'undefined') {
+            console.error(`❌ Video ${index} sin videoId válido:`, video);
+            return null;
+        }
+        
         // MEJORADO: Obtener duración correcta
         let duration = 0;
         
         if (video.duration) {
-            duration = typeof video.duration === 'number' ? video.duration : this.parseDuration(video.duration);
+            // Si ya es número, usarlo directamente
+            duration = typeof video.duration === 'number' 
+                ? video.duration 
+                : this.parseDuration(video.duration);
         } else if (video.contentDetails?.duration) {
+            // Fallback: duración de YouTube API (formato ISO)
             duration = this.parseDuration(video.contentDetails.duration);
         }
         
+        // MEJORADO: Priorizar datos del backend (artist y title ya procesados)
+        // Si no existen, extraer del título completo
+        let artist = video.artist || video.uploaderName || video.author;
+        let title = video.title || "Título Desconocido";
+        
+        // Si no hay artista separado pero hay título completo, intentar extraer
+        if (!artist || artist === 'Desconocido') {
+            // Intentar obtener de uploaderName primero
+            if (video.uploaderName && video.uploaderName !== 'Desconocido') {
+                artist = video.uploaderName;
+            } else if (video.author && video.author !== 'Desconocido') {
+                artist = video.author;
+            } else {
+                // Último recurso: extraer del título si tiene separador
+                const separatorMatch = title.match(/^(.+?)\s*[-:]\s*(.+?)$/);
+                if (separatorMatch && separatorMatch[1]) {
+                    artist = separatorMatch[1].trim();
+                } else {
+                    artist = 'YouTube';
+                }
+            }
+        }
+        
+        // Construir objeto normalizado
         return {
+            // Identificación
             videoId: video.videoId,
-            title: video.title || "Título Desconocido",
+            sourcePlaylistId: video.sourcePlaylistId || 'queue',
+            source: video.source || 'queue',
+            
+            // Información de visualización (ya procesada del backend)
+            title: title,
+            artist: artist,
+            uploaderName: artist, // Mantener compatibilidad
+            author: artist,       // Mantener compatibilidad
+            
+            // Media
             thumbnail: video.thumbnail || './electronic.ico',
             duration: duration,
-            uploaderName: video.uploaderName || video.author || this.extractArtistAndTitle(video.title),
-            author: video.author || video.uploaderName || this.extractArtistAndTitle(video.title),
-            sourcePlaylistId: 'queue',
-            source: 'queue'
+            
+            // Metadata adicional (opcional)
+            addedAt: video.addedAt || Date.now(),
+            originalTitle: video.originalTitle || video.title
         };
-    });
+    }).filter(video => video !== null); // Eliminar videos inválidos
     
-    console.log(`📊 Cola de reproducción: ${flatList.length} videos`);
+    // Log de debug
+    if (flatList.length !== queuePlaylist.videos.length) {
+        console.warn(`⚠️ Se filtraron ${queuePlaylist.videos.length - flatList.length} videos inválidos`);
+    }
+    
+    console.log(`📊 Cola de reproducción: ${flatList.length} videos válidos`);
+    
     return flatList;
 }
     async getBatchVideoDurations(videoIds) {
@@ -1523,78 +1646,6 @@ getFlattenedPlaylist() {
         console.warn(`⚠️ No se pudo parsear duración: "${durationInput}", usando 210s por defecto`);
         return 210;
     }
-extractArtistAndTitle(fullTitle) {
-    if (!fullTitle) return { artist: 'Desconocido', title: 'Título Desconocido' };
-    
-    let cleanTitle = fullTitle;
-    
-    // Eliminar patrones comunes de videos
-    const patternsToRemove = [
-        /\(Videoclip Oficial\)/gi,
-        /\(Video Oficial\)/gi,
-        /\| Video Oficial/gi,
-        /\[Video Oficial\]/gi,
-        /\(Official Video\)/gi,
-        /\[Official Video\]/gi,
-        /\(Official Music Video\)/gi,
-        /\[Official Music Video\]/gi,
-        /\(Lyric Video\)/gi,
-        /\[Lyric Video\]/gi,
-        /\(Audio Oficial\)/gi,
-        /\[Audio Oficial\]/gi,
-        /\(HD\)/gi,
-        /\[HD\]/gi,
-        /\(4K\)/gi,
-        /\[4K\]/gi,
-    ];
-    
-    patternsToRemove.forEach(pattern => {
-        cleanTitle = cleanTitle.replace(pattern, '');
-    });
-    
-    // Intentar extraer artista y título: "Artista - Título"
-    const separatorPatterns = [
-        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Guión
-        /^(.+?)\s*:\s*(.+?)$/,       // Dos puntos
-        /^(.+?)\s*\|\s*(.+?)$/,      // Pipe
-        /^(.+?)\s*•\s*(.+?)$/        // Punto medio
-    ];
-    
-    for (const pattern of separatorPatterns) {
-        const match = cleanTitle.match(pattern);
-        if (match && match[1] && match[2]) {
-            let artist = match[1].trim();
-            let title = match[2].trim();
-            
-            // Limpiar features y remixes del título
-            title = title
-                .replace(/\s*\(feat\..*?\)/gi, '')
-                .replace(/\s*\[feat\..*?\]/gi, '')
-                .replace(/\s*\(ft\..*?\)/gi, '')
-                .replace(/\s*\[ft\..*?\]/gi, '')
-                .replace(/\s*\(Remix\)/gi, '')
-                .replace(/\s*\[Remix\]/gi, '');
-            
-            // Limpiar espacios múltiples
-            artist = artist.replace(/\s+/g, ' ').trim();
-            title = title.replace(/\s+/g, ' ').trim();
-            
-            return { artist, title };
-        }
-    }
-    
-    // Si no se encuentra separador, intentar extraer antes del primer paréntesis
-    const beforeParenthesis = cleanTitle.split(/[\(\[]/)[0].trim();
-    if (beforeParenthesis && beforeParenthesis.length < cleanTitle.length) {
-        return { 
-            artist: beforeParenthesis, 
-            title: cleanTitle.replace(beforeParenthesis, '').replace(/^[\s\-–—:\|\•]+/, '').trim() || beforeParenthesis
-        };
-    }
-    
-    // Fallback: retornar título completo
-    return { artist: 'YouTube', title: cleanTitle.trim() };
-}
     // =============================================
     // MONITOREO Y ESTADO
     // =============================================
