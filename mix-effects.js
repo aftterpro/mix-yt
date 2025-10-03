@@ -334,214 +334,346 @@ async capturePlayerAudio(player, playerNum) {
         console.log('✅ playNextVideo hooked con audio real');
     }
     
-    async requestTabCapture(playerNum) {
-        console.log('🎤 Solicitando captura de pestaña...');
-        
-        const dialog = document.createElement('div');
-        dialog.className = 'audio-capture-dialog';
-        dialog.innerHTML = `
-            <div class="dialog-content">
-                <h3>🎚️ Activar Efectos de Audio</h3>
-                <p>Para que los efectos funcionen perfectamente, necesitamos acceso al audio de la pestaña.</p>
-                <div class="dialog-steps">
-                    <div class="step">
-                        <span class="step-number">1</span>
-                        <span>Click en "Permitir"</span>
-                    </div>
-                    <div class="step">
-                        <span class="step-number">2</span>
-                        <span>Selecciona "Esta pestaña"</span>
-                    </div>
-                    <div class="step">
-                        <span class="step-number">3</span>
-                        <span>Activa "Compartir audio de la pestaña"</span>
-                    </div>
-                </div>
-                <div class="dialog-actions">
-                    <button id="allowAudioCapture" class="btn-primary">
-                        <i class="fas fa-check"></i> Permitir
-                    </button>
-                    <button id="cancelAudioCapture" class="btn-secondary">
-                        Cancelar
-                    </button>
-                </div>
-                <p class="dialog-note">
-                    <i class="fas fa-info-circle"></i>
-                    Esto solo captura audio, no video ni datos personales
-                </p>
-            </div>
-        `;
-        
-        this.addDialogStyles();
-        document.body.appendChild(dialog);
-        
-        return new Promise((resolve) => {
-            dialog.querySelector('#allowAudioCapture').addEventListener('click', async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({
-                        video: false,
-                        audio: {
-                            echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false,
-                            sampleRate: 48000
-                        }
-                    });
-                    
-                    console.log('✅ Stream de audio capturado');
-                    
-                    const source = this.audioContext.createMediaStreamSource(stream);
-                    const nodes = this.createEffectChain(playerNum);
-                    this.connectNodes(source, nodes);
-                    
-                    const playerData = {
-                        source,
-                        nodes,
-                        stream,
-                        connected: true
-                    };
-                    
-                    this.players.set(playerNum, playerData);
-                    dialog.remove();
-                    
-                    if (window.unifiedCore) {
-                        window.unifiedCore.showMessage('✅ Efectos de audio activados', 'success');
-                    }
-                    
-                    resolve(playerData);
-                    
-                } catch (error) {
-                    console.error('❌ Error capturando audio:', error);
-                    dialog.remove();
-                    
-                    if (window.unifiedCore) {
-                        window.unifiedCore.showMessage('⚠️ Captura cancelada - Efectos limitados', 'warning');
-                    }
-                    
-                    resolve(null);
-                }
-            });
-            
-            dialog.querySelector('#cancelAudioCapture').addEventListener('click', () => {
-                dialog.remove();
-                resolve(null);
-            });
-        });
+async requestTabCapture(playerNum) {
+    console.log('🎤 Solicitando captura de pestaña...');
+    
+    // VALIDACIÓN: Verificar si getDisplayMedia está disponible
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        console.warn('⚠️ getDisplayMedia no está disponible en este navegador');
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('⚠️ Efectos de audio no disponibles en este navegador', 'warning');
+        }
+        return null;
     }
     
-    addDialogStyles() {
-        if (document.getElementById('audio-dialog-styles')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'audio-dialog-styles';
-        style.textContent = `
-            .audio-capture-dialog {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.9);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10001;
-                backdrop-filter: blur(10px);
-            }
-            
-            .dialog-content {
-                background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
-                border-radius: 16px;
-                padding: 30px;
-                max-width: 500px;
-                width: 90%;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-                border: 2px solid rgba(255, 107, 53, 0.3);
-            }
-            
-            .dialog-content h3 {
-                color: #ff6b35;
-                margin: 0 0 15px 0;
-                font-size: 24px;
-            }
-            
-            .dialog-content p {
-                color: white;
-                line-height: 1.6;
-                margin-bottom: 20px;
-            }
-            
-            .dialog-steps {
-                background: rgba(255, 107, 53, 0.1);
-                border-radius: 8px;
-                padding: 15px;
-                margin: 20px 0;
-            }
-            
-            .step {
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                padding: 10px 0;
-                color: white;
-            }
-            
-            .step-number {
-                background: linear-gradient(135deg, #ff6b35, #ff8a65);
-                width: 30px;
-                height: 30px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: 600;
-            }
-            
-            .dialog-actions {
-                display: flex;
-                gap: 10px;
-                margin-top: 20px;
-            }
-            
-            .btn-primary, .btn-secondary {
-                flex: 1;
-                padding: 12px 20px;
-                border: none;
-                border-radius: 8px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-            }
-            
-            .btn-primary {
-                background: linear-gradient(135deg, #ff6b35, #ff8a65);
-                color: white;
-            }
-            
-            .btn-primary:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(255,107,53,0.4);
-            }
-            
-            .btn-secondary {
-                background: rgba(255,255,255,0.1);
-                color: white;
-            }
-            
-            .dialog-note {
-                margin-top: 20px;
-                font-size: 13px;
-                color: #999;
-                text-align: center;
-            }
-        `;
-        
-        document.head.appendChild(style);
+    // Verificar si estamos en contexto seguro (HTTPS)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        console.warn('⚠️ getDisplayMedia requiere HTTPS');
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('⚠️ Efectos de audio requieren HTTPS', 'warning');
+        }
+        return null;
     }
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'audio-capture-dialog';
+    dialog.innerHTML = `
+        <div class="dialog-content">
+            <h3>🎚️ Activar Efectos de Audio</h3>
+            <p>Para que los efectos funcionen perfectamente, necesitamos acceso al audio de la pestaña.</p>
+            <div class="dialog-steps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <span>Click en "Permitir"</span>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <span>Selecciona "Esta pestaña"</span>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <span>Activa "Compartir audio de la pestaña"</span>
+                </div>
+            </div>
+            <div class="dialog-actions">
+                <button id="allowAudioCapture" class="btn-primary">
+                    <i class="fas fa-check"></i> Permitir
+                </button>
+                <button id="cancelAudioCapture" class="btn-secondary">
+                    Ahora no
+                </button>
+            </div>
+            <p class="dialog-note">
+                <i class="fas fa-info-circle"></i>
+                Esto solo captura audio, no video ni datos personales
+            </p>
+            <p class="dialog-note browser-note">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Nota:</strong> Esta función requiere Chrome/Edge 94+ o Firefox 94+
+            </p>
+        </div>
+    `;
+    
+    this.addDialogStyles();
+    document.body.appendChild(dialog);
+    
+    return new Promise((resolve) => {
+        dialog.querySelector('#allowAudioCapture').addEventListener('click', async () => {
+            try {
+                // Mostrar indicador de carga
+                const allowBtn = dialog.querySelector('#allowAudioCapture');
+                const originalText = allowBtn.innerHTML;
+                allowBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Esperando permiso...';
+                allowBtn.disabled = true;
+                
+                console.log('🎤 Solicitando captura con getDisplayMedia...');
+                
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: false,
+                    audio: {
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        sampleRate: 48000
+                    }
+                }).catch(err => {
+                    // Capturar errores específicos
+                    console.error('❌ Error en getDisplayMedia:', err);
+                    throw err;
+                });
+                
+                if (!stream) {
+                    throw new Error('No se obtuvo stream de audio');
+                }
+                
+                console.log('✅ Stream de audio capturado:', {
+                    id: stream.id,
+                    active: stream.active,
+                    audioTracks: stream.getAudioTracks().length
+                });
+                
+                // Verificar que hay audio tracks
+                const audioTracks = stream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    throw new Error('No se capturó audio - asegúrate de activar "Compartir audio de la pestaña"');
+                }
+                
+                const source = this.audioContext.createMediaStreamSource(stream);
+                const nodes = this.createEffectChain(playerNum);
+                this.connectNodes(source, nodes);
+                
+                const playerData = {
+                    source,
+                    nodes,
+                    stream,
+                    connected: true
+                };
+                
+                this.players.set(playerNum, playerData);
+                dialog.remove();
+                
+                if (window.unifiedCore) {
+                    window.unifiedCore.showMessage('✅ Efectos de audio activados', 'success');
+                }
+                
+                resolve(playerData);
+                
+            } catch (error) {
+                console.error('❌ Error capturando audio:', error);
+                
+                // Mensajes de error más específicos
+                let errorMessage = '⚠️ No se pudo capturar audio';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = '⚠️ Permiso denegado - Efectos limitados';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = '⚠️ Tu navegador no soporta esta función';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = '⚠️ No se encontró fuente de audio';
+                } else if (error.name === 'AbortError') {
+                    errorMessage = '⚠️ Captura cancelada';
+                } else if (error.message.includes('audio')) {
+                    errorMessage = '⚠️ Activa "Compartir audio" en el diálogo';
+                }
+                
+                dialog.remove();
+                
+                if (window.unifiedCore) {
+                    window.unifiedCore.showMessage(errorMessage, 'warning');
+                }
+                
+                resolve(null);
+            }
+        });
+        
+        dialog.querySelector('#cancelAudioCapture').addEventListener('click', () => {
+            console.log('ℹ️ Usuario canceló captura de audio');
+            dialog.remove();
+            
+            if (window.unifiedCore) {
+                window.unifiedCore.showMessage('Efectos de audio desactivados', 'info');
+            }
+            
+            resolve(null);
+        });
+        
+        // Cerrar con ESC
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                dialog.remove();
+                resolve(null);
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    });
+}
+    
+addDialogStyles() {
+    if (document.getElementById('audio-dialog-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'audio-dialog-styles';
+    style.textContent = `
+        .audio-capture-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10001;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .dialog-content {
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border: 2px solid rgba(255, 107, 53, 0.3);
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .dialog-content h3 {
+            color: #ff6b35;
+            margin: 0 0 15px 0;
+            font-size: 24px;
+        }
+        
+        .dialog-content p {
+            color: white;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .dialog-steps {
+            background: rgba(255, 107, 53, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 0;
+            color: white;
+        }
+        
+        .step-number {
+            background: linear-gradient(135deg, #ff6b35, #ff8a65);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .dialog-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn-primary, .btn-secondary {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b35, #ff8a65);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,53,0.4);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .dialog-note {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #999;
+            text-align: center;
+        }
+        
+        .browser-note {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 3px solid #ffc107;
+            padding: 10px;
+            margin-top: 10px;
+            text-align: left;
+            border-radius: 4px;
+            color: #ffc107;
+        }
+        
+        .browser-note strong {
+            color: #ffeb3b;
+        }
+        
+        .fa-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    `;
+    
+    document.head.appendChild(style);
+}
     
     setupUI() {
         // UI básico - puede expandirse según necesidades
