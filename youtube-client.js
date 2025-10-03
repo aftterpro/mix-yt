@@ -93,48 +93,67 @@ class YouTubeSimplifiedClient {
      * Validar respuesta del backend
      * El backend ya procesó los títulos, solo verificamos estructura
      */
-    validateResponse(data, query, continuation) {
-        console.log('📊 Validando respuesta del backend:', {
-            source: continuation ? 'paginación' : 'primera búsqueda',
-            itemsCount: data.items?.length || 0,
-            hasNextpage: !!data.nextpage,
-            backendProcessed: data.items?.[0]?.artist ? 'Yes' : 'No'
-        });
+validateResponse(data, query, continuation) {
+    console.log('📊 Validando respuesta del backend:', {
+        source: continuation ? 'paginación' : 'primera búsqueda',
+        itemsCount: data.items?.length || 0,
+        hasNextpage: !!data.nextpage,
+        backendProcessed: data.items?.[0]?.artist ? 'Yes' : 'No'
+    });
 
-        // Verificar que los items tengan la estructura esperada
-        const validItems = (data.items || []).filter(item => {
-            // Validación básica
-            if (!item.videoId || !item.title) {
-                console.warn('⚠️ Item sin videoId o title:', item);
-                return false;
+    // Verificar y procesar items
+    const validItems = (data.items || []).map(item => {
+        // CORRECCIÓN: Extraer videoId si solo viene url
+        let videoId = item.videoId;
+        
+        if (!videoId && item.url) {
+            // Extraer de url formato /watch?v=VIDEO_ID
+            const match = item.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+            if (match && match[1]) {
+                videoId = match[1];
             }
-
-            // Validar videoId (11 caracteres)
-            if (!/^[a-zA-Z0-9_-]{11}$/.test(item.videoId)) {
-                console.warn('⚠️ VideoId inválido:', item.videoId);
-                return false;
-            }
-
-            return true;
-        });
-
-        if (validItems.length < data.items?.length) {
-            console.warn(`⚠️ ${data.items.length - validItems.length} items descartados por validación`);
+        }
+        
+        // Validación
+        if (!videoId || !item.title) {
+            console.warn('⚠️ Item sin videoId o title válido:', {
+                hasUrl: !!item.url,
+                hasVideoId: !!videoId,
+                title: item.title?.substring(0, 30)
+            });
+            return null;
         }
 
-        console.log(`✅ ${validItems.length} videos válidos`);
+        // Validar formato videoId (11 caracteres)
+        if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+            console.warn('⚠️ VideoId con formato inválido:', videoId);
+            return null;
+        }
 
+        // Retornar item con videoId extraído
         return {
-            items: validItems,
-            nextpage: data.nextpage || null,
-            suggestion: data.suggestion || null,
-            metadata: {
-                source: 'piped',
-                backendProcessed: true,
-                timestamp: Date.now()
-            }
+            ...item,
+            videoId: videoId // Asegurar que videoId está presente
         };
+    }).filter(item => item !== null);
+
+    if (validItems.length < (data.items?.length || 0)) {
+        console.warn(`⚠️ ${(data.items?.length || 0) - validItems.length} items descartados por validación`);
     }
+
+    console.log(`✅ ${validItems.length} videos válidos`);
+
+    return {
+        items: validItems,
+        nextpage: data.nextpage || null,
+        suggestion: data.suggestion || null,
+        metadata: {
+            source: 'piped',
+            backendProcessed: true,
+            timestamp: Date.now()
+        }
+    };
+}
 
     /**
      * Extraer videoId de URL (por si acaso, ya no debería ser necesario)
