@@ -761,91 +761,112 @@ updateQueuePopup() {
     console.log('✅ Popup de cola actualizado y event listeners reconfigurados');
 }
 setupQueuePopupEventListeners(container) {
-    if (!container) {
-        console.warn('⚠️ Container no encontrado para event listeners');
-        return;
-    }
-    
-    console.log('🔧 Configurando event listeners de cola popup');
-    
-    // Event listeners para reproducir video
-    const queueItems = container.querySelectorAll('.queue-item');
-    console.log(`🔧 Configurando ${queueItems.length} items de reproducción`);
-    
-    queueItems.forEach((item, index) => {
-        // Crear nuevo event listener para cada item
-        const clickHandler = (e) => {
-            if (e.target.closest('.queue-item-remove')) return; // No hacer nada si es el botón eliminar
-            
-            const flatIndex = parseInt(item.dataset.flatIndex);
-            if (!isNaN(flatIndex)) {
-                console.log(`▶️ Reproducir video en índice ${flatIndex}`);
-                this.playVideoAtIndex(flatIndex);
-                this.closeQueuePopup();
-            }
-        };
+ if (!container) {
+            console.warn('⚠️ Container no encontrado para event listeners');
+            return;
+        }
         
-        item.addEventListener('click', clickHandler);
-    });
-    
-    // Event listeners para eliminar video - CORRECCIÓN CRÍTICA
-    const removeButtons = container.querySelectorAll('.queue-item-remove');
-    console.log(`🔧 Configurando ${removeButtons.length} botones de eliminación`);
-    
-    removeButtons.forEach((btn, index) => {
-        const clickHandler = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const videoId = btn.dataset.videoId;
-            
-            if (!videoId) {
-                console.warn(`⚠️ videoId no encontrado en botón ${index}`);
-                return;
-            }
-            
-            console.log(`🗑️ Eliminando video: ${videoId}`);
-            
-            // Feedback visual inmediato
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            
-            // Marcar item para eliminación
-            const queueItem = btn.closest('.queue-item');
-            if (queueItem) {
-                queueItem.classList.add('removing');
-            }
-            
-            // Ejecutar eliminación
-            setTimeout(() => {
-                const success = this.removeVideoFromQueue(videoId);
-                
-                if (!success) {
-                    // Restaurar botón si falló
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                    btn.innerHTML = '<i class="fas fa-times"></i>';
-                    if (queueItem) {
-                        queueItem.classList.remove('removing');
-                    }
-                    this.showMessage('Error eliminando video', 'error');
+        console.log('🔧 Configurando event listeners de cola popup (MEJORADO)');
+        
+        // 1. Event listeners para reproducir video
+        const queueItems = container.querySelectorAll('.queue-item');
+        console.log(`🔧 Configurando ${queueItems.length} items de reproducción`);
+        
+        queueItems.forEach((item) => {
+            const clickHandler = (e) => {
+                // No hacer nada si es el botón eliminar
+                if (e.target.closest('.queue-item-remove')) {
+                    return;
                 }
-                // Si success = true, updateQueuePopup() se llama automáticamente
-            }, 200);
-        };
+                
+                const flatIndex = parseInt(item.dataset.flatIndex);
+                if (!isNaN(flatIndex)) {
+                    console.log(`▶️ Reproducir video en índice ${flatIndex}`);
+                    this.playVideoAtIndex(flatIndex);
+                    this.closeQueuePopup();
+                }
+            };
+            
+            // Remover listeners anteriores clonando
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
+            newItem.addEventListener('click', clickHandler);
+        });
         
-        // Remover listeners existentes clonando el botón
-        const newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
+        // 2. Event listeners para eliminar video - CORRECCIÓN CRÍTICA
+        const removeButtons = container.querySelectorAll('.queue-item-remove');
+        console.log(`🔧 Configurando ${removeButtons.length} botones de eliminación`);
         
-        // Agregar nuevo listener
-        newBtn.addEventListener('click', clickHandler);
-    });
-    
-    console.log('✅ Event listeners de cola configurados correctamente');
-}
-
+        removeButtons.forEach((btn) => {
+            const clickHandler = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const videoId = btn.dataset.videoId;
+                
+                console.log(`🗑️ Click en eliminar video: ${videoId}`);
+                
+                if (!videoId || videoId === 'undefined') {
+                    console.error(`❌ videoId inválido en botón`);
+                    this.showMessage('Error: Video inválido', 'error');
+                    return;
+                }
+                
+                // Feedback visual inmediato
+                btn.disabled = true;
+                btn.style.opacity = '0.3';
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // Marcar item para eliminación
+                const queueItem = btn.closest('.queue-item');
+                if (queueItem) {
+                    queueItem.style.transition = 'all 0.3s ease';
+                    queueItem.style.opacity = '0.5';
+                    queueItem.style.transform = 'translateX(-10px)';
+                }
+                
+                console.log(`🗑️ Ejecutando eliminación de ${videoId}...`);
+                
+                // Ejecutar eliminación con delay
+                setTimeout(() => {
+                    const success = this.removeVideoFromQueue(videoId);
+                    
+                    console.log(`🗑️ Resultado de eliminación: ${success ? 'ÉXITO' : 'FALLO'}`);
+                    
+                    if (!success) {
+                        // Restaurar botón si falló
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.innerHTML = '<i class="fas fa-times"></i>';
+                        if (queueItem) {
+                            queueItem.style.opacity = '1';
+                            queueItem.style.transform = 'translateX(0)';
+                        }
+                        this.showMessage('Error eliminando video', 'error');
+                    }
+                    // Si success = true, updateQueuePopup() ya fue llamado
+                }, 300);
+            };
+            
+            // Remover listeners existentes clonando el botón
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            // Agregar nuevo listener
+            newBtn.addEventListener('click', clickHandler);
+            
+            console.log(`✅ Listener configurado para botón de video ${newBtn.dataset.videoId}`);
+        });
+        
+        // Reconfigurar drag & drop
+        if (window.queueDragDrop) {
+            setTimeout(() => {
+                window.queueDragDrop.attachDragListeners();
+            }, 100);
+        }
+        
+        console.log('✅ Event listeners de cola configurados completamente');
+    };
     // Función para calcular duración total
 formatTotalDuration(videos) {
     const totalSeconds = videos.reduce((sum, video) => sum + (video.duration || 0), 0);
@@ -1848,66 +1869,105 @@ async addVideoToQueue(videoData) {
     setTimeout(() => saveAllData(), 500);
 }
 removeVideoFromQueue(videoId) {
-    console.log(`🗑️ removeVideoFromQueue: ${videoId}`);
-    
-    if (!videoId || videoId === 'undefined') {
-        console.error('❌ videoId inválido para eliminar');
-        return false;
-    }
-    
-    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
-    if (!queuePlaylist) {
-        console.warn('⚠️ No se encontró playlist de cola');
-        return false;
-    }
-    
-    const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
-    
-    if (videoIndex === -1) {
-        console.warn(`⚠️ Video ${videoId} no encontrado en cola`);
-        return false;
-    }
-    
-    const removedVideo = queuePlaylist.videos[videoIndex];
-    const wasCurrentlyPlaying = currentPlayingInfo.videoId === videoId;
-    
-    // ELIMINAR EL VIDEO
-    queuePlaylist.videos.splice(videoIndex, 1);
-    
-    console.log(`✅ Video eliminado: ${removedVideo.title}`);
-    console.log(`📊 Cola: ${videoIndex} eliminado, quedan ${queuePlaylist.videos.length} videos`);
-    
-    // AJUSTAR ÍNDICES
-    if (currentPlayingInfo.flattenedIndex > videoIndex) {
-        currentPlayingInfo.flattenedIndex--;
-    } else if (wasCurrentlyPlaying) {
-        if (queuePlaylist.videos.length > 0) {
-            if (currentPlayingInfo.flattenedIndex >= queuePlaylist.videos.length) {
-                currentPlayingInfo.flattenedIndex = 0;
-            }
-            // Reproducir siguiente video
-            setTimeout(() => {
-                const nextVideo = queuePlaylist.videos[currentPlayingInfo.flattenedIndex];
-                if (nextVideo) {
-                    this.playVideoAtIndex(currentPlayingInfo.flattenedIndex);
-                }
-            }, 100);
-        } else {
-            this.handleEmptyPlaylist();
+        console.log(`🗑️ removeVideoFromQueue INICIADO: ${videoId}`);
+        
+        // VALIDACIÓN CRÍTICA
+        if (!videoId || videoId === 'undefined' || videoId === 'null') {
+            console.error('❌ videoId inválido para eliminar:', videoId);
+            this.showMessage('Error: ID de video inválido', 'error');
+            return false;
         }
-    }
-    
-    // ACTUALIZAR UI
-    this.updatePlaylistsUI();
-    this.updateQueuePopup(); // Actualizar popup inmediatamente
-    
-    // Guardar cambios
-    setTimeout(() => saveAllData(), 100);
-    
-    this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
-    
-    return true;
-}
+        
+        // Obtener cola
+        const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        if (!queuePlaylist) {
+            console.error('❌ No se encontró playlist de cola');
+            this.showMessage('Error: Cola no encontrada', 'error');
+            return false;
+        }
+        
+        // Buscar índice del video
+        const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
+        
+        if (videoIndex === -1) {
+            console.error(`❌ Video ${videoId} no encontrado en cola`);
+            this.showMessage('Video no encontrado en la cola', 'error');
+            return false;
+        }
+        
+        const removedVideo = queuePlaylist.videos[videoIndex];
+        const wasCurrentlyPlaying = currentPlayingInfo.videoId === videoId;
+        
+        console.log(`📊 Eliminando video en índice ${videoIndex}:`, {
+            title: removedVideo.title.substring(0, 30),
+            wasPlaying: wasCurrentlyPlaying,
+            currentIndex: currentPlayingInfo.flattenedIndex,
+            totalVideos: queuePlaylist.videos.length
+        });
+        
+        // ELIMINAR EL VIDEO
+        queuePlaylist.videos.splice(videoIndex, 1);
+        
+        console.log(`✅ Video eliminado físicamente de la cola`);
+        console.log(`📊 Quedan ${queuePlaylist.videos.length} videos en cola`);
+        
+        // AJUSTAR ÍNDICE DE REPRODUCCIÓN
+        if (wasCurrentlyPlaying) {
+            console.log('🎵 El video eliminado estaba reproduciéndose');
+            
+            if (queuePlaylist.videos.length > 0) {
+                // Si quedan videos, reproducir el siguiente (ahora en la misma posición)
+                let newIndex = videoIndex;
+                if (newIndex >= queuePlaylist.videos.length) {
+                    newIndex = 0; // Volver al principio si era el último
+                }
+                
+                currentPlayingInfo.flattenedIndex = newIndex;
+                
+                console.log(`▶️ Reproduciendo siguiente video en índice ${newIndex}`);
+                
+                // Reproducir el siguiente video
+                setTimeout(() => {
+                    const nextVideo = queuePlaylist.videos[newIndex];
+                    if (nextVideo) {
+                        this.playVideoAtIndex(newIndex);
+                    }
+                }, 200);
+            } else {
+                console.log('📭 Cola vacía después de eliminar');
+                this.handleEmptyPlaylist();
+            }
+        } else if (currentPlayingInfo.flattenedIndex > videoIndex) {
+            // Ajustar índice si eliminamos un video anterior al actual
+            currentPlayingInfo.flattenedIndex--;
+            console.log(`🔢 Índice de reproducción ajustado a ${currentPlayingInfo.flattenedIndex}`);
+        }
+        
+        // ACTUALIZAR UI INMEDIATAMENTE
+        console.log('🔄 Actualizando UI...');
+        
+        // Actualizar playlist manager si existe
+        if (window.playlistManager) {
+            window.playlistManager.updatePlaylistsUI();
+        }
+        
+        // Actualizar popup de cola si está abierto
+        this.updateQueuePopup();
+        
+        // Actualizar vista principal
+        this.updateNowPlaying();
+        
+        // Guardar cambios
+        setTimeout(() => {
+            console.log('💾 Guardando cambios...');
+            saveAllData();
+        }, 100);
+        
+        this.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+        
+        console.log('✅ removeVideoFromQueue COMPLETADO');
+        return true;
+};
     // =============================================
     // UTILIDADES Y HELPERS
     // =============================================
