@@ -404,6 +404,172 @@ async loadPersistentData() {
             console.error(`❌ No se pudo encontrar índice de playlist ${playlistId}`);
         }
     }
+// 3. DRAG AND DROP EN COLA DE REPRODUCCIÓN
+// =============================================
+
+class QueueDragDrop {
+    constructor() {
+        this.draggedItem = null;
+        this.draggedIndex = null;
+        this.placeholder = null;
+        this.setupDragAndDrop();
+    }
+    
+    setupDragAndDrop() {
+        console.log('🎯 Configurando Drag & Drop para cola');
+        
+        // Observar cambios en el popup de cola para reconfigurar
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.classList && node.classList.contains('queue-popup-overlay')) {
+                            // Esperar a que el contenido se renderice
+                            setTimeout(() => {
+                                this.attachDragListeners();
+                            }, 100);
+                        }
+                    });
+                }
+            });
+        });
+        
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+    
+    attachDragListeners() {
+        const queueItems = document.querySelectorAll('.queue-item');
+        
+        console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
+        
+        queueItems.forEach((item, index) => {
+            // Hacer items arrastrables
+            item.setAttribute('draggable', 'true');
+            item.style.cursor = 'move';
+            
+            // Eliminar listeners anteriores
+            item.removeEventListener('dragstart', this.handleDragStart);
+            item.removeEventListener('dragover', this.handleDragOver);
+            item.removeEventListener('drop', this.handleDrop);
+            item.removeEventListener('dragend', this.handleDragEnd);
+            item.removeEventListener('dragenter', this.handleDragEnter);
+            item.removeEventListener('dragleave', this.handleDragLeave);
+            
+            // Agregar nuevos listeners
+            item.addEventListener('dragstart', (e) => this.handleDragStart(e, item, index));
+            item.addEventListener('dragover', (e) => this.handleDragOver(e));
+            item.addEventListener('drop', (e) => this.handleDrop(e, item, index));
+            item.addEventListener('dragend', (e) => this.handleDragEnd(e));
+            item.addEventListener('dragenter', (e) => this.handleDragEnter(e, item));
+            item.addEventListener('dragleave', (e) => this.handleDragLeave(e, item));
+        });
+    }
+    
+    handleDragStart(e, item, index) {
+        console.log(`🎯 Drag start: item ${index}`);
+        
+        this.draggedItem = item;
+        this.draggedIndex = index;
+        
+        // Estilo visual
+        item.style.opacity = '0.5';
+        item.classList.add('dragging');
+        
+        // Datos para el drag
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', item.innerHTML);
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            index: index,
+            videoId: item.dataset.videoId
+        }));
+    }
+    
+    handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        return false;
+    }
+    
+    handleDragEnter(e, item) {
+        if (item !== this.draggedItem) {
+            item.classList.add('drag-over');
+        }
+    }
+    
+    handleDragLeave(e, item) {
+        item.classList.remove('drag-over');
+    }
+    
+    handleDrop(e, targetItem, targetIndex) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        targetItem.classList.remove('drag-over');
+        
+        if (this.draggedItem === targetItem) {
+            return false;
+        }
+        
+        console.log(`🎯 Drop: de ${this.draggedIndex} a ${targetIndex}`);
+        
+        // Reordenar en playlistsData
+        const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        if (!queuePlaylist) return;
+        
+        // Extraer el video arrastrado
+        const [movedVideo] = queuePlaylist.videos.splice(this.draggedIndex, 1);
+        
+        // Insertar en nueva posición
+        let newIndex = targetIndex;
+        if (this.draggedIndex < targetIndex) {
+            newIndex--;
+        }
+        
+        queuePlaylist.videos.splice(newIndex, 0, movedVideo);
+        
+        // Actualizar índice de reproducción si es necesario
+        if (currentPlayingInfo.flattenedIndex === this.draggedIndex) {
+            currentPlayingInfo.flattenedIndex = newIndex;
+        } else if (this.draggedIndex < currentPlayingInfo.flattenedIndex && 
+                   newIndex >= currentPlayingInfo.flattenedIndex) {
+            currentPlayingInfo.flattenedIndex--;
+        } else if (this.draggedIndex > currentPlayingInfo.flattenedIndex && 
+                   newIndex <= currentPlayingInfo.flattenedIndex) {
+            currentPlayingInfo.flattenedIndex++;
+        }
+        
+        // Actualizar UI
+        if (window.unifiedCore) {
+            window.unifiedCore.updateQueuePopup();
+            window.unifiedCore.showMessage('Orden actualizado', 'success');
+        }
+        
+        // Guardar cambios
+        setTimeout(() => saveAllData(), 100);
+        
+        return false;
+    }
+    
+    handleDragEnd(e) {
+        console.log('🎯 Drag end');
+        
+        if (this.draggedItem) {
+            this.draggedItem.style.opacity = '1';
+            this.draggedItem.classList.remove('dragging');
+        }
+        
+        // Limpiar todos los estilos drag-over
+        document.querySelectorAll('.queue-item').forEach(item => {
+            item.classList.remove('drag-over');
+        });
+        
+        this.draggedItem = null;
+        this.draggedIndex = null;
+    }
+}
+
+// Inicializar drag & drop
+window.queueDragDrop = new QueueDragDrop();
 
     /**
      * Crear popup de playlist con detalles
