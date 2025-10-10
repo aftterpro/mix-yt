@@ -19,6 +19,7 @@ let reproduccionIniciada = false;
 let nextVideoScheduled = false;
 let lastCrossfadeTime = 0;
 const CROSSFADE_DEBOUNCE = 500; // ms
+const CROSSFADE_TRIGGER_TIME = 10; // segundos antes del fin para iniciar crossfade
 
 // Estado de playlists y reproducción
 let playlistsData = [];
@@ -726,7 +727,7 @@ handleNext() {
     
     console.log(`⏭️ Botón Next presionado en índice ${currentPlayingInfo.flattenedIndex}`);
     
-    // Forzar crossfade en el próximo ciclo del monitor
+    // ✅ IMPORTANTE: Marcar que el usuario presionó next
     hasOutroCrossfadeStarted = true;
     nextVideoScheduled = true;
     
@@ -981,7 +982,7 @@ startCrossfade(prevPlayer, nextPlayer) {
         console.log('🎨 Elemento anterior preparado para fade-out');
     }
     
-    // ✅ CROSSFADE DE AUDIO CON MEJOR CONTROL
+    // ✅ CROSSFADE DE AUDIO Y VISUAL SINCRONIZADO
     const duration = CROSSFADE_DURATION * 1000;
     const steps = 60;
     const stepTime = duration / steps;
@@ -1002,7 +1003,7 @@ startCrossfade(prevPlayer, nextPlayer) {
             console.warn("Advertencia durante crossfade de audio:", e);
         }
         
-        // Actualizar opacidad visual
+        // Actualizar opacidad visual (suave transición)
         if (prevElement) {
             prevElement.style.opacity = (1 - progress).toString();
         }
@@ -1740,8 +1741,6 @@ updateCurrentPlayingIndex() {
         console.error("Error en updateCurrentPlayingIndex:", e);
     }
 }
-
-
     // =============================================
     // UI UPDATES
     // =============================================
@@ -2204,6 +2203,9 @@ function monitorPlayers() {
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
+        // ✅ LOGS DETALLADOS PARA DEBUG
+        console.log(`📊 Monitor: state=${playerState}, currentTime=${currentTime.toFixed(1)}s, duration=${videoDuration.toFixed(1)}s`);
+
         // SponsorBlock: Solo verificar si está reproduciendo
         if (videoId && 
             playerState === YT.PlayerState.PLAYING && 
@@ -2213,41 +2215,48 @@ function monitorPlayers() {
             checkAndSkipSegment(activePlayer);
         }
 
-        // ✅ CROSSFADE MEJORADO CON VALIDACIONES
-        if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime > 0) {
+        // ✅ CROSSFADE MEJORADO - ESPERAR A QUE VIDEO ESTÉ CASI TERMINADO
+        if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime >= 0) {
             const timeRemaining = videoDuration - currentTime;
             
-            // Evitar múltiples crossfades
-            const now = Date.now();
-            const timeSinceLastCrossfade = now - lastCrossfadeTime;
+            console.log(`⏱️ Tiempo restante: ${timeRemaining.toFixed(1)}s (trigger en: ${CROSSFADE_TRIGGER_TIME}s)`);
             
-            // Solo iniciar si:
-            // 1. Tiempo restante está en el rango correcto
-            // 2. No hay crossfade en progreso
-            // 3. No hemos tenido un crossfade recientemente
-            // 4. No hay transición en progreso
-            if (timeRemaining <= CROSSFADE_DURATION && 
-                timeRemaining > (CROSSFADE_DURATION - 1) && 
-                !hasOutroCrossfadeStarted && 
-                !crossfadeInProgress &&
-                !isTransitioning &&
-                timeSinceLastCrossfade > CROSSFADE_DEBOUNCE &&
-                !nextVideoScheduled) {
+            // CONDICIÓN CRÍTICA: El video está en los últimos 10 segundos
+            if (timeRemaining <= CROSSFADE_TRIGGER_TIME && timeRemaining > 0) {
                 
-                console.log(`⏰ Crossfade triggers: ${timeRemaining.toFixed(1)}s remaining`);
-                console.log(`   Estado: crossfadeInProgress=${crossfadeInProgress}, isTransitioning=${isTransitioning}`);
-                
-                hasOutroCrossfadeStarted = true;
-                nextVideoScheduled = true;
-                lastCrossfadeTime = now;
-                
-                // IMPORTANTE: Usar setTimeout para asegurar que se ejecuta después del monitor actual
-                setTimeout(() => {
-                    if (window.unifiedCore && !crossfadeInProgress) {
+                // Validaciones adicionales para evitar crossfades múltiples
+                if (!hasOutroCrossfadeStarted && 
+                    !crossfadeInProgress &&
+                    !isTransitioning &&
+                    !nextVideoScheduled) {
+                    
+                    console.log(`⏰ ¡CROSSFADE TRIGGER! Tiempo restante: ${timeRemaining.toFixed(1)}s`);
+                    console.log(`   Estado: crossfadeInProgress=${crossfadeInProgress}, isTransitioning=${isTransitioning}, nextVideoScheduled=${nextVideoScheduled}`);
+                    
+                    // Marcar que el crossfade ha comenzado
+                    hasOutroCrossfadeStarted = true;
+                    nextVideoScheduled = true;
+                    lastCrossfadeTime = Date.now();
+                    
+                    // Ejecutar playNextVideo
+                    if (window.unifiedCore) {
                         window.unifiedCore.playNextVideo();
                     }
-                    nextVideoScheduled = false;
-                }, 100);
+                }
+                // Si ya está marcado pero aún no hemos avanzado, no hacer nada
+                else if (hasOutroCrossfadeStarted) {
+                    console.log(`🔄 Crossfade ya iniciado, esperando completación...`);
+                }
+            }
+            // Si el video terminó completamente sin haber iniciado crossfade
+            else if (timeRemaining <= 0 && !hasOutroCrossfadeStarted && reproduccionIniciada) {
+                console.log(`⚠️ Video terminó sin crossfade trigger`);
+                hasOutroCrossfadeStarted = true;
+                nextVideoScheduled = true;
+                
+                if (window.unifiedCore) {
+                    window.unifiedCore.playNextVideo();
+                }
             }
         }
         
