@@ -1,22 +1,30 @@
 // =============================================
-// MIX-EFFECTS.JS - CONTROL DE AUDIO AVANZADO
+// MIX-EFFECTS.JS - EFECTOS VISUALES Y UI
+// =============================================
+// Este archivo SOLO maneja:
+// - Efectos visuales del crossfade
+// - Animaciones UI
+// - Estados visuales
+// NO manipula directamente los reproductores
 // =============================================
 
-console.log('🎵 Cargando sistema de control de audio...');
+console.log('🎨 Cargando sistema de efectos visuales...');
 
-// Estado del volumen global
-let audioState = {
-    currentVolume: 100,
-    isMuted: false,
-    previousVolume: 100,
-    masterVolume: 100
+// =============================================
+// ESTADO DE EFECTOS
+// =============================================
+const effectsState = {
+    crossfadeDuration: 10,
+    isEffectActive: false,
+    currentEffect: null,
+    effectHistory: []
 };
 
 // =============================================
-// INICIALIZACIÓN DE CONTROLES DE AUDIO
+// CONTROLES VISUALES DEL VOLUMEN
 // =============================================
-function setupAudioControls() {
-    console.log('🔊 Configurando controles de audio avanzados...');
+function setupVolumeControlsUI() {
+    console.log('🔊 Configurando UI de controles de volumen...');
     
     const volumeButton = document.getElementById('volumeButton');
     const volumeSlider = document.getElementById('volumeSlider');
@@ -26,35 +34,13 @@ function setupAudioControls() {
         return;
     }
     
-    // Cargar volumen guardado
-    const savedVolume = localStorage.getItem('ytcm_volume');
-    if (savedVolume !== null) {
-        audioState.currentVolume = parseInt(savedVolume, 10);
-        audioState.masterVolume = audioState.currentVolume;
-        updateVolumeUI(audioState.currentVolume);
-    }
-    
     // =============================================
-    // EVENTO: CLICK EN BOTÓN DE VOLUMEN (MUTE/UNMUTE)
+    // EVENTO: CLICK EN BOTÓN DE VOLUMEN (UI ONLY)
     // =============================================
     volumeButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        audioState.isMuted = !audioState.isMuted;
-        
-        if (audioState.isMuted) {
-            audioState.previousVolume = audioState.currentVolume;
-            audioState.currentVolume = 0;
-            volumeButton.querySelector('i').className = 'fas fa-volume-mute';
-            console.log('🔇 Volumen muteado');
-        } else {
-            audioState.currentVolume = audioState.previousVolume > 0 ? audioState.previousVolume : 50;
-            updateVolumeIcon(audioState.currentVolume);
-            console.log('🔊 Volumen restaurado:', audioState.currentVolume);
-        }
-        
-        updateVolumeUI(audioState.currentVolume);
-        applyVolumeToAllPlayers(audioState.currentVolume);
-        saveVolume(audioState.currentVolume);
+        updateVolumeIconUI(0); // Mostrar visualmente muteado
+        console.log('🔇 UI: Mostrar estado muteado');
     });
     
     // =============================================
@@ -62,18 +48,20 @@ function setupAudioControls() {
     // =============================================
     volumeButton.addEventListener('mouseenter', () => {
         volumeSlider.classList.add('show');
+        console.log('🔊 UI: Slider visible');
     });
     
     volumeSlider.addEventListener('mouseleave', () => {
         setTimeout(() => {
             if (!volumeSlider.matches(':hover')) {
                 volumeSlider.classList.remove('show');
+                console.log('🔊 UI: Slider oculto');
             }
         }, 300);
     });
     
     // =============================================
-    // EVENTO: CLICK EN SLIDER
+    // EVENTO: CLICK EN SLIDER (UI FEEDBACK)
     // =============================================
     volumeSlider.addEventListener('click', (e) => {
         const rect = volumeSlider.getBoundingClientRect();
@@ -81,30 +69,29 @@ function setupAudioControls() {
         const height = rect.height;
         const percentage = Math.max(0, Math.min(100, 100 - (clickY / height * 100)));
         
-        audioState.currentVolume = Math.round(percentage);
-        audioState.isMuted = false;
+        updateVolumeUIVisually(Math.round(percentage));
+        console.log(`🔊 UI: Volumen visual actualizado a ${Math.round(percentage)}%`);
         
-        updateVolumeUI(audioState.currentVolume);
-        applyVolumeToAllPlayers(audioState.currentVolume);
-        saveVolume(audioState.currentVolume);
-        
-        console.log(`🔊 Volumen ajustado: ${audioState.currentVolume}%`);
+        // Emitir evento para que core.js lo capture
+        document.dispatchEvent(new CustomEvent('volumeChanged', {
+            detail: { volume: Math.round(percentage) }
+        }));
     });
     
     // =============================================
-    // EVENTO: DRAG EN EL SLIDER
+    // EVENTO: DRAG EN EL SLIDER (UI FEEDBACK)
     // =============================================
     let isDragging = false;
     
     volumeSlider.addEventListener('mousedown', (e) => {
         isDragging = true;
         volumeSlider.classList.add('dragging');
-        handleVolumeDrag(e);
+        handleVolumeDragUI(e);
     });
     
     document.addEventListener('mousemove', (e) => {
         if (isDragging) {
-            handleVolumeDrag(e);
+            handleVolumeDragUI(e);
         }
     });
     
@@ -112,30 +99,30 @@ function setupAudioControls() {
         if (isDragging) {
             isDragging = false;
             volumeSlider.classList.remove('dragging');
-            saveVolume(audioState.currentVolume);
         }
     });
     
-    function handleVolumeDrag(e) {
+    function handleVolumeDragUI(e) {
         const rect = volumeSlider.getBoundingClientRect();
         const clickY = e.clientY - rect.top;
         const height = rect.height;
         const percentage = Math.max(0, Math.min(100, 100 - (clickY / height * 100)));
         
-        audioState.currentVolume = Math.round(percentage);
-        audioState.isMuted = false;
+        updateVolumeUIVisually(Math.round(percentage));
         
-        updateVolumeUI(audioState.currentVolume);
-        applyVolumeToAllPlayers(audioState.currentVolume);
+        // Emitir evento en tiempo real
+        document.dispatchEvent(new CustomEvent('volumeChanging', {
+            detail: { volume: Math.round(percentage) }
+        }));
     }
     
-    console.log('✅ Controles de audio configurados');
+    console.log('✅ UI de controles de volumen configurada');
 }
 
 // =============================================
-// ACTUALIZAR UI DEL VOLUMEN
+// ACTUALIZAR UI DEL VOLUMEN (VISUAL ONLY)
 // =============================================
-function updateVolumeUI(volume) {
+function updateVolumeUIVisually(volume) {
     const volumeSlider = document.getElementById('volumeSlider');
     const fill = volumeSlider?.querySelector('.volume-fill');
     
@@ -144,19 +131,19 @@ function updateVolumeUI(volume) {
         fill.style.transition = 'height 0.1s linear';
     }
     
-    updateVolumeIcon(volume);
+    updateVolumeIconUI(volume);
 }
 
 // =============================================
-// ACTUALIZAR ICONO DE VOLUMEN
+// ACTUALIZAR ICONO DE VOLUMEN (VISUAL ONLY)
 // =============================================
-function updateVolumeIcon(volume) {
+function updateVolumeIconUI(volume) {
     const volumeButton = document.getElementById('volumeButton');
     const icon = volumeButton?.querySelector('i');
     
     if (!icon) return;
     
-    if (volume === 0 || audioState.isMuted) {
+    if (volume === 0) {
         icon.className = 'fas fa-volume-mute';
     } else if (volume < 30) {
         icon.className = 'fas fa-volume-off';
@@ -168,251 +155,266 @@ function updateVolumeIcon(volume) {
 }
 
 // =============================================
-// APLICAR VOLUMEN A TODOS LOS PLAYERS
+// EFECTOS VISUALES DEL CROSSFADE
 // =============================================
-function applyVolumeToAllPlayers(volume) {
-    try {
-        // Acceder a los players globales
-        if (typeof window.player1 !== 'undefined' && window.player1) {
-            if (typeof window.player1.setVolume === 'function') {
-                window.player1.setVolume(volume);
-                console.log(`📻 Player 1: Volumen ${volume}%`);
-            }
-        }
-        
-        if (typeof window.player2 !== 'undefined' && window.player2) {
-            if (typeof window.player2.setVolume === 'function') {
-                window.player2.setVolume(volume);
-                console.log(`📻 Player 2: Volumen ${volume}%`);
-            }
-        }
-        
-        audioState.masterVolume = volume;
-        
-    } catch (error) {
-        console.error('❌ Error aplicando volumen:', error);
-    }
-}
-
-// =============================================
-// GUARDAR VOLUMEN EN LOCALSTORAGE
-// =============================================
-function saveVolume(volume) {
-    try {
-        localStorage.setItem('ytcm_volume', volume.toString());
-        console.log(`💾 Volumen guardado: ${volume}%`);
-    } catch (error) {
-        console.warn('⚠️ No se pudo guardar volumen:', error);
-    }
-}
-
-// =============================================
-// CONTROL DE VOLUMEN DURANTE CROSSFADE
-// =============================================
-function applyVolumeForCrossfade(player, targetVolume, duration = 1000) {
-    if (!player || typeof player.setVolume !== 'function') {
-        console.warn('⚠️ Player inválido para crossfade');
-        return;
+function applyCrossfadeVisualEffect() {
+    console.log('🎨 Aplicando efecto visual de crossfade...');
+    
+    effectsState.isEffectActive = true;
+    effectsState.currentEffect = 'crossfade';
+    effectsState.effectHistory.push({
+        effect: 'crossfade',
+        timestamp: Date.now(),
+        duration: effectsState.crossfadeDuration
+    });
+    
+    const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    const nextElement = document.getElementById(`player${currentPlayer}`);
+    
+    // ✅ SOLO ANIMAR, NO MANIPULAR PLAYERS
+    if (nextElement) {
+        nextElement.classList.add('crossfade-enter');
+        nextElement.style.transition = `opacity ${effectsState.crossfadeDuration}s cubic-bezier(0.25, 0.8, 0.25, 1)`;
     }
     
-    const steps = 30;
+    if (prevElement) {
+        prevElement.classList.add('crossfade-exit');
+        prevElement.style.transition = `opacity ${effectsState.crossfadeDuration}s cubic-bezier(0.25, 0.8, 0.25, 1)`;
+    }
+    
+    // Limpiar después del efecto
+    setTimeout(() => {
+        effectsState.isEffectActive = false;
+        effectsState.currentEffect = null;
+        
+        if (prevElement) {
+            prevElement.classList.remove('crossfade-exit');
+            prevElement.classList.add('hidden');
+        }
+        if (nextElement) {
+            nextElement.classList.remove('crossfade-enter');
+        }
+        
+        console.log('✅ Efecto visual de crossfade completado');
+    }, effectsState.crossfadeDuration * 1000);
+}
+
+// =============================================
+// EFECTO DE FADE IN PARA NEXT PLAYER
+// =============================================
+function applyFadeInEffect(playerId) {
+    console.log(`🎨 Fade-in para player${playerId}`);
+    
+    const element = document.getElementById(`player${playerId}`);
+    if (!element) return;
+    
+    element.classList.remove('hidden', 'fade-out');
+    element.classList.add('fade-in');
+    element.style.opacity = '1';
+}
+
+// =============================================
+// EFECTO DE FADE OUT PARA CURRENT PLAYER
+// =============================================
+function applyFadeOutEffect(playerId) {
+    console.log(`🎨 Fade-out para player${playerId}`);
+    
+    const element = document.getElementById(`player${playerId}`);
+    if (!element) return;
+    
+    element.classList.remove('fade-in');
+    element.classList.add('fade-out');
+    element.style.opacity = '0';
+}
+
+// =============================================
+// EFECTO DE PULSACIÓN PARA INDICAR CAMBIO
+// =============================================
+function applyPulseEffect(elementId) {
+    console.log(`🎨 Pulse para ${elementId}`);
+    
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    element.style.animation = 'subtlePulse 2s infinite alternate';
+    
+    setTimeout(() => {
+        element.style.animation = 'none';
+    }, 2000);
+}
+
+// =============================================
+// EFECTO DE CAMBIO DE ESTADO EN UI
+// =============================================
+function updatePlayerStatusUI(status) {
+    const statusElements = document.querySelectorAll('[data-player-status]');
+    
+    statusElements.forEach(el => {
+        el.textContent = status;
+        el.classList.add('status-update');
+        
+        setTimeout(() => {
+            el.classList.remove('status-update');
+        }, 300);
+    });
+    
+    console.log(`📊 UI Estado: ${status}`);
+}
+
+// =============================================
+// MOSTRAR INDICADOR VISUAL DE CROSSFADE
+// =============================================
+function showCrossfadeIndicator() {
+    console.log('🎨 Mostrando indicador de crossfade');
+    
+    let indicator = document.querySelector('.crossfade-indicator');
+    
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'crossfade-indicator';
+        indicator.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #ff6b35, #ff8a65);
+            color: white;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        `;
+        indicator.textContent = '🎨 Crossfade activo...';
+        document.body.appendChild(indicator);
+    }
+    
+    setTimeout(() => {
+        indicator.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => indicator.remove(), 300);
+    }, effectsState.crossfadeDuration * 1000);
+}
+
+// =============================================
+// ANIMAR CAMBIO DE VOLUMEN EN UI
+// =============================================
+function animateVolumeChange(fromVolume, toVolume, duration = 300) {
+    console.log(`🎚️ Animando volumen: ${fromVolume}% → ${toVolume}%`);
+    
+    const steps = 20;
     const stepTime = duration / steps;
-    const startVolume = player.getVolume();
     let step = 0;
     
     const interval = setInterval(() => {
         step++;
         const progress = step / steps;
+        const currentVolume = Math.round(fromVolume + (toVolume - fromVolume) * progress);
         
-        // Transición logarítmica para mejor sonoridad
-        const easeVolume = Math.pow(progress, 1.5);
-        const currentVolume = Math.round(startVolume + (targetVolume - startVolume) * easeVolume);
-        
-        try {
-            player.setVolume(currentVolume);
-        } catch (e) {
-            console.warn('⚠️ Error configurando volumen en crossfade:', e);
-        }
+        updateVolumeUIVisually(currentVolume);
         
         if (step >= steps) {
             clearInterval(interval);
-            try {
-                player.setVolume(targetVolume);
-            } catch (e) {
-                console.error('❌ Error final de volumen:', e);
-            }
+            updateVolumeUIVisually(toVolume);
         }
     }, stepTime);
 }
 
 // =============================================
-// SINCRONIZAR VOLUMEN ENTRE REPRODUCTORES
+// EFECTO DE ERROR EN UI
 // =============================================
-function syncVolumeBetweenPlayers() {
-    try {
-        if (window.player1 && window.player2) {
-            const player1Volume = window.player1.getVolume?.() || audioState.masterVolume;
-            window.player2.setVolume(player1Volume);
-            console.log(`🔀 Volumen sincronizado: ${player1Volume}%`);
-        }
-    } catch (error) {
-        console.warn('⚠️ No se pudo sincronizar volumen:', error);
-    }
-}
-
-// =============================================
-// OBTENER VOLUMEN ACTUAL
-// =============================================
-function getCurrentVolume() {
-    return audioState.currentVolume;
-}
-
-// =============================================
-// ESTABLECER VOLUMEN
-// =============================================
-function setVolume(volume) {
-    const validVolume = Math.max(0, Math.min(100, volume));
+function showErrorEffectUI(message) {
+    console.log(`❌ Efecto de error: ${message}`);
     
-    audioState.currentVolume = validVolume;
-    audioState.isMuted = false;
+    let errorContainer = document.querySelector('.error-effect');
     
-    updateVolumeUI(validVolume);
-    applyVolumeToAllPlayers(validVolume);
-    saveVolume(validVolume);
-    
-    console.log(`🔊 Volumen establecido a: ${validVolume}%`);
-}
-
-// =============================================
-// AUMENTAR VOLUMEN
-// =============================================
-function increaseVolume(step = 5) {
-    const newVolume = Math.min(100, audioState.currentVolume + step);
-    setVolume(newVolume);
-}
-
-// =============================================
-// DISMINUIR VOLUMEN
-// =============================================
-function decreaseVolume(step = 5) {
-    const newVolume = Math.max(0, audioState.currentVolume - step);
-    setVolume(newVolume);
-}
-
-// =============================================
-// TOGGLE MUTE
-// =============================================
-function toggleMute() {
-    if (audioState.isMuted) {
-        audioState.currentVolume = audioState.previousVolume > 0 ? audioState.previousVolume : 50;
-        audioState.isMuted = false;
-    } else {
-        audioState.previousVolume = audioState.currentVolume;
-        audioState.currentVolume = 0;
-        audioState.isMuted = true;
+    if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.className = 'error-effect';
+        errorContainer.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: shake 0.5s ease-in-out;
+        `;
+        document.body.appendChild(errorContainer);
     }
     
-    updateVolumeUI(audioState.currentVolume);
-    applyVolumeToAllPlayers(audioState.currentVolume);
-    saveVolume(audioState.currentVolume);
+    errorContainer.textContent = message;
+    
+    setTimeout(() => {
+        errorContainer.remove();
+    }, 3000);
 }
 
 // =============================================
-// CONTROL DE VOLUMEN ADAPTATIVO
+// OBTENER ESTADO DE EFECTOS
 // =============================================
-function getAdaptiveVolume(videoQuality) {
-    // Ajustar volumen según calidad de video
-    switch(videoQuality) {
-        case 'low':
-            return Math.min(100, audioState.masterVolume * 1.1); // +10%
-        case 'medium':
-            return audioState.masterVolume;
-        case 'high':
-            return Math.max(0, audioState.masterVolume * 0.9); // -10%
-        default:
-            return audioState.masterVolume;
-    }
-}
-
-// =============================================
-// MONITOREAR CAMBIOS DE VOLUMEN EN PLAYERS
-// =============================================
-function monitorPlayerVolume() {
-    setInterval(() => {
-        try {
-            if (window.player1 && typeof window.player1.getVolume === 'function') {
-                const player1Vol = window.player1.getVolume();
-                
-                // Si el volumen cambió (ej: usuario ajustó directamente), actualizar estado
-                if (player1Vol !== audioState.masterVolume) {
-                    audioState.currentVolume = player1Vol;
-                    audioState.masterVolume = player1Vol;
-                    updateVolumeUI(player1Vol);
-                }
-            }
-        } catch (error) {
-            // Silenciar errores de monitoreo
-        }
-    }, 500);
-}
-
-// =============================================
-// ECUALIZADOR BÁSICO (OPCIONAL)
-// =============================================
-function applyEqualizerPreset(preset) {
-    // Bass, Mid, Treble adjustments (simulado via volumen)
-    const presets = {
-        'bass': { boost: 1.2, label: 'Bajos Reforzados' },
-        'treble': { boost: 0.8, label: 'Agudos Reforzados' },
-        'balanced': { boost: 1.0, label: 'Balanceado' },
-        'quiet': { boost: 0.6, label: 'Modo Tranquilo' },
-        'loud': { boost: 1.5, label: 'Modo Fuerte' }
+function getEffectsState() {
+    return {
+        isActive: effectsState.isEffectActive,
+        currentEffect: effectsState.currentEffect,
+        duration: effectsState.crossfadeDuration,
+        history: effectsState.effectHistory
     };
-    
-    if (presets[preset]) {
-        const adjustedVolume = Math.min(100, audioState.masterVolume * presets[preset].boost);
-        console.log(`🎚️ Preset: ${presets[preset].label}`);
-        setVolume(adjustedVolume);
-    }
 }
+
+// =============================================
+// LIMPIAR HISTORIAL DE EFECTOS
+// =============================================
+function clearEffectsHistory() {
+    effectsState.effectHistory = [];
+    console.log('🧹 Historial de efectos limpiado');
+}
+
+// =============================================
+// ESCUCHAR EVENTOS DE CORE.JS
+// =============================================
+document.addEventListener('crossfadeStarted', () => {
+    applyCrossfadeVisualEffect();
+    showCrossfadeIndicator();
+});
+
+document.addEventListener('crossfadeCompleted', () => {
+    console.log('✅ Crossfade completado');
+});
+
+document.addEventListener('playerStateChanged', (e) => {
+    const { state, playerId } = e.detail;
+    updatePlayerStatusUI(`Player ${playerId}: ${state}`);
+});
 
 // =============================================
 // INICIALIZACIÓN AUTOMÁTICA
 // =============================================
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('📄 DOM cargado, inicializando audio...');
-        setupAudioControls();
-        
-        // Iniciar monitoreo después de que los players estén listos
-        setTimeout(() => {
-            monitorPlayerVolume();
-            applyVolumeToAllPlayers(audioState.currentVolume);
-        }, 2000);
+        console.log('📄 DOM cargado, inicializando efectos...');
+        setupVolumeControlsUI();
     });
 } else {
-    console.log('📄 DOM ya cargado, inicializando audio...');
-    setupAudioControls();
-    
-    setTimeout(() => {
-        monitorPlayerVolume();
-        applyVolumeToAllPlayers(audioState.currentVolume);
-    }, 2000);
+    console.log('📄 DOM ya cargado, inicializando efectos...');
+    setupVolumeControlsUI();
 }
 
 // =============================================
 // EXPONER FUNCIONES GLOBALMENTE
 // =============================================
-window.setupAudioControls = setupAudioControls;
-window.setVolume = setVolume;
-window.getCurrentVolume = getCurrentVolume;
-window.increaseVolume = increaseVolume;
-window.decreaseVolume = decreaseVolume;
-window.toggleMute = toggleMute;
-window.applyVolumeToAllPlayers = applyVolumeToAllPlayers;
-window.applyVolumeForCrossfade = applyVolumeForCrossfade;
-window.syncVolumeBetweenPlayers = syncVolumeBetweenPlayers;
-window.applyEqualizerPreset = applyEqualizerPreset;
-window.audioState = audioState;
+window.effectsState = effectsState;
+window.setupVolumeControlsUI = setupVolumeControlsUI;
+window.updateVolumeUIVisually = updateVolumeUIVisually;
+window.updateVolumeIconUI = updateVolumeIconUI;
+window.applyCrossfadeVisualEffect = applyCrossfadeVisualEffect;
+window.applyFadeInEffect = applyFadeInEffect;
+window.applyFadeOutEffect = applyFadeOutEffect;
+window.applyPulseEffect = applyPulseEffect;
+window.animateVolumeChange = animateVolumeChange;
+window.showCrossfadeIndicator = showCrossfadeIndicator;
+window.showErrorEffectUI = showErrorEffectUI;
+window.getEffectsState = getEffectsState;
 
-console.log('✅ Sistema de audio avanzado cargado');
+console.log('✅ Sistema de efectos visuales cargado');
