@@ -2143,31 +2143,234 @@ function monitorPlayers() {
         const playerState = activePlayer.getPlayerState();
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
+        const videoId = activePlayer.getVideoData()?.video_id;
 
-        // REDUCIR TRIGGER TIME PARA ANTICIPAR EL CROSSFADE
-        const CROSSFADE_TRIGGER_TIME = 12; // Aumentar de 10 a 12 segundos antes
+        // ✅ SOLO PROCESAR SI EL VIDEO ESTÁ REPRODUCIENDO
+        if (playerState !== YT.PlayerState.PLAYING) return;
+        if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
+
+        // =============================================
+        // 1. OBTENER DATOS DEL VIDEO ACTUAL
+        // =============================================
+        const flatList = this.getFlattenedPlaylist?.() || [];
+        const currentVideoData = flatList[currentPlayingInfo.flattenedIndex];
         
-        if (playerState === YT.PlayerState.PLAYING && videoDuration > 0 && currentTime >= 0) {
-            const timeRemaining = videoDuration - currentTime;
+        if (!currentVideoData) return;
+
+        // =============================================
+        // 2. CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
+        // =============================================
+        // Sumar TODOS los segmentos sin importar si ya pasaron o no
+        let totalSponsorBlockDuration = 0;
+        let sponsorBlockSegments = [];
+        
+        if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
+            const segments = segmentosCache[videoId];
             
-            if (timeRemaining <= CROSSFADE_TRIGGER_TIME && timeRemaining > 0) {
-                if (!hasOutroCrossfadeStarted && 
-                    !crossfadeInProgress &&
-                    !isTransitioning &&
-                    !nextVideoScheduled) {
+            segments.forEach(segment => {
+                if (segment.category === 'music_offtopic') {
+                    let start, end;
                     
-                    hasOutroCrossfadeStarted = true;
-                    nextVideoScheduled = true;
+                    if (segment.segment && Array.isArray(segment.segment)) {
+                        start = segment.segment[0];
+                        end = segment.segment[1];
+                    } else if (segment.startTime !== undefined && segment.endTime !== undefined) {
+                        start = segment.startTime;
+                        end = segment.endTime;
+                    }
                     
-                    if (window.unifiedCore) {
-                        window.unifiedCore.playNextVideo();
+                    // Validar segmento
+                    if (typeof start === 'number' && typeof end === 'number' && end > start) {
+                        const duration = end - start;
+                        totalSponsorBlockDuration += duration;
+                        
+                        sponsorBlockSegments.push({
+                            start: Math.round(start * 100) / 100,
+                            end: Math.round(end * 100) / 100,
+                            duration: Math.round(duration * 100) / 100,
+                            passed: currentTime > end,
+                            current: currentTime >= start && currentTime < end
+                        });
                     }
                 }
+            });
+        }
+
+        // =============================================
+        // 3. CALCULAR DURACIÓN EFECTIVA DEL VIDEO
+        // =============================================
+        // Duración real del video MENOS los segmentos SponsorBlock que se saltan
+        const effectiveVideoDuration = videoDuration - totalSponsorBlockDuration;
+
+        // =============================================
+        // 4. CALCULAR PUNTO DE TRIGGER DEL CROSSFADE
+        // =============================================
+        // Fórmula: (DuraciónEfectiva) - (CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN)
+        
+        const CROSSFADE_DURATION = 10; // segundos
+        const API_BUFFER = 1; // segundos de buffer para API delays
+        const SAFETY_MARGIN = 0.5; // margen de seguridad
+        
+        const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
+        const triggerTime = effectiveVideoDuration - totalAdjustment;
+
+        const timeRemaining = videoDuration - currentTime;
+        const effectiveTimeRemaining = effectiveVideoDuration - (currentTime - calculatePastSponsorBlockTime(videoId, currentTime));
+
+        // =============================================
+        // 5. LOGS DETALLADOS PARA DEBUG
+        // =============================================
+        if (videoId) {
+            console.log(`📊 VIDEO MONITOR:`, {
+                videoId: videoId?.substring(0, 8),
+                totalDuration: Math.round(videoDuration * 10) / 10,
+                effectiveDuration: Math.round(effectiveVideoDuration * 10) / 10,
+                currentTime: Math.round(currentTime * 10) / 10,
+                timeRemaining: Math.round(timeRemaining * 10) / 10,
+                effectiveTimeRemaining: Math.round(effectiveTimeRemaining * 10) / 10,
+                totalSponsorBlockDuration: Math.round(totalSponsorBlockDuration * 10) / 10,
+                sponsorBlockSegments: sponsorBlockSegments.length,
+                totalAdjustment: Math.round(totalAdjustment * 10) / 10,
+                triggerTime: Math.round(triggerTime * 10) / 10,
+                shouldTrigger: effectiveTimeRemaining <= totalAdjustment
+            });
+        }
+
+        // =============================================
+        // 6. SPONSOR BLOCK: Saltar segmentos si procede
+        // =============================================
+        if (videoId && playerState === YT.PlayerState.PLAYING && 
+            currentTime > 0 && !isNaN(currentTime) && videoDuration > 0) {
+            checkAndSkipSegment(activePlayer);
+        }
+
+        // =============================================
+        // 7. TRIGGER DEL CROSSFADE EN EL MOMENTO EXACTO
+        // =============================================
+        // Usar tiempo efectivo para determinar si debe iniciar crossfade
+        if (effectiveTimeRemaining <= totalAdjustment && effectiveTimeRemaining > 0) {
+            
+            // ✅ VALIDACIONES CRÍTICAS
+            if (!hasOutroCrossfadeStarted && 
+                !crossfadeInProgress &&
+                !isTransitioning &&
+                !nextVideoScheduled) {
+                
+                console.log(`⏰ ¡CROSSFADE TRIGGER EXACTO!`, {
+                    currentTime: Math.round(currentTime * 10) / 10,
+                    effectiveTime: Math.round((currentTime - calculatePastSponsorBlockTime(videoId, currentTime)) * 10) / 10,
+                    triggerTime: Math.round(triggerTime * 10) / 10,
+                    timeRemaining: Math.round(effectiveTimeRemaining * 10) / 10,
+                    estimatedCrossfadeStart: new Date().toLocaleTimeString(),
+                    sponsorBlockInfo: {
+                        total: totalSponsorBlockDuration,
+                        segments: sponsorBlockSegments.length
+                    }
+                });
+                
+                // Marcar que el crossfade ha comenzado
+                hasOutroCrossfadeStarted = true;
+                nextVideoScheduled = true;
+                lastCrossfadeTime = Date.now();
+                
+                // ✅ EJECUTAR PLAYBACK SIGUIENTE
+                if (window.unifiedCore) {
+                    window.unifiedCore.playNextVideo();
+                } else {
+                    console.error('❌ UnifiedCore no disponible');
+                }
+            }
+            // Si ya está marcado pero aún no se ejecutó completamente
+            else if (hasOutroCrossfadeStarted) {
+                console.log(`🔄 Crossfade ya iniciado, esperando completación...`);
             }
         }
+        // Si el video terminó completamente sin haber iniciado crossfade (seguridad)
+        else if (effectiveTimeRemaining <= 0.5 && !hasOutroCrossfadeStarted && reproduccionIniciada) {
+            console.log(`⚠️ VIDEO TERMINÓ SIN CROSSFADE - INICIANDO DE EMERGENCIA`);
+            hasOutroCrossfadeStarted = true;
+            nextVideoScheduled = true;
+            
+            if (window.unifiedCore) {
+                window.unifiedCore.playNextVideo();
+            }
+        }
+        
     } catch (error) {
         console.error("❌ Error en monitorPlayers:", error);
     }
+}
+// =============================================
+// FUNCIÓN AUXILIAR: Calcular tiempo pasado en SponsorBlock
+// =============================================
+function calculatePastSponsorBlockTime(videoId, currentTime) {
+    if (!videoId || !segmentosCache[videoId]) return 0;
+    
+    const segments = segmentosCache[videoId];
+    let pastTime = 0;
+    
+    segments.forEach(segment => {
+        if (segment.category === 'music_offtopic') {
+            let start, end;
+            
+            if (segment.segment && Array.isArray(segment.segment)) {
+                start = segment.segment[0];
+                end = segment.segment[1];
+            } else if (segment.startTime !== undefined && segment.endTime !== undefined) {
+                start = segment.startTime;
+                end = segment.endTime;
+            }
+            
+            // Si el segmento ya pasó completamente
+            if (currentTime > end && typeof start === 'number' && typeof end === 'number') {
+                pastTime += (end - start);
+            }
+            // Si estamos dentro del segmento
+            else if (currentTime >= start && currentTime < end) {
+                pastTime += (currentTime - start);
+            }
+        }
+    });
+    
+    return pastTime;
+}
+
+// =============================================
+// FUNCIÓN AUXILIAR: Obtener tiempo de trigger
+// =============================================
+function calculateCrossfadeTriggerTime(videoDuration, videoId) {
+    const CROSSFADE_DURATION = 10;
+    const API_BUFFER = 1;
+    const SAFETY_MARGIN = 0.5;
+    
+    // Calcular TOTAL SponsorBlock (todos los segmentos)
+    let totalSponsorBlockDuration = 0;
+    
+    if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
+        totalSponsorBlockDuration = segmentosCache[videoId]
+            .filter(s => s.category === 'music_offtopic')
+            .reduce((sum, s) => {
+                const start = s.segment?.[0] ?? s.startTime;
+                const end = s.segment?.[1] ?? s.endTime;
+                return sum + (end - start);
+            }, 0);
+    }
+    
+    // Duración efectiva del video
+    const effectiveVideoDuration = videoDuration - totalSponsorBlockDuration;
+    
+    const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
+    return effectiveVideoDuration - totalAdjustment;
+}
+
+// =============================================
+// FUNCIÓN AUXILIAR: Resetear flags de crossfade
+// =============================================
+function resetCrossfadeFlags() {
+    hasOutroCrossfadeStarted = false;
+    nextVideoScheduled = false;
+    lastCrossfadeTime = 0;
+    console.log('🔄 Flags de crossfade reseteados');
 }
 // Función para forzar recarga de segmentos
 window.reloadSponsorBlockSegments = function(videoId) {
