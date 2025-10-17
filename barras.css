@@ -1341,3 +1341,183 @@ Spinner
         font-size: 16px;
     }
 }
+/* =============================================
+   INDICADOR DE VIDEO REPRODUCIENDO EN COLA
+   ============================================= */
+
+.queue-item.playing {
+    background: linear-gradient(135deg, rgba(255, 107, 53, 0.2) 0%, rgba(255, 107, 53, 0.1) 100%);
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    position: relative;
+}
+
+/* Borde animado para item reproduciendo */
+.queue-item.playing::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    animation: playingPulse 2s infinite;
+}
+
+@keyframes playingPulse {
+    0%, 100% { 
+        opacity: 1;
+        box-shadow: 0 0 10px rgba(255, 107, 53, 0.5);
+    }
+    50% { 
+        opacity: 0.7;
+        box-shadow: 0 0 20px rgba(255, 107, 53, 0.8);
+    }
+}
+
+.queue-item-number {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--surface-light), var(--surface-color));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    transition: all var(--transition-fast);
+}
+
+/* Icono de reproducción en cola */
+.queue-item-playing {
+    color: var(--primary-color);
+    font-size: 16px;
+    animation: playingIconPulse 2s infinite;
+}
+
+@keyframes playingIconPulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.15);
+        opacity: 0.8;
+    }
+}
+
+.queue-item.playing .queue-item-number {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-color: var(--primary-color);
+    animation: numberPulse 2s infinite;
+}
+
+@keyframes numberPulse {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.4);
+    }
+    50% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 0 8px rgba(255, 107, 53, 0.1);
+    }
+}
+
+/* Título destacado cuando está reproduciendo */
+.queue-item.playing .queue-item-title {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+/* Thumbnail con borde cuando reproduce */
+.queue-item.playing .queue-item-thumbnail {
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+}
+
+/* =============================================
+   EVITAR QUE AMBOS PLAYERS SE OCULTEN
+   ============================================= */
+
+.video-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
+    transition: opacity var(--crossfade-duration) ease;
+    will-change: opacity;
+    z-index: 1;
+    display: block !important; /* Forzar siempre visible */
+}
+
+.video-player.hidden {
+    opacity: 0 !important;
+    z-index: 0 !important;
+    pointer-events: none !important;
+    /* NO usar display: none */
+}
+
+.video-player.fade-in {
+    opacity: 1 !important;
+    z-index: 3 !important;
+    pointer-events: auto !important;
+}
+
+.video-player.fade-out {
+    opacity: 0 !important;
+    z-index: 1 !important;
+    pointer-events: none !important;
+}
+
+/* Asegurar que el contenedor siempre tenga fondo */
+.video-container {
+    background-color: #000;
+    position: relative;
+    min-height: 200px; /* Altura mínima */
+}
+
+/* Fallback: mostrar al menos uno siempre */
+.video-container:not(:has(.video-player:not(.hidden))) .video-player:first-child {
+    opacity: 1 !important;
+    z-index: 2 !important;
+    display: block !important;
+}
+
+/* =============================================
+   TRANSICIONES SUAVES SIN SALTOS
+   ============================================= */
+
+.queue-item {
+    scroll-margin-top: 20px; /* Espacio para scroll suave */
+}
+
+/* Smooth scroll para cola */
+.queue-popup-content {
+    scroll-behavior: smooth;
+    scroll-padding-top: 10px;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+
+@media (max-width: 768px) {
+    .queue-item.playing::before {
+        width: 3px;
+    }
+    
+    .queue-item-number {
+        width: 28px;
+        height: 28px;
+        font-size: 11px;
+    }
+    
+    .queue-item-playing {
+        font-size: 14px;
+    }
+}
