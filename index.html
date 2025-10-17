@@ -855,390 +855,187 @@
         }
     </style>
 </head>
-<body class="unified-loading">
-    
-    <!-- ELEMENTOS MOBILE FALTANTES -->
-    <div class="mobile-header" style="display: none;">
-        <div class="mobile-logo">
-            <div class="logo-icon">
-                <i class="fas fa-music"></i>
-            </div>
-            <span class="logo-text">YT CrossMix</span>
-        </div>
-        <div class="mobile-search">
-            <input type="text" id="mobileSearchInput" class="mobile-search-input" placeholder="Buscar música..." data-requires-unified>
-        </div>
-        <div class="mobile-user-actions">
-            <button class="mobile-menu-btn" data-requires-unified>
-                <i class="fas fa-user"></i>
-            </button>
-        </div>
-    </div>
-    <!-- ✅ INDICADOR DE ESTADO UNIFICADO -->
-    <div class="unified-status-indicator" id="unifiedStatusIndicator">
-        Inicializando Sistema Unificado...
-    </div>
-
-    <!-- ✅ DEBUG PANEL UNIFICADO (Solo en desarrollo) -->
-    <div class="unified-debug-panel" id="unifiedDebugPanel">
-        <h4>🔧 YT CrossMix Debug Unificado</h4>
-        <div id="debugContent">Cargando...</div>
-    </div>
-
-    <!-- ✅ STATE DEBUG PANEL -->
-    <div class="unified-state-debug" id="unifiedStateDebug">
-        <h4>📊 Estado Unificado</h4>
-        <div id="stateDebugContent">Inicializando...</div>
-    </div>
-
-    <!-- ✅ CONTROLES DE DESARROLLO UNIFICADO -->
-    <div class="unified-controls" id="unifiedControls" style="display: none;">
-        <button class="unified-control-btn" onclick="window.debugUnified?.()">
-            Debug
-        </button>
-        <button class="unified-control-btn" onclick="window.unifiedStateManager?.debug?.()">
-            State
-        </button>
-        <button class="unified-control-btn" onclick="window.resetUnified?.()">
-            Reset
-        </button>
-        <button class="unified-control-btn" onclick="toggleUnifiedDebug()">
-            Toggle Debug
-        </button>
-    </div>
-
-    <!-- Loading inicial mejorado -->
-    <div class="loading-spinner hidden" id="loadingSpinner">
-        <div class="spinner"></div>
-    </div>
-
-    <div class="app-container">
-        <!-- Sidebar Desktop -->
-        <aside class="desktop-sidebar" id="sidebar">
+<body>
+    <div class="ytmusic-app">
+        <!-- Sidebar -->
+        <aside class="ytmusic-sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-music"></i>
-                </div>
-                <h1 class="app-name">YT CrossMix</h1>
-                <!-- ✅ INDICADOR SISTEMA UNIFICADO -->
-                <div class="unified-indicator" id="unifiedIndicator" style="
-                    width: 8px; height: 8px; border-radius: 50%; 
-                    background: #666; margin-left: auto;
-                    transition: background-color 0.3s ease;
-                " title="Sistema Unificado"></div>
-            </div>
-            
-            <!-- Búsqueda en sidebar -->
-            <div class="sidebar-search">
-                <input type="text" 
-                       id="sidebarSearchInput"
-                       class="sidebar-search-input"
-                       placeholder="Buscar música..."
-                       aria-label="Buscar videos"
-                       data-requires-unified>
-            </div>
-            
-            <nav class="sidebar-nav">
-                <!-- Navegación Principal -->
-                <div class="nav-section">
-                    <button class="nav-item active" data-view="home" data-requires-unified>
-                        <i class="fas fa-home"></i>
-                        Inicio
-                    </button>
-                    <button class="nav-item" data-view="search" data-requires-unified>
-                        <i class="fas fa-search"></i>
-                        Explorar
-                    </button>
-                    <button class="nav-item" data-view="playing" data-requires-unified>
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo-container">
+                    <div class="logo-icon">
                         <i class="fas fa-music"></i>
-                        Reproduciendo
-                    </button>
-                </div>
-
-                <!-- Tu Biblioteca -->
-                <div class="nav-section">
-                    <div class="nav-section-title">Tu biblioteca</div>
-                    <button class="nav-item" data-view="library" data-requires-unified>
-                        <i class="fas fa-folder"></i>
-                        Biblioteca
-                    </button>
-                    <button class="nav-item" data-view="favorites" data-requires-unified>
-                        <i class="fas fa-heart"></i>
-                        Me gusta
-                    </button>
-                    <button class="nav-item" data-view="recientes" data-requires-unified>
-                        <i class="fas fa-clock"></i>
-                        Recientes
-                    </button>
-                </div>
-
-                <!-- Añadir Playlist -->
-                <div class="nav-section">
-                    <div class="playlist-add-section">
-                        <input type="text" 
-                               id="searchInput2"
-                               class="playlist-url-input"
-                               placeholder="URL de playlist de YouTube..."
-                               aria-label="URL de la playlist"
-                               data-requires-unified>
-                        <button id="añadirUrlButton" class="add-playlist-button" data-requires-unified>
-                            <i class="fas fa-plus"></i>
-                            <span>Añadir Playlist</span>
-                        </button>
                     </div>
+                    <span class="logo-text">YT CrossMix</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <a href="#" class="nav-item active" data-view="home">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <span class="nav-item-text">Inicio</span>
+                    </a>
+                    <a href="#" class="nav-item" data-view="explore">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-compass"></i>
+                        </div>
+                        <span class="nav-item-text">Explorar</span>
+                    </a>
+                    <a href="#" class="nav-item" data-view="library">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-folder"></i>
+                        </div>
+                        <span class="nav-item-text">Biblioteca</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="library-section">
+                        <div class="library-header">
+                            <span>Tu biblioteca</span>
+                        </div>
+                    </div>
+                    <a href="#" class="nav-item" data-view="playlists">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-list-music"></i>
+                        </div>
+                        <span class="nav-item-text">Playlists</span>
+                    </a>
+                    <a href="#" class="nav-item" data-view="liked">
+                        <div class="nav-item-icon">
+                            <i class="fas fa-heart"></i>
+                        </div>
+                        <span class="nav-item-text">Me gusta</span>
+                    </a>
                 </div>
             </nav>
         </aside>
 
         <!-- Contenido Principal -->
-        <div class="main-content">
+        <main class="ytmusic-main">
+            <!-- Header -->
+            <header class="ytmusic-header">
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="Buscar canciones, artistas, playlists...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                
+                <div class="header-actions">
+                    <button class="header-btn" id="queueBtn" title="Cola">
+                        <i class="fas fa-list"></i>
+                    </button>
+                    <button class="header-btn" title="Configuración">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+            </header>
+
             <!-- Área de Contenido -->
-            <div class="content-area">
-                <!-- Vista Inicio -->
-                <div class="content-view active" id="homeView">
-                    <div class="welcome-section">
-                        <div class="welcome-icon">
-                            <i class="fas fa-headphones"></i>
-                        </div>
-                        <h2 class="welcome-title">Bienvenido a YT CrossMix</h2>
-                        <p class="welcome-subtitle">Sistema Unificado - Crea mezclas perfectas con transiciones suaves entre canciones</p>
-                        <button class="welcome-cta" onclick="window.unifiedCore?.switchView?.('library')" data-requires-unified>
-                            <i class="fas fa-play"></i>
-                            Comenzar
-                        </button>
+            <div class="content-area" id="contentArea">
+                <!-- Hero Section -->
+                <div class="hero-section">
+                    <h1 class="hero-title">Bienvenido a YT CrossMix</h1>
+                    <p class="hero-subtitle">Mezcla perfecta de tus playlists con transiciones suaves</p>
+                    <button class="hero-cta">
+                        <i class="fas fa-play"></i>
+                        Comenzar
+                    </button>
+                </div>
+
+                <!-- Carousel: Escucha Rápida -->
+                <div class="carousel-section">
+                    <div class="carousel-header">
+                        <h2 class="carousel-title">Escucha rápida</h2>
+                        <a href="#" class="view-all">Ver todo</a>
                     </div>
-                    
-                    <div class="overview-grid" id="overviewGrid">
-                        <div class="overview-card">
-                            <div class="overview-card-header">
-                                <div class="overview-card-icon">
-                                    <i class="fas fa-list-ul"></i>
-                                </div>
-                                <h3 class="overview-card-title">Tus Playlists</h3>
-                            </div>
-                            <div class="overview-stats">
-                                <div class="overview-stat">0 playlists cargadas</div>
-                                <div class="overview-stat">0 videos en total</div>
-                                <div class="overview-stat" id="unifiedSystemStatus">Sistema: Cargando...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="overview-card">
-                            <div class="overview-card-header">
-                                <div class="overview-card-icon">
-                                    <i class="fas fa-music"></i>
-                                </div>
-                                <h3 class="overview-card-title">Reproducción</h3>
-                            </div>
-                            <div class="overview-stats">
-                                <div class="overview-stat">Estado: Detenido</div>
-                                <div class="overview-stat">Video actual: Ninguno</div>
-                                <div class="overview-stat" id="unifiedPlayersStatus">Reproductores: Inicializando...</div>
-                            </div>
-                        </div>
+                    <div class="cards-grid" id="quickPicksGrid">
+                        <!-- Cards dinámicas -->
                     </div>
                 </div>
 
-<!-- Vista Explorar con pestañas -->
-<div class="content-view" id="searchView">
-    <div class="explore-tabs">
-        <button class="explore-tab active" data-tab="music">
-            <i class="fas fa-music"></i> Música
-        </button>
-        <button class="explore-tab" data-tab="playlists">
-            <i class="fas fa-list"></i> Playlists
-        </button>
-        <button class="explore-tab" data-tab="recent">
-            <i class="fas fa-clock"></i> Recientes
-        </button>
-    </div>
-    
-    <div class="tab-content">
-        <div class="tab-pane active" id="musicTab">
-            <div class="search-results" id="searchResults" data-requires-unified>
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>Busca música, artistas o playlists</p>
-                    <p><small>Sistema Unificado Activo</small></p>
+                <!-- Carousel: Tus Playlists -->
+                <div class="carousel-section">
+                    <div class="carousel-header">
+                        <h2 class="carousel-title">Tus playlists</h2>
+                        <a href="#" class="view-all">Ver todo</a>
+                    </div>
+                    <div class="cards-grid" id="playlistsGrid">
+                        <!-- Cards dinámicas -->
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="tab-pane" id="playlistsTab">
-            <div class="trending-playlists">
-                <p>Playlists populares aparecerán aquí</p>
-            </div>
-        </div>
-        
-        <div class="tab-pane" id="recentTab">
-            <div class="recent-searches">
-                <p>Tus búsquedas recientes aparecerán aquí</p>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Vista Biblioteca con pestañas -->
-<div class="content-view" id="libraryView">
-    <div class="library-tabs">
-        <button class="library-tab active" data-tab="playlists">
-            <i class="fas fa-folder"></i> Playlists
-        </button>
-        <button class="library-tab" data-tab="debug">
-            <i class="fas fa-bug"></i> Debug
-        </button>
-        <button class="library-tab" data-tab="sync">
-            <i class="fas fa-sync"></i> Sync
-        </button>
-            <button class="auth-btn" id="googleSignInButton" title="Cargar mi Biblioteca" data-requires-unified>
-                        <i class="fab fa-google"></i>
-                        Conectar
-                    </button>
-                    <button class="auth-btn hidden" id="googleSignOutButton" title="Cerrar Sesión" data-requires-unified>
-                        <i class="fas fa-sign-out-alt"></i>
-                        Cerrar Sesión
-                    </button>
-        </button>
-    </div>
-    
-    <div class="tab-content">
-        <div class="tab-pane active" id="playlistsLibraryTab">
-            <div id="playlistsGrid" class="playlists-grid" data-requires-unified>
-                <div class="search-placeholder">
-                    <i class="fas fa-music"></i>
-                    <p><strong>¡Conecta tu cuenta de Google!</strong></p>
-                    <p>Ve tus playlists de YouTube y crea mezclas increíbles</p>
-                    <p><small>Powered by ....</small></p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="tab-pane" id="debugLibraryTab">
-            <div class="debug-panel">
-                <button onclick="window.debugUnified?.()" class="debug-btn">
-                    <i class="fas fa-bug"></i> Debug Estado
-                </button>
-                <button onclick="window.resetUnified?.()" class="debug-btn">
-                    <i class="fas fa-refresh"></i> Reset Sistema
-                </button>
-                <button onclick="window.clearSponsorBlockCache?.()" class="debug-btn">
-                    <i class="fas fa-eraser"></i> Limpiar Cache SB
-                </button>
-            </div>
-        </div>
-        
-        <div class="tab-pane" id="syncLibraryTab">
-            <div class="sync-panel">
-                <button onclick="window.unifiedCore?.syncLibrary?.()" class="sync-btn">
-                    <i class="fas fa-sync"></i> Sincronizar Biblioteca
-                </button>
-                <p>Sincroniza tu biblioteca con la cuenta de Google</p>
-            </div>
-        </div>
-        
-        <div class="tab-pane" id="connectLibraryTab">
-            <div class="connect-panel">
-                <button onclick="window.signIn?.()" class="connect-btn">
-                    <i class="fab fa-google"></i> Conectar con Google
-                </button>
-                <button onclick="window.signOut?.()" class="disconnect-btn">
-                    <i class="fas fa-sign-out-alt"></i> Desconectar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Vista Reproduciendo -->
-<div class="content-view" id="playingView">
-    <div class="now-playing-container">
-        <div class="video-container" id="videoContainer">
-            <div id="player1" class="video-player"></div>
-            <div id="player2" class="video-player hidden"></div>
-        </div>
-        <h2 class="now-playing-title" id="nowPlayingTitle">Selecciona una canción</h2>
-        <p class="now-playing-artist" id="nowPlayingArtist">YT CrossMix</p>
-    </div>
-    
-    <!-- Cola de reproducción SOLO aparece cuando se presiona el botón cola -->
-    <div class="queue-section hidden" id="queueSection">
-        <div class="queue-header">
-            <h3 class="queue-title">Cola de reproducción</h3>
-            <button class="queue-close-btn" id="queueCloseBtn">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div id="playlistContainer" class="playlist-container-desktop">
-            <div class="empty-queue-message">
-                <i class="fas fa-music"></i>
-                <p>La cola está vacía</p>
-                <p>Añade música desde la biblioteca o búsqueda</p>
-            </div>
-        </div>
-    </div>
-</div>
-            </div>
-        </div>
+        </main>
     </div>
 
-    <!-- Reproductor inferior -->
-    <div class="bottom-player">
-        <div class="player-info">
-            <img src="https://st3.depositphotos.com/29384342/35173/v/450/depositphotos_351736538-stock-illustration-music-icon-design-vector.jpg" 
-                 alt="Playing" 
-                 class="player-thumbnail" 
-                 id="playerThumbnail">
-            <div class="player-text">
-                <div class="player-title" id="playerTitle">Selecciona una canción</div>
-                <div class="player-artist" id="playerArtist">YT CrossMix - Sistema Unificado</div>
+    <!-- Reproductor Inferior -->
+    <div class="ytmusic-player" id="player">
+        <!-- Info del Track -->
+        <div class="player-track-info">
+            <img src="https://via.placeholder.com/48" alt="Track" class="track-thumbnail" id="playerThumb">
+            <div class="track-details">
+                <div class="track-title" id="playerTitle">Selecciona una canción</div>
+                <div class="track-artist" id="playerArtist">YT CrossMix</div>
+            </div>
+            <div class="track-actions">
+                <button class="control-btn" title="Me gusta">
+                    <i class="far fa-heart"></i>
+                </button>
             </div>
         </div>
-        
+
+        <!-- Controles Centrales -->
         <div class="player-controls">
-            <button class="control-button" id="prevButton" title="Anterior" disabled data-requires-unified>
-                <i class="fas fa-step-backward"></i>
-            </button>
-            <button class="control-button primary" id="botonPlay" title="Reproducir/Pausar" disabled data-requires-unified>
-                <i class="fas fa-play"></i>
-            </button>
-            <button class="control-button" id="botonNext" title="Siguiente" disabled data-requires-unified>
-                <i class="fas fa-step-forward"></i>
-            </button>
+            <div class="controls-buttons">
+                <button class="control-btn" id="shuffleBtn" title="Aleatorio">
+                    <i class="fas fa-random"></i>
+                </button>
+                <button class="control-btn" id="prevBtn" title="Anterior" disabled>
+                    <i class="fas fa-step-backward"></i>
+                </button>
+                <button class="control-btn play-pause" id="playBtn" title="Reproducir" disabled>
+                    <i class="fas fa-play"></i>
+                </button>
+                <button class="control-btn" id="nextBtn" title="Siguiente" disabled>
+                    <i class="fas fa-step-forward"></i>
+                </button>
+                <button class="control-btn" id="repeatBtn" title="Repetir">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            
+            <div class="progress-container">
+                <span class="time-display" id="currentTime">0:00</span>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill">
+                        <div class="progress-handle"></div>
+                    </div>
+                </div>
+                <span class="time-display" id="totalTime">0:00</span>
+            </div>
         </div>
 
-        <div class="player-extras">
-            <button class="control-button" id="queueButton" title="Cola" data-requires-unified>
-                <i class="fas fa-list"></i>
-            </button>
-            <div class="player-volume">
-                <button class="control-button" id="volumeButton" title="Volumen">
+        <!-- Controles Adicionales -->
+        <div class="player-extra-controls">
+            <div class="volume-control">
+                <button class="control-btn" id="volumeBtn" title="Volumen">
                     <i class="fas fa-volume-up"></i>
                 </button>
                 <div class="volume-slider" id="volumeSlider">
-                    <div class="volume-fill"></div>
+                    <div class="volume-fill" id="volumeFill"></div>
                 </div>
             </div>
+            <button class="control-btn" id="queueBtn2" title="Cola">
+                <i class="fas fa-list"></i>
+            </button>
         </div>
     </div>
-
-    <!-- BOTTOM NAVIGATION MOBILE -->
-    <div class="bottom-nav" style="display: none;">
-        <button class="nav-tab active" data-view="home" data-requires-unified>
-            <i class="fas fa-home"></i>
-            <span>Inicio</span>
-        </button>
-        <button class="nav-tab" data-view="search" data-requires-unified>
-            <i class="fas fa-search"></i>
-            <span>Buscar</span>
-        </button>
-        <button class="nav-tab" data-view="library" data-requires-unified>
-            <i class="fas fa-folder"></i>
-            <span>Biblioteca</span>
-        </button>
-        <button class="nav-tab" data-view="playing" data-requires-unified>
-            <i class="fas fa-music"></i>
-            <span>Reproduciendo</span>
-        </button>
-    </div>
-
     <!-- Pie de página -->
     <footer class="page-footer">
         <p>Con la tecnología de SponsorBlock. Created by <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.</p>
@@ -1246,14 +1043,12 @@
         <p> Sugerencias: <a href="mailto:aftterpro@gmail.com" target="_blank" rel="noopener noreferrer">Correo</a>.</p> 
     </footer>
 
-    <!-- Hidden search input for mobile compatibility -->
-    <input type="text" id="searchInput" style="display: none;" placeholder="Buscar música..." data-requires-unified>
+    <!-- Font Awesome -->
+    <script src="https://kit.fontawesome.com/your-kit-id.js" crossorigin="anonymous"></script>
+    <!-- O usar CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
 
-    <!-- Elements for compatibility -->
-    <div id="floatingMessageContainer" class="floating-messages"></div>
-
-
-    <!-- ✅ CARGA DEL SISTEMA UNIFICADO -->
+    <!--  CARGA DEL SISTEMA UNIFICADO -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -1278,47 +1073,81 @@
 <!-- Para visualización de onda de audio -->
 <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.0.0/dist/wavesurfer.min.js"></script>
     <script>
-        // Script inline para manejar errores de carga
-        window.addEventListener('error', function(e) {
-            if (e.filename && (e.filename.includes('core.js') || e.filename.includes('auth.js'))) {
-                console.error('💥 Error crítico en script principal:', e.error);
+       // =============================================
+        // FUNCIONALIDAD BÁSICA
+        // =============================================
+
+        // Toggle Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+        }
+
+        // Navegación
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
                 
-                const statusIndicator = document.getElementById('unifiedStatusIndicator');
-                if (statusIndicator) {
-                    statusIndicator.textContent = 'Error de carga - Recarga la página';
-                    statusIndicator.className = 'unified-status-indicator show error';
-                }
-            }
+                // Actualizar activo
+                document.querySelectorAll('.nav-item').forEach(nav => {
+                    nav.classList.remove('active');
+                });
+                item.classList.add('active');
+                
+                // Cambiar vista (integrar con tu código existente)
+                const view = item.dataset.view;
+                console.log('Cambiando a vista:', view);
+            });
         });
 
-        // Timeout de seguridad
-        setTimeout(() => {
-            if (!window.unifiedCore || !window.unifiedCore.state.initialized) {
-                console.warn('⏰ Sistema no inicializado después de 20 segundos');
-                
-                const statusIndicator = document.getElementById('unifiedStatusIndicator');
-                if (statusIndicator) {
-                    statusIndicator.textContent = 'Inicialización lenta - Verifica tu conexión';
-                    statusIndicator.className = 'unified-status-indicator show warning';
-                }
-                
-                // Intentar inicialización manual
-                if (window.UnifiedCore) {
-                    console.log('🔄 Intentando inicialización manual...');
-                    window.unifiedCore = new window.UnifiedCore();
-                }
-            }
-        }, 20000);
+        // Generar cards de ejemplo
+        function generateSampleCards() {
+            const quickPicksGrid = document.getElementById('quickPicksGrid');
+            const playlistsGrid = document.getElementById('playlistsGrid');
+            
+            const sampleData = [
+                { title: 'Mix Electrónica', artist: 'Varios artistas', img: 'https://via.placeholder.com/180?text=Mix1' },
+                { title: 'Rock Clásico', artist: 'Grandes Éxitos', img: 'https://via.placeholder.com/180?text=Mix2' },
+                { title: 'Chill Vibes', artist: 'Relajante', img: 'https://via.placeholder.com/180?text=Mix3' },
+                { title: 'Indie Pop', artist: 'Lo mejor', img: 'https://via.placeholder.com/180?text=Mix4' },
+                { title: 'Hip Hop', artist: 'Urbano', img: 'https://via.placeholder.com/180?text=Mix5' },
+                { title: 'Jazz Clásico', artist: 'Smooth', img: 'https://via.placeholder.com/180?text=Mix6' }
+            ];
 
-        // Debug en desarrollo
-        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-            console.log('🛠️ Modo desarrollo detectado');
-            setTimeout(() => {
-                if (window.unifiedCore) {
-                    window.unifiedCore.enableDebugMode();
-                }
-            }, 2000);
+            function createCard(data) {
+                return `
+                    <div class="music-card">
+                        <div class="card-thumbnail">
+                            <img src="${data.img}" alt="${data.title}">
+                            <div class="card-overlay">
+                                <button class="play-button">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">${data.title}</div>
+                            <div class="card-subtitle">${data.artist}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            quickPicksGrid.innerHTML = sampleData.map(createCard).join('');
+            playlistsGrid.innerHTML = sampleData.map(createCard).join('');
         }
+
+        // Inicializar
+        generateSampleCards();
+
+        // Responsive - Toggle móvil
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 1024) {
+                document.getElementById('sidebar').classList.add('collapsed');
+            } else {
+                document.getElementById('sidebar').classList.remove('collapsed');
+            }
+        });
     </script>
 </body>
 </html>
