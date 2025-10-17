@@ -670,9 +670,12 @@ async function testTokenValidity() {
 function updateAuthUI() {
     const signInBtn = document.getElementById('googleSignInButton');
     const signOutBtn = document.getElementById('googleSignOutButton');
-        
+    
+    // ✅ AGREGAR BOTÓN MÓVIL
+    const mobileSignInBtn = document.getElementById('mobileSignInButton');
+    
     if (!signInBtn || !signOutBtn) {
-        console.warn('⚠️ Botones no encontrados, reintentando...');
+        console.warn('⚠️ Botones desktop no encontrados, reintentando...');
         setTimeout(updateAuthUI, 1000);
         return;
     }
