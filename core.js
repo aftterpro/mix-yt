@@ -908,9 +908,6 @@ async playNextVideo() {
     }
 }
 
-// ✅ VARIABLE PARA DEBOUNCE
-let lastCrossfadeTime = 0;
-
 // =============================================
 // PREPARAR SIGUIENTE (OPCIONAL)
 // =============================================
