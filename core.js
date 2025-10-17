@@ -782,8 +782,18 @@ handleNext() {
     }
 
 async playNextVideo() {
+    const now = Date.now();
+    
+    // ✅ DEBOUNCE CRÍTICO: 500ms entre llamadas
+    if (now - lastCrossfadeTime < 500) {
+        console.log('🔒 Ignorando llamada duplicada (debounce)');
+        return;
+    }
+    lastCrossfadeTime = now;
+    
+    // ✅ PREVENIR MÚLTIPLES TRANSICIONES
     if (isTransitioning || crossfadeInProgress) {
-        console.log('🔄 Omitiendo playNextVideo - ya hay transición');
+        console.log('🔒 Ya hay transición en progreso');
         return;
     }
 
@@ -809,32 +819,21 @@ async playNextVideo() {
 
     const nextVideo = flatList[nextIndex];
     
-    // ✅ VALIDAR VIDEO ELIMINADO
-    if (!nextVideo || !nextVideo.videoId || 
-        nextVideo.title.toLowerCase().includes('deleted video') ||
-        nextVideo.title.toLowerCase().includes('[deleted video]')) {
-        
-        console.warn(`⚠️ Video eliminado detectado en índice ${nextIndex}, saltando...`);
-        
-        // Eliminar de cola
-        if (window.playlistManager) {
-            window.playlistManager.removeVideoFromQueue(nextVideo.videoId);
-        }
-        
-        // Reintentar con siguiente
+    // ✅ VALIDAR VIDEO
+    if (!nextVideo?.videoId) {
+        console.warn(`⚠️ Video inválido en índice ${nextIndex}`);
         isTransitioning = false;
         setTimeout(() => this.playNextVideo(), 500);
         return;
     }
     
-    // ✅ ACTUALIZAR INFO INMEDIATAMENTE (antes de cargar video)
+    // ✅ ACTUALIZAR INFO INMEDIATAMENTE
     currentPlayingInfo = {
         flattenedIndex: nextIndex,
         videoId: nextVideo.videoId,
         playlistId: nextVideo.sourcePlaylistId
     };
     
-    // ✅ ACTUALIZAR UI INMEDIATAMENTE
     this.updateNowPlaying();
 
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
@@ -843,49 +842,40 @@ async playNextVideo() {
     const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
 
     try {
+        // ✅ PREPARAR SIGUIENTE
         if (nextPlayerElement) {
             nextPlayerElement.classList.remove('hidden', 'fade-out');
             nextPlayerElement.style.display = 'block';
-            nextPlayerElement.style.zIndex = '1';
+            nextPlayerElement.style.opacity = '0';
         }
 
-        // CARGAR SIGUIENTE VIDEO
+        // ✅ CARGAR VIDEO
         await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('Timeout cargando video'));
-            }, 8000);
-
-            let hasResolved = false;
-            const resolveOnce = () => {
-                if (!hasResolved) {
-                    hasResolved = true;
-                    clearTimeout(timeout);
-                    resolve();
-                }
-            };
+            const timeout = setTimeout(() => reject(new Error('Timeout')), 8000);
 
             try {
                 nextPlayerInstance.loadVideoById({
                     videoId: nextVideo.videoId,
                     startSeconds: 0
                 });
-
                 nextPlayerInstance.setVolume(0);
-                setTimeout(resolveOnce, 500);
-                
-            } catch (loadError) {
-                reject(loadError);
+                setTimeout(() => {
+                    clearTimeout(timeout);
+                    resolve();
+                }, 500);
+            } catch (e) {
+                clearTimeout(timeout);
+                reject(e);
             }
         });
 
-        // CAMBIAR REPRODUCTOR
-        const previousPlayer = currentPlayer;
+        // ✅ CAMBIAR REPRODUCTOR
         currentPlayer = currentPlayer === 1 ? 2 : 1;
         
-        // INICIAR CROSSFADE
+        // ✅ INICIAR CROSSFADE (definida en core.js)
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
         
-        // ✅ ACTUALIZAR COLA Y UI (sin interrumpir audio)
+        // ✅ ACTUALIZAR UI
         setTimeout(() => {
             if (window.playlistManager) {
                 window.playlistManager.updateQueuePopup();
@@ -893,14 +883,14 @@ async playNextVideo() {
             }
         }, 200);
         
+        // ✅ RESETEAR FLAG
         hasOutroCrossfadeStarted = false;
 
     } catch (error) {
         console.error("❌ Error en playNextVideo:", error);
         
-        // Si falla, intentar siguiente
-        if (error.message.includes('Timeout') || error.message.includes('unavailable')) {
-            console.log('🔄 Video no disponible, saltando al siguiente...');
+        if (error.message.includes('Timeout')) {
+            console.log('🔄 Video no disponible, saltando...');
             if (window.playlistManager) {
                 window.playlistManager.removeVideoFromQueue(nextVideo.videoId);
             }
@@ -911,13 +901,18 @@ async playNextVideo() {
         }
     } finally {
         if (!error || !error.message.includes('Timeout')) {
-            isTransitioning = false;
+            setTimeout(() => {
+                isTransitioning = false;
+            }, 1000);
         }
     }
 }
 
+// ✅ VARIABLE PARA DEBOUNCE
+let lastCrossfadeTime = 0;
+
 // =============================================
-// FUNCIÓN 4: PREPARAR SIGUIENTE (OPCIONAL)
+// PREPARAR SIGUIENTE (OPCIONAL)
 // =============================================
 async preLoadNextVideo() {
     try {
@@ -2252,9 +2247,7 @@ function monitorPlayers() {
         if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
         if (!videoId) return;
 
-        // =============================================
-        // 1. CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
-        // =============================================
+        // ✅ CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
         let totalSponsorBlockDuration = 0;
         
         if (segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
@@ -2270,97 +2263,70 @@ function monitorPlayers() {
                 }, 0);
         }
 
-        // =============================================
-        // 2. CALCULAR PUNTO DE TRIGGER
-        // =============================================
-        const CROSSFADE_DURATION = 10; // segundos
-        const API_BUFFER = 1; // segundos
-        const SAFETY_MARGIN = 0.5; // segundos
-        
+        // ✅ CALCULAR PUNTO DE TRIGGER
+        const API_BUFFER = 1;
+        const SAFETY_MARGIN = 0.5;
         const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
-        
-        // triggerTime = cuándo DEBE INICIAR el crossfade
         const triggerTime = videoDuration - (totalAdjustment + totalSponsorBlockDuration);
-        
         const timeRemaining = videoDuration - currentTime;
         
-        // ✅ DEBUG CADA 2 SEGUNDOS (no cada 300ms para no saturar logs)
-        const shouldLog = Math.floor(currentTime) !== Math.floor(currentTime - 0.3);
+        // ✅ DEBUG CADA 5 SEGUNDOS
+        const shouldLog = Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== Math.floor(currentTime - 0.3);
         
-        if (shouldLog && currentTime > triggerTime - 15) {
+        if (shouldLog && currentTime > triggerTime - 20) {
             console.log(`⏱️ [${Math.round(currentTime)}s/${Math.round(videoDuration)}s]`, {
                 triggerTime: Math.round(triggerTime * 10) / 10,
-                shouldTrigger: currentTime >= triggerTime,
                 timeRemaining: Math.round(timeRemaining * 10) / 10,
-                sponsorBlockTotal: Math.round(totalSponsorBlockDuration * 10) / 10
+                shouldTrigger: currentTime >= triggerTime,
+                transitionActive: isTransitioning,
+                crossfadeActive: crossfadeInProgress
             });
         }
 
-        // =============================================
-        // 3. SPONSOR BLOCK: Saltar segmentos
-        // =============================================
-        if (currentTime > 0 && !isNaN(currentTime)) {
+        // ✅ SPONSORBLOCK: Saltar segmentos
+        if (currentTime > 0) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // =============================================
-        // 4. ¿HA LLEGADO EL MOMENTO DEL CROSSFADE?
-        // =============================================
-        // IMPORTANTE: currentTime >= triggerTime significa que YA debería haber iniciado
-        
-        if (currentTime >= triggerTime && !hasOutroCrossfadeStarted) {
+        // ✅ CRITICAL: VERIFICAR CONDICIONES ANTES DE DISPARAR
+        if (currentTime >= triggerTime && 
+            !hasOutroCrossfadeStarted && 
+            !isTransitioning && 
+            !crossfadeInProgress) {
             
-            console.log(`🚀 ¡¡CROSSFADE TRIGGER EXACTO!!`, {
+            console.log(`🚀 ¡CROSSFADE TRIGGER!`, {
                 currentTime: Math.round(currentTime * 10) / 10,
                 triggerTime: Math.round(triggerTime * 10) / 10,
-                videoDuration: Math.round(videoDuration * 10) / 10,
-                diferenciaSegundos: Math.round((videoDuration - currentTime) * 10) / 10,
-                estado: 'INICIANDO EFECTO AHORA'
+                timeRemaining: Math.round(timeRemaining * 10) / 10
             });
             
-            // ✅ MARCAR INMEDIATAMENTE
             hasOutroCrossfadeStarted = true;
-            nextVideoScheduled = true;
             
-            // ✅ ACTIVAR EFECTO VISUAL
             if (window.applyCrossfadeVisualEffect) {
                 window.applyCrossfadeVisualEffect();
             }
             
-            // ✅ DISPARAR EVENTO PARA CORE
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
                 detail: {
-                    currentTime: currentTime,
-                    triggerTime: triggerTime,
-                    timeRemaining: timeRemaining,
-                    videoDuration: videoDuration,
-                    sponsorBlockDuration: totalSponsorBlockDuration,
-                    crossfadeDuration: CROSSFADE_DURATION
+                    currentTime,
+                    triggerTime,
+                    timeRemaining,
+                    videoDuration
                 }
             }));
             
-            // ✅ EJECUTAR PLAYBACK SIGUIENTE (si está disponible)
-            if (window.unifiedCore && typeof window.unifiedCore.playNextVideo === 'function') {
+            if (window.unifiedCore?.playNextVideo) {
                 setTimeout(() => {
                     window.unifiedCore.playNextVideo();
-                }, 100); // Pequeño delay para que el evento se procese
+                }, 100);
             }
             
-            return; // Salir inmediatamente después de triggear
+            return;
         }
         
-        // =============================================
-        // 5. FALLBACK: Si el video termina SIN crossfade
-        // =============================================
+        // ✅ FALLBACK: Video terminó sin crossfade
         if (timeRemaining <= 0.5 && !hasOutroCrossfadeStarted && reproduccionIniciada) {
-            
-            console.warn(`⚠️ VIDEO TERMINÓ SIN CROSSFADE - FALLBACK INICIADO`, {
-                currentTime: Math.round(currentTime * 10) / 10,
-                videoDuration: Math.round(videoDuration * 10) / 10,
-                triggerTime: Math.round(triggerTime * 10) / 10,
-                razon: 'El monitor llegó tarde o el cálculo fue incorrecto'
-            });
-            
+            console.warn(`⚠️ FALLBACK: Video terminó sin crossfade`);
             hasOutroCrossfadeStarted = true;
             
             if (window.unifiedCore) {
