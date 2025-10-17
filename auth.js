@@ -708,7 +708,7 @@ function updateAuthUI() {
         // TODO listo para autenticar
         signInBtn.classList.remove('hidden');
         signOutBtn.classList.add('hidden');
-        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar por 7 días</span>';
+        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
         signInBtn.disabled = false;
         signInBtn.title = 'Conectarse y mantener sesión por 7 días';
         
