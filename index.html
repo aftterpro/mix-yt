@@ -12,1008 +12,193 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <!-- Fuentes -->
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
     
-    <!-- ✅ ESTILOS UNIFICADOS -->
-    <link rel="stylesheet" type="text/css" href="./styles-youtube-music.css">
-    <link rel="stylesheet" type="text/css" href="./efecto.css">
-    <link rel="stylesheet" type="text/css" href="./barras.css">
+    <!-- Styles -->
+    <link rel="stylesheet" href="./styles-youtube-music.css">
+    <link rel="stylesheet" href="./efecto.css">
+    <link rel="stylesheet" href="./barras.css">
     
     <link rel="icon" href="./electronic.ico">
-    <link rel="manifest" href="./manifest.json">
-    
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "YT CrossMix",
-      "url": "https://mix-yt.netlify.app", 
-      "description": "Mezclador de playlists de YouTube con efecto crossfade automático para transiciones suaves.",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://mix-yt.netlify.app",  
-        "query-input": "required name=search_term_string"
-      }
-    }
-    </script>
-
-    <!-- ✅ ESTILOS ADICIONALES PARA SISTEMA UNIFICADO -->
-   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        /* =============================================
-           VARIABLES - TEMA YT MUSIC
-           ============================================= */
-        :root {
-            /* Colores YT Music Dark */
-            --yt-spec-base-background: #030303;
-            --yt-spec-raised-background: #212121;
-            --yt-spec-menu-background: #282828;
-            --yt-spec-10-percent-layer: rgba(255, 255, 255, 0.1);
-            --yt-spec-brand-background-solid: #FF0000;
-            --yt-spec-brand-background-primary: #FF0000;
-            
-            /* Textos */
-            --yt-spec-text-primary: #FFFFFF;
-            --yt-spec-text-secondary: rgba(255, 255, 255, 0.6);
-            --yt-spec-text-disabled: rgba(255, 255, 255, 0.3);
-            
-            /* Específicos */
-            --yt-spec-icon-inactive: rgba(255, 255, 255, 0.5);
-            --yt-spec-icon-active: #FFFFFF;
-            --yt-spec-badge-chip-background: rgba(255, 255, 255, 0.15);
-            
-            /* Estructura */
-            --sidebar-width: 240px;
-            --mini-sidebar-width: 72px;
-            --player-height: 72px;
-            --header-height: 64px;
-            
-            /* Animaciones */
-            --transition-timing: cubic-bezier(0.05, 0, 0, 1);
-            --transition-duration: 200ms;
-        }
-
-        /* =============================================
-           RESET Y BASE
-           ============================================= */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: var(--yt-spec-base-background);
-            color: var(--yt-spec-text-primary);
-            overflow: hidden;
-            line-height: 1.5;
-        }
-
-        /* =============================================
-           LAYOUT PRINCIPAL - YT MUSIC STYLE
-           ============================================= */
-        .ytmusic-app {
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        /* =============================================
-           SIDEBAR - COMO YT MUSIC
-           ============================================= */
-        .ytmusic-sidebar {
-            width: var(--sidebar-width);
-            background: var(--yt-spec-base-background);
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--yt-spec-10-percent-layer);
-            transition: width var(--transition-duration) var(--transition-timing);
-            z-index: 100;
-        }
-
-        .ytmusic-sidebar.collapsed {
-            width: var(--mini-sidebar-width);
-        }
-
-        /* Logo y Menú Toggle */
-        .sidebar-header {
-            height: var(--header-height);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            gap: 16px;
-        }
-
-        .menu-toggle {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: none;
-            border: none;
-            color: var(--yt-spec-text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background var(--transition-duration);
-        }
-
-        .menu-toggle:hover {
-            background: var(--yt-spec-10-percent-layer);
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--yt-spec-brand-background-primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 18px;
-        }
-
-        .logo-text {
-            font-size: 20px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .ytmusic-sidebar.collapsed .logo-text {
-            display: none;
-        }
-
-        /* Navegación Principal */
-        .sidebar-nav {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 8px 0;
-        }
-
-        .sidebar-nav::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .sidebar-nav::-webkit-scrollbar-thumb {
-            background: var(--yt-spec-10-percent-layer);
-            border-radius: 4px;
-        }
-
-        .nav-section {
-            padding: 8px 0;
-        }
-
-        .nav-section + .nav-section {
-            border-top: 1px solid var(--yt-spec-10-percent-layer);
-            margin-top: 8px;
-            padding-top: 8px;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            padding: 10px 16px;
-            margin: 0 8px;
-            border-radius: 8px;
-            color: var(--yt-spec-text-primary);
-            cursor: pointer;
-            transition: background var(--transition-duration);
-            text-decoration: none;
-            gap: 24px;
-            position: relative;
-            border: none;
-            background: none;
-            width: calc(100% - 16px);
-            text-align: left;
-        }
-
-        .nav-item:hover {
-            background: var(--yt-spec-10-percent-layer);
-        }
-
-        .nav-item.active {
-            background: var(--yt-spec-10-percent-layer);
-            font-weight: 500;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 24px;
-            background: var(--yt-spec-brand-background-primary);
-            border-radius: 0 2px 2px 0;
-        }
-
-        .nav-item-icon {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--yt-spec-icon-inactive);
-            font-size: 24px;
-            flex-shrink: 0;
-        }
-
-        .nav-item.active .nav-item-icon,
-        .nav-item:hover .nav-item-icon {
-            color: var(--yt-spec-icon-active);
-        }
-
-        .nav-item-text {
-            font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .ytmusic-sidebar.collapsed .nav-item-text {
-            display: none;
-        }
-
-        .ytmusic-sidebar.collapsed .nav-item {
-            justify-content: center;
-            padding: 12px 0;
-        }
-
-        /* Sección de Biblioteca */
-        .library-section {
-            padding: 8px 16px;
-        }
-
-        .library-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 0;
-            color: var(--yt-spec-text-secondary);
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .ytmusic-sidebar.collapsed .library-header {
-            display: none;
-        }
-
-        /* =============================================
-           CONTENIDO PRINCIPAL
-           ============================================= */
-        .ytmusic-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Header Superior */
-        .ytmusic-header {
-            height: var(--header-height);
-            background: var(--yt-spec-base-background);
-            border-bottom: 1px solid var(--yt-spec-10-percent-layer);
-            display: flex;
-            align-items: center;
-            padding: 0 24px;
-            gap: 16px;
-            z-index: 90;
-        }
-
-        /* Búsqueda estilo YT Music */
-        .search-box {
-            flex: 1;
-            max-width: 600px;
-            position: relative;
-        }
-
-        .search-input {
-            width: 100%;
-            height: 40px;
-            background: var(--yt-spec-10-percent-layer);
-            border: none;
-            border-radius: 20px;
-            padding: 0 48px 0 16px;
-            color: var(--yt-spec-text-primary);
-            font-size: 14px;
-            outline: none;
-            transition: background var(--transition-duration);
-        }
-
-        .search-input:focus {
-            background: var(--yt-spec-raised-background);
-        }
-
-        .search-input::placeholder {
-            color: var(--yt-spec-text-secondary);
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--yt-spec-icon-inactive);
-            pointer-events: none;
-        }
-
-        /* Acciones del Header */
-        .header-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .header-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: none;
-            border: none;
-            color: var(--yt-spec-text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background var(--transition-duration);
-        }
-
-        .header-btn:hover {
-            background: var(--yt-spec-10-percent-layer);
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: var(--yt-spec-brand-background-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 500;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        /* =============================================
-           ÁREA DE CONTENIDO
-           ============================================= */
-        .content-area {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-            padding-bottom: calc(var(--player-height) + 24px);
-        }
-
-        .content-area::-webkit-scrollbar {
-            width: 12px;
-        }
-
-        .content-area::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .content-area::-webkit-scrollbar-thumb {
-            background: var(--yt-spec-10-percent-layer);
-            border-radius: 6px;
-            border: 3px solid var(--yt-spec-base-background);
-        }
-
-        /* Sección Hero */
-        .hero-section {
-            margin-bottom: 32px;
-            text-align: center;
-            padding: 48px 24px;
-        }
-
-        .hero-title {
-            font-size: 36px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            background: linear-gradient(90deg, #FF0000, #FF6B35);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero-subtitle {
-            font-size: 16px;
-            color: var(--yt-spec-text-secondary);
-            margin-bottom: 24px;
-        }
-
-        .hero-cta {
-            background: var(--yt-spec-brand-background-primary);
-            border: none;
-            padding: 12px 32px;
-            border-radius: 24px;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: transform var(--transition-duration);
-        }
-
-        .hero-cta:hover {
-            transform: scale(1.05);
-        }
-
-        /* Carruseles estilo YT Music */
-        .carousel-section {
-            margin-bottom: 40px;
-        }
-
-        .carousel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
-        }
-
-        .carousel-title {
-            font-size: 22px;
-            font-weight: 500;
-        }
-
-        .view-all {
-            color: var(--yt-spec-text-secondary);
-            font-size: 14px;
-            text-decoration: none;
-            transition: color var(--transition-duration);
-        }
-
-        .view-all:hover {
-            color: var(--yt-spec-text-primary);
-        }
-
-        /* Grid de Cards */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 16px;
-        }
-
-        /* Card estilo YT Music */
-        .music-card {
-            background: transparent;
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: background var(--transition-duration);
-        }
-
-        .music-card:hover {
-            background: var(--yt-spec-10-percent-layer);
-        }
-
-        .card-thumbnail {
-            position: relative;
-            width: 100%;
-            padding-bottom: 100%;
-            background: var(--yt-spec-raised-background);
-            overflow: hidden;
-            border-radius: 8px;
-        }
-
-        .card-thumbnail img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform var(--transition-duration);
-        }
-
-        .music-card:hover .card-thumbnail img {
-            transform: scale(1.05);
-        }
-
-        .card-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.7) 100%);
-            display: flex;
-            align-items: flex-end;
-            justify-content: flex-end;
-            padding: 8px;
-            opacity: 0;
-            transition: opacity var(--transition-duration);
-        }
-
-        .music-card:hover .card-overlay {
-            opacity: 1;
-        }
-
-        .play-button {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: var(--yt-spec-brand-background-primary);
-            border: none;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: transform var(--transition-duration);
-        }
-
-        .play-button:hover {
-            transform: scale(1.1);
-        }
-
-        .card-info {
-            padding: 12px 8px;
-        }
-
-        .card-title {
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 4px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .card-subtitle {
-            font-size: 13px;
-            color: var(--yt-spec-text-secondary);
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* =============================================
-           REPRODUCTOR INFERIOR - YT MUSIC STYLE
-           ============================================= */
-        .ytmusic-player {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: var(--player-height);
-            background: var(--yt-spec-raised-background);
-            border-top: 1px solid var(--yt-spec-10-percent-layer);
-            display: flex;
-            align-items: center;
-            padding: 0 16px;
-            gap: 16px;
-            z-index: 200;
-        }
-
-        /* Info del Track */
-        .player-track-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 180px;
-            flex: 1;
-            max-width: 300px;
-        }
-
-        .track-thumbnail {
-            width: 48px;
-            height: 48px;
-            border-radius: 4px;
-            background: var(--yt-spec-menu-background);
-            object-fit: cover;
-        }
-
-        .track-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .track-title {
-            font-size: 14px;
-            font-weight: 400;
-            margin-bottom: 2px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .track-artist {
-            font-size: 12px;
-            color: var(--yt-spec-text-secondary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .track-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        /* Controles Centrales */
-        .player-controls {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            max-width: 600px;
-        }
-
-        .controls-buttons {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .control-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: none;
-            border: none;
-            color: var(--yt-spec-text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background var(--transition-duration);
-        }
-
-        .control-btn:hover {
-            background: var(--yt-spec-10-percent-layer);
-        }
-
-        .control-btn:disabled {
-            color: var(--yt-spec-text-disabled);
-            cursor: not-allowed;
-        }
-
-        .control-btn.play-pause {
-            width: 48px;
-            height: 48px;
-            font-size: 24px;
-        }
-
-        /* Barra de Progreso */
-        .progress-container {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .time-display {
-            font-size: 11px;
-            color: var(--yt-spec-text-secondary);
-            min-width: 40px;
-            text-align: center;
-        }
-
-        .progress-bar {
-            flex: 1;
-            height: 4px;
-            background: var(--yt-spec-10-percent-layer);
-            border-radius: 2px;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .progress-bar:hover {
-            height: 6px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--yt-spec-brand-background-primary);
-            border-radius: 2px;
-            width: 30%;
-            position: relative;
-        }
-
-        .progress-handle {
-            position: absolute;
-            right: -6px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 12px;
-            height: 12px;
-            background: white;
-            border-radius: 50%;
-            opacity: 0;
-            transition: opacity var(--transition-duration);
-        }
-
-        .progress-bar:hover .progress-handle {
-            opacity: 1;
-        }
-
-        /* Controles Adicionales */
-        .player-extra-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 180px;
-            flex: 1;
-            max-width: 300px;
-            justify-content: flex-end;
-        }
-
-        .volume-control {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .volume-slider {
-            width: 80px;
-            height: 4px;
-            background: var(--yt-spec-10-percent-layer);
-            border-radius: 2px;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .volume-fill {
-            height: 100%;
-            background: white;
-            border-radius: 2px;
-            width: 70%;
-        }
-
-        /* =============================================
-           RESPONSIVE
-           ============================================= */
-        @media (max-width: 1024px) {
-            .ytmusic-sidebar {
-                width: var(--mini-sidebar-width);
-            }
-
-            .logo-text,
-            .nav-item-text {
-                display: none;
-            }
-
-            .nav-item {
-                justify-content: center;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .ytmusic-sidebar {
-                position: fixed;
-                left: -100%;
-                transition: left var(--transition-duration);
-                z-index: 1000;
-            }
-
-            .ytmusic-sidebar.mobile-open {
-                left: 0;
-            }
-
-            .search-box {
-                max-width: 100%;
-            }
-
-            .player-track-info,
-            .player-extra-controls {
-                display: none;
-            }
-
-            .cards-grid {
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: 12px;
-            }
-        }
-
-        /* =============================================
-           ANIMACIONES Y EFECTOS
-           ============================================= */
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .music-card {
-            animation: fadeIn 0.3s var(--transition-timing);
-        }
-
-        /* Skeleton Loader */
-        .skeleton {
-            background: linear-gradient(90deg, 
-                var(--yt-spec-10-percent-layer) 25%, 
-                var(--yt-spec-raised-background) 50%, 
-                var(--yt-spec-10-percent-layer) 75%
-            );
-            background-size: 200% 100%;
-            animation: loading 1.5s infinite;
-        }
-
-        @keyframes loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-    </style>
 </head>
 <body>
-    <div class="ytmusic-app">
-        <!-- Sidebar -->
-        <aside class="ytmusic-sidebar" id="sidebar">
+    <!-- ESTRUCTURA YT MUSIC -->
+    <div class="app-container">
+        
+        <!-- ===== SIDEBAR DESKTOP ===== -->
+        <aside class="desktop-sidebar" id="desktopSidebar">
+            <!-- Header con logo y menú -->
             <div class="sidebar-header">
-                <button class="menu-toggle" onclick="toggleSidebar()">
+                <button class="menu-toggle-btn" onclick="toggleSidebar()">
                     <i class="fas fa-bars"></i>
                 </button>
-                <div class="logo-container">
-                    <div class="logo-icon">
-                        <i class="fas fa-music"></i>
-                    </div>
-                    <span class="logo-text">YT CrossMix</span>
+                <div class="logo">
+                    <i class="fas fa-music"></i>
                 </div>
+                <span class="app-name">YT CrossMix</span>
             </div>
 
+            <!-- Navegación -->
             <nav class="sidebar-nav">
                 <div class="nav-section">
-                    <a href="#" class="nav-item active" data-view="home">
-                        <div class="nav-item-icon">
-                            <i class="fas fa-home"></i>
-                        </div>
-                        <span class="nav-item-text">Inicio</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="explore">
-                        <div class="nav-item-icon">
-                            <i class="fas fa-compass"></i>
-                        </div>
-                        <span class="nav-item-text">Explorar</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="library">
-                        <div class="nav-item-icon">
-                            <i class="fas fa-folder"></i>
-                        </div>
-                        <span class="nav-item-text">Biblioteca</span>
-                    </a>
+                    <button class="nav-item active" data-view="home">
+                        <i class="fas fa-home"></i>
+                        <span>Inicio</span>
+                    </button>
+                    <button class="nav-item" data-view="search">
+                        <i class="fas fa-search"></i>
+                        <span>Buscar</span>
+                    </button>
+                    <button class="nav-item" data-view="library">
+                        <i class="fas fa-folder"></i>
+                        <span>Biblioteca</span>
+                    </button>
                 </div>
 
                 <div class="nav-section">
-                    <div class="library-section">
-                        <div class="library-header">
-                            <span>Tu biblioteca</span>
-                        </div>
-                    </div>
-                    <a href="#" class="nav-item" data-view="playlists">
-                        <div class="nav-item-icon">
-                            <i class="fas fa-list-music"></i>
-                        </div>
-                        <span class="nav-item-text">Playlists</span>
-                    </a>
-                    <a href="#" class="nav-item" data-view="liked">
-                        <div class="nav-item-icon">
-                            <i class="fas fa-heart"></i>
-                        </div>
-                        <span class="nav-item-text">Me gusta</span>
-                    </a>
+                    <div class="nav-section-title">Tu Música</div>
+                    <button class="nav-item" data-view="playing">
+                        <i class="fas fa-play-circle"></i>
+                        <span>Reproduciendo</span>
+                    </button>
+                    <button class="nav-item" id="queueButton">
+                        <i class="fas fa-list-ul"></i>
+                        <span>Cola</span>
+                    </button>
                 </div>
             </nav>
         </aside>
 
-        <!-- Contenido Principal -->
-        <main class="ytmusic-main">
-            <!-- Header -->
-            <header class="ytmusic-header">
-                <div class="search-box">
-                    <input type="text" class="search-input" placeholder="Buscar canciones, artistas, playlists...">
-                    <i class="fas fa-search search-icon"></i>
+        <!-- ===== MAIN CONTENT ===== -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <!-- Búsqueda Desktop -->
+                <div class="sidebar-search">
+                    <input type="text" 
+                           id="sidebarSearchInput" 
+                           class="sidebar-search-input" 
+                           placeholder="Buscar música, artistas, playlists...">
                 </div>
-                
-                <div class="header-actions">
-                    <button class="header-btn" id="queueBtn" title="Cola">
-                        <i class="fas fa-list"></i>
+
+                <!-- User Actions -->
+                <div class="user-actions">
+                    <button class="auth-btn" id="googleSignInButton">
+                        <i class="fab fa-google"></i>
+                        <span>Conectar</span>
                     </button>
-                    <button class="header-btn" title="Configuración">
-                        <i class="fas fa-cog"></i>
+                    <button class="auth-btn hidden" id="googleSignOutButton">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Salir</span>
                     </button>
-                    <div class="user-avatar">
-                        <i class="fas fa-user"></i>
-                    </div>
                 </div>
             </header>
 
-            <!-- Área de Contenido -->
-            <div class="content-area" id="contentArea">
-                <!-- Hero Section -->
-                <div class="hero-section">
-                    <h1 class="hero-title">Bienvenido a YT CrossMix</h1>
-                    <p class="hero-subtitle">Mezcla perfecta de tus playlists con transiciones suaves</p>
-                    <button class="hero-cta">
-                        <i class="fas fa-play"></i>
-                        Comenzar
-                    </button>
-                </div>
-
-                <!-- Carousel: Escucha Rápida -->
-                <div class="carousel-section">
-                    <div class="carousel-header">
-                        <h2 class="carousel-title">Escucha rápida</h2>
-                        <a href="#" class="view-all">Ver todo</a>
-                    </div>
-                    <div class="cards-grid" id="quickPicksGrid">
-                        <!-- Cards dinámicas -->
+            <!-- Content Area -->
+            <div class="content-area">
+                
+                <!-- ===== HOME VIEW ===== -->
+                <div class="content-view active" id="homeView">
+                    <div class="welcome-section">
+                        <div class="welcome-icon">
+                            <i class="fas fa-music"></i>
+                        </div>
+                        <h1 class="welcome-title">Bienvenido a YT CrossMix</h1>
+                        <p class="welcome-subtitle">
+                            Crea mezclas perfectas con transiciones suaves entre canciones.<br>
+                            Conecta tu cuenta de Google para empezar.
+                        </p>
+                        <button class="welcome-cta" onclick="document.getElementById('googleSignInButton').click()">
+                            <i class="fas fa-play"></i>
+                            Comenzar Ahora
+                        </button>
                     </div>
                 </div>
 
-                <!-- Carousel: Tus Playlists -->
-                <div class="carousel-section">
-                    <div class="carousel-header">
-                        <h2 class="carousel-title">Tus playlists</h2>
-                        <a href="#" class="view-all">Ver todo</a>
-                    </div>
-                    <div class="cards-grid" id="playlistsGrid">
-                        <!-- Cards dinámicas -->
+                <!-- ===== SEARCH VIEW ===== -->
+                <div class="content-view" id="searchView">
+                    <div class="carousel-section">
+                        <div class="carousel-header">
+                            <h2 class="carousel-title">Resultados de Búsqueda</h2>
+                        </div>
+                        <div class="search-results-grid" id="searchResults">
+                            <div class="search-placeholder">
+                                <i class="fas fa-search"></i>
+                                <p>Busca música, artistas o playlists</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- ===== LIBRARY VIEW ===== -->
+                <div class="content-view" id="libraryView">
+                    <div class="carousel-section">
+                        <div class="carousel-header">
+                            <h2 class="carousel-title">Tu Biblioteca</h2>
+                        </div>
+                        <div class="playlists-grid" id="playlistsGrid">
+                            <!-- Playlists dinámicas -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== PLAYING VIEW ===== -->
+                <div class="content-view" id="playingView">
+                    <!-- Video Container -->
+                    <div class="video-container" style="position: relative; width: 100%; max-width: 800px; margin: 0 auto; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden;">
+                        <div id="player1" class="video-player"></div>
+                        <div id="player2" class="video-player hidden"></div>
+                    </div>
+
+                    <!-- Now Playing Info -->
+                    <div style="text-align: center; margin-top: 24px;">
+                        <h2 id="nowPlayingTitle" style="font-size: 24px; margin-bottom: 8px;">Selecciona una canción</h2>
+                        <p id="nowPlayingArtist" style="color: var(--yt-text-secondary);">YT CrossMix</p>
+                    </div>
+                </div>
+
             </div>
         </main>
+
     </div>
 
-    <!-- Reproductor Inferior -->
-    <div class="ytmusic-player" id="player">
-        <!-- Info del Track -->
-        <div class="player-track-info">
-            <img src="https://via.placeholder.com/48" alt="Track" class="track-thumbnail" id="playerThumb">
-            <div class="track-details">
-                <div class="track-title" id="playerTitle">Selecciona una canción</div>
-                <div class="track-artist" id="playerArtist">YT CrossMix</div>
-            </div>
-            <div class="track-actions">
-                <button class="control-btn" title="Me gusta">
-                    <i class="far fa-heart"></i>
-                </button>
+    <!-- ===== BOTTOM PLAYER ===== -->
+    <div class="bottom-player">
+        <!-- Player Info -->
+        <div class="player-info">
+            <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
+            <div class="player-text">
+                <div class="player-title" id="playerTitle">Selecciona una canción</div>
+                <div class="player-artist" id="playerArtist">YT CrossMix</div>
             </div>
         </div>
 
-        <!-- Controles Centrales -->
+        <!-- Player Controls -->
         <div class="player-controls">
             <div class="controls-buttons">
-                <button class="control-btn" id="shuffleBtn" title="Aleatorio">
+                <button class="control-button" id="shuffleBtn" title="Aleatorio" disabled>
                     <i class="fas fa-random"></i>
                 </button>
-                <button class="control-btn" id="prevBtn" title="Anterior" disabled>
+                <button class="control-button" id="prevButton" title="Anterior" disabled>
                     <i class="fas fa-step-backward"></i>
                 </button>
-                <button class="control-btn play-pause" id="playBtn" title="Reproducir" disabled>
+                <button class="control-button primary" id="botonPlay" title="Reproducir" disabled>
                     <i class="fas fa-play"></i>
                 </button>
-                <button class="control-btn" id="nextBtn" title="Siguiente" disabled>
+                <button class="control-button" id="botonNext" title="Siguiente" disabled>
                     <i class="fas fa-step-forward"></i>
                 </button>
-                <button class="control-btn" id="repeatBtn" title="Repetir">
+                <button class="control-button" id="repeatBtn" title="Repetir" disabled>
                     <i class="fas fa-redo"></i>
                 </button>
             </div>
             
             <div class="progress-container">
                 <span class="time-display" id="currentTime">0:00</span>
-                <div class="progress-bar" id="progressBar">
-                    <div class="progress-fill" id="progressFill">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%">
                         <div class="progress-handle"></div>
                     </div>
                 </div>
@@ -1021,132 +206,105 @@
             </div>
         </div>
 
-        <!-- Controles Adicionales -->
-        <div class="player-extra-controls">
-            <div class="volume-control">
-                <button class="control-btn" id="volumeBtn" title="Volumen">
+        <!-- Player Extras -->
+        <div class="player-extras">
+            <div class="player-volume">
+                <button class="control-button" id="volumeButton" title="Volumen">
                     <i class="fas fa-volume-up"></i>
                 </button>
                 <div class="volume-slider" id="volumeSlider">
-                    <div class="volume-fill" id="volumeFill"></div>
+                    <div class="volume-fill"></div>
                 </div>
             </div>
-            <button class="control-btn" id="queueBtn2" title="Cola">
+            <button class="control-button" id="queueButton2" title="Cola">
                 <i class="fas fa-list"></i>
             </button>
         </div>
     </div>
-    <!-- Pie de página -->
+
+    <!-- ===== MOBILE HEADER ===== -->
+    <header class="mobile-header">
+        <div class="mobile-logo">
+            <div class="logo-icon">
+                <i class="fas fa-music"></i>
+            </div>
+            <span class="logo-text">CrossMix</span>
+        </div>
+        <div class="mobile-search">
+            <input type="text" 
+                   id="mobileSearchInput" 
+                   class="mobile-search-input" 
+                   placeholder="Buscar...">
+        </div>
+        <div class="mobile-user-actions">
+            <button class="mobile-menu-btn auth-btn" id="mobileSignInButton">
+                <i class="fab fa-google"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== BOTTOM NAV MOBILE ===== -->
+    <nav class="bottom-nav">
+        <button class="nav-tab active" data-view="home">
+            <i class="fas fa-home"></i>
+            <span>Inicio</span>
+        </button>
+        <button class="nav-tab" data-view="search">
+            <i class="fas fa-search"></i>
+            <span>Buscar</span>
+        </button>
+        <button class="nav-tab" data-view="library">
+            <i class="fas fa-folder"></i>
+            <span>Biblioteca</span>
+        </button>
+        <button class="nav-tab" data-view="playing">
+            <i class="fas fa-play-circle"></i>
+            <span>Reproduciendo</span>
+        </button>
+    </nav>
+
+    <!-- ===== FLOATING MESSAGES ===== -->
+    <div class="floating-messages" id="floatingMessageContainer"></div>
+
+    <!-- ===== FOOTER ===== -->
     <footer class="page-footer">
-        <p>Con la tecnología de SponsorBlock. Created by <a href="https://ajay.app/" target="_blank" rel="noopener noreferrer">Ajay Ramachandran</a>.</p>
-        <p>Utilizamos la API de <a href="https://piped.video/" target="_blank" rel="noopener noreferrer">Piped</a>.</p>  
-        <p> Sugerencias: <a href="mailto:aftterpro@gmail.com" target="_blank" rel="noopener noreferrer">Correo</a>.</p> 
+        <p>Powered by <a href="https://sponsor.ajay.app/" target="_blank">SponsorBlock</a> • 
+           <a href="https://piped.video/" target="_blank">Piped API</a></p>
+        <p>Sugerencias: <a href="mailto:aftterpro@gmail.com">aftterpro@gmail.com</a></p>
     </footer>
 
-    <!-- Font Awesome -->
-    <script src="https://kit.fontawesome.com/your-kit-id.js" crossorigin="anonymous"></script>
-    <!-- O usar CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-
-    <!--  CARGA DEL SISTEMA UNIFICADO -->
+    <!-- ===== SCRIPTS ===== -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-<!-- 1. Utilidades primero -->
-<script src="youtube-client.js"></script>
-<script src="init.js"></script>
+    <script src="youtube-client.js"></script>
+    <script src="init.js"></script>
+    <script src="auth.js"></script>
+    <script src="core.js"></script>
+    <script src="mix-effects.js"></script>
+    <script src="playlist.js" defer></script>
 
-<!-- 2. Auth (define funciones de persistencia) -->
-<script src="auth.js"></script>
-
-<!-- 3. Core (usa y define más funciones de persistencia) -->  
-<script src="core.js"></script>
-<script src="mix-effects.js"></script>
-<!-- 4. Playlist manager al final -->
-<script src="playlist.js" defer></script>
-<!-- Para análisis de audio avanzado -->
-<script src="https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js"></script>
-
-<!-- Para manipulación de tempo -->
-<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
-
-<!-- Para visualización de onda de audio -->
-<script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.0.0/dist/wavesurfer.min.js"></script>
     <script>
-       // =============================================
-        // FUNCIONALIDAD BÁSICA
-        // =============================================
-
         // Toggle Sidebar
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
+            const sidebar = document.getElementById('desktopSidebar');
             sidebar.classList.toggle('collapsed');
         }
 
-        // Navegación
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
+        // Navegación unificada
+        document.querySelectorAll('[data-view]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const view = e.currentTarget.dataset.view;
                 
-                // Actualizar activo
-                document.querySelectorAll('.nav-item').forEach(nav => {
-                    nav.classList.remove('active');
-                });
-                item.classList.add('active');
+                // Actualizar activos
+                document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
                 
-                // Cambiar vista (integrar con tu código existente)
-                const view = item.dataset.view;
-                console.log('Cambiando a vista:', view);
+                // Cambiar vista
+                if (window.unifiedCore) {
+                    window.unifiedCore.switchView(view);
+                }
             });
-        });
-
-        // Generar cards de ejemplo
-        function generateSampleCards() {
-            const quickPicksGrid = document.getElementById('quickPicksGrid');
-            const playlistsGrid = document.getElementById('playlistsGrid');
-            
-            const sampleData = [
-                { title: 'Mix Electrónica', artist: 'Varios artistas', img: 'https://via.placeholder.com/180?text=Mix1' },
-                { title: 'Rock Clásico', artist: 'Grandes Éxitos', img: 'https://via.placeholder.com/180?text=Mix2' },
-                { title: 'Chill Vibes', artist: 'Relajante', img: 'https://via.placeholder.com/180?text=Mix3' },
-                { title: 'Indie Pop', artist: 'Lo mejor', img: 'https://via.placeholder.com/180?text=Mix4' },
-                { title: 'Hip Hop', artist: 'Urbano', img: 'https://via.placeholder.com/180?text=Mix5' },
-                { title: 'Jazz Clásico', artist: 'Smooth', img: 'https://via.placeholder.com/180?text=Mix6' }
-            ];
-
-            function createCard(data) {
-                return `
-                    <div class="music-card">
-                        <div class="card-thumbnail">
-                            <img src="${data.img}" alt="${data.title}">
-                            <div class="card-overlay">
-                                <button class="play-button">
-                                    <i class="fas fa-play"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-info">
-                            <div class="card-title">${data.title}</div>
-                            <div class="card-subtitle">${data.artist}</div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            quickPicksGrid.innerHTML = sampleData.map(createCard).join('');
-            playlistsGrid.innerHTML = sampleData.map(createCard).join('');
-        }
-
-        // Inicializar
-        generateSampleCards();
-
-        // Responsive - Toggle móvil
-        window.addEventListener('resize', () => {
-            if (window.innerWidth <= 1024) {
-                document.getElementById('sidebar').classList.add('collapsed');
-            } else {
-                document.getElementById('sidebar').classList.remove('collapsed');
-            }
         });
     </script>
 </body>
