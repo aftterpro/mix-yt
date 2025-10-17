@@ -809,11 +809,33 @@ async playNextVideo() {
 
     const nextVideo = flatList[nextIndex];
     
+    // ✅ VALIDAR VIDEO ELIMINADO
+    if (!nextVideo || !nextVideo.videoId || 
+        nextVideo.title.toLowerCase().includes('deleted video') ||
+        nextVideo.title.toLowerCase().includes('[deleted video]')) {
+        
+        console.warn(`⚠️ Video eliminado detectado en índice ${nextIndex}, saltando...`);
+        
+        // Eliminar de cola
+        if (window.playlistManager) {
+            window.playlistManager.removeVideoFromQueue(nextVideo.videoId);
+        }
+        
+        // Reintentar con siguiente
+        isTransitioning = false;
+        setTimeout(() => this.playNextVideo(), 500);
+        return;
+    }
+    
+    // ✅ ACTUALIZAR INFO INMEDIATAMENTE (antes de cargar video)
     currentPlayingInfo = {
         flattenedIndex: nextIndex,
         videoId: nextVideo.videoId,
         playlistId: nextVideo.sourcePlaylistId
     };
+    
+    // ✅ ACTUALIZAR UI INMEDIATAMENTE
+    this.updateNowPlaying();
 
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
@@ -827,7 +849,7 @@ async playNextVideo() {
             nextPlayerElement.style.zIndex = '1';
         }
 
-        // CARGAR SIGUIENTE VIDEO SIN DELAY INNECESARIO
+        // CARGAR SIGUIENTE VIDEO
         await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error('Timeout cargando video'));
@@ -848,9 +870,7 @@ async playNextVideo() {
                     startSeconds: 0
                 });
 
-                nextPlayerInstance.setVolume(0); // Comienza en 0 para crossfade
-                
-                // RESOLVER RÁPIDO PARA EMPEZAR CROSSFADE
+                nextPlayerInstance.setVolume(0);
                 setTimeout(resolveOnce, 500);
                 
             } catch (loadError) {
@@ -858,26 +878,41 @@ async playNextVideo() {
             }
         });
 
-        // CAMBIAR REPRODUCTOR ANTES DEL CROSSFADE
+        // CAMBIAR REPRODUCTOR
         const previousPlayer = currentPlayer;
         currentPlayer = currentPlayer === 1 ? 2 : 1;
         
-        // INICIAR CROSSFADE INMEDIATAMENTE
+        // INICIAR CROSSFADE
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
         
-        // Actualizar UI sin interrumpir audio
+        // ✅ ACTUALIZAR COLA Y UI (sin interrumpir audio)
         setTimeout(() => {
-            this.updatePlaylistsUI();
-            this.updateQueuePopup();
+            if (window.playlistManager) {
+                window.playlistManager.updateQueuePopup();
+                window.playlistManager.syncQueueIndicator();
+            }
         }, 200);
         
         hasOutroCrossfadeStarted = false;
 
     } catch (error) {
         console.error("❌ Error en playNextVideo:", error);
-        isTransitioning = false;
+        
+        // Si falla, intentar siguiente
+        if (error.message.includes('Timeout') || error.message.includes('unavailable')) {
+            console.log('🔄 Video no disponible, saltando al siguiente...');
+            if (window.playlistManager) {
+                window.playlistManager.removeVideoFromQueue(nextVideo.videoId);
+            }
+            isTransitioning = false;
+            setTimeout(() => this.playNextVideo(), 500);
+        } else {
+            isTransitioning = false;
+        }
     } finally {
-        isTransitioning = false;
+        if (!error || !error.message.includes('Timeout')) {
+            isTransitioning = false;
+        }
     }
 }
 
@@ -903,12 +938,14 @@ async preLoadNextVideo() {
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) return;
     
-    console.log('🎨 Iniciando crossfade de 10 segundos...');
+    const CROSSFADE_DURATION = 10; // Variable global
+    console.log(`🎨 Iniciando crossfade de ${CROSSFADE_DURATION} segundos SIN SILENCIOS...`);
     crossfadeInProgress = true;
     
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
     
+    // ✅ CONFIGURAR ELEMENTOS VISUALES
     if (nextElement) {
         nextElement.classList.remove('hidden', 'fade-out');
         nextElement.classList.add('fade-in', 'crossfade-enter');
@@ -924,31 +961,45 @@ startCrossfade(prevPlayer, nextPlayer) {
         prevElement.style.zIndex = '2';
     }
     
-    // CROSSFADE SUAVE SIN SILENCIOS
-    const CROSSFADE_DURATION = 10; // 10 segundos exactos
+    // ✅ CROSSFADE DE AUDIO SIN SILENCIOS (Estilo Spotify)
     const duration = CROSSFADE_DURATION * 1000;
-    const steps = 60;
+    const steps = 100; // Más steps = más suave
     const stepTime = duration / steps;
     let step = 0;
+    
+    // ✅ INICIAR SIGUIENTE VIDEO INMEDIATAMENTE CON VOLUMEN 0
+    try {
+        nextPlayer.playVideo();
+        nextPlayer.setVolume(0);
+        console.log('▶️ Siguiente video iniciado en background');
+    } catch (e) {
+        console.warn('⚠️ Error iniciando siguiente video:', e);
+    }
     
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
         
-        // LOGARÍTMICO PARA MEJOR FADE DE AUDIO
-        const audioProgress = Math.pow(progress, 1.2);
+        // ✅ CURVA LOGARÍTMICA PARA AUDIO NATURAL
+        const audioProgress = Math.pow(progress, 0.8); // Curva suave
         
         const prevVolume = Math.max(0, Math.round(100 * (1 - audioProgress)));
         const nextVolume = Math.min(100, Math.round(100 * audioProgress));
         
         try {
+            // ✅ AJUSTAR VOLÚMENES SIN PAUSAR
             prevPlayer.setVolume(prevVolume);
             nextPlayer.setVolume(nextVolume);
+            
+            // Debug cada 20 steps
+            if (step % 20 === 0) {
+                console.log(`🎚️ Crossfade: Prev=${prevVolume}%, Next=${nextVolume}%`);
+            }
         } catch (e) {
             console.warn("⚠️ Advertencia durante crossfade:", e);
         }
         
-        // FADE VISUAL SUAVE
+        // ✅ FADE VISUAL SUAVE
         if (prevElement) {
             prevElement.style.opacity = (1 - progress).toString();
         }
@@ -961,9 +1012,12 @@ startCrossfade(prevPlayer, nextPlayer) {
             crossfadeInterval = null;
             crossfadeInProgress = false;
             
-            // LIMPIAR SIN SILENCIOS
+            console.log('✅ Crossfade completado sin silencios');
+            
+            // ✅ LIMPIAR SIN PAUSAR AUDIO
             setTimeout(() => {
                 try {
+                    // Detener video anterior DESPUÉS de fade completo
                     prevPlayer.stopVideo();
                     
                     if (prevElement) {
@@ -979,10 +1033,12 @@ startCrossfade(prevPlayer, nextPlayer) {
                         nextElement.style.zIndex = '2';
                     }
                     
+                    console.log('🧹 Limpieza post-crossfade completada');
+                    
                 } catch (e) {
                     console.error('❌ Error limpiando crossfade:', e);
                 }
-            }, 100); // Reducir delay de limpieza
+            }, 100);
         }
     }, stepTime);
 }
@@ -1444,8 +1500,11 @@ createSearchResultCard(video, videoId) {
     div.textContent = text;
     return div.innerHTML;
 }
- getFlattenedPlaylist() {
- const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+/**
+ * Obtener cola limpia (sin videos eliminados)
+ */
+getFlattenedPlaylist() {
+    const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
     if (!queuePlaylist) {
         console.warn('⚠️ No se encontró playlist de cola');
@@ -1457,40 +1516,68 @@ createSearchResultCard(video, videoId) {
         return [];
     }
     
-    const flatList = queuePlaylist.videos.map((video, index) => {
-        // VALIDACIÓN: Asegurar que el video tiene videoId válido
+    // ✅ FILTRAR VIDEOS ELIMINADOS Y VALIDAR
+    const validVideos = queuePlaylist.videos.filter((video, index) => {
+        // Validar videoId
         if (!video.videoId || video.videoId === 'undefined') {
             console.error(`❌ Video ${index} sin videoId válido:`, video);
-            return null;
+            return false;
         }
         
-        // MEJORADO: Obtener duración correcta
+        // ✅ DETECTAR VIDEOS ELIMINADOS
+        const title = (video.title || '').toLowerCase();
+        const isDeleted = 
+            title.includes('deleted video') ||
+            title.includes('[deleted video]') ||
+            title.includes('video unavailable') ||
+            title.includes('private video') ||
+            title === 'deleted video' ||
+            title === '';
+        
+        if (isDeleted) {
+            console.warn(`🗑️ Video eliminado detectado: "${video.title}" (${video.videoId})`);
+            
+            // Eliminar de cola automáticamente
+            setTimeout(() => {
+                if (window.playlistManager) {
+                    window.playlistManager.removeVideoFromQueue(video.videoId);
+                    window.unifiedCore?.showMessage(`Video eliminado: "${video.title}"`, 'info');
+                }
+            }, 100);
+            
+            return false;
+        }
+        
+        return true;
+    });
+    
+    // Log si se filtraron videos
+    if (validVideos.length !== queuePlaylist.videos.length) {
+        const filtered = queuePlaylist.videos.length - validVideos.length;
+        console.warn(`⚠️ Se filtraron ${filtered} videos inválidos/eliminados`);
+    }
+    
+    // Mapear a estructura normalizada
+    const flatList = validVideos.map((video, index) => {
         let duration = 0;
         
         if (video.duration) {
-            // Si ya es número, usarlo directamente
             duration = typeof video.duration === 'number' 
                 ? video.duration 
                 : this.parseDuration(video.duration);
         } else if (video.contentDetails?.duration) {
-            // Fallback: duración de YouTube API (formato ISO)
             duration = this.parseDuration(video.contentDetails.duration);
         }
         
-        // MEJORADO: Priorizar datos del backend (artist y title ya procesados)
-        // Si no existen, extraer del título completo
         let artist = video.artist || video.uploaderName || video.author;
         let title = video.title || "Título Desconocido";
         
-        // Si no hay artista separado pero hay título completo, intentar extraer
         if (!artist || artist === 'Desconocido') {
-            // Intentar obtener de uploaderName primero
             if (video.uploaderName && video.uploaderName !== 'Desconocido') {
                 artist = video.uploaderName;
             } else if (video.author && video.author !== 'Desconocido') {
                 artist = video.author;
             } else {
-                // Último recurso: extraer del título si tiene separador
                 const separatorMatch = title.match(/^(.+?)\s*[-:]\s*(.+?)$/);
                 if (separatorMatch && separatorMatch[1]) {
                     artist = separatorMatch[1].trim();
@@ -1500,37 +1587,52 @@ createSearchResultCard(video, videoId) {
             }
         }
         
-        // Construir objeto normalizado
         return {
-            // Identificación
             videoId: video.videoId,
             sourcePlaylistId: video.sourcePlaylistId || 'queue',
             source: video.source || 'queue',
-            
-            // Información de visualización (ya procesada del backend)
             title: title,
             artist: artist,
-            uploaderName: artist, // Mantener compatibilidad
-            author: artist,       // Mantener compatibilidad
-            
-            // Media
+            uploaderName: artist,
+            author: artist,
             thumbnail: video.thumbnail || './electronic.ico',
             duration: duration,
-            
-            // Metadata adicional (opcional)
             addedAt: video.addedAt || Date.now(),
             originalTitle: video.originalTitle || video.title
         };
-    }).filter(video => video !== null); // Eliminar videos inválidos
-    
-    // Log de debug
-    if (flatList.length !== queuePlaylist.videos.length) {
-        console.warn(`⚠️ Se filtraron ${queuePlaylist.videos.length - flatList.length} videos inválidos`);
-    }
+    });
     
     console.log(`📊 Cola de reproducción: ${flatList.length} videos válidos`);
     
     return flatList;
+}
+
+/**
+ * Validar video antes de reproducir
+ */
+async validateVideoBeforePlay(videoId) {
+    try {
+        // Intentar obtener info del video
+        const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+        
+        if (!response.ok) {
+            console.warn(`⚠️ Video ${videoId} no disponible (HTTP ${response.status})`);
+            return false;
+        }
+        
+        const data = await response.json();
+        
+        if (!data.title || data.title.toLowerCase().includes('deleted')) {
+            console.warn(`⚠️ Video ${videoId} eliminado: "${data.title}"`);
+            return false;
+        }
+        
+        return true;
+        
+    } catch (error) {
+        console.warn(`⚠️ Error validando video ${videoId}:`, error);
+        return false; // Asumir inválido si hay error
+    }
 }
     async getBatchVideoDurations(videoIds) {
     if (!videoIds || videoIds.length === 0) return {};
