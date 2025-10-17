@@ -578,7 +578,7 @@ showQueuePopup() {
     /**
      * Actualizar contenido del popup de cola
      */
- updateQueuePopup() {
+updateQueuePopup() {
     const popupContent = document.getElementById('queuePopupContent');
     if (!popupContent) return;
 
@@ -588,41 +588,74 @@ showQueuePopup() {
     popupContent.innerHTML = this.renderQueueContent(flatList);
     
     console.log(`📊 Cola actualizada: ${flatList.length} videos`);
-    console.log(`🎵 Video actual: ${window.currentPlayingInfo?.videoId || 'Ninguno'}`);
     
-    // Reconfigurar listeners
+    // ✅ RECONFIGURAR LISTENERS Y SINCRONIZAR
     setTimeout(() => {
         this.setupQueueItemListeners();
         
+        // ✅ SINCRONIZAR INDICADOR
+        this.syncQueueIndicator();
+        
         if (window.queueDragDrop) {
             window.queueDragDrop.attachDragListeners();
-        }
-        
-        // ✅ SCROLL AL VIDEO ACTUAL (opcional pero útil)
-        const playingItem = popupContent.querySelector('.queue-item.playing');
-        if (playingItem) {
-            playingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            console.log('👀 Scroll a video actual en cola');
         }
     }, 50);
 }
     /**
  * Sincronizar cola después de cambio de video
  */
-    syncQueueIndicator() {
+syncQueueIndicator() {
     const queueItems = document.querySelectorAll('.queue-item');
     const currentVideoId = window.currentPlayingInfo?.videoId;
+    
+    if (!currentVideoId) {
+        console.log('⚠️ No hay video actual para sincronizar');
+        return;
+    }
+    
+    console.log(`🎵 Sincronizando indicador para: ${currentVideoId}`);
+    
+    let foundPlaying = false;
     
     queueItems.forEach(item => {
         const itemVideoId = item.dataset.videoId;
         
         if (itemVideoId === currentVideoId) {
+            // ✅ MARCAR COMO REPRODUCIENDO
             item.classList.add('playing');
+            
+            // ✅ ACTUALIZAR NÚMERO A ICONO
+            const numberEl = item.querySelector('.queue-item-number');
+            if (numberEl) {
+                numberEl.innerHTML = '<i class="fas fa-play-circle queue-item-playing"></i>';
+            }
+            
+            foundPlaying = true;
             console.log(`✅ Marcado como playing: ${itemVideoId}`);
+            
+            // ✅ SCROLL SUAVE AL ITEM
+            requestAnimationFrame(() => {
+                item.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                });
+            });
         } else {
+            // ✅ REMOVER MARCA
             item.classList.remove('playing');
+            
+            // ✅ RESTAURAR NÚMERO
+            const numberEl = item.querySelector('.queue-item-number');
+            const index = parseInt(item.dataset.flatIndex);
+            if (numberEl && !isNaN(index)) {
+                numberEl.textContent = index + 1;
+            }
         }
     });
+    
+    if (!foundPlaying) {
+        console.warn(`⚠️ No se encontró item con videoId: ${currentVideoId}`);
+    }
 }
 /**
  * Escapar HTML para prevenir XSS
@@ -661,13 +694,10 @@ renderQueueContent(flatList) {
     `;
 
     flatList.forEach((video, index) => {
-        // ✅ CORRECCIÓN: Verificar correctamente si está reproduciendo
         const isPlaying = window.currentPlayingInfo?.videoId === video.videoId;
         const formattedDuration = video.duration && video.duration > 0 
             ? this.core?.formatDuration(video.duration) 
             : '--:--';
-        
-        console.log(`🎵 Queue item ${index}: ${video.title.substring(0, 30)}... playing=${isPlaying}`);
         
         html += `
             <div class="queue-item ${isPlaying ? 'playing' : ''}" 
@@ -675,17 +705,15 @@ renderQueueContent(flatList) {
                  data-flat-index="${index}"
                  draggable="true">
                 
-                <!-- Drag handle -->
-                <div class="queue-item-drag-handle">
-                    <i class="fas fa-grip-vertical"></i>
-                </div>
-                
-                <!-- Número o indicador de reproducción -->
                 <div class="queue-item-number">
-                    ${isPlaying ? '<i class="fas fa-play-circle"></i>' : (index + 1)}
+                    ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
                 </div>
                 
-                <!-- Información del video -->
+                <img src="${video.thumbnail}" 
+                     alt="${this.escapeHTML(video.title)}" 
+                     class="queue-item-thumbnail"
+                     onerror="this.src='./electronic.ico';">
+                
                 <div class="queue-item-info">
                     <div class="queue-item-title">${this.escapeHTML(video.title)}</div>
                     <div class="queue-item-meta">
@@ -694,23 +722,16 @@ renderQueueContent(flatList) {
                     </div>
                 </div>
                 
-                <!-- Indicador visual si está reproduciéndose -->
-                ${isPlaying ? `
-                    <div class="queue-item-playing-indicator">
-                        <i class="fas fa-volume-up"></i>
-                    </div>
-                ` : ''}
-                
-                <!-- Botón eliminar -->
-                <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola">
+                <button class="queue-item-remove" 
+                        data-video-id="${video.videoId}" 
+                        title="Eliminar de la cola">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
         `;
     });
     
-    html += '</div>'; // Cerrar queue-items
-    
+    html += '</div>';
     return html;
 }
     /**
