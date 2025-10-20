@@ -38,6 +38,7 @@ let currentSearchQuery = '';
 let segmentosCache = {};
 let lastSeekEndTime = -1;
 let lastSeekVideoId = null;
+
 const PIPED_SPONSOR_BLOCK_URL = 'https://api.piped.private.coffee/sponsors/';
 
 // Estado del sistema unificado
@@ -2248,18 +2249,16 @@ updateCurrentPlayingIndex() {
 async function obtenerSegmentosSponsorBlock(videoId) {
     if (window.unifiedCore.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
 
-    // Asumo que 'segmentosCache' es una variable global o de clase
-    if (window.segmentosCache[videoId]) {
+    // 🚨 CORRECCIÓN CLAVE: Usamos 'segmentosCache' directamente (sin window.) y añadimos chequeo de existencia
+    if (segmentosCache && segmentosCache[videoId]) {
         if (window.unifiedCore.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
-        return window.segmentosCache[videoId];
+        return segmentosCache[videoId];
     }
     
     try {
         const categories = ["sponsor", "selfpromo", "intermission", "music_offtopic"];
-        // La URL se construye con el ID del video y las categorías codificadas en JSON.
         const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${encodeURIComponent(JSON.stringify(categories))}`;
         
-        // 🚨 AQUÍ SE USA 'await', por lo que la función DEBE ser 'async'
         const response = await fetch(fetchUrl);
 
         if (!response.ok) {
@@ -2270,7 +2269,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         
         let segments = [];
         
-        // Manejo de la Respuesta (puede ser un objeto contenedor o un array directo)
+        // Manejo de la Respuesta
         if (data.segments && Array.isArray(data.segments)) {
             segments = data.segments;
         } else if (Array.isArray(data)) {
@@ -2279,7 +2278,8 @@ async function obtenerSegmentosSponsorBlock(videoId) {
              segments = []; 
         }
 
-        window.segmentosCache[videoId] = segments; // Asumo 'segmentosCache' es accesible globalmente
+        // 🚨 CORRECCIÓN CLAVE: Asignamos usando la variable de alcance de archivo
+        segmentosCache[videoId] = segments; 
         console.log(`✅ Segmentos SponsorBlock cargados. Total: ${segments.length}`);
         return segments;
 
