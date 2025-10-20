@@ -56,18 +56,6 @@
                         <span>Biblioteca</span>
                     </button>
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">Tu Música</div>
-                        <button class="nav-item" data-view="playing">
-                        <i class="fas fa-play-circle"></i>
-                            <span>Reproduciendo</span>
-                        </button>
-                        <button class="nav-item" id="queueButton" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
-                    <i class="fas fa-list-ul"></i>
-                <span>Cola</span>
-            </button>
-                </div>
             </nav>
         </aside>
 
@@ -151,23 +139,35 @@
                 </div>
 
                 <!-- ===== PLAYING VIEW ===== -->
-                <div class="content-view" id="playingView">
-                    <!-- Video Container -->
-                    <div class="video-container" style="position: relative; width: 100%; max-width: 800px; margin: 0 auto; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden;">
-                        <div id="player1" class="video-player"></div>
-                        <div id="player2" class="video-player hidden"></div>
+                <div class="content-view full-player-view" id="fullPlayerView">
+                    <div class="main-player-wrapper">
+                    <div class="player-queue-layout">
+                <!-- Video grande a la izquierda -->
+                    <div id="fullVideoContainer" class="video-container-full">
+                    <div id="player1" class="video-player"></div>
+                    <div id="player2" class="video-player hidden"></div>
+                    <div class="now-playing-info-large">
+                    <h2 id="nowPlayingTitleFull">Selecciona una canción</h2>
+                    <p id="nowPlayingArtistFull">YT CrossMix</p>
+                </div>
+            </div>
+            
+            <!-- Cola persistente a la derecha -->
+            <div id="persistentQueue" class="persistent-queue-sidebar">
+                <div class="queue-header">
+                    <h3>Cola de reproducción</h3>
+                    <span id="queueCount" class="queue-count-badge">0</span>
+                </div>
+                <div id="queueContentList" class="queue-list-content">
+                    <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
                     </div>
-
-                    <!-- Now Playing Info -->
-                    <div style="text-align: center; margin-top: 24px;">
-                        <h2 id="nowPlayingTitle" style="font-size: 24px; margin-bottom: 8px;">Selecciona una canción</h2>
-                        <p id="nowPlayingArtist" style="color: var(--yt-text-secondary);">YT CrossMix</p>
+                    </div>
                     </div>
                 </div>
+            </div>
 
             </div>
         </main>
-
     </div>
 
     <!-- ===== BOTTOM PLAYER ===== -->
@@ -265,7 +265,9 @@
             <span>Reproduciendo</span>
         </button>
     </nav>
-
+<div id="miniPlayerContainer" class="mini-player-float hidden">
+    <!-- El reproductor se moverá aquí dinámicamente -->
+</div>
     <!-- ===== FLOATING MESSAGES ===== -->
     <div class="floating-messages" id="floatingMessageContainer"></div>
 
@@ -310,5 +312,6 @@
             });
         });
     </script>
+    
 </body>
 </html>
