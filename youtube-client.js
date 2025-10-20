@@ -114,17 +114,24 @@ class YouTubeSimplifiedClient {
      * Validar respuesta del backend
      * Ahora adaptado para la respuesta directa de Piped API
      */
-    validateResponse(data, query, continuation) {
+validateResponse(data, query, continuation) {
         console.log('📊 Validando respuesta de Piped API:', {
             source: continuation ? 'paginación' : 'primera búsqueda',
             itemsCount: data.items?.length || 0,
-            hasNextpage: !!data.nextpage,
-            backendProcessed: false 
+            hasNextpage: !!data.nextpage
         });
 
         // Verificar y procesar items
         const validItems = (data.items || []).map(item => {
-            // 🔴 CORRECCIÓN CLAVE: Intentar tomar videoId de 'videoId' o 'id'
+            // Solo procesamos elementos de tipo 'stream' (videos)
+            if (item.type !== 'stream') {
+                return null;
+            }
+            
+            // 🔴 CORRECCIÓN CLAVE: Intentar tomar videoId de varias fuentes
+            // 1. Intentar videoId (si existiera)
+            // 2. Intentar id (si existiera, en otros endpoints de Piped)
+            // 3. Extraer desde la URL (lo que hace Piped en búsqueda)
             let videoId = item.videoId || item.id;
             
             if (!videoId && item.url) {
@@ -135,22 +142,21 @@ class YouTubeSimplifiedClient {
                 }
             }
             
-            // Validación: Si después de todas las comprobaciones no hay ID, descartar.
-            if (!videoId || !item.title) {
-                console.warn('⚠️ Item sin videoId o title válido, descartado.');
-                return null;
-            }
-
-            // Validar formato videoId (11 caracteres)
-            if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-                console.warn('⚠️ VideoId con formato inválido:', videoId);
+            // Validación final
+            if (!videoId || !item.title || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+                //console.warn('⚠️ Item sin videoId o title válido, descartado.');
                 return null;
             }
 
             // Retornar item con videoId extraído
             return {
                 ...item,
-                videoId: videoId // Asegurar que videoId está presente
+                videoId: videoId, // Aseguramos que videoId está presente
+                // Aseguramos que el resto de propiedades necesarias estén
+                duration: item.duration || 0,
+                thumbnail: item.thumbnail,
+                uploaderName: item.uploaderName || 'Desconocido',
+                // Otras propiedades que uses...
             };
         }).filter(item => item !== null);
 
