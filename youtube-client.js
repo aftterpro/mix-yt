@@ -4,7 +4,7 @@ class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
         // La función de Netlify procesa los datos en el backend
-        this.netlifyFunction = '/.netlify/functions/search';
+        this.searchApiUrl = = 'https://api.piped.private.coffee';
     }
 
     async init() {
@@ -37,8 +37,8 @@ class YouTubeSimplifiedClient {
     async searchViaCorsProxy(query, continuation) {
         console.log('📡 Usando la función de Netlify (con procesamiento backend)');
         
-        let targetUrl = this.netlifyFunction;
-        const fetchOptions = {
+            let targetUrl = `${this.searchApiUrl}/search?q=${query}&filter=all`; // Ajusta la ruta si es necesario       
+            const fetchOptions = {
             headers: {    
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
