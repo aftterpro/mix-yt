@@ -638,11 +638,13 @@ setupPlayerContainerHandlers() {
                 !e.target.closest('.volume-slider') &&
                 !e.target.closest('.progress-bar')) {
                 
-                if (this.state.currentPlayingInfo.videoId) {
-                    // 🔴 CORRECCIÓN CLAVE: Cambiar a la vista 'queue'
-                    // Esto asume que la vista 'queue' es la que tiene el diseño de YT Music
+                // 🔴 CORRECCIÓN CLAVE: Verificar currentPlayingInfo
+                if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
+                    // Cambiar a la vista 'queue' (o 'fullPlayer', dependiendo del diseño)
                     this.switchView('queue');
-                    
+                } else {
+                    // Si no hay video, podríamos ir a la búsqueda o no hacer nada
+                    console.log('⚠️ No hay video reproduciéndose para abrir la vista completa.');
                 }
             }
         });
@@ -652,8 +654,10 @@ setupPlayerContainerHandlers() {
     const miniPlayer = document.getElementById('miniPlayerContainer');
     if (miniPlayer) {
         miniPlayer.addEventListener('click', () => {
-            // 🔴 CORRECCIÓN CLAVE: Cambiar a la vista 'queue'
-            this.switchView('queue');
+            // 🔴 CORRECCIÓN CLAVE: Verificar currentPlayingInfo
+            if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
+                this.switchView('queue');
+            }
         });
     }
 }
@@ -804,7 +808,8 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-    if (!this.views.includes(viewName) && viewName !== 'fullPlayer') return;
+    // Verificar si la vista es válida o si es 'fullPlayer' (que a menudo actúa como una vista)
+    if (!this.views.includes(viewName) && viewName !== 'fullPlayer' && viewName !== 'queue') return; // Añadido 'queue' por seguridad
 
     console.log(`🔄 Cambiando a vista: ${viewName}`);
 
@@ -823,7 +828,9 @@ switchView(viewName) {
 
     // Mostrar vista seleccionada
     let targetView = document.getElementById(`${viewName}View`);
-    if (!targetView && viewName === 'fullPlayer') {
+    // 🔴 Corregir caso 'queue' y 'fullPlayer' si no tienen una vista específica 'queueView'
+    if (!targetView && (viewName === 'fullPlayer' || viewName === 'queue')) {
+        // Asumimos que la lógica de 'fullPlayer' también maneja la vista 'queue'
         targetView = document.getElementById('fullPlayerView');
     }
     
@@ -833,10 +840,11 @@ switchView(viewName) {
 
     this.currentView = viewName;
 
-    // LÓGICA DE REPRODUCTOR
-    if (this.state.currentPlayingInfo.videoId) {
-        if (viewName === 'fullPlayer') {
-            // Mostrar reproductor completo
+    // 🔴 LÓGICA DE REPRODUCTOR (CORRECCIÓN CLAVE)
+    // Se verifica que this.state.currentPlayingInfo exista, NO SOLO videoId
+    if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) { 
+        if (viewName === 'fullPlayer' || viewName === 'queue') { // Añadido 'queue'
+            // Mostrar reproductor completo (y la cola al lado si el CSS lo soporta)
             this.movePlayer('full');
             this.hideMiniPlayer();
             this.updatePersistentQueue();
@@ -856,6 +864,7 @@ switchView(viewName) {
             this.focusSearchInput();
             break;
         case 'fullPlayer':
+        case 'queue': // Añadido 'queue'
             this.updatePersistentQueue();
             break;
     }
