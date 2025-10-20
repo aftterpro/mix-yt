@@ -638,13 +638,12 @@ setupPlayerContainerHandlers() {
                 !e.target.closest('.volume-slider') &&
                 !e.target.closest('.progress-bar')) {
                 
-                // 🔴 CORRECCIÓN CLAVE: Verificar currentPlayingInfo
-                if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
-                    // Cambiar a la vista 'queue' (o 'fullPlayer', dependiendo del diseño)
+                // 🔴 Corrección: Verificar this.state, currentPlayingInfo y videoId
+                if (this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
+                    // Navegar a la vista de cola/reproductor grande
                     this.switchView('queue');
                 } else {
-                    // Si no hay video, podríamos ir a la búsqueda o no hacer nada
-                    console.log('⚠️ No hay video reproduciéndose para abrir la vista completa.');
+                    console.log('⚠️ Click en reproductor: no hay video cargado.');
                 }
             }
         });
@@ -654,9 +653,11 @@ setupPlayerContainerHandlers() {
     const miniPlayer = document.getElementById('miniPlayerContainer');
     if (miniPlayer) {
         miniPlayer.addEventListener('click', () => {
-            // 🔴 CORRECCIÓN CLAVE: Verificar currentPlayingInfo
-            if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
+            // 🔴 Corrección: Verificar this.state, currentPlayingInfo y videoId
+            if (this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
                 this.switchView('queue');
+            } else {
+                console.log('⚠️ Click en mini-reproductor: no hay video cargado.');
             }
         });
     }
@@ -808,12 +809,12 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-    // Verificar si la vista es válida o si es 'fullPlayer' (que a menudo actúa como una vista)
-    if (!this.views.includes(viewName) && viewName !== 'fullPlayer' && viewName !== 'queue') return; // Añadido 'queue' por seguridad
+    // 1. Validación de vista: Incluir 'queue' ya que se usa para el player grande.
+    if (!this.views.includes(viewName) && viewName !== 'fullPlayer' && viewName !== 'queue') return;
 
     console.log(`🔄 Cambiando a vista: ${viewName}`);
 
-    // Actualizar navegación activa
+    // 2. Actualizar navegación activa
     document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
         item.classList.remove('active');
     });
@@ -821,16 +822,15 @@ switchView(viewName) {
         item.classList.add('active');
     });
 
-    // Ocultar todas las vistas
+    // 3. Ocultar todas las vistas
     document.querySelectorAll('.content-view').forEach(view => {
         view.classList.remove('active');
     });
 
-    // Mostrar vista seleccionada
+    // 4. Mostrar vista seleccionada
     let targetView = document.getElementById(`${viewName}View`);
-    // 🔴 Corregir caso 'queue' y 'fullPlayer' si no tienen una vista específica 'queueView'
+    // Fallback: si la vista es 'fullPlayer' o 'queue' y no hay un div específico, usar 'fullPlayerView'
     if (!targetView && (viewName === 'fullPlayer' || viewName === 'queue')) {
-        // Asumimos que la lógica de 'fullPlayer' también maneja la vista 'queue'
         targetView = document.getElementById('fullPlayerView');
     }
     
@@ -840,11 +840,13 @@ switchView(viewName) {
 
     this.currentView = viewName;
 
-    // 🔴 LÓGICA DE REPRODUCTOR (CORRECCIÓN CLAVE)
-    // Se verifica que this.state.currentPlayingInfo exista, NO SOLO videoId
-    if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) { 
-        if (viewName === 'fullPlayer' || viewName === 'queue') { // Añadido 'queue'
-            // Mostrar reproductor completo (y la cola al lado si el CSS lo soporta)
+    // 5. LÓGICA DE REPRODUCTOR (PROTEGIDA)
+    // 🔴 Corrección: Verificar this.state Y currentPlayingInfo antes de acceder a videoId
+    const isVideoPlaying = this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId;
+
+    if (isVideoPlaying) {
+        if (viewName === 'fullPlayer' || viewName === 'queue') {
+            // Mostrar reproductor completo (e.g., player grande con cola al lado)
             this.movePlayer('full');
             this.hideMiniPlayer();
             this.updatePersistentQueue();
@@ -855,7 +857,7 @@ switchView(viewName) {
         }
     }
 
-    // Acciones específicas por vista
+    // 6. Acciones específicas por vista
     switch (viewName) {
         case 'library':
             this.refreshLibraryView();
@@ -864,7 +866,7 @@ switchView(viewName) {
             this.focusSearchInput();
             break;
         case 'fullPlayer':
-        case 'queue': // Añadido 'queue'
+        case 'queue':
             this.updatePersistentQueue();
             break;
     }
