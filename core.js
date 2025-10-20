@@ -2243,10 +2243,10 @@ updateCurrentPlayingIndex() {
 // =============================================
 
 /**
- * Obtener segmentos SponsorBlock - CORREGIDO
+ * Obtener segmentos SponsorBlock
  */
 function obtenerSegmentosSponsorBlock(videoId) {
-if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
+    if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
 
     if (segmentosCache[videoId]) {
         if (this.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
@@ -2254,29 +2254,33 @@ if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock p
     }
     
     try {
-        // Usamos la categoría 'sponsor' por defecto para saltar intros/promociones
-        // Incluimos otras categorías comunes de molestia como selfpromo, intermission, music_offtopic
+        // Definimos las categorías que queremos saltar
         const categories = ["sponsor", "selfpromo", "intermission", "music_offtopic"];
+        
+        // La URL se construye con el ID del video y las categorías codificadas en JSON.
+        // Usando PIPED_SPONSOR_BLOCK_URL (definida arriba)
         const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${JSON.stringify(categories)}`;
         
         const response = await fetch(fetchUrl);
 
         if (!response.ok) {
+            // Manejar errores HTTP (404, 500, etc.)
             throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json(); 
         
-        // 🚨 CORRECCIÓN CLAVE: El API de Piped puede devolver un array o un objeto contenedor.
         let segments = [];
-        if (Array.isArray(data)) {
-            // Formato estándar de SponsorBlock: un array de segmentos
-            segments = data;
-        } else if (data.segments && Array.isArray(data.segments)) {
-            // Formato Piped (legacy) o el que describiste: un objeto con el campo "segments"
+        
+        // 🚨 Manejo de la Respuesta: El formato que recibes es un OBJETO con la clave "segments"
+        if (data.segments && Array.isArray(data.segments)) {
+            // Caso 1: Formato { "videoID": "...", "segments": [...] }
             segments = data.segments;
+        } else if (Array.isArray(data)) {
+            // Caso 2: Formato estándar de SponsorBlock (por si cambia)
+            segments = data;
         } else {
-             // Si el video no tiene segmentos, puede retornar un objeto vacío o null
+             // Caso 3: Video sin segmentos (retorna objeto vacío o inesperado)
              segments = []; 
         }
 
@@ -2285,12 +2289,12 @@ if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock p
         return segments;
 
     } catch (error) {
+        // Esto captura el SyntaxError: Unexpected token '<' que tenías antes.
         console.error(`❌ Error obteniendo segmentos SponsorBlock para ${videoId}:`, error);
-        // Devolver array vacío para que la reproducción continúe sin segmentos
+        // Devolver array vacío para que la reproducción no se detenga.
         return [];
     }
 }
-
 /**
  * Verificar y saltar segmentos
  */
