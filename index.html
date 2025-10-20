@@ -59,14 +59,14 @@
 
                 <div class="nav-section">
                     <div class="nav-section-title">Tu Música</div>
-                    <button class="nav-item" data-view="playing">
+                        <button class="nav-item" data-view="playing">
                         <i class="fas fa-play-circle"></i>
-                        <span>Reproduciendo</span>
-                    </button>
-                    <button class="nav-item" id="queueButton">
-                        <i class="fas fa-list-ul"></i>
-                        <span>Cola</span>
-                    </button>
+                            <span>Reproduciendo</span>
+                        </button>
+                        <button class="nav-item" id="queueButton" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
+                    <i class="fas fa-list-ul"></i>
+                <span>Cola</span>
+            </button>
                 </div>
             </nav>
         </aside>
@@ -171,7 +171,7 @@
     </div>
 
     <!-- ===== BOTTOM PLAYER ===== -->
-    <div class="bottom-player">
+  <div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
         <!-- Player Info -->
         <div class="player-info">
             <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
@@ -222,9 +222,6 @@
                     <div class="volume-fill"></div>
                 </div>
             </div>
-            <button class="control-button" id="queueButton2" title="Cola">
-                <i class="fas fa-list"></i>
-            </button>
         </div>
     </div>
 
