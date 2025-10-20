@@ -1419,50 +1419,54 @@ createSearchResultCard(video, videoId) {
         <div class="search-result-info">
             <h3 class="search-result-title" title="${safeTitle}">${safeTitle}</h3>
             <p class="search-result-author">${safeArtist}</p>
+            <div class="search-result-actions">
             <button class="search-result-add-btn" 
-                    data-video-id="${videoId}" 
-                    data-title="${safeTitle}" 
-                    data-thumbnail="${safeThumbnail}"
-                    data-duration="${video.duration || 0}"
-                    data-author="${safeArtist}">
-                <i class="fas fa-plus"></i>
-                Añadir a Cola
-            </button>
-        </div>
+            data-video-id="${videoId}" 
+            data-title="${safeTitle}" 
+            data-thumbnail="${safeThumbnail}"
+            data-duration="${video.duration || 0}"
+            data-author="${safeArtist}">
+        <i class="fas fa-plus"></i>
+        Añadir a Cola
+    </button>
+    <button class="search-result-add-next-btn" 
+            data-video-id="${videoId}" 
+            data-title="${safeTitle}" 
+            data-thumbnail="${safeThumbnail}"
+            data-duration="${video.duration || 0}"
+            data-author="${safeArtist}">
+        <i class="fas fa-forward"></i>
+        Añadir Siguiente
+    </button>
+</div>
     `;
 
-    // Event listener para el botón
-    const addBtn = card.querySelector('.search-result-add-btn');
-    addBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const btn = e.target.closest('.search-result-add-btn');
-        const btnVideoId = btn.dataset.videoId;
-        
-        if (!btnVideoId || btnVideoId === 'undefined') {
-            console.error('❌ Click handler: videoId inválido en botón');
-            this.showMessage('Error: Video inválido', 'error');
-            return;
-        }
+// Event listener para botón "Añadir Siguiente"
+const addNextBtn = card.querySelector('.search-result-add-next-btn');
+addNextBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const btn = e.target.closest('.search-result-add-next-btn');
+    const btnVideoId = btn.dataset.videoId;
+    
+    if (!btnVideoId || btnVideoId === 'undefined') {
+        console.error('❌ Click handler: videoId inválido en botón');
+        this.showMessage('Error: Video inválido', 'error');
+        return;
+    }
 
-        console.log('🎵 Añadiendo video desde búsqueda:', {
-            videoId: btnVideoId,
-            title: btn.dataset.title?.substring(0, 30)
-        });
+    const videoData = {
+        videoId: btnVideoId,
+        title: btn.dataset.title,
+        thumbnail: btn.dataset.thumbnail,
+        duration: parseInt(btn.dataset.duration) || 0,
+        uploaderName: btn.dataset.author,
+        author: btn.dataset.author
+    };
 
-        const videoData = {
-            videoId: btnVideoId,
-            title: btn.dataset.title,
-            thumbnail: btn.dataset.thumbnail,
-            duration: parseInt(btn.dataset.duration) || 0,
-            uploaderName: btn.dataset.author,
-            author: btn.dataset.author
-        };
-
-        // Añadir después del video actual
-        this.addVideoToQueueAfterCurrent(videoData);
-    });
+    this.addVideoToQueueAfterCurrent(videoData);
+});
     
     console.log('✅ Card creada exitosamente:', videoId);
     return card;
