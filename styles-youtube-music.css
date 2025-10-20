@@ -539,7 +539,7 @@ body {
 .playlists-grid,
 .search-results-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(4, 1fr); /* Forzar 4 columnas */
     gap: var(--spacing-lg);
 }
 
@@ -987,6 +987,11 @@ body {
 /* =============================================
    RESPONSIVE DESIGN
    ============================================= */
+@media (max-width: 1400px) {
+    .search-results-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
 @media (max-width: 1200px) {
     :root {
         --sidebar-width: 240px;
@@ -1039,7 +1044,9 @@ body {
         bottom: 60px; /* encima del bottom nav */
         z-index: 998;
     }
-    
+        .search-results-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
     /* Cuando hay reproducción activa, mostrar mini player */
     body.playing .mini-player {
         display: flex !important;
@@ -1091,6 +1098,9 @@ body {
     .overview-grid {
         grid-template-columns: 1fr;
         gap: var(--spacing-md);
+    }
+       .search-results-grid {
+        grid-template-columns: 1fr;
     }
 }
 
