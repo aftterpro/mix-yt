@@ -38,6 +38,7 @@ let currentSearchQuery = '';
 let segmentosCache = {};
 let lastSeekEndTime = -1;
 let lastSeekVideoId = null;
+const PIPED_SPONSOR_BLOCK_URL = 'https://api.piped.private.coffee/sponsors/';
 
 // Estado del sistema unificado
 const unifiedState = {
@@ -2245,64 +2246,49 @@ updateCurrentPlayingIndex() {
  * Obtener segmentos SponsorBlock - CORREGIDO
  */
 function obtenerSegmentosSponsorBlock(videoId) {
-    if (segmentosCache[videoId] === 'fetching') return;
-    
-    segmentosCache[videoId] = 'fetching';
-    console.log(`🔍 Obteniendo segmentos SponsorBlock para: ${videoId}`);
+if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
 
-    fetch(`/api/segments/${videoId}`, {
-        headers: { 'X-UserID': 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd' }
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        } else if (response.status === 404) {
-            // 404 es normal, significa que no hay segmentos
-            return [];
-        } else {
-            throw new Error(`HTTP ${response.status}`);
+    if (segmentosCache[videoId]) {
+        if (this.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
+        return segmentosCache[videoId];
+    }
+    
+    try {
+        // Usamos la categoría 'sponsor' por defecto para saltar intros/promociones
+        // Incluimos otras categorías comunes de molestia como selfpromo, intermission, music_offtopic
+        const categories = ["sponsor", "selfpromo", "intermission", "music_offtopic"];
+        const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${JSON.stringify(categories)}`;
+        
+        const response = await fetch(fetchUrl);
+
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
         }
-    })
-    .then(segments => {
-        // VALIDACIÓN CRÍTICA: Asegurar que segments es un array válido
-        if (Array.isArray(segments)) {
-            // Filtrar solo segmentos válidos
-            const validSegments = segments.filter(seg => {
-                // Validar estructura del segmento
-                if (!seg || typeof seg !== 'object') return false;
-                
-                // Debe tener segment array o startTime/endTime
-                const hasSegmentArray = Array.isArray(seg.segment) && seg.segment.length >= 2;
-                const hasTimeProps = typeof seg.startTime === 'number' && typeof seg.endTime === 'number';
-                
-                if (!hasSegmentArray && !hasTimeProps) return false;
-                
-                // Debe tener categoría
-                if (!seg.category) return false;
-                
-                return true;
-            });
-            
-            segmentosCache[videoId] = validSegments;
-            
-            if (validSegments.length > 0) {
-                console.log(`✅ ${validSegments.length} segmentos SponsorBlock válidos para ${videoId}`);
-                
-                // Log de categorías encontradas
-                const categories = validSegments.map(s => s.category);
-                console.log(`📊 Categorías: ${[...new Set(categories)].join(', ')}`);
-            } else {
-                console.log(`ℹ️ No hay segmentos válidos para ${videoId}`);
-            }
+        
+        const data = await response.json(); 
+        
+        // 🚨 CORRECCIÓN CLAVE: El API de Piped puede devolver un array o un objeto contenedor.
+        let segments = [];
+        if (Array.isArray(data)) {
+            // Formato estándar de SponsorBlock: un array de segmentos
+            segments = data;
+        } else if (data.segments && Array.isArray(data.segments)) {
+            // Formato Piped (legacy) o el que describiste: un objeto con el campo "segments"
+            segments = data.segments;
         } else {
-            console.warn(`⚠️ Respuesta inválida para ${videoId}:`, segments);
-            segmentosCache[videoId] = [];
+             // Si el video no tiene segmentos, puede retornar un objeto vacío o null
+             segments = []; 
         }
-    })
-    .catch(error => {
-        console.error("❌ Error obteniendo segmentos SponsorBlock:", error);
-        segmentosCache[videoId] = [];
-    });
+
+        segmentosCache[videoId] = segments;
+        console.log(`✅ Segmentos SponsorBlock cargados. Total: ${segments.length}`);
+        return segments;
+
+    } catch (error) {
+        console.error(`❌ Error obteniendo segmentos SponsorBlock para ${videoId}:`, error);
+        // Devolver array vacío para que la reproducción continúe sin segmentos
+        return [];
+    }
 }
 
 /**
