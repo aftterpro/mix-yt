@@ -579,27 +579,26 @@ showQueuePopup() {
      * Actualizar contenido del popup de cola
      */
 updateQueuePopup() {
+    // Actualizar popup (código existente)
     const popupContent = document.getElementById('queuePopupContent');
-    if (!popupContent) return;
-
-    console.log('🔄 Actualizando popup de cola...');
-
-    const flatList = this.core?.getFlattenedPlaylist() || [];
-    popupContent.innerHTML = this.renderQueueContent(flatList);
-    
-    console.log(`📊 Cola actualizada: ${flatList.length} videos`);
-    
-    // ✅ RECONFIGURAR LISTENERS Y SINCRONIZAR
-    setTimeout(() => {
-        this.setupQueueItemListeners();
+    if (popupContent) {
+        const flatList = this.core?.getFlattenedPlaylist() || [];
+        popupContent.innerHTML = this.renderQueueContent(flatList);
         
-        // ✅ SINCRONIZAR INDICADOR
-        this.syncQueueIndicator();
-        
-        if (window.queueDragDrop) {
-            window.queueDragDrop.attachDragListeners();
-        }
-    }, 50);
+        setTimeout(() => {
+            this.setupQueueItemListeners();
+            this.syncQueueIndicator();
+            
+            if (window.queueDragDrop) {
+                window.queueDragDrop.attachDragListeners();
+            }
+        }, 50);
+    }
+    
+    // NUEVO: Actualizar cola persistente
+    if (this.core && this.core.updatePersistentQueue) {
+        this.core.updatePersistentQueue();
+    }
 }
     /**
  * Sincronizar cola después de cambio de video
