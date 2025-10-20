@@ -1420,16 +1420,7 @@ createSearchResultCard(video, videoId) {
             <h3 class="search-result-title" title="${safeTitle}">${safeTitle}</h3>
             <p class="search-result-author">${safeArtist}</p>
             <div class="search-result-actions">
-         <!-- ` <button class="search-result-add-btn" 
-            data-video-id="${videoId}" 
-            data-title="${safeTitle}" 
-            data-thumbnail="${safeThumbnail}"
-            data-duration="${video.duration || 0}"
-            data-author="${safeArtist}">
-        <i class="fas fa-plus"></i>
-        Añadir a Cola
-    </button> 
-            ` -->
+
     <button class="search-result-add-next-btn" 
             data-video-id="${videoId}" 
             data-title="${safeTitle}" 
