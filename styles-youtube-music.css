@@ -535,13 +535,10 @@ body {
 }
 /* ==== RESULTADOS DE BÚSQUEDA ==== */
 .search-results-grid {
-  display: grid;
-grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
   gap: 20px;
-
-  padding: 16px 24px;
   box-sizing: border-box;
-  justify-content: center;
   align-items: start;
 }
 
@@ -1120,7 +1117,7 @@ grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         z-index: 998;
     }
         .search-results-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     }
     /* Cuando hay reproducción activa, mostrar mini player */
     body.playing .mini-player {
@@ -1175,7 +1172,7 @@ grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: var(--spacing-md);
     }
        .search-results-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     }
 }
 
