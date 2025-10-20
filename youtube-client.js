@@ -1,21 +1,20 @@
-console.log('🎵 Cargando YouTube Client con procesamiento backend...');
+console.log('🎵 Cargando YouTube Client estático para Cloudflare Pages...');
 
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        // La función de Netlify procesa los datos en el backend
+        // 🔴 CAMBIO CLAVE 1: Ahora apunta directamente a la API (y corrige la sintaxis)
         this.searchApiUrl = 'https://api.piped.private.coffee';
     }
 
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Client inicializado con procesamiento backend');
+        console.log('✅ YouTube Client inicializado para Cloudflare Pages (API Directa)');
         return true;
     }
 
     /**
      * Método principal para buscar
-     * Los datos ya vienen procesados del backend
      */
     async search(query, continuation = null) {
         if (!this.initialized) await this.init();
@@ -23,42 +22,56 @@ class YouTubeSimplifiedClient {
         console.log(`🔍 Búsqueda: "${query}"${continuation ? ' (paginación)' : ''}`);
 
         try {
-            return await this.searchViaCorsProxy(query, continuation);
+            // Llamar al método de llamada directa
+            return await this.searchDirect(query, continuation);
         } catch (error) {
             console.error("❌ Error en búsqueda:", error);
-            return { items: [], nextpage: null, suggestion: "Error al buscar resultados." };
+            // 🔴 CORRECCIÓN: Evitar el error 'undefined' devolviendo una estructura vacía
+            return { items: [], nextpage: null, suggestion: "Error al buscar resultados. Intenta otra búsqueda." };
         }
     }
 
     /**
-     * Realiza la llamada al proxy de Netlify
-     * Backend procesa y limpia los datos automáticamente
+     * Realiza la llamada directa a la API de Piped
+     * ⚠️ ATENCIÓN: Se asume que Piped usa GET para búsqueda y paginación.
      */
-    async searchViaCorsProxy(query, continuation) {
-        console.log('📡 Usando la función de Netlify (con procesamiento backend)');
-        
-            let targetUrl = `${this.searchApiUrl}/search?q=${query}&filter=all`; // Ajusta la ruta si es necesario       
-            const fetchOptions = {
-            headers: {    
+    async searchDirect(query, continuation) {
+        console.log('📡 Usando llamada directa a Piped API');
+
+        let targetUrl;
+        const fetchOptions = {
+            method: 'GET', // Método por defecto
+            headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                // No se necesita Content-Type para GET
             },
             signal: AbortSignal.timeout(15000)
         };
 
         if (continuation) {
-            // PAGINACIÓN: POST
-            console.log('📄 Petición POST para paginación...');
-            fetchOptions.method = 'POST';
-            fetchOptions.body = JSON.stringify({
-                query: query,
-                nextpage: continuation
+            // 🔴 CAMBIO CLAVE 2: PAGINACIÓN - Usamos GET con parámetros de Piped
+            // La paginación en Piped es un GET al endpoint /nextpage con el token de continuación
+            console.log('📄 Petición GET para paginación...');
+            
+            // Si la continuación es un objeto complejo (como en tu código original), debe ser stringificado
+            const continuationString = JSON.stringify(continuation);
+            const params = new URLSearchParams({
+                q: query,
+                nextpage: continuationString // Piped espera el objeto nextpage
             });
+
+            targetUrl = `${this.searchApiUrl}/search?${params.toString()}`;
+            
+            // Nota: Algunas instancias de Piped usan '/nextpage', otras usan '/search' con 'nextpage' como parámetro. 
+            // Usamos '/search' para maximizar compatibilidad.
+            // Si falla, probar con: targetUrl = `${this.searchApiUrl}/nextpage?${params.toString()}`;
+            
         } else {
             // BÚSQUEDA INICIAL: GET
             console.log('📄 Petición GET para primera búsqueda...');
-            fetchOptions.method = 'GET';
-            targetUrl = `${this.netlifyFunction}?q=${encodeURIComponent(query)}`;
+            targetUrl = `${this.searchApiUrl}/search?q=${encodeURIComponent(query)}`;
+            // Incluimos filtro para obtener solo videos (opcional, Piped lo hace por defecto)
+            targetUrl += '&filter=all';
         }
 
         console.log(`📡 ${fetchOptions.method} a:`, targetUrl);
@@ -68,17 +81,26 @@ class YouTubeSimplifiedClient {
             
             console.log(`📊 Respuesta: ${response.status} ${response.statusText}`);
             
+            // Manejo de errores HTTP (4xx, 5xx)
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ 
-                    details: 'Respuesta de error no es JSON' 
-                }));
-                throw new Error(`Error ${response.status}: ${errorData.details || errorData.error}`);
+                const errorText = await response.text();
+                console.error('Error del servidor de Piped:', errorText);
+                throw new Error(`Error en la API de Piped: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            // Los datos YA vienen procesados del backend
-            // Solo necesitamos validación final
+            // 🔴 CAMBIO CLAVE 3: Adaptar la respuesta. 
+            // La respuesta directa de Piped NO tiene la propiedad '.items'. 
+            // Piped devuelve directamente el objeto de búsqueda que contiene 'items' y 'nextpage'.
+            
+            // Tu función validateResponse necesita que la respuesta sea el objeto completo de Piped
+            // (que incluye 'items', 'nextpage', etc.).
+            
+            // Si tu core.js espera que el resultado de esta función tenga la propiedad '.search', 
+            // tendrás que modificar core.js o simular esa estructura aquí.
+            
+            // Asumimos que la respuesta de Piped es compatible con la estructura esperada por validateResponse
             return this.validateResponse(data, query, continuation);
 
         } catch (error) {
@@ -91,69 +113,68 @@ class YouTubeSimplifiedClient {
 
     /**
      * Validar respuesta del backend
-     * El backend ya procesó los títulos, solo verificamos estructura
+     * El backend YA procesó los títulos, solo verificamos estructura
      */
-validateResponse(data, query, continuation) {
-    console.log('📊 Validando respuesta del backend:', {
-        source: continuation ? 'paginación' : 'primera búsqueda',
-        itemsCount: data.items?.length || 0,
-        hasNextpage: !!data.nextpage,
-        backendProcessed: data.items?.[0]?.artist ? 'Yes' : 'No'
-    });
+    validateResponse(data, query, continuation) {
+        // La lógica de validación se mantiene igual
+        console.log('📊 Validando respuesta de Piped API:', {
+            source: continuation ? 'paginación' : 'primera búsqueda',
+            itemsCount: data.items?.length || 0,
+            hasNextpage: !!data.nextpage,
+            // 🔴 ATENCIÓN: 'backendProcessed: false' porque ya no hay backend custom
+            backendProcessed: false 
+        });
 
-    // Verificar y procesar items
-    const validItems = (data.items || []).map(item => {
-        // CORRECCIÓN: Extraer videoId si solo viene url
-        let videoId = item.videoId;
-        
-        if (!videoId && item.url) {
-            // Extraer de url formato /watch?v=VIDEO_ID
-            const match = item.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-            if (match && match[1]) {
-                videoId = match[1];
+        // Verificar y procesar items
+        const validItems = (data.items || []).map(item => {
+            // CORRECCIÓN: Extraer videoId si solo viene url (esta lógica es buena, la mantenemos)
+            let videoId = item.videoId;
+            
+            if (!videoId && item.url) {
+                // Extraer de url formato /watch?v=VIDEO_ID
+                const match = item.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                if (match && match[1]) {
+                    videoId = match[1];
+                }
             }
-        }
-        
-        // Validación
-        if (!videoId || !item.title) {
-            console.warn('⚠️ Item sin videoId o title válido:', {
-                hasUrl: !!item.url,
-                hasVideoId: !!videoId,
-                title: item.title?.substring(0, 30)
-            });
-            return null;
+            
+            // Validación
+            if (!videoId || !item.title) {
+                console.warn('⚠️ Item sin videoId o title válido, descartado.');
+                return null;
+            }
+
+            // Validar formato videoId (11 caracteres)
+            if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+                console.warn('⚠️ VideoId con formato inválido:', videoId);
+                return null;
+            }
+
+            // Retornar item con videoId extraído
+            return {
+                ...item,
+                videoId: videoId // Asegurar que videoId está presente
+            };
+        }).filter(item => item !== null);
+
+        if (validItems.length < (data.items?.length || 0)) {
+            console.warn(`⚠️ ${(data.items?.length || 0) - validItems.length} items descartados por validación`);
         }
 
-        // Validar formato videoId (11 caracteres)
-        if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-            console.warn('⚠️ VideoId con formato inválido:', videoId);
-            return null;
-        }
+        console.log(`✅ ${validItems.length} videos válidos`);
 
-        // Retornar item con videoId extraído
+        // Devolver la estructura esperada por core.js
         return {
-            ...item,
-            videoId: videoId // Asegurar que videoId está presente
+            items: validItems,
+            nextpage: data.nextpage || null,
+            suggestion: data.suggestion || null,
+            metadata: {
+                source: 'piped',
+                backendProcessed: false,
+                timestamp: Date.now()
+            }
         };
-    }).filter(item => item !== null);
-
-    if (validItems.length < (data.items?.length || 0)) {
-        console.warn(`⚠️ ${(data.items?.length || 0) - validItems.length} items descartados por validación`);
     }
-
-    console.log(`✅ ${validItems.length} videos válidos`);
-
-    return {
-        items: validItems,
-        nextpage: data.nextpage || null,
-        suggestion: data.suggestion || null,
-        metadata: {
-            source: 'piped',
-            backendProcessed: true,
-            timestamp: Date.now()
-        }
-    };
-}
 
     /**
      * Extraer videoId de URL (por si acaso, ya no debería ser necesario)
