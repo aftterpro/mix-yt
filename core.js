@@ -2245,26 +2245,24 @@ updateCurrentPlayingIndex() {
 /**
  * Obtener segmentos SponsorBlock
  */
-function obtenerSegmentosSponsorBlock(videoId) {
-    if (this.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
+async function obtenerSegmentosSponsorBlock(videoId) {
+    if (window.unifiedCore.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
 
-    if (segmentosCache[videoId]) {
-        if (this.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
-        return segmentosCache[videoId];
+    // Asumo que 'segmentosCache' es una variable global o de clase
+    if (window.segmentosCache[videoId]) {
+        if (window.unifiedCore.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
+        return window.segmentosCache[videoId];
     }
     
     try {
-        // Definimos las categorías que queremos saltar
         const categories = ["sponsor", "selfpromo", "intermission", "music_offtopic"];
-        
         // La URL se construye con el ID del video y las categorías codificadas en JSON.
-        // Usando PIPED_SPONSOR_BLOCK_URL (definida arriba)
-        const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${JSON.stringify(categories)}`;
+        const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${encodeURIComponent(JSON.stringify(categories))}`;
         
+        // 🚨 AQUÍ SE USA 'await', por lo que la función DEBE ser 'async'
         const response = await fetch(fetchUrl);
 
         if (!response.ok) {
-            // Manejar errores HTTP (404, 500, etc.)
             throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
         }
         
@@ -2272,26 +2270,21 @@ function obtenerSegmentosSponsorBlock(videoId) {
         
         let segments = [];
         
-        // 🚨 Manejo de la Respuesta: El formato que recibes es un OBJETO con la clave "segments"
+        // Manejo de la Respuesta (puede ser un objeto contenedor o un array directo)
         if (data.segments && Array.isArray(data.segments)) {
-            // Caso 1: Formato { "videoID": "...", "segments": [...] }
             segments = data.segments;
         } else if (Array.isArray(data)) {
-            // Caso 2: Formato estándar de SponsorBlock (por si cambia)
             segments = data;
         } else {
-             // Caso 3: Video sin segmentos (retorna objeto vacío o inesperado)
              segments = []; 
         }
 
-        segmentosCache[videoId] = segments;
+        window.segmentosCache[videoId] = segments; // Asumo 'segmentosCache' es accesible globalmente
         console.log(`✅ Segmentos SponsorBlock cargados. Total: ${segments.length}`);
         return segments;
 
     } catch (error) {
-        // Esto captura el SyntaxError: Unexpected token '<' que tenías antes.
         console.error(`❌ Error obteniendo segmentos SponsorBlock para ${videoId}:`, error);
-        // Devolver array vacío para que la reproducción no se detenga.
         return [];
     }
 }
