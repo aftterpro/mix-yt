@@ -110,25 +110,22 @@ class YouTubeSimplifiedClient {
             throw error;
         }
     }
-
     /**
      * Validar respuesta del backend
-     * El backend YA procesó los títulos, solo verificamos estructura
+     * Ahora adaptado para la respuesta directa de Piped API
      */
     validateResponse(data, query, continuation) {
-        // La lógica de validación se mantiene igual
         console.log('📊 Validando respuesta de Piped API:', {
             source: continuation ? 'paginación' : 'primera búsqueda',
             itemsCount: data.items?.length || 0,
             hasNextpage: !!data.nextpage,
-            // 🔴 ATENCIÓN: 'backendProcessed: false' porque ya no hay backend custom
             backendProcessed: false 
         });
 
         // Verificar y procesar items
         const validItems = (data.items || []).map(item => {
-            // CORRECCIÓN: Extraer videoId si solo viene url (esta lógica es buena, la mantenemos)
-            let videoId = item.videoId;
+            // 🔴 CORRECCIÓN CLAVE: Intentar tomar videoId de 'videoId' o 'id'
+            let videoId = item.videoId || item.id;
             
             if (!videoId && item.url) {
                 // Extraer de url formato /watch?v=VIDEO_ID
@@ -138,7 +135,7 @@ class YouTubeSimplifiedClient {
                 }
             }
             
-            // Validación
+            // Validación: Si después de todas las comprobaciones no hay ID, descartar.
             if (!videoId || !item.title) {
                 console.warn('⚠️ Item sin videoId o title válido, descartado.');
                 return null;
@@ -163,7 +160,6 @@ class YouTubeSimplifiedClient {
 
         console.log(`✅ ${validItems.length} videos válidos`);
 
-        // Devolver la estructura esperada por core.js
         return {
             items: validItems,
             nextpage: data.nextpage || null,
@@ -175,7 +171,6 @@ class YouTubeSimplifiedClient {
             }
         };
     }
-
     /**
      * Extraer videoId de URL (por si acaso, ya no debería ser necesario)
      * @deprecated - El backend ya proporciona videoId limpio
