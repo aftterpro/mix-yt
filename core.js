@@ -173,7 +173,7 @@ function loadPlaylistsDataPersistent() {
     }
 }
 class UnifiedCore {
-    constructor() {
+    constructor(config) {
         this.state = unifiedState;
         this.views = ['home', 'search', 'library', 'playing'];
         this.currentView = 'home';
@@ -181,6 +181,7 @@ class UnifiedCore {
         this.init();
         this.setupAutomaticSaving();
         this.playlistsData = playlistsData;
+        this.setupPlayerContainerHandlers();
     }
 
 setupAutomaticSaving() {
@@ -619,47 +620,243 @@ updatePlaylistsUI() {
         }
     }
     // =============================================
+// GESTIÓN DE CONTENEDORES DE REPRODUCTOR
+// =============================================
+
+/**
+ * Configurar handlers para cambio de contenedor
+ */
+setupPlayerContainerHandlers() {
+    console.log('🎬 Configurando handlers de contenedores');
+    
+    // Click en bottom-player para abrir vista completa
+    const bottomPlayer = document.querySelector('.bottom-player');
+    if (bottomPlayer) {
+        // Prevenir que los botones internos activen el click
+        bottomPlayer.addEventListener('click', (e) => {
+            // Solo activar si NO se clickeó en un botón de control
+            if (!e.target.closest('.control-button') && 
+                !e.target.closest('.volume-slider') &&
+                !e.target.closest('.progress-bar')) {
+                
+                if (this.state.currentPlayingInfo.videoId) {
+                    this.showFullPlayer();
+                }
+            }
+        });
+    }
+    
+    // Click en mini-player para abrir vista completa
+    const miniPlayer = document.getElementById('miniPlayerContainer');
+    if (miniPlayer) {
+        miniPlayer.addEventListener('click', () => {
+            this.showFullPlayer();
+        });
+    }
+}
+
+/**
+ * Mostrar reproductor en vista completa
+ */
+showFullPlayer() {
+    console.log('🎬 Mostrando reproductor completo');
+    
+    // Cambiar a vista fullPlayer
+    this.switchView('fullPlayer');
+    
+    // Mover reproductor al contenedor completo
+    this.movePlayer('full');
+    
+    // Ocultar mini-player
+    this.hideMiniPlayer();
+    
+    // Actualizar cola persistente
+    this.updatePersistentQueue();
+}
+
+/**
+ * Mover reproductor entre contenedores
+ */
+movePlayer(target) {
+    const activePlayerId = currentPlayer === 1 ? 'player1' : 'player2';
+    const activePlayerElement = document.getElementById(activePlayerId);
+
+    if (!activePlayerElement) {
+        console.warn('❌ Jugador activo no encontrado');
+        return;
+    }
+
+    let targetContainer;
+    if (target === 'full') {
+        targetContainer = document.getElementById('fullVideoContainer');
+    } else if (target === 'mini') {
+        targetContainer = document.getElementById('miniPlayerContainer');
+    }
+
+    if (targetContainer) {
+        targetContainer.appendChild(activePlayerElement);
+        
+        // Asegurar dimensiones correctas
+        activePlayerElement.style.width = '100%';
+        activePlayerElement.style.height = '100%';
+        activePlayerElement.style.position = 'absolute';
+        activePlayerElement.style.top = '0';
+        activePlayerElement.style.left = '0';
+        
+        console.log(`🎬 Jugador movido a: ${target}`);
+    }
+}
+
+/**
+ * Mostrar mini-player
+ */
+showMiniPlayer() {
+    const miniPlayer = document.getElementById('miniPlayerContainer');
+    if (miniPlayer) {
+        miniPlayer.classList.remove('hidden');
+        console.log('🎬 Mini-player visible');
+    }
+}
+
+/**
+ * Ocultar mini-player
+ */
+hideMiniPlayer() {
+    const miniPlayer = document.getElementById('miniPlayerContainer');
+    if (miniPlayer) {
+        miniPlayer.classList.add('hidden');
+        console.log('🎬 Mini-player oculto');
+    }
+}
+
+/**
+ * Actualizar cola persistente
+ */
+updatePersistentQueue() {
+    if (!window.playlistManager) return;
+    
+    const queueContentList = document.getElementById('queueContentList');
+    if (!queueContentList) return;
+
+    const flatList = this.getFlattenedPlaylist();
+    
+    if (flatList.length === 0) {
+        queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>';
+        this.updateQueueCount(0);
+        return;
+    }
+
+    const html = flatList.map((video, index) => {
+        const isPlaying = this.state.currentPlayingInfo.flattenedIndex === index;
+        const activeClass = isPlaying ? ' playing' : '';
+        
+        return `
+            <div class="queue-item${activeClass}" 
+                 data-video-id="${video.videoId}" 
+                 data-flat-index="${index}"
+                 onclick="window.unifiedCore.playVideoAtIndex(${index})">
+                
+                <div class="queue-item-number">
+                    ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
+                </div>
+                
+                <img src="${video.thumbnail}" 
+                     alt="${this.escapeHTML(video.title)}" 
+                     class="queue-item-thumbnail"
+                     onerror="this.src='./electronic.ico';">
+                
+                <div class="queue-item-info">
+                    <div class="queue-item-title">${this.escapeHTML(video.title)}</div>
+                    <div class="queue-item-meta">
+                        <span class="queue-item-duration">${this.formatDuration(video.duration)}</span>
+                        ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
+                    </div>
+                </div>
+                
+                <button class="queue-item-remove" 
+                        onclick="event.stopPropagation(); window.playlistManager.removeVideoFromQueue('${video.videoId}')"
+                        title="Eliminar de la cola">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    queueContentList.innerHTML = html;
+    this.updateQueueCount(flatList.length);
+    
+    console.log(`✅ Cola persistente actualizada: ${flatList.length} videos`);
+}
+
+/**
+ * Actualizar contador de cola
+ */
+updateQueueCount(count) {
+    const queueCountBadge = document.getElementById('queueCount');
+    if (queueCountBadge) {
+        queueCountBadge.textContent = count;
+    }
+}
+    // =============================================
     // GESTIÓN DE VISTAS
     // =============================================
-    switchView(viewName) {
-        if (!this.views.includes(viewName)) return;
+switchView(viewName) {
+    if (!this.views.includes(viewName) && viewName !== 'fullPlayer') return;
 
-        console.log(`🔄 Cambiando a vista: ${viewName}`);
+    console.log(`🔄 Cambiando a vista: ${viewName}`);
 
-        // Actualizar navegación activa (tanto desktop como móvil)
-        document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelectorAll(`[data-view="${viewName}"]`).forEach(item => {
-            item.classList.add('active');
-        });
+    // Actualizar navegación activa
+    document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
+        item.classList.remove('active');
+    });
+    document.querySelectorAll(`[data-view="${viewName}"]`).forEach(item => {
+        item.classList.add('active');
+    });
 
-        // Ocultar todas las vistas
-        document.querySelectorAll('.content-view').forEach(view => {
-            view.classList.remove('active');
-        });
+    // Ocultar todas las vistas
+    document.querySelectorAll('.content-view').forEach(view => {
+        view.classList.remove('active');
+    });
 
-        // Mostrar vista seleccionada
-        const targetView = document.getElementById(`${viewName}View`);
-        if (targetView) {
-            targetView.classList.add('active');
-        }
+    // Mostrar vista seleccionada
+    let targetView = document.getElementById(`${viewName}View`);
+    if (!targetView && viewName === 'fullPlayer') {
+        targetView = document.getElementById('fullPlayerView');
+    }
+    
+    if (targetView) {
+        targetView.classList.add('active');
+    }
 
-        this.currentView = viewName;
+    this.currentView = viewName;
 
-        // Acciones específicas por vista
-        switch (viewName) {
-            case 'library':
-                this.refreshLibraryView();
-                break;
-            case 'search':
-                this.focusSearchInput();
-                break;
-            case 'playing':
-                this.refreshPlayingView();
-                break;
+    // LÓGICA DE REPRODUCTOR
+    if (this.state.currentPlayingInfo.videoId) {
+        if (viewName === 'fullPlayer') {
+            // Mostrar reproductor completo
+            this.movePlayer('full');
+            this.hideMiniPlayer();
+            this.updatePersistentQueue();
+        } else if (viewName === 'search' || viewName === 'home' || viewName === 'library') {
+            // Minimizar reproductor
+            this.movePlayer('mini');
+            this.showMiniPlayer();
         }
     }
+
+    // Acciones específicas por vista
+    switch (viewName) {
+        case 'library':
+            this.refreshLibraryView();
+            break;
+        case 'search':
+            this.focusSearchInput();
+            break;
+        case 'fullPlayer':
+            this.updatePersistentQueue();
+            break;
+    }
+}
 
     refreshLibraryView() {
         this.updatePlaylistsUI();
