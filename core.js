@@ -785,7 +785,7 @@ async playNextVideo() {
     const now = Date.now();
     
     // ✅ DEBOUNCE CRÍTICO: 500ms entre llamadas
-    if (now - lastCrossfadeTime < 500) {
+    if (now - lastCrossfadeTime < 1000) {
         console.log('🔒 Ignorando llamada duplicada (debounce)');
         return;
     }
@@ -2286,10 +2286,11 @@ function monitorPlayers() {
         }
 
         // ✅ CRITICAL: VERIFICAR CONDICIONES ANTES DE DISPARAR
-        if (currentTime >= triggerTime && 
-            !hasOutroCrossfadeStarted && 
-            !isTransitioning && 
-            !crossfadeInProgress) {
+    if (currentTime >= triggerTime && 
+        !hasOutroCrossfadeStarted && 
+        !isTransitioning && 
+        !crossfadeInProgress &&
+        !nextVideoScheduled) { 
             
             console.log(`🚀 ¡CROSSFADE TRIGGER!`, {
                 currentTime: Math.round(currentTime * 10) / 10,
@@ -2298,7 +2299,8 @@ function monitorPlayers() {
             });
             
             hasOutroCrossfadeStarted = true;
-            
+            nextVideoScheduled = true; 
+        
             if (window.applyCrossfadeVisualEffect) {
                 window.applyCrossfadeVisualEffect();
             }
@@ -2319,16 +2321,6 @@ function monitorPlayers() {
             }
             
             return;
-        }
-        
-        // ✅ FALLBACK: Video terminó sin crossfade
-        if (timeRemaining <= 0.5 && !hasOutroCrossfadeStarted && reproduccionIniciada) {
-            console.warn(`⚠️ FALLBACK: Video terminó sin crossfade`);
-            hasOutroCrossfadeStarted = true;
-            
-            if (window.unifiedCore) {
-                window.unifiedCore.playNextVideo();
-            }
         }
         
     } catch (error) {
