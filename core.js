@@ -622,14 +622,13 @@ updatePlaylistsUI() {
     // =============================================
 // GESTIÓN DE CONTENEDORES DE REPRODUCTOR
 // =============================================
-
 /**
  * Configurar handlers para cambio de contenedor
  */
 setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de contenedores');
     
-    // Click en bottom-player para abrir vista completa
+    // Click en bottom-player para abrir vista completa (REPRODUCTOR + COLA)
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
         // Prevenir que los botones internos activen el click
@@ -640,7 +639,10 @@ setupPlayerContainerHandlers() {
                 !e.target.closest('.progress-bar')) {
                 
                 if (this.state.currentPlayingInfo.videoId) {
-                    this.showFullPlayer();
+                    // 🔴 CORRECCIÓN CLAVE: Cambiar a la vista 'queue'
+                    // Esto asume que la vista 'queue' es la que tiene el diseño de YT Music
+                    this.switchView('queue');
+                    
                 }
             }
         });
@@ -650,7 +652,8 @@ setupPlayerContainerHandlers() {
     const miniPlayer = document.getElementById('miniPlayerContainer');
     if (miniPlayer) {
         miniPlayer.addEventListener('click', () => {
-            this.showFullPlayer();
+            // 🔴 CORRECCIÓN CLAVE: Cambiar a la vista 'queue'
+            this.switchView('queue');
         });
     }
 }
