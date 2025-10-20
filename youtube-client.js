@@ -4,7 +4,7 @@ class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
         // La función de Netlify procesa los datos en el backend
-        this.searchApiUrl = = 'https://api.piped.private.coffee';
+        this.searchApiUrl = 'https://api.piped.private.coffee';
     }
 
     async init() {
