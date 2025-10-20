@@ -536,9 +536,9 @@ body {
 /* ==== RESULTADOS DE BÚSQUEDA ==== */
 .search-results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
   gap: 20px;
-  width: 100%;
+
   padding: 16px 24px;
   box-sizing: border-box;
   justify-content: center;
@@ -608,8 +608,7 @@ body {
 
 /* Grid Cards */
 .cards-grid,
-.playlists-grid,
-.search-results-grid {
+.playlists-grid{
     display: grid;
     grid-template-columns: repeat(4, 1fr); /* Forzar 4 columnas */
     gap: var(--spacing-lg);
@@ -1068,11 +1067,6 @@ body {
 /* =============================================
    RESPONSIVE DESIGN
    ============================================= */
-@media (max-width: 1400px) {
-    .search-results-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
 @media (max-width: 1200px) {
     :root {
         --sidebar-width: 240px;
