@@ -208,6 +208,122 @@ function handleAuthResult(accessToken) {
     loadUserPlaylistsAndStore();
 }
 
+function signIn() {
+    console.log('🔐 Iniciando sign in...');
+    console.log('Estados:', { gapiReady, gisReady, tokenClient: !!tokenClient });
+    
+    if (!gapiReady) {
+        console.error('❌ GAPI no está cargado');
+        showError('Google API no disponible');
+        return;
+    }
+    
+    if (!gisReady || !tokenClient) {
+        console.error('❌ GIS no está listo');
+        showError('Sistema de autenticación no listo');
+        return;
+    }
+
+    console.log('🚀 Solicitando token...');
+    
+    if (window.unifiedCore) {
+        window.unifiedCore.showMessage('Abriendo ventana de Google...', 'info');
+    }
+    
+    try {
+        // Esto DEBERÍA abrir el popup de Google
+        tokenClient.requestAccessToken({ 
+            prompt: 'consent' 
+        });
+        console.log('🚀 Token solicitado, esperando popup...');
+    } catch (error) {
+        console.error('❌ Error solicitando token:', error);
+        showError('Error solicitando autorización: ' + error.message);
+    }
+}
+
+// Exponer globalmente
+window.signIn = signIn;
+
+function updateAuthUI() {
+    const signInBtn = document.getElementById('googleSignInButton');
+    const signOutBtn = document.getElementById('googleSignOutButton');
+    
+    // ✅ AGREGAR BOTÓN MÓVIL
+    const mobileSignInBtn = document.getElementById('mobileSignInButton');
+    
+    if (!signInBtn || !signOutBtn) {
+        console.warn('⚠️ Botones desktop no encontrados, reintentando...');
+        setTimeout(updateAuthUI, 1000);
+        return;
+    }
+    
+    // Limpiar listeners anteriores
+    signInBtn.onclick = null;
+    signOutBtn.onclick = null;
+    signInBtn.removeAttribute('disabled');
+    
+    if (isAuthorized) {
+        // Usuario YA autenticado
+        signInBtn.classList.add('hidden');
+        signOutBtn.classList.remove('hidden');
+        signOutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i><span> Cerrar Sesión</span>';
+        signOutBtn.onclick = signOut;
+        
+        // NUEVO: Mostrar información de persistencia
+        const storedToken = localStorage.getItem(PERSISTENCE_CONFIG.STORAGE_KEYS.TOKEN);
+        if (storedToken) {
+            try {
+                const tokenData = JSON.parse(storedToken);
+                const daysRemaining = Math.ceil((tokenData.custom_expiry - Date.now()) / (24 * 60 * 60 * 1000));
+                signOutBtn.title = `Conectado por ${daysRemaining} días más`;
+            } catch (e) {
+                signOutBtn.title = 'Conectado';
+            }
+        }
+        
+    } else if (gapiReady && gisReady && tokenClient) {
+        // TODO listo para autenticar
+        signInBtn.classList.remove('hidden');
+        signOutBtn.classList.add('hidden');
+        signInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
+        signInBtn.disabled = false;
+        signInBtn.title = 'Conectarse y mantener sesión por 7 días';
+        
+        // ASIGNAR EL LISTENER CRÍTICO
+        signInBtn.onclick = function(e) {
+            e.preventDefault();
+            console.log('🚀 ¡Click en conectar detectado!');
+            signIn();
+        };
+        
+        console.log('✅ Botón listo para autenticación');
+    } else {
+        // Estados de carga
+        signInBtn.classList.remove('hidden');
+        signOutBtn.classList.add('hidden');
+        
+        if (!gapiReady && !gisReady) {
+            signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Cargando...</span>';
+            signInBtn.disabled = true;
+        } else if (!gapiReady) {
+            signInBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Google API';
+            signInBtn.disabled = true;
+        } else if (!gisReady) {
+            signInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando Identity...';
+            signInBtn.disabled = true;
+        } else if (!tokenClient) {
+            signInBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error Token Client';
+            signInBtn.disabled = true;
+        }
+    }
+
+    // Actualizar estado en overview
+    updateOverviewAuthStatus();
+    
+    // Sincronizar botones móviles
+    syncMobileAuthButtons();
+}
 /**
  * Actualizar UI según estado de autenticación
  */
@@ -677,8 +793,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Limpiar datos expirados
     cleanupExpiredData();
     
-    // Configurar listeners (AHORA EXISTE)
-    setupAuthListeners();
+    // NO llamar a setupAuthListeners si updateAuthUI ya configura los botones
+    // setupAuthListeners(); // COMENTAR O ELIMINAR ESTA LÍNEA
     
     // Verificar estado de autenticación
     const authState = checkAuthState();
@@ -698,12 +814,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkCore = setInterval(() => {
             if (window.unifiedCore) {
                 clearInterval(checkCore);
-                window.updateAuthUI();
-                console.log('✅ UI de autenticación sincronizada con unifiedCore');
+                // La función updateAuthUI del auth.js original ya configura los botones
+                if (typeof updateAuthUI === 'function') {
+                    updateAuthUI();
+                }
+                console.log('✅ UI de autenticación sincronizada');
             }
         }, 100);
         
-        // Timeout de seguridad (10 segundos)
+        // Timeout de seguridad
         setTimeout(() => {
             if (!window.unifiedCore) {
                 console.error('❌ Timeout: unifiedCore no se inicializó');
