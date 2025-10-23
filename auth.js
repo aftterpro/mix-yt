@@ -214,48 +214,74 @@ function handleAuthResult(accessToken) {
 window.updateAuthUI = function() {
     console.log('🔄 Actualizando UI de autenticación');
     
-    // VERIFICAR que unifiedCore exista antes de acceder
+    // VERIFICAR que unifiedCore exista
     if (!window.unifiedCore) {
         console.warn('⚠️ unifiedCore no disponible aún, reintentando...');
         setTimeout(window.updateAuthUI, 100);
         return;
     }
     
-    const authStatus = window.authStatus || { isAuthenticated: false };
-    const userMenuBtn = document.getElementById('userMenuButton');
+    // Obtener estado actual
+    const authState = window.authStatus || { isAuthenticated: false };
+    
+    // Elementos de UI
     const loginBtn = document.getElementById('loginButton');
+    const logoutBtn = document.getElementById('logoutButton');
+    const mobileLoginBtn = document.getElementById('mobileLoginButton');
+    const mobileLogoutBtn = document.getElementById('mobileLogoutButton');
+    const userMenuBtn = document.getElementById('userMenuButton');
     const userAvatar = document.getElementById('userAvatar');
     const userName = document.getElementById('userName');
+    const userEmail = document.getElementById('userEmail');
 
-    if (authStatus.isAuthenticated && authStatus.user) {
-        // Usuario autenticado
-        if (userMenuBtn) userMenuBtn.style.display = 'flex';
+    if (authState.isAuthenticated && authState.user) {
+        // Usuario autenticado - MOSTRAR elementos de usuario
         if (loginBtn) loginBtn.style.display = 'none';
+        if (mobileLoginBtn) mobileLoginBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+        if (mobileLogoutBtn) mobileLogoutBtn.style.display = 'inline-flex';
+        if (userMenuBtn) userMenuBtn.style.display = 'flex';
         
-        if (userAvatar && authStatus.user.photoURL) {
-            userAvatar.src = authStatus.user.photoURL;
-            userAvatar.onerror = () => {
-                userAvatar.src = './user-default.png';
-            };
+        // Actualizar avatar
+        if (userAvatar) {
+            if (authState.user.photoURL) {
+                userAvatar.src = authState.user.photoURL;
+                userAvatar.onerror = () => {
+                    userAvatar.src = './electronic.ico';
+                };
+            } else {
+                userAvatar.src = './electronic.ico';
+            }
         }
         
-        if (userName && authStatus.user.displayName) {
-            userName.textContent = authStatus.user.displayName;
+        // Actualizar nombre
+        if (userName) {
+            userName.textContent = authState.user.displayName || authState.user.email || 'Usuario';
         }
         
-        // Marcar auth como lista en unifiedCore
+        // Actualizar email
+        if (userEmail) {
+            userEmail.textContent = authState.user.email || '';
+        }
+        
+        // Marcar como listo en unifiedCore
         window.unifiedCore.state.authReady = true;
         
-    } else {
-        // Usuario no autenticado
-        if (userMenuBtn) userMenuBtn.style.display = 'none';
-        if (loginBtn) loginBtn.style.display = 'flex';
+        console.log('✅ UI actualizada: Usuario autenticado');
         
-        // Marcar auth como no lista
+    } else {
+        // Usuario NO autenticado - MOSTRAR botones de login
+        if (loginBtn) loginBtn.style.display = 'inline-flex';
+        if (mobileLoginBtn) mobileLoginBtn.style.display = 'inline-flex';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (mobileLogoutBtn) mobileLogoutBtn.style.display = 'none';
+        if (userMenuBtn) userMenuBtn.style.display = 'none';
+        
+        // Marcar como no listo en unifiedCore
         window.unifiedCore.state.authReady = false;
+        
+        console.log('✅ UI actualizada: Usuario no autenticado');
     }
-    
-    console.log('✅ UI de autenticación actualizada');
 };
 
 // =============================================
@@ -445,6 +471,204 @@ window.loadUserPlaylists = loadUserPlaylists;
 window.loadUserPlaylistsAndStore = loadUserPlaylistsAndStore;
 
 // =============================================
+// CONFIGURACIÓN DE LISTENERS DE AUTENTICACIÓN
+// =============================================
+
+/**
+ * Configurar todos los event listeners de autenticación
+ */
+function setupAuthListeners() {
+    console.log('🔧 Configurando listeners de autenticación...');
+    
+    // Botón de Login Desktop
+    const loginBtn = document.getElementById('loginButton');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', handleLogin);
+        console.log('✅ Listener de login desktop configurado');
+    } else {
+        console.warn('⚠️ Botón loginButton no encontrado');
+    }
+    
+    // Botón de Login Mobile
+    const mobileLoginBtn = document.getElementById('mobileLoginButton');
+    if (mobileLoginBtn) {
+        mobileLoginBtn.addEventListener('click', handleLogin);
+        console.log('✅ Listener de login mobile configurado');
+    }
+    
+    // Botón de Logout Desktop
+    const logoutBtn = document.getElementById('logoutButton');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', handleLogout);
+        console.log('✅ Listener de logout desktop configurado');
+    }
+    
+    // Botón de Logout Mobile
+    const mobileLogoutBtn = document.getElementById('mobileLogoutButton');
+    if (mobileLogoutBtn) {
+        mobileLogoutBtn.addEventListener('click', handleLogout);
+        console.log('✅ Listener de logout mobile configurado');
+    }
+    
+    // Menu de usuario
+    const userMenuBtn = document.getElementById('userMenuButton');
+    const userMenu = document.getElementById('userMenu');
+    
+    if (userMenuBtn && userMenu) {
+        userMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenu.classList.toggle('show');
+        });
+        
+        // Cerrar menu al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (!userMenuBtn.contains(e.target) && !userMenu.contains(e.target)) {
+                userMenu.classList.remove('show');
+            }
+        });
+        
+        console.log('✅ Listeners de menú de usuario configurados');
+    }
+    
+    console.log('✅ Todos los listeners de autenticación configurados');
+}
+
+/**
+ * Manejar inicio de sesión
+ */
+async function handleLogin() {
+    console.log('🔑 Iniciando proceso de login...');
+    
+    try {
+        // Verificar que unifiedCore exista
+        if (!window.unifiedCore) {
+            throw new Error('Sistema no inicializado');
+        }
+        
+        // Mostrar mensaje de carga
+        if (window.unifiedCore.showMessage) {
+            window.unifiedCore.showMessage('Iniciando sesión con Google...', 'info');
+        }
+        
+        // Aquí iría la lógica real de autenticación con Google
+        // Por ahora, simulamos una autenticación exitosa
+        console.log('🔐 Autenticación en progreso...');
+        
+        // Llamar a la función de Google Sign-In si está disponible
+        if (typeof window.signIn === 'function') {
+            window.signIn();
+        } else {
+            console.error('❌ Función signIn no disponible');
+            throw new Error('Sistema de autenticación no disponible');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en login:', error);
+        if (window.unifiedCore && window.unifiedCore.showMessage) {
+            window.unifiedCore.showMessage(`Error: ${error.message}`, 'error');
+        }
+    }
+}
+
+/**
+ * Manejar cierre de sesión
+ */
+async function handleLogout() {
+    console.log('👋 Cerrando sesión...');
+    
+    try {
+        // Mostrar confirmación
+        if (!confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+            return;
+        }
+        
+        // Limpiar datos locales
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_expires_at');
+        
+        // Actualizar estado global
+        window.authStatus = { isAuthenticated: false };
+        
+        // Llamar a función de Google Sign-Out si está disponible
+        if (typeof window.signOut === 'function') {
+            window.signOut();
+        }
+        
+        // Actualizar UI
+        window.updateAuthUI();
+        
+        // Mostrar mensaje
+        if (window.unifiedCore && window.unifiedCore.showMessage) {
+            window.unifiedCore.showMessage('Sesión cerrada exitosamente', 'success');
+        }
+        
+        console.log('✅ Sesión cerrada exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error en logout:', error);
+        if (window.unifiedCore && window.unifiedCore.showMessage) {
+            window.unifiedCore.showMessage(`Error cerrando sesión: ${error.message}`, 'error');
+        }
+    }
+}
+
+/**
+ * Verificar estado de autenticación
+ */
+function checkAuthState() {
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('auth_user');
+    const expiresAt = localStorage.getItem('auth_expires_at');
+    
+    if (!token || !userStr || !expiresAt) {
+        return { isAuthenticated: false };
+    }
+    
+    const now = Date.now();
+    if (now > parseInt(expiresAt)) {
+        console.log('⏰ Token expirado');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_expires_at');
+        return { isAuthenticated: false };
+    }
+    
+    try {
+        const user = JSON.parse(userStr);
+        return {
+            isAuthenticated: true,
+            user: user,
+            token: token
+        };
+    } catch (error) {
+        console.error('❌ Error parseando usuario:', error);
+        return { isAuthenticated: false };
+    }
+}
+
+/**
+ * Guardar estado de autenticación
+ */
+function saveAuthState(authData) {
+    try {
+        localStorage.setItem('auth_token', authData.token);
+        localStorage.setItem('auth_user', JSON.stringify(authData.user));
+        
+        // Token válido por 7 días
+        const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('auth_expires_at', expiresAt.toString());
+        
+        window.authStatus = authData;
+        
+        console.log('✅ Estado de autenticación guardado');
+        return true;
+    } catch (error) {
+        console.error('❌ Error guardando estado de autenticación:', error);
+        return false;
+    }
+}
+// =============================================
 // INICIALIZACIÓN
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -453,26 +677,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Limpiar datos expirados
     cleanupExpiredData();
     
-    // Configurar listeners
+    // Configurar listeners (AHORA EXISTE)
     setupAuthListeners();
     
-    // Verificar token existente
-    const token = localStorage.getItem('auth_token');
-    const userStr = localStorage.getItem('auth_user');
-    
-    if (token && userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            window.authStatus = {
-                isAuthenticated: true,
-                user: user,
-                token: token
-            };
-            console.log('✅ Usuario autenticado encontrado:', user.email);
-        } catch (error) {
-            console.error('❌ Error parseando usuario guardado:', error);
-            localStorage.removeItem('auth_user');
-        }
+    // Verificar estado de autenticación
+    const authState = checkAuthState();
+    if (authState.isAuthenticated) {
+        window.authStatus = authState;
+        console.log('✅ Usuario autenticado encontrado:', authState.user.email || authState.user.displayName);
+    } else {
+        window.authStatus = { isAuthenticated: false };
+        console.log('ℹ️ No hay sesión activa');
     }
     
     // Actualizar UI cuando unifiedCore esté listo
@@ -484,8 +699,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.unifiedCore) {
                 clearInterval(checkCore);
                 window.updateAuthUI();
+                console.log('✅ UI de autenticación sincronizada con unifiedCore');
             }
         }, 100);
+        
+        // Timeout de seguridad (10 segundos)
+        setTimeout(() => {
+            if (!window.unifiedCore) {
+                console.error('❌ Timeout: unifiedCore no se inicializó');
+                clearInterval(checkCore);
+            }
+        }, 10000);
     }
     
     console.log('✅ Sistema de autenticación iniciado');
