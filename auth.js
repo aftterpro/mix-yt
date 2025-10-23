@@ -224,18 +224,18 @@ window.updateAuthUI = function() {
     // Obtener estado actual
     const authState = window.authStatus || { isAuthenticated: false };
     
-    // Elementos de UI
-    const loginBtn = document.getElementById('loginButton');
-    const logoutBtn = document.getElementById('logoutButton');
-    const mobileLoginBtn = document.getElementById('mobileLoginButton');
-    const mobileLogoutBtn = document.getElementById('mobileLogoutButton');
+    // Elementos de UI (usar los IDs correctos)
+    const loginBtn = document.getElementById('googleSignInButton');
+    const logoutBtn = document.getElementById('googleSignOutButton');
+    const mobileLoginBtn = document.getElementById('mobileSignInButton');
+    const mobileLogoutBtn = document.getElementById('mobileSignOutButton');
     const userMenuBtn = document.getElementById('userMenuButton');
     const userAvatar = document.getElementById('userAvatar');
     const userName = document.getElementById('userName');
     const userEmail = document.getElementById('userEmail');
 
     if (authState.isAuthenticated && authState.user) {
-        // Usuario autenticado - MOSTRAR elementos de usuario
+        // Usuario autenticado
         if (loginBtn) loginBtn.style.display = 'none';
         if (mobileLoginBtn) mobileLoginBtn.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = 'inline-flex';
@@ -270,7 +270,7 @@ window.updateAuthUI = function() {
         console.log('✅ UI actualizada: Usuario autenticado');
         
     } else {
-        // Usuario NO autenticado - MOSTRAR botones de login
+        // Usuario NO autenticado
         if (loginBtn) loginBtn.style.display = 'inline-flex';
         if (mobileLoginBtn) mobileLoginBtn.style.display = 'inline-flex';
         if (logoutBtn) logoutBtn.style.display = 'none';
@@ -480,37 +480,37 @@ window.loadUserPlaylistsAndStore = loadUserPlaylistsAndStore;
 function setupAuthListeners() {
     console.log('🔧 Configurando listeners de autenticación...');
     
-    // Botón de Login Desktop
-    const loginBtn = document.getElementById('loginButton');
+    // Botón de Login Desktop (Google Sign In)
+    const loginBtn = document.getElementById('googleSignInButton');
     if (loginBtn) {
         loginBtn.addEventListener('click', handleLogin);
         console.log('✅ Listener de login desktop configurado');
     } else {
-        console.warn('⚠️ Botón loginButton no encontrado');
+        console.warn('⚠️ Botón googleSignInButton no encontrado');
     }
     
     // Botón de Login Mobile
-    const mobileLoginBtn = document.getElementById('mobileLoginButton');
+    const mobileLoginBtn = document.getElementById('mobileSignInButton');
     if (mobileLoginBtn) {
         mobileLoginBtn.addEventListener('click', handleLogin);
         console.log('✅ Listener de login mobile configurado');
     }
     
-    // Botón de Logout Desktop
-    const logoutBtn = document.getElementById('logoutButton');
+    // Botón de Logout Desktop (Google Sign Out)
+    const logoutBtn = document.getElementById('googleSignOutButton');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);
         console.log('✅ Listener de logout desktop configurado');
     }
     
     // Botón de Logout Mobile
-    const mobileLogoutBtn = document.getElementById('mobileLogoutButton');
+    const mobileLogoutBtn = document.getElementById('mobileSignOutButton');
     if (mobileLogoutBtn) {
         mobileLogoutBtn.addEventListener('click', handleLogout);
         console.log('✅ Listener de logout mobile configurado');
     }
     
-    // Menu de usuario
+    // Menu de usuario (si existe)
     const userMenuBtn = document.getElementById('userMenuButton');
     const userMenu = document.getElementById('userMenu');
     
