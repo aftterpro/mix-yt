@@ -104,7 +104,7 @@ window.gapiInitialize_auth = function() {
     console.log('📡 Inicializando GAPI...');
     
     gapi.client.init({
-        apiKey: 'AIzaSyDCU8hByM-4DrUqRUYnGn-3llEzqYpmx_4', // API Key pública
+        apiKey: 'AIzaSyDCU8hByM-4DrUqRUYnGn-3llEzqYpmx_4',
         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
     }).then(() => {
         return gapi.client.load('youtube', 'v3');
@@ -194,7 +194,37 @@ function handleAuthResult(accessToken) {
     }
     
     updateAuthUI();
-    loadUserPlaylistsAndStore();
+    
+    // ✅ ESPERAR A QUE CORE Y PLAYLISTMANAGER ESTÉN LISTOS
+    waitForSystemReady().then(() => {
+        console.log('📡 Sistema listo, cargando playlists...');
+        loadUserPlaylistsAndStore();
+    }).catch(err => {
+        console.error('❌ Error esperando sistema:', err);
+    });
+}
+
+/**
+ * ✅ NUEVA FUNCIÓN: Esperar a que el sistema esté completamente listo
+ */
+function waitForSystemReady() {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error('Timeout esperando sistema'));
+        }, 10000);
+        
+        const checkInterval = setInterval(() => {
+            const coreReady = window.unifiedCore?.state?.initialized;
+            const managerReady = window.playlistManager !== undefined;
+            
+            if (coreReady && managerReady) {
+                clearInterval(checkInterval);
+                clearTimeout(timeout);
+                console.log('✅ Sistema completamente listo:', { coreReady, managerReady });
+                resolve();
+            }
+        }, 100);
+    });
 }
 
 /**
@@ -251,6 +281,9 @@ function signOut() {
     if (window.unifiedCore) {
         window.unifiedCore.clearYouTubeLibrary();
     }
+    
+    // ✅ DISPARAR EVENTO DE LOGOUT
+    document.dispatchEvent(new CustomEvent('userLoggedOut'));
 }
 
 /**
@@ -294,22 +327,18 @@ function updateAuthUI() {
     }
     
     if (isAuthorized) {
-        // Usuario autenticado
         newSignInBtn.classList.add('hidden');
         newSignOutBtn.classList.remove('hidden');
         newSignOutBtn.onclick = signOut;
-        
         console.log('✅ UI: Usuario autenticado');
         
     } else if (gapiReady && gisReady && tokenClient) {
-        // Listo para autenticar
         newSignInBtn.classList.remove('hidden');
         newSignOutBtn.classList.add('hidden');
         newSignInBtn.innerHTML = '<i class="fab fa-google"></i><span> Conectar</span>';
         newSignInBtn.disabled = false;
         newSignInBtn.title = 'Conectarse con Google';
         
-        // CRÍTICO: Asignar evento onclick
         newSignInBtn.onclick = function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -320,7 +349,6 @@ function updateAuthUI() {
         console.log('✅ Botón Conectar configurado y listo');
         
     } else {
-        // Cargando
         newSignInBtn.classList.remove('hidden');
         newSignOutBtn.classList.add('hidden');
         
@@ -438,18 +466,36 @@ window.loadUserPlaylists = async function() {
     }
 };
 
+/**
+ * ✅ CORREGIDO: Ahora espera al sistema y dispara evento correcto
+ */
 window.loadUserPlaylistsAndStore = async function() {
-    if (!isAuthorized || !window.unifiedCore) {
-        console.log('❌ No autorizado o Core no disponible.');
+    if (!isAuthorized) {
+        console.log('❌ No autorizado.');
         return;
     }
 
+    // ✅ ESPERAR A QUE EL SISTEMA ESTÉ LISTO
+    try {
+        await waitForSystemReady();
+    } catch (error) {
+        console.error('❌ Sistema no listo después de timeout:', error);
+        return;
+    }
+
+    console.log('📡 Cargando playlists de YouTube...');
+    
     const playlistsMetadata = await window.loadUserPlaylists();
+    
     if (playlistsMetadata.length === 0) {
-        window.unifiedCore.clearYouTubeLibrary();
+        console.log('📭 No hay playlists para sincronizar');
+        if (window.playlistManager) {
+            window.playlistManager.clearYouTubeLibraryPlaylists();
+        }
         return;
     }
     
+    // Cargar videos de cada playlist
     const loadPromises = playlistsMetadata.map(async (playlist) => {
         const videos = await getYouTubeLibraryPlaylistItems(playlist.id);
         return {
@@ -461,8 +507,17 @@ window.loadUserPlaylistsAndStore = async function() {
 
     const detailedPlaylists = await Promise.all(loadPromises);
     
-    window.unifiedCore.syncYouTubeLibrary(detailedPlaylists);
-    console.log('✅ Sincronización de biblioteca de YouTube finalizada.');
+    console.log(`✅ ${detailedPlaylists.length} playlists cargadas con videos`);
+    
+    // ✅ DISPARAR EVENTO UNIFICADO
+    document.dispatchEvent(new CustomEvent('youtubePlaylistsReady', {
+        detail: {
+            playlists: detailedPlaylists,
+            source: 'sync'
+        }
+    }));
+    
+    console.log('✅ Evento youtubePlaylistsReady disparado');
 };
 
 // =============================================
@@ -479,10 +534,8 @@ window.isAuthorized = () => isAuthorized;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 DOM cargado, inicializando auth...');
     
-    // Inicializar APIs
     initializeGoogleAPIs();
     
-    // Intentar cargar sesión guardada
     const savedToken = loadAuthData();
     if (savedToken) {
         console.log('🔑 Token guardado encontrado, intentando restaurar sesión...');
