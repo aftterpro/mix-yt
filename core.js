@@ -637,20 +637,28 @@ updatePlaylistsUI() {
 setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de contenedores');
     
-    // Click en bottom-player para abrir vista completa (REPRODUCTOR + COLA)
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
-        bottomPlayer.addEventListener('click', (e) => {
-            // Solo activar si NO se clickeó en un botón de control
+        // Limpiar listeners anteriores
+        const newBottomPlayer = bottomPlayer.cloneNode(true);
+        bottomPlayer.parentNode.replaceChild(newBottomPlayer, bottomPlayer);
+        
+        // Agregar nuevo listener
+        newBottomPlayer.addEventListener('click', (e) => {
+            // Solo si NO se clickeó en un control
             if (!e.target.closest('.control-button') && 
                 !e.target.closest('.volume-slider') &&
                 !e.target.closest('.progress-bar')) {
                 
-                if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
-                    // CAMBIO: Ir a 'fullPlayer' en lugar de 'queue'
-                    this.switchView('fullPlayer');
+                // Alternar entre vista actual y fullPlayer
+                if (this.currentView === 'fullPlayer') {
+                    this.switchView('home');
                 } else {
-                    console.log('⚠️ Click en reproductor: no hay video cargado.');
+                    if (this.state.currentPlayingInfo?.videoId) {
+                        this.switchView('fullPlayer');
+                    } else {
+                        this.showMessage('Selecciona una canción primero', 'info');
+                    }
                 }
             }
         });
@@ -803,7 +811,6 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-    // Validación de vista: Incluir 'fullPlayer'
     const validViews = ['home', 'search', 'library', 'fullPlayer'];
     if (!validViews.includes(viewName)) {
         console.warn(`⚠️ Vista inválida: ${viewName}`);
@@ -828,29 +835,48 @@ switchView(viewName) {
     // Mostrar vista seleccionada
     let targetView = document.getElementById(`${viewName}View`);
     
-    if (targetView) {
-        targetView.classList.add('active');
-    } else {
+    if (!targetView) {
         console.error(`❌ Vista no encontrada: ${viewName}View`);
         return;
     }
 
+    targetView.classList.add('active');
     this.currentView = viewName;
 
-    // Lógica de reproductor
+    // ✅ LÓGICA DE REPRODUCTOR COMO YOUTUBE MUSIC
+    const bottomPlayer = document.querySelector('.bottom-player');
+    const fullPlayerView = document.getElementById('fullPlayerView');
     const isVideoPlaying = this.state?.currentPlayingInfo?.videoId;
 
-    if (isVideoPlaying) {
-        if (viewName === 'fullPlayer') {
-            // Modo reproductor completo con cola
-            this.movePlayer('full');
-            this.hideMiniPlayer();
-            this.updatePersistentQueue();
-        } else {
-            // Otras vistas: minimizar reproductor
-            this.movePlayer('mini');
-            this.showMiniPlayer();
+    if (viewName === 'fullPlayer') {
+        // ✅ MODO REPRODUCTOR COMPLETO
+        if (fullPlayerView) {
+            fullPlayerView.classList.add('active');
         }
+        if (bottomPlayer) {
+            bottomPlayer.style.cursor = 'default'; // No clickeable en vista completa
+        }
+        
+        // Mover reproductores al contenedor grande
+        this.movePlayerToFullView();
+        
+        // Actualizar cola persistente
+        this.updatePersistentQueue();
+        this.updateNowPlayingFull();
+        
+        console.log('🎬 Vista completa activada');
+        
+    } else {
+        // ✅ OTRAS VISTAS: Minimizar reproductor
+        if (fullPlayerView) {
+            fullPlayerView.classList.remove('active');
+        }
+        if (bottomPlayer) {
+            bottomPlayer.style.cursor = 'pointer'; // Clickeable para abrir
+        }
+        
+        // Mantener reproductores en la barra inferior (ocultos pero funcionales)
+        console.log(`📱 Vista ${viewName}: Reproductor minimizado`);
     }
 
     // Acciones específicas por vista
@@ -861,11 +887,51 @@ switchView(viewName) {
         case 'search':
             this.focusSearchInput();
             break;
-        case 'fullPlayer':
-            this.updatePersistentQueue();
-            this.updateNowPlayingFull();
+        case 'home':
+            // Opcional: Cargar trending
             break;
     }
+}
+
+/**
+ * Mover reproductores a vista completa
+ */
+movePlayerToFullView() {
+    const fullVideoContainer = document.getElementById('fullVideoContainer');
+    const player1El = document.getElementById('player1');
+    const player2El = document.getElementById('player2');
+    
+    if (!fullVideoContainer) {
+        console.error('❌ fullVideoContainer no encontrado');
+        return;
+    }
+    
+    const videoWrapper = fullVideoContainer.querySelector('.video-wrapper');
+    if (!videoWrapper) {
+        console.error('❌ video-wrapper no encontrado');
+        return;
+    }
+    
+    // Mover ambos reproductores al contenedor grande
+    if (player1El && !videoWrapper.contains(player1El)) {
+        videoWrapper.appendChild(player1El);
+    }
+    if (player2El && !videoWrapper.contains(player2El)) {
+        videoWrapper.appendChild(player2El);
+    }
+    
+    // Asegurar estilos correctos
+    [player1El, player2El].forEach(player => {
+        if (player) {
+            player.style.position = 'absolute';
+            player.style.top = '0';
+            player.style.left = '0';
+            player.style.width = '100%';
+            player.style.height = '100%';
+        }
+    });
+    
+    console.log('✅ Reproductores movidos a vista completa');
 }
 
     refreshLibraryView() {
@@ -2034,7 +2100,13 @@ updateNowPlayingFull() {
         const artistFull = document.getElementById('nowPlayingArtistFull');
         
         if (titleFull) titleFull.textContent = currentVideo.title;
-        if (artistFull) artistFull.textContent = currentVideo.uploaderName || currentVideo.author || 'YouTube';
+        if (artistFull) {
+            const artist = currentVideo.artist || 
+                          currentVideo.uploaderName || 
+                          currentVideo.author || 
+                          'YouTube';
+            artistFull.textContent = artist;
+        }
     }
 }
     updatePlayButton(state) {
