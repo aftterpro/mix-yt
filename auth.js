@@ -97,14 +97,34 @@ function loadAuthData() {
 }
 
 /**
- * Limpieza de datos (para el intervalo periódico).
+ * Limpiar datos expirados al iniciar
  */
 function cleanupExpiredData() {
-    const token = loadAuthData(); // La función loadAuthData se encarga de la limpieza si está expirado
-    if (!token) {
-        console.log('🧹 No hay datos de autenticación válidos para limpiar.');
-        isAuthorized = false;
-        updateAuthUI();
+    console.log('🧹 Limpiando datos expirados...');
+    
+    const expiresAt = localStorage.getItem('auth_expires_at');
+    const now = Date.now();
+    
+    if (expiresAt && now > parseInt(expiresAt)) {
+        console.log('⏰ Token expirado, limpiando...');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        localStorage.removeItem('auth_expires_at');
+        window.authStatus = { isAuthenticated: false };
+    }
+    
+    // VERIFICAR que unifiedCore exista antes de actualizar UI
+    if (window.unifiedCore) {
+        window.updateAuthUI();
+    } else {
+        console.log('⏳ Esperando inicialización de unifiedCore...');
+        // Esperar a que unifiedCore esté disponible
+        const checkCore = setInterval(() => {
+            if (window.unifiedCore) {
+                clearInterval(checkCore);
+                window.updateAuthUI();
+            }
+        }, 100);
     }
 }
 
@@ -189,27 +209,53 @@ function handleAuthResult(accessToken) {
 }
 
 /**
- * Actualiza la interfaz de usuario para reflejar el estado de autenticación.
+ * Actualizar UI según estado de autenticación
  */
 window.updateAuthUI = function() {
-    const authElements = document.querySelectorAll('.auth-required');
-    const authStatus = document.getElementById('authStatus');
-    const signInBtn = document.getElementById('signInButton');
-    const signOutBtn = document.getElementById('signOutButton');
+    console.log('🔄 Actualizando UI de autenticación');
     
-    if (isAuthorized) {
-        authElements.forEach(el => el.classList.remove('disabled'));
-        if (authStatus) authStatus.textContent = '✅ Autorizado';
-        if (signInBtn) signInBtn.style.display = 'none';
-        if (signOutBtn) signOutBtn.style.display = 'block';
-        window.unifiedCore?.enablePlayButton();
+    // VERIFICAR que unifiedCore exista antes de acceder
+    if (!window.unifiedCore) {
+        console.warn('⚠️ unifiedCore no disponible aún, reintentando...');
+        setTimeout(window.updateAuthUI, 100);
+        return;
+    }
+    
+    const authStatus = window.authStatus || { isAuthenticated: false };
+    const userMenuBtn = document.getElementById('userMenuButton');
+    const loginBtn = document.getElementById('loginButton');
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+
+    if (authStatus.isAuthenticated && authStatus.user) {
+        // Usuario autenticado
+        if (userMenuBtn) userMenuBtn.style.display = 'flex';
+        if (loginBtn) loginBtn.style.display = 'none';
+        
+        if (userAvatar && authStatus.user.photoURL) {
+            userAvatar.src = authStatus.user.photoURL;
+            userAvatar.onerror = () => {
+                userAvatar.src = './user-default.png';
+            };
+        }
+        
+        if (userName && authStatus.user.displayName) {
+            userName.textContent = authStatus.user.displayName;
+        }
+        
+        // Marcar auth como lista en unifiedCore
+        window.unifiedCore.state.authReady = true;
+        
     } else {
-        authElements.forEach(el => el.classList.add('disabled'));
-        if (authStatus) authStatus.textContent = '❌ No Autorizado';
-        if (signInBtn) signInBtn.style.display = 'block';
-        if (signOutBtn) signOutBtn.style.display = 'none';
+        // Usuario no autenticado
+        if (userMenuBtn) userMenuBtn.style.display = 'none';
+        if (loginBtn) loginBtn.style.display = 'flex';
+        
+        // Marcar auth como no lista
         window.unifiedCore.state.authReady = false;
     }
+    
+    console.log('✅ UI de autenticación actualizada');
 };
 
 // =============================================
@@ -398,31 +444,51 @@ window.getYouTubeLibraryPlaylistItems = getYouTubeLibraryPlaylistItems;
 window.loadUserPlaylists = loadUserPlaylists;
 window.loadUserPlaylistsAndStore = loadUserPlaylistsAndStore;
 
-
 // =============================================
-// AUTO-INICIALIZACIÓN CON LIMPIEZA AUTOMÁTICA
+// INICIALIZACIÓN
 // =============================================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🎯 DOM listo para auth con persistencia');
+    console.log('🚀 Inicializando sistema de autenticación...');
     
-    // 1. Limpiar datos expirados al inicio
+    // Limpiar datos expirados
     cleanupExpiredData();
     
-    // 2. Esperar un poco para que los scripts de Google se carguen
-    // init.js se encarga de llamar a initializeGoogleAPIs cuando detecta gapi y gis
-    if (window.gapiInitialize) {
-        console.log('⏳ Esperando gapi/gis en init.js...');
-    } else {
-        // Fallback si init.js no existe/no se carga bien
-         setTimeout(() => {
-            if (typeof gapi !== 'undefined') {
-                initializeGoogleAPIs();
-            }
-        }, 2000);
+    // Configurar listeners
+    setupAuthListeners();
+    
+    // Verificar token existente
+    const token = localStorage.getItem('auth_token');
+    const userStr = localStorage.getItem('auth_user');
+    
+    if (token && userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            window.authStatus = {
+                isAuthenticated: true,
+                user: user,
+                token: token
+            };
+            console.log('✅ Usuario autenticado encontrado:', user.email);
+        } catch (error) {
+            console.error('❌ Error parseando usuario guardado:', error);
+            localStorage.removeItem('auth_user');
+        }
     }
     
-    // 3. Limpieza automática cada hora
-    setInterval(cleanupExpiredData, 60 * 60 * 1000);
+    // Actualizar UI cuando unifiedCore esté listo
+    if (window.unifiedCore) {
+        window.updateAuthUI();
+    } else {
+        console.log('⏳ Esperando inicialización de unifiedCore...');
+        const checkCore = setInterval(() => {
+            if (window.unifiedCore) {
+                clearInterval(checkCore);
+                window.updateAuthUI();
+            }
+        }, 100);
+    }
+    
+    console.log('✅ Sistema de autenticación iniciado');
 });
 
 console.log('✅ Módulo de autenticación con persistencia de 7 días cargado');
