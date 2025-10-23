@@ -416,9 +416,8 @@ async loadTrendingContent() {
         console.error('❌ Error en reproductor:', event.data);
         this.showMessage(`Error en reproductor: ${event.data}`, 'error');
     }
-
 initializeAuth() {
-    console.log("🔧 Configurando eventos de autenticación optimizados...");
+    console.log("🔧 Configurando eventos de autenticación...");
     
     if (window.authEventsConfigured) {
         console.log("⚠️ Eventos de auth ya configurados");
@@ -426,49 +425,46 @@ initializeAuth() {
     }
     window.authEventsConfigured = true;
     
-    // Crear handler unificado pero mantener lógica específica
+    // ✅ HANDLER UNIFICADO SIMPLIFICADO
     const playlistHandler = (event) => {
-        let playlists, source;
+        const { playlists, source } = event.detail;
         
-        // Determinar tipo de evento y extraer datos
-        if (event.type === 'youtubePlaylistsReady') {
-            ({ playlists, source } = event.detail);
-        } else if (event.type === 'playlistsFetched') {
-            playlists = event.detail;
-            source = 'realtime';
+        if (!playlists || playlists.length === 0) {
+            console.warn('❌ Evento sin playlists válidas');
+            return;
         }
-        
-        if (!playlists || playlists.length === 0) return;
         
         console.log(`📁 Evento ${event.type} recibido:`, {
             playlistsCount: playlists.length,
             source,
-            systemReady: this.state.initialized
+            systemReady: this.state.initialized,
+            managerReady: !!window.playlistManager
         });
         
-        // Verificar que el sistema esté listo
+        // ✅ VERIFICAR SISTEMA LISTO
         if (!this.state.initialized || !window.playlistManager) {
-            console.log("⏳ Sistema no listo, programando procesamiento diferido");
+            console.log("⏳ Sistema no listo, guardando en pendientes");
             window.pendingYouTubePlaylists = playlists;
             return;
         }
         
+        // ✅ PROCESAR INMEDIATAMENTE
         this.processYouTubePlaylists(playlists);
     };
     
-    // Usar el mismo handler para ambos eventos
+    // Escuchar evento unificado
     document.addEventListener('youtubePlaylistsReady', playlistHandler);
-    document.addEventListener('playlistsFetched', playlistHandler);
 
-    // Evento de logout (mantener separado porque es diferente)
+    // Evento de logout
     document.addEventListener('userLoggedOut', () => {
         console.log("🚪 Usuario desconectado, limpiando playlists de YouTube");
         if (window.playlistManager?.clearYouTubeLibraryPlaylists) {
             window.playlistManager.clearYouTubeLibraryPlaylists();
         }
-        window.playlistsAlreadyProcessed = false;
         setTimeout(() => this.updatePlaylistsUI(), 500);
     });
+    
+    console.log("✅ Eventos de autenticación configurados");
 }
     initializeUI() {
         // Asegurar que existe la cola de reproducción
