@@ -589,64 +589,38 @@ window.loadUserPlaylistsAndStore = loadUserPlaylistsAndStore;
 // =============================================
 // CONFIGURACIÓN DE LISTENERS DE AUTENTICACIÓN
 // =============================================
-
-/**
- * Configurar todos los event listeners de autenticación
- */
 function setupAuthListeners() {
     console.log('🔧 Configurando listeners de autenticación...');
     
-    // Botón de Login Desktop (Google Sign In)
+    // Botón de Login Desktop
     const loginBtn = document.getElementById('googleSignInButton');
     if (loginBtn) {
-        loginBtn.addEventListener('click', handleLogin);
+        // IMPORTANTE: Remover listeners previos
+        const newLoginBtn = loginBtn.cloneNode(true);
+        loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
+        
+        newLoginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🚀 Click en botón de login detectado');
+            handleLogin();
+        });
         console.log('✅ Listener de login desktop configurado');
-    } else {
-        console.warn('⚠️ Botón googleSignInButton no encontrado');
     }
     
     // Botón de Login Mobile
     const mobileLoginBtn = document.getElementById('mobileSignInButton');
     if (mobileLoginBtn) {
-        mobileLoginBtn.addEventListener('click', handleLogin);
+        const newMobileBtn = mobileLoginBtn.cloneNode(true);
+        mobileLoginBtn.parentNode.replaceChild(newMobileBtn, mobileLoginBtn);
+        
+        newMobileBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleLogin();
+        });
         console.log('✅ Listener de login mobile configurado');
     }
-    
-    // Botón de Logout Desktop (Google Sign Out)
-    const logoutBtn = document.getElementById('googleSignOutButton');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', handleLogout);
-        console.log('✅ Listener de logout desktop configurado');
-    }
-    
-    // Botón de Logout Mobile
-    const mobileLogoutBtn = document.getElementById('mobileSignOutButton');
-    if (mobileLogoutBtn) {
-        mobileLogoutBtn.addEventListener('click', handleLogout);
-        console.log('✅ Listener de logout mobile configurado');
-    }
-    
-    // Menu de usuario (si existe)
-    const userMenuBtn = document.getElementById('userMenuButton');
-    const userMenu = document.getElementById('userMenu');
-    
-    if (userMenuBtn && userMenu) {
-        userMenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            userMenu.classList.toggle('show');
-        });
-        
-        // Cerrar menu al hacer click fuera
-        document.addEventListener('click', (e) => {
-            if (!userMenuBtn.contains(e.target) && !userMenu.contains(e.target)) {
-                userMenu.classList.remove('show');
-            }
-        });
-        
-        console.log('✅ Listeners de menú de usuario configurados');
-    }
-    
-    console.log('✅ Todos los listeners de autenticación configurados');
 }
 
 /**
@@ -655,37 +629,28 @@ function setupAuthListeners() {
 async function handleLogin() {
     console.log('🔑 Iniciando proceso de login...');
     
+    if (!gapiReady || !gisReady || !tokenClient) {
+        console.error('❌ APIs no están listas:', { gapiReady, gisReady, tokenClient: !!tokenClient });
+        alert('Sistema de autenticación no está listo. Por favor recarga la página.');
+        return;
+    }
+    
     try {
-        // Verificar que unifiedCore exista
-        if (!window.unifiedCore) {
-            throw new Error('Sistema no inicializado');
-        }
+        console.log('🚀 Solicitando autorización de Google...');
         
-        // Mostrar mensaje de carga
-        if (window.unifiedCore.showMessage) {
-            window.unifiedCore.showMessage('Iniciando sesión con Google...', 'info');
-        }
+        // CRÍTICO: Usar requestAccessToken correctamente
+        tokenClient.requestAccessToken({ 
+            prompt: 'consent',
+            hint: '', // Dejar vacío para forzar selector de cuenta
+        });
         
-        // Aquí iría la lógica real de autenticación con Google
-        // Por ahora, simulamos una autenticación exitosa
-        console.log('🔐 Autenticación en progreso...');
-        
-        // Llamar a la función de Google Sign-In si está disponible
-        if (typeof window.signIn === 'function') {
-            window.signIn();
-        } else {
-            console.error('❌ Función signIn no disponible');
-            throw new Error('Sistema de autenticación no disponible');
-        }
+        console.log('✅ Popup de Google debería aparecer ahora');
         
     } catch (error) {
         console.error('❌ Error en login:', error);
-        if (window.unifiedCore && window.unifiedCore.showMessage) {
-            window.unifiedCore.showMessage(`Error: ${error.message}`, 'error');
-        }
+        alert(`Error al iniciar sesión: ${error.message}`);
     }
 }
-
 /**
  * Manejar cierre de sesión
  */
