@@ -104,7 +104,7 @@ window.gapiInitialize_auth = function() {
     console.log('📡 Inicializando GAPI...');
     
     gapi.client.init({
-        apiKey: 'AIzaSyDCU8hByM-4DrUqRUYnGn-3llEzqYpmx_4',
+        apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4',
         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
     }).then(() => {
         return gapi.client.load('youtube', 'v3');
