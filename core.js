@@ -49,7 +49,18 @@ const unifiedState = {
     authReady: false,
     playersReady: false
 };
-
+// =============================================
+// CONFIGURACIÓN DE PERSISTENCIA
+// =============================================
+const PERSISTENCE_CONFIG = {
+    STORAGE_KEYS: {
+        PLAYLISTS_CORE: 'ytcm_playlists_persistent',
+        QUEUE: 'ytcm_queue_persistent',
+        PLAYING_STATE: 'ytcm_playing_state'
+    },
+    PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000, // 7 días
+    QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000 // 7 días
+};
 // =============================================
 // SISTEMA UNIFICADO - CORE
 // =============================================
@@ -633,33 +644,18 @@ setupPlayerContainerHandlers() {
     // Click en bottom-player para abrir vista completa (REPRODUCTOR + COLA)
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
-        // Prevenir que los botones internos activen el click
         bottomPlayer.addEventListener('click', (e) => {
             // Solo activar si NO se clickeó en un botón de control
             if (!e.target.closest('.control-button') && 
                 !e.target.closest('.volume-slider') &&
                 !e.target.closest('.progress-bar')) {
                 
-                // 🔴 Corrección: Verificar this.state, currentPlayingInfo y videoId
-                if (this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
-                    // Navegar a la vista de cola/reproductor grande
-                    this.switchView('queue');
+                if (this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
+                    // CAMBIO: Ir a 'fullPlayer' en lugar de 'queue'
+                    this.switchView('fullPlayer');
                 } else {
                     console.log('⚠️ Click en reproductor: no hay video cargado.');
                 }
-            }
-        });
-    }
-    
-    // Click en mini-player para abrir vista completa
-    const miniPlayer = document.getElementById('miniPlayerContainer');
-    if (miniPlayer) {
-        miniPlayer.addEventListener('click', () => {
-            // 🔴 Corrección: Verificar this.state, currentPlayingInfo y videoId
-            if (this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId) {
-                this.switchView('queue');
-            } else {
-                console.log('⚠️ Click en mini-reproductor: no hay video cargado.');
             }
         });
     }
@@ -811,12 +807,16 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-    // 1. Validación de vista: Incluir 'queue' ya que se usa para el player grande.
-    if (!this.views.includes(viewName) && viewName !== 'fullPlayer' && viewName !== 'queue') return;
+    // Validación de vista: Incluir 'fullPlayer'
+    const validViews = ['home', 'search', 'library', 'fullPlayer'];
+    if (!validViews.includes(viewName)) {
+        console.warn(`⚠️ Vista inválida: ${viewName}`);
+        return;
+    }
 
     console.log(`🔄 Cambiando a vista: ${viewName}`);
 
-    // 2. Actualizar navegación activa
+    // Actualizar navegación activa
     document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
         item.classList.remove('active');
     });
@@ -824,42 +824,40 @@ switchView(viewName) {
         item.classList.add('active');
     });
 
-    // 3. Ocultar todas las vistas
+    // Ocultar todas las vistas
     document.querySelectorAll('.content-view').forEach(view => {
         view.classList.remove('active');
     });
 
-    // 4. Mostrar vista seleccionada
+    // Mostrar vista seleccionada
     let targetView = document.getElementById(`${viewName}View`);
-    // Fallback: si la vista es 'fullPlayer' o 'queue' y no hay un div específico, usar 'fullPlayerView'
-    if (!targetView && (viewName === 'fullPlayer' || viewName === 'queue')) {
-        targetView = document.getElementById('fullPlayerView');
-    }
     
     if (targetView) {
         targetView.classList.add('active');
+    } else {
+        console.error(`❌ Vista no encontrada: ${viewName}View`);
+        return;
     }
 
     this.currentView = viewName;
 
-    // 5. LÓGICA DE REPRODUCTOR (PROTEGIDA)
-    // 🔴 Corrección: Verificar this.state Y currentPlayingInfo antes de acceder a videoId
-    const isVideoPlaying = this.state && this.state.currentPlayingInfo && this.state.currentPlayingInfo.videoId;
+    // Lógica de reproductor
+    const isVideoPlaying = this.state?.currentPlayingInfo?.videoId;
 
     if (isVideoPlaying) {
-        if (viewName === 'fullPlayer' || viewName === 'queue') {
-            // Mostrar reproductor completo (e.g., player grande con cola al lado)
+        if (viewName === 'fullPlayer') {
+            // Modo reproductor completo con cola
             this.movePlayer('full');
             this.hideMiniPlayer();
             this.updatePersistentQueue();
-        } else if (viewName === 'search' || viewName === 'home' || viewName === 'library') {
-            // Minimizar reproductor
+        } else {
+            // Otras vistas: minimizar reproductor
             this.movePlayer('mini');
             this.showMiniPlayer();
         }
     }
 
-    // 6. Acciones específicas por vista
+    // Acciones específicas por vista
     switch (viewName) {
         case 'library':
             this.refreshLibraryView();
@@ -868,8 +866,8 @@ switchView(viewName) {
             this.focusSearchInput();
             break;
         case 'fullPlayer':
-        case 'queue':
             this.updatePersistentQueue();
+            this.updateNowPlayingFull();
             break;
     }
 }
@@ -2028,7 +2026,21 @@ updateCurrentPlayingIndex() {
             }
         }
     }
-
+/**
+ * Actualizar información en vista completa
+ */
+updateNowPlayingFull() {
+    const flatList = this.getFlattenedPlaylist();
+    const currentVideo = flatList[this.state.currentPlayingInfo?.flattenedIndex];
+    
+    if (currentVideo) {
+        const titleFull = document.getElementById('nowPlayingTitleFull');
+        const artistFull = document.getElementById('nowPlayingArtistFull');
+        
+        if (titleFull) titleFull.textContent = currentVideo.title;
+        if (artistFull) artistFull.textContent = currentVideo.uploaderName || currentVideo.author || 'YouTube';
+    }
+}
     updatePlayButton(state) {
         const playBtn = document.getElementById('botonPlay');
         const miniPlayBtn = document.getElementById('miniPlayBtn');
