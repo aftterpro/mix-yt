@@ -544,4 +544,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('✅ Sistema de autenticación iniciado');
 });
 
+// =============================================
+// FUNCIÓN DE DEBUG
+// =============================================
+window.debugYouTubeSync = function() {
+    console.log('🐛 Estado de sincronización:', {
+        isAuthorized,
+        gapiReady,
+        gisReady,
+        coreReady: window.unifiedCore?.state?.initialized,
+        playlistManagerReady: !!window.playlistManager
+    });
+};
+
 console.log('✅ Módulo de autenticación cargado');
