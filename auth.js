@@ -133,7 +133,7 @@ window.gisInitalize_auth = function() {
     
     try {
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
+            client_id: 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,
             scope: SCOPES,
             callback: (tokenResponse) => {
                 console.log('🎉 Respuesta de token recibida:', tokenResponse);
