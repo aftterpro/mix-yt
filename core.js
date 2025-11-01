@@ -853,18 +853,21 @@ switchView(viewName) {
     targetView.classList.add('active');
     this.currentView = viewName;
 
-    // ✅ LÓGICA DE REPRODUCTOR COMO YOUTUBE MUSIC
+    // LÓGICA DE REPRODUCTOR COMO YOUTUBE MUSIC
     const bottomPlayer = document.querySelector('.bottom-player');
     const fullPlayerView = document.getElementById('fullPlayerView');
     const isVideoPlaying = this.state?.currentPlayingInfo?.videoId;
 
     if (viewName === 'fullPlayer') {
-        // ✅ MODO REPRODUCTOR COMPLETO
+        //  MODO REPRODUCTOR COMPLETO
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
         }
+        //  Bottom player siempre visible pero sin cursor pointer
         if (bottomPlayer) {
+            bottomPlayer.style.display = 'flex'; // Siempre visible
             bottomPlayer.style.cursor = 'default'; // No clickeable en vista completa
+            bottomPlayer.style.pointerEvents = 'auto'; // Habilitar eventos para los botones
         }
         
         // Mover reproductores al contenedor grande
@@ -877,16 +880,24 @@ switchView(viewName) {
         console.log('🎬 Vista completa activada');
         
     } else {
-        // ✅ OTRAS VISTAS: Minimizar reproductor
+        // Mini reproductor flotante
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
-        if (bottomPlayer) {
-            bottomPlayer.style.cursor = 'pointer'; // Clickeable para abrir
+        
+        // Mostrar mini player flotante si hay video reproduciéndose
+        if (isVideoPlaying) {
+            this.showMiniPlayerFloat();
         }
         
-        // Mantener reproductores en la barra inferior (ocultos pero funcionales)
-        console.log(`📱 Vista ${viewName}: Reproductor minimizado`);
+        // Bottom player siempre visible y clickeable
+        if (bottomPlayer) {
+            bottomPlayer.style.display = 'flex'; // Siempre visible
+            bottomPlayer.style.cursor = 'pointer'; // Clickeable para abrir
+            bottomPlayer.style.pointerEvents = 'auto'; // Habilitar eventos
+        }
+        
+        console.log(`📱 Vista ${viewName}: Mini reproductor activo`);
     }
 
     // Acciones específicas por vista
