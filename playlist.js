@@ -1165,7 +1165,7 @@ setupQueueItemListeners() {
     /**
      * Añadir playlists de YouTube Library
      */
-    addYouTubeLibraryPlaylists(youtubePlaylists) {
+addYouTubeLibraryPlaylists(youtubePlaylists) {
         console.log(`📥 addYouTubeLibraryPlaylists llamada con ${youtubePlaylists?.length || 0} playlists`);
         
         if (!youtubePlaylists?.length) {
@@ -1173,6 +1173,7 @@ setupQueueItemListeners() {
             return;
         }
 
+        // ✅ VERIFICAR SI YA ESTÁN CARGADAS (evitar duplicados)
         const currentYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
         
         if (currentYouTubeCount >= youtubePlaylists.length) {
@@ -1185,40 +1186,58 @@ setupQueueItemListeners() {
             this.playlistsData = this.playlistsData.filter(p => p.source !== 'youtube_library');
         }
 
+        // ✅ PROCESAR PLAYLISTS CON VIDEOS YA CARGADOS
         const validPlaylists = youtubePlaylists
-            .filter(playlist => playlist.snippet?.title && playlist.contentDetails?.itemCount > 0)
-            .map(playlist => ({
-                id: playlist.id,
-                name: playlist.snippet.title,
-                thumbnailUrl: playlist.snippet.thumbnails?.high?.url || 
-                             playlist.snippet.thumbnails?.default?.url || 
-                             './electronic.ico',
-                videos: [],
-                isExpanded: false,
-                source: 'youtube_library',
-                isLoaded: false
-            }));
+            .filter(playlist => {
+                // Verificar que tenga videos cargados (vienen de auth.js)
+                const hasVideos = playlist.videos && Array.isArray(playlist.videos);
+                const hasValidVideos = hasVideos && playlist.videos.length > 0;
+                
+                if (!hasValidVideos) {
+                    console.warn(`⚠️ Playlist "${playlist.title || playlist.name}" sin videos válidos`);
+                }
+                
+                return hasValidVideos;
+            })
+            .map(playlist => {
+                // ✅ OBTENER THUMBNAIL DEL PRIMER VIDEO
+                let thumbnailUrl = './electronic.ico';
+                if (playlist.videos && playlist.videos.length > 0) {
+                    thumbnailUrl = playlist.videos[0].thumbnail || './electronic.ico';
+                }
+                
+                return {
+                    id: playlist.id,
+                    name: playlist.title || playlist.name || 'Playlist Sin Nombre',
+                    thumbnailUrl: thumbnailUrl,
+                    videos: playlist.videos, // ✅ VIDEOS YA VIENEN CARGADOS
+                    isExpanded: false,
+                    source: 'youtube_library',
+                    isLoaded: true, // ✅ YA ESTÁ CARGADA
+                    count: playlist.videos.length
+                };
+            });
 
         if (validPlaylists.length === 0) {
-            console.warn("❌ No hay playlists válidas para añadir");
+            console.warn("❌ No hay playlists con videos válidos para añadir");
             return;
         }
 
-        const insertIndex = Math.max(
-            this.playlistsData.findIndex(p => p.id === 'manual'),
-            this.playlistsData.findIndex(p => p.id === 'queue') + 1,
-            0
-        );
+        // ✅ INSERTAR DESPUÉS DE LA COLA
+        const queueIndex = this.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
+        const insertIndex = queueIndex !== -1 ? queueIndex + 1 : 0;
         
         this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
         
         console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
+        console.log(`📊 Total de videos: ${validPlaylists.reduce((sum, p) => sum + p.videos.length, 0)}`);
 
+        // ✅ ACTUALIZAR UI INMEDIATAMENTE
         requestAnimationFrame(() => {
             this.updatePlaylistsUI();
             
             if (this.core?.showMessage) {
-                this.core.showMessage(`${validPlaylists.length} playlists de YouTube sincronizadas`, 'success');
+                this.core.showMessage(`${validPlaylists.length} playlists sincronizadas`, 'success');
             }
         });
     }
