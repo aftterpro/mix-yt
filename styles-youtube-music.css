@@ -1,10 +1,4 @@
 /* styles-youtube-music.css - Sistema Unificado YT CrossMix */
-/* Inspirado en YouTube Music con funcionalidad completa */
-/* =============================================
-   STYLES-YOUTUBE-MUSIC.CSS - MEJORADO
-   Reemplazar las variables y estilos base existentes
-   ============================================= */
-
 :root {
     /* === TEMA YT MUSIC DARK === */
     --yt-bg-base: #030303;
@@ -1503,14 +1497,52 @@ display: grid;
     font-size: 10px;
 }
 /* =============================================
-   MINI PLAYER FLOTANTE - ESTILO YOUTUBE MUSIC
-   Agregar al final de styles-youtube-music.css
+   AGREGAR AL FINAL DE styles-youtube-music.css
+   CORRECCIÓN: Bottom Player SIEMPRE visible
    ============================================= */
 
-/* Mini Player Flotante (estilo YouTube Music) */
+/* Bottom Player - FORZAR VISIBILIDAD */
+.bottom-player {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: var(--player-height) !important;
+    background: var(--yt-bg-raised) !important;
+    border-top: 1px solid var(--yt-layer-10) !important;
+    z-index: 200 !important;
+}
+
+/* Prevenir que clases lo oculten */
+.bottom-player.hidden {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Solo deshabilitar pointer en info cuando no es clickeable */
+.bottom-player[style*="cursor: default"] .player-info {
+    pointer-events: none;
+}
+
+/* Los controles SIEMPRE clickeables */
+.bottom-player .control-button,
+.bottom-player .volume-slider,
+.bottom-player .progress-bar,
+.bottom-player .control-btn,
+.bottom-player .player-extras,
+.bottom-player .player-extras button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+/* Mini Player Flotante */
 .mini-player-float {
     position: fixed;
-    bottom: calc(var(--player-height) + 20px); /* Encima del bottom player */
+    bottom: calc(var(--player-height) + 20px);
     right: 20px;
     width: 320px;
     height: 180px;
@@ -1522,7 +1554,7 @@ display: grid;
         0 0 0 1px rgba(255, 255, 255, 0.1);
     z-index: 999;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: none; /* Oculto por defecto */
+    display: none;
 }
 
 .mini-player-float.show {
@@ -1531,7 +1563,7 @@ display: grid;
 }
 
 .mini-player-float.hidden {
-    display: none;
+    display: none !important;
 }
 
 @keyframes miniPlayerSlideIn {
@@ -1545,7 +1577,6 @@ display: grid;
     }
 }
 
-/* Contenedor de videos */
 .mini-player-video {
     position: relative;
     width: 100%;
@@ -1567,7 +1598,6 @@ display: grid;
     pointer-events: none;
 }
 
-/* Botón de expandir */
 .mini-player-expand {
     position: absolute;
     top: 10px;
@@ -1594,20 +1624,18 @@ display: grid;
     transform: scale(1.1);
 }
 
-/* Hover effect */
-.mini-player-float:hover {
-    box-shadow: 
-        0 12px 40px rgba(0, 0, 0, 0.7),
-        0 0 0 1px rgba(255, 255, 255, 0.15);
-}
-
 /* Responsive */
 @media (max-width: 768px) {
     .mini-player-float {
         width: 280px;
         height: 157.5px;
-        bottom: calc(var(--player-height) + 70px); /* Más arriba por el bottom nav */
+        bottom: calc(var(--player-height) + 70px);
         right: 10px;
+    }
+    
+    /* Bottom player más pequeño en móvil */
+    .bottom-player {
+        height: 64px !important;
     }
 }
 
@@ -1623,28 +1651,5 @@ display: grid;
         height: 32px;
         font-size: 14px;
     }
-}
-
-/* =============================================
-   CORRECCIÓN: Bottom Player siempre visible
-   ============================================= */
-.bottom-player {
-    /* Asegurar que siempre esté visible */
-    display: flex !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Solo deshabilitar pointer-events en los hijos cuando no sea clickeable */
-.bottom-player[style*="cursor: default"] .player-info {
-    pointer-events: none;
-}
-
-/* Los controles siempre deben ser clickeables */
-.bottom-player .control-button,
-.bottom-player .volume-slider,
-.bottom-player .control-btn,
-.bottom-player .player-extras button {
-    pointer-events: auto !important;
-    cursor: pointer !important;
+}er !important;
 }
