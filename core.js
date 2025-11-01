@@ -1083,7 +1083,7 @@ handleNext() {
     }
 
 async playNextVideo() {
-    const now = Date.now();
+      const now = Date.now();
     
     // ✅ DEBOUNCE CRÍTICO: 1000ms entre llamadas
     if (now - lastCrossfadeTime < 1000) {
@@ -1092,20 +1092,10 @@ async playNextVideo() {
     }
     lastCrossfadeTime = now;
     
-    // ✅ PREVENIR MÚLTIPLES TRANSICIONES (pero permitir retry después de timeout)
+    // ✅ PREVENIR MÚLTIPLES TRANSICIONES
     if (isTransitioning || crossfadeInProgress) {
         console.log('🔒 Ya hay transición en progreso');
-        
-        // ✅ TIMEOUT DE SEGURIDAD: Si lleva más de 15s en transición, resetear
-        setTimeout(() => {
-            if (isTransitioning) {
-                console.warn('⚠️ Transición bloqueada detectada, reseteando...');
-                isTransitioning = false;
-                crossfadeInProgress = false;
-            }
-        }, 15000);
-        
-        return;
+        return; // Salir inmediatamente
     }
 
     if (!playersInitialized) {
@@ -1187,7 +1177,7 @@ async playNextVideo() {
         // ✅ CAMBIAR REPRODUCTOR
         currentPlayer = currentPlayer === 1 ? 2 : 1;
         
-        // ✅ INICIAR CROSSFADE (definida en core.js)
+        // ✅ INICIAR CROSSFADE
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
         
         // ✅ ACTUALIZAR UI
@@ -1198,8 +1188,11 @@ async playNextVideo() {
             }
         }, 200);
         
-        // ✅ RESETEAR FLAG
+        // ✅ RESETEAR FLAGS
         hasOutroCrossfadeStarted = false;
+        nextVideoScheduled = false;
+        
+        console.log('✅ playNextVideo completado, crossfade en progreso');
 
     } catch (error) {
         console.error("❌ Error en playNextVideo:", error);
@@ -1210,9 +1203,20 @@ async playNextVideo() {
                 window.playlistManager.removeVideoFromQueue(nextVideo.videoId);
             }
             isTransitioning = false;
+            
+            // Reiniciar monitoreo antes de saltar
+            if (!monitorInterval) {
+                this.startMonitoring();
+            }
+            
             setTimeout(() => this.playNextVideo(), 500);
         } else {
             isTransitioning = false;
+            
+            // Reiniciar monitoreo en caso de error
+            if (!monitorInterval) {
+                this.startMonitoring();
+            }
         }
     } finally {
         if (!error || !error.message.includes('Timeout')) {
@@ -1221,8 +1225,7 @@ async playNextVideo() {
             }, 1000);
         }
     }
-}
-
+};
 // =============================================
 // PREPARAR SIGUIENTE (OPCIONAL)
 // =============================================
@@ -1243,16 +1246,21 @@ async preLoadNextVideo() {
 }
 
 startCrossfade(prevPlayer, nextPlayer) {
-    if (crossfadeInProgress) return;
+    if (crossfadeInProgress) {
+        console.warn('🔒 Crossfade ya en progreso, ignorando');
+        return;
+    }
     
-    const CROSSFADE_DURATION = 10; // Variable global
-    console.log(`🎨 Iniciando crossfade de ${CROSSFADE_DURATION} segundos SIN SILENCIOS...`);
+    const CROSSFADE_DURATION_MS = CROSSFADE_DURATION * 1000;
+    console.log(`🎨 Iniciando crossfade de ${CROSSFADE_DURATION}s SIN SILENCIOS...`);
     crossfadeInProgress = true;
     
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
     
-    // ✅ CONFIGURAR ELEMENTOS VISUALES
+    // =============================================
+    // CONFIGURAR ELEMENTOS VISUALES
+    // =============================================
     if (nextElement) {
         nextElement.classList.remove('hidden', 'fade-out');
         nextElement.classList.add('fade-in', 'crossfade-enter');
@@ -1268,21 +1276,23 @@ startCrossfade(prevPlayer, nextPlayer) {
         prevElement.style.zIndex = '2';
     }
     
-    // ✅ CROSSFADE DE AUDIO SIN SILENCIOS (Estilo Spotify)
-    const duration = CROSSFADE_DURATION * 1000;
+    // =============================================
+    // CROSSFADE DE AUDIO SIN SILENCIOS (Estilo Spotify)
+    // =============================================
     const steps = 100; // Más steps = más suave
-    const stepTime = duration / steps;
+    const stepTime = CROSSFADE_DURATION_MS / steps;
     let step = 0;
     
     // ✅ INICIAR SIGUIENTE VIDEO INMEDIATAMENTE CON VOLUMEN 0
     try {
         nextPlayer.playVideo();
         nextPlayer.setVolume(0);
-        console.log('▶️ Siguiente video iniciado en background');
+        console.log('▶️ Siguiente video iniciado en background con volumen 0');
     } catch (e) {
         console.warn('⚠️ Error iniciando siguiente video:', e);
     }
     
+    // Intervalo de crossfade
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
@@ -1300,10 +1310,10 @@ startCrossfade(prevPlayer, nextPlayer) {
             
             // Debug cada 20 steps
             if (step % 20 === 0) {
-                console.log(`🎚️ Crossfade: Prev=${prevVolume}%, Next=${nextVolume}%`);
+                console.log(`🎚️ Crossfade [${step}/${steps}]: Prev=${prevVolume}%, Next=${nextVolume}%`);
             }
         } catch (e) {
-            console.warn("⚠️ Advertencia durante crossfade:", e);
+            console.warn("⚠️ Advertencia ajustando volumen:", e);
         }
         
         // ✅ FADE VISUAL SUAVE
@@ -1314,6 +1324,9 @@ startCrossfade(prevPlayer, nextPlayer) {
             nextElement.style.opacity = progress.toString();
         }
         
+        // =============================================
+        // FINALIZACIÓN DEL CROSSFADE
+        // =============================================
         if (step >= steps) {
             clearInterval(crossfadeInterval);
             crossfadeInterval = null;
@@ -1327,6 +1340,7 @@ startCrossfade(prevPlayer, nextPlayer) {
                     // Detener video anterior DESPUÉS de fade completo
                     prevPlayer.stopVideo();
                     
+                    // Limpiar clases y estilos
                     if (prevElement) {
                         prevElement.classList.add('hidden');
                         prevElement.classList.remove('fade-out', 'crossfade-exit');
@@ -1341,6 +1355,12 @@ startCrossfade(prevPlayer, nextPlayer) {
                     }
                     
                     console.log('🧹 Limpieza post-crossfade completada');
+                    
+                    // ✅ REINICIAR MONITOREO
+                    if (!monitorInterval && window.unifiedCore) {
+                        window.unifiedCore.startMonitoring();
+                        console.log('📊 Monitoreo reiniciado después de crossfade');
+                    }
                     
                 } catch (e) {
                     console.error('❌ Error limpiando crossfade:', e);
@@ -2030,27 +2050,31 @@ async validateVideoBeforePlay(videoId) {
     // MONITOREO Y ESTADO
     // =============================================
     startMonitoring() {
-        if (!monitorInterval) {
-            monitorInterval = setInterval(() => {
-                monitorPlayers();
-                
-                // SPONSORBLOCK integrado aquí
-                const activePlayer = (currentPlayer === 1) ? player1 : player2;
-                if (activePlayer && reproduccionIniciada) {
-                    checkAndSkipSegment(activePlayer);
-                }
-            }, 300);
-            console.log('📊 Monitoreo iniciado (intervalo: 300ms)');
-        }
+        if (monitorInterval) {
+        console.warn('⚠️ Ya hay un monitoreo activo, no se crea otro');
+        return;
     }
+    
+    monitorInterval = setInterval(() => {
+        monitorPlayers();
+        
+        // SPONSORBLOCK integrado aquí
+        const activePlayer = (currentPlayer === 1) ? player1 : player2;
+        if (activePlayer && reproduccionIniciada) {
+            checkAndSkipSegment(activePlayer);
+        }
+    }, 300); // Cada 300ms
+    
+    console.log('📊 Monitoreo iniciado (intervalo: 300ms)');
+};
 
     stopMonitoring() {
         if (monitorInterval) {
-            clearInterval(monitorInterval);
-            monitorInterval = null;
-            console.log('📊 Monitoreo detenido');
-        }
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+        console.log('📊 Monitoreo detenido');
     }
+};
 
 updateCurrentPlayingIndex() {
     const flatList = this.getFlattenedPlaylist();
@@ -2540,6 +2564,7 @@ function checkAndSkipSegment(player) {
  * Monitorear reproductores
  */
 function monitorPlayers() {
+    // Validaciones básicas
     if (!playersInitialized || !reproduccionIniciada) return;
 
     try {
@@ -2551,12 +2576,14 @@ function monitorPlayers() {
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        // ✅ VALIDACIONES BÁSICAS
+        // Solo monitorear cuando está reproduciendo
         if (playerState !== YT.PlayerState.PLAYING) return;
         if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
         if (!videoId) return;
 
-        // ✅ CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
+        // =============================================
+        // CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
+        // =============================================
         let totalSponsorBlockDuration = 0;
         
         if (segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
@@ -2572,15 +2599,20 @@ function monitorPlayers() {
                 }, 0);
         }
 
-        // ✅ CALCULAR PUNTO DE TRIGGER
-        const API_BUFFER = 1;
-        const SAFETY_MARGIN = 0.5;
+        // =============================================
+        // CALCULAR PUNTO DE TRIGGER
+        // =============================================
+        const API_BUFFER = 1; // Buffer para carga de API
+        const SAFETY_MARGIN = 0.5; // Margen de seguridad
         const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
         const triggerTime = videoDuration - (totalAdjustment + totalSponsorBlockDuration);
         const timeRemaining = videoDuration - currentTime;
         
-        // ✅ DEBUG CADA 5 SEGUNDOS
-        const shouldLog = Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== Math.floor(currentTime - 0.3);
+        // =============================================
+        // DEBUG CADA 5 SEGUNDOS (solo cuando está cerca del trigger)
+        // =============================================
+        const shouldLog = Math.floor(currentTime) % 5 === 0 && 
+                         Math.floor(currentTime) !== Math.floor(currentTime - 0.3);
         
         if (shouldLog && currentTime > triggerTime - 20) {
             console.log(`⏱️ [${Math.round(currentTime)}s/${Math.round(videoDuration)}s]`, {
@@ -2588,35 +2620,54 @@ function monitorPlayers() {
                 timeRemaining: Math.round(timeRemaining * 10) / 10,
                 shouldTrigger: currentTime >= triggerTime,
                 transitionActive: isTransitioning,
-                crossfadeActive: crossfadeInProgress
+                crossfadeActive: crossfadeInProgress,
+                flags: {
+                    hasOutro: hasOutroCrossfadeStarted,
+                    nextScheduled: nextVideoScheduled
+                }
             });
         }
 
-        // ✅ SPONSORBLOCK: Saltar segmentos
+        // =============================================
+        // SPONSORBLOCK: Saltar segmentos durante reproducción
+        // =============================================
         if (currentTime > 0) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // ✅ CRITICAL: VERIFICAR CONDICIONES ANTES DE DISPARAR
-    if (currentTime >= triggerTime && 
-        !hasOutroCrossfadeStarted && 
-        !isTransitioning && 
-        !crossfadeInProgress &&
-        !nextVideoScheduled) { 
+        // =============================================
+        // ⚠️ CRITICAL: DISPARAR CROSSFADE
+        // =============================================
+        if (currentTime >= triggerTime && 
+            !hasOutroCrossfadeStarted && 
+            !isTransitioning && 
+            !crossfadeInProgress &&
+            !nextVideoScheduled) { 
             
             console.log(`🚀 ¡CROSSFADE TRIGGER!`, {
                 currentTime: Math.round(currentTime * 10) / 10,
                 triggerTime: Math.round(triggerTime * 10) / 10,
-                timeRemaining: Math.round(timeRemaining * 10) / 10
+                timeRemaining: Math.round(timeRemaining * 10) / 10,
+                videoDuration: Math.round(videoDuration)
             });
             
+            // ✅ MARCAR FLAGS INMEDIATAMENTE
             hasOutroCrossfadeStarted = true;
-            nextVideoScheduled = true; 
+            nextVideoScheduled = true;
+            
+            // ✅ PAUSAR MONITOREO DURANTE CROSSFADE
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+                console.log('📊 Monitoreo pausado durante crossfade');
+            }
         
+            // Efectos visuales
             if (window.applyCrossfadeVisualEffect) {
                 window.applyCrossfadeVisualEffect();
             }
             
+            // Disparar evento
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
                 detail: {
                     currentTime,
@@ -2626,19 +2677,21 @@ function monitorPlayers() {
                 }
             }));
             
+            // Ejecutar playNextVideo
             if (window.unifiedCore?.playNextVideo) {
                 setTimeout(() => {
                     window.unifiedCore.playNextVideo();
                 }, 100);
             }
             
-            return;
+            return; // Salir inmediatamente
         }
         
     } catch (error) {
         console.error("❌ Error en monitorPlayers:", error);
     }
 }
+
 // =============================================
 // FUNCIÓN AUXILIAR: Calcular tiempo pasado en SponsorBlock
 // =============================================
