@@ -2,7 +2,7 @@
 <html lang="es"> 
 <head>
     <meta charset="UTF-8">
-    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title> 
+    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title>
     
     <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
     <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
@@ -22,6 +22,10 @@
     <link rel="stylesheet" href="./barras.css">
     
     <link rel="icon" href="./electronic.ico">
+
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
 </head>
 <body class="unified-loading">
     <!-- ESTRUCTURA YT MUSIC -->
@@ -282,16 +286,19 @@
            <a href="https://piped.video/" target="_blank">Piped API</a></p>
         <p>Sugerencias: <a href="mailto:aftterpro@gmail.com">aftterpro@gmail.com</a></p>
     </footer>
-
-    <!-- ===== SCRIPTS ===== -->
-    <script src="https://apis.google.com/js/api.js" async defer></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-
+    <script> //  CONFIGURACIÓN PREVIA para evitar errores
+    window.ytCrossMixAPIs = {
+        gapi: false,
+        gis: false,
+        youtube: false,
+        ready: false
+    };
+</script>
+    <script src="init.js"></script>
+    <script src="youtube-client.js"></script>           
     <script src="core.js"></script>
     <script src="playlist.js"></script>
-    <script src="youtube-client.js"></script>
     <script src="auth.js"></script>
-    <script src="init.js"></script>
     <script src="mix-effects.js"></script>
 
     <script>
