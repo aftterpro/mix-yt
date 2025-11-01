@@ -130,7 +130,7 @@ function showInitError(message) {
 // =============================================
 
 /**
- * Cargar YouTube IFrame API
+ Cargar YouTube API con origin correcto
  */
 function loadYouTubeAPI() {
     if (document.querySelector('script[src*="iframe_api"]')) {
@@ -142,13 +142,64 @@ function loadYouTubeAPI() {
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
     script.async = true;
+    
+    // ✅ CORRECCIÓN: Agregar atributos para evitar error de postMessage
+    script.setAttribute('data-origin', window.location.origin);
+    
     script.onerror = () => {
         console.error('❌ Error cargando YouTube IFrame API');
         showInitError('Error cargando YouTube API');
     };
+    
     document.head.appendChild(script);
 }
+/**
+ * Configurar players con origin correcto
+ */
+window.onYouTubeIframeAPIReady = function() {
+    try {
+        console.log('🎵 YouTube IFrame API cargada');
+        window.ytCrossMixAPIs.youtube = true;
+        
+        // ✅ CONFIGURAR ORIGIN PARA EVITAR ERROR DE POSTMESSAGE
+        if (window.YT && window.YT.Player) {
+            // Configurar origin global para todos los players
+            const originalPlayer = window.YT.Player;
+            window.YT.Player = function(elementId, config) {
+                // Asegurar que playerVars tenga origin correcto
+                config = config || {};
+                config.playerVars = config.playerVars || {};
+                config.playerVars.origin = window.location.origin;
+                
+                // Llamar al constructor original
+                return new originalPlayer(elementId, config);
+            };
+            
+            // Preservar el prototipo
+            window.YT.Player.prototype = originalPlayer.prototype;
+            
+            console.log('✅ YouTube API configurada con origin:', window.location.origin);
+        }
+        
+        checkAllAPIsReady();
+    } catch (error) {
+        console.error('❌ Error con YouTube API:', error);
+        showInitError('Error cargando YouTube API');
+    }
+};
 
+// ✅ ASEGURAR QUE SE LLAME A loadYouTubeAPI
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📄 DOM cargado, verificando APIs...');
+        ensureAPIsLoaded();
+        loadYouTubeAPI(); // ✅ Llamar explícitamente
+    });
+} else {
+    console.log('📄 DOM ya cargado, verificando APIs...');
+    ensureAPIsLoaded();
+    loadYouTubeAPI(); // ✅ Llamar explícitamente
+}
 /**
  * Verificar y cargar APIs faltantes
  */
