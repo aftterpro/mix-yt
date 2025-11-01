@@ -527,52 +527,13 @@ updatePlaylistsUI() {
  * Mostrar popup de cola
  */
 showQueuePopup() {
-    // Verificar si ya existe el popup
-    let existingPopup = document.querySelector('.queue-popup-overlay');
-    if (existingPopup) {
-        existingPopup.remove();
+    console.log('📋 Redirigiendo a vista completa...');
+    // En vez de popup, ir a vista fullPlayer
+    if (this.core) {
+        this.core.switchView('fullPlayer');
+    } else if (window.unifiedCore) {
+        window.unifiedCore.switchView('fullPlayer');
     }
-
-    const flatList = this.core?.getFlattenedPlaylist() || [];
-    
-    const popup = document.createElement('div');
-    popup.className = 'queue-popup-overlay';
-    popup.innerHTML = `
-        <div class="queue-popup">
-            <div class="queue-popup-header">
-                <h3>Cola de Reproducción</h3>
-                <button class="queue-popup-close">×</button>
-            </div>
-            <div class="queue-popup-content" id="queuePopupContent">
-                ${this.renderQueueContent(flatList)}
-            </div>
-        </div>
-    `;
-
-    // Event listeners para el popup
-    const closeBtn = popup.querySelector('.queue-popup-close');
-    closeBtn.addEventListener('click', () => {
-        popup.remove();
-    });
-
-    popup.addEventListener('click', (e) => {
-        if (e.target === popup) popup.remove();
-    });
-
-    document.body.appendChild(popup);
-    
-    // Configurar event listeners para los items DESPUÉS de añadir al DOM
-    setTimeout(() => {
-        this.setupQueueItemListeners();
-        
-        // Configurar drag & drop
-        if (window.queueDragDrop) {
-            window.queueDragDrop.attachDragListeners();
-        }
-    }, 50);
-    
-    // Animación de entrada
-    setTimeout(() => popup.classList.add('show'), 10);
 }
 
     /**
