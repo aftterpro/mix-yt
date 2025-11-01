@@ -89,12 +89,47 @@ function initializeGoogleAPIs() {
     
     console.log('📡 Iniciando carga de Google APIs...');
     
-    // Cargar GAPI
+    // ✅ VERIFICAR Y CARGAR GAPI
     if (typeof gapi !== 'undefined') {
         gapi.load('client', gapiInitialize_auth);
     } else {
-        console.error('❌ GAPI no disponible');
+        console.warn('⚠️ GAPI no disponible, esperando carga...');
+        // Reintentar después de 1 segundo
+        setTimeout(() => {
+            if (typeof gapi !== 'undefined') {
+                gapi.load('client', gapiInitialize_auth);
+            } else {
+                console.error('❌ GAPI no se cargó correctamente');
+            }
+        }, 1000);
     }
+    
+    // ✅ VERIFICAR Y CARGAR GIS (Google Identity Services)
+    setTimeout(() => {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+            console.log('✅ GIS ya disponible, inicializando...');
+            window.gisInitalize_auth();
+        } else {
+            console.warn('⚠️ GIS no disponible aún, esperando...');
+            // Configurar listener para cuando se cargue
+            const checkGIS = setInterval(() => {
+                if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                    console.log('✅ GIS detectado, inicializando...');
+                    clearInterval(checkGIS);
+                    window.gisInitalize_auth();
+                }
+            }, 500);
+            
+            // Timeout de seguridad (15 segundos)
+            setTimeout(() => {
+                clearInterval(checkGIS);
+                if (!gisReady) {
+                    console.error('❌ GIS no se cargó después de 15s');
+                    updateAuthUI();
+                }
+            }, 15000);
+        }
+    }, 500);
 }
 
 /**
@@ -124,17 +159,26 @@ window.gapiInitialize_auth = function() {
  * ✅ CORREGIDO: Inicializa el cliente de token GIS
  */
 window.gisInitalize_auth = function() {
+    console.log('🔑 gisInitalize_auth llamado');
+    
     if (!CLIENT_ID) {
         console.error('❌ CLIENT_ID no disponible');
         return;
     }
     
+    // ✅ VERIFICAR QUE GOOGLE.ACCOUNTS ESTÉ DISPONIBLE
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        console.error('❌ google.accounts.oauth2 no disponible');
+        setTimeout(() => window.gisInitalize_auth(), 500);
+        return;
+    }
+    
     console.log('🔑 Inicializando GIS Token Client...');
+    console.log('CLIENT_ID:', CLIENT_ID);
     
     try {
-        // ✅ CORRECCIÓN CRÍTICA: Remover comillas del client_id
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,  // ✅ Variable sin comillas
+            client_id: CLIENT_ID,
             scope: SCOPES,
             callback: (tokenResponse) => {
                 console.log('🎉 Respuesta de token recibida:', tokenResponse);
@@ -150,11 +194,12 @@ window.gisInitalize_auth = function() {
         });
         
         gisReady = true;
-        console.log('✅ GIS Token Client inicializado.');
+        console.log('✅ GIS Token Client inicializado correctamente');
         checkAndUpdateUI();
         
     } catch (error) {
         console.error('❌ Error inicializando GIS:', error);
+        console.error('Error completo:', error);
         gisReady = false;
         updateAuthUI();
     }
