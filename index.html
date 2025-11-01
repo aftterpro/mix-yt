@@ -77,8 +77,7 @@
                            id="sidebarSearchInput" 
                            class="sidebar-search-input" 
                            placeholder="Buscar música, artistas, playlists...">
-                </div>
-
+                         </div>
                 <!-- User Actions -->
                 <div class="user-actions">
                     <button class="auth-btn" id="googleSignInButton">
@@ -145,10 +144,19 @@
                         </div>
                     </div>
                 </div>
-
+              <!-- Mini Player Flotante (se crea dinámicamente) -->
+               <div id="miniPlayerFloat" class="mini-player-float hidden">
+                <div class="mini-player-video">
+                   <div id="miniPlayer1Container" class="mini-video-container"></div>
+                <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
+                </div>
+                    <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
+                <i class="fas fa-expand"></i>
+            </button>
+            </div>
                 <!-- ===== PLAYING VIEW ===== -->
-<div class="content-view full-player-view" id="fullPlayerView">
-    <div class="player-queue-layout">
+            <div class="content-view full-player-view" id="fullPlayerView">
+            <div class="player-queue-layout">
         
         <!-- Video grande a la izquierda -->
         <div class="video-container-full">
@@ -182,11 +190,9 @@
             <div id="queueContentList" class="queue-list-content">
                 <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
             </div>
-        </div>
-        
+        </div>  
+     </div>
     </div>
-</div>
-
     <!-- ===== BOTTOM PLAYER ===== -->
   <div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
         <!-- Player Info -->
@@ -328,6 +334,32 @@
             });
         });
     </script>
+    <!-- Script para manejar clicks en bottom player -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const bottomPlayer = document.querySelector('.bottom-player');
     
+    if (bottomPlayer) {
+        // Prevenir que el click del contenedor se propague a los botones
+        bottomPlayer.addEventListener('click', (e) => {
+            // Solo si NO se clickeó en un control
+            if (!e.target.closest('.control-button') && 
+                !e.target.closest('.volume-slider') &&
+                !e.target.closest('.progress-bar') &&
+                !e.target.closest('.control-btn')) {
+                
+                // Verificar si hay video reproduciéndose
+                if (window.unifiedCore?.state?.currentPlayingInfo?.videoId) {
+                    // Verificar cursor style para saber si es clickeable
+                    const cursorStyle = window.getComputedStyle(bottomPlayer).cursor;
+                    if (cursorStyle === 'pointer') {
+                        window.unifiedCore.switchView('fullPlayer');
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
 </body>
 </html>
