@@ -442,7 +442,7 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
     console.log(`📡 Iniciando carga de playlist: ${playlistId}`);
 
     try {
-        do {
+do {
             const response = await gapi.client.youtube.playlistItems.list({
                 playlistId: playlistId,
                 part: 'snippet,contentDetails',
@@ -452,17 +452,42 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 
             const items = response.result.items;
             items.forEach(item => {
-                if (item.snippet.resourceId.videoId) {
+                //  VALIDACIÓN ROBUSTA
+                const videoId = item.snippet?.resourceId?.videoId;
+                const title = item.snippet?.title || 'Título Desconocido';
+                
+                // Validar que el video no esté eliminado o privado
+                const isDeleted = title.toLowerCase().includes('deleted video') || 
+                                 title.toLowerCase().includes('[deleted video]') ||
+                                 title === 'Deleted video' ||
+                                 title === 'Private video';
+                
+                if (videoId && !isDeleted) {
+                    //  OBTENER THUMBNAIL CON FALLBACKS
+                    let thumbnail = './electronic.ico'; // Fallback por defecto
+                    
+                    if (item.snippet?.thumbnails) {
+                        const thumbs = item.snippet.thumbnails;
+                        thumbnail = thumbs.high?.url || 
+                                   thumbs.medium?.url || 
+                                   thumbs.default?.url || 
+                                   thumbs.standard?.url || 
+                                   thumbs.maxres?.url || 
+                                   './electronic.ico';
+                    }
+                    
                     videos.push({
-                        videoId: item.snippet.resourceId.videoId,
-                        title: item.snippet.title,
-                        uploaderName: item.snippet.channelTitle,
-                        duration: 0,
-                        thumbnail: item.snippet.thumbnails.default.url,
+                        videoId: videoId,
+                        title: title,
+                        uploaderName: item.snippet?.channelTitle || 'YouTube',
+                        duration: 0, // Se obtendrá después en lote
+                        thumbnail: thumbnail,
                         source: 'youtube_library',
                         playlistId: playlistId,
                         dateAdded: Date.now()
                     });
+                } else if (videoId) {
+                    console.warn(`⚠️ Video eliminado detectado: "${title}" (${videoId})`);
                 }
             });
 
