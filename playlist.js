@@ -804,9 +804,22 @@ renderQueueContent(flatList) {
             });
         }
 
-        // Click en card para popup
-        card.addEventListener('click', (e) => {
+        //Click en card para mostrar videos
+        card.addEventListener('click', async (e) => {
             if (!e.target.closest('.play-playlist-btn') && !e.target.closest('.delete-playlist-btn')) {
+                console.log(`🎵 Click en playlist: ${playlist.name}`);
+                
+                // Si es de YouTube Library y no está cargada, cargar videos
+                if (isYouTubeLibrary && !playlist.isLoaded) {
+                    console.log('📥 Cargando videos de YouTube Library...');
+                    const success = await this.loadPlaylistVideos(playlist.id);
+                    if (!success) {
+                        this.core?.showMessage('Error cargando videos de la playlist', 'error');
+                        return;
+                    }
+                }
+                
+                // Mostrar popup con videos
                 this.createPlaylistPopup(playlist);
             }
         });
