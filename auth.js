@@ -21,7 +21,7 @@ function getClientIdForDomain() {
         'mix-yt.netlify.app': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
         'mix-yt.pages.dev': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
         'localhost': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
-        '127.0.0.1': '374474688710-p6m4rc6p7s7bp3j8ccns6p9pbtj5p9vl.apps.googleusercontent.com',
+        '127.0.0.1': '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com',
     };
     
     let clientId = clientIds[hostname];
@@ -121,7 +121,7 @@ window.gapiInitialize_auth = function() {
 };
 
 /**
- * Inicializa el cliente de token GIS
+ * ✅ CORREGIDO: Inicializa el cliente de token GIS
  */
 window.gisInitalize_auth = function() {
     if (!CLIENT_ID) {
@@ -132,8 +132,9 @@ window.gisInitalize_auth = function() {
     console.log('🔑 Inicializando GIS Token Client...');
     
     try {
+        // ✅ CORRECCIÓN CRÍTICA: Remover comillas del client_id
         tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: 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,
+            client_id: CLIENT_ID,  // ✅ Variable sin comillas
             scope: SCOPES,
             callback: (tokenResponse) => {
                 console.log('🎉 Respuesta de token recibida:', tokenResponse);
