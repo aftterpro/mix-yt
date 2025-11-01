@@ -22,10 +22,14 @@
     <link rel="stylesheet" href="./barras.css">
     
     <link rel="icon" href="./electronic.ico">
-
-    <script src="https://apis.google.com/js/api.js" async defer></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!--  Google APIs CON CALLBACKS  -->
+    <script src="https://apis.google.com/js/api.js" 
+            async defer 
+            onload="console.log('✅ GAPI script loaded')"></script>
     
+    <script src="https://accounts.google.com/gsi/client" 
+            async defer 
+            onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
 </head>
 <body class="unified-loading">
     <!-- ESTRUCTURA YT MUSIC -->
