@@ -650,21 +650,26 @@ setupPlayerContainerHandlers() {
                 !e.target.closest('.volume-slider') &&
                 !e.target.closest('.progress-bar')) {
                 
-                // Alternar entre vista actual y fullPlayer
-                if (this.currentView === 'fullPlayer') {
-                    this.switchView('home');
+                // ✅ CAMBIO: Ir a vista fullPlayer en vez de mostrar popup
+                if (this.state.currentPlayingInfo?.videoId) {
+                    this.switchView('fullPlayer');
                 } else {
-                    if (this.state.currentPlayingInfo?.videoId) {
-                        this.switchView('fullPlayer');
-                    } else {
-                        this.showMessage('Selecciona una canción primero', 'info');
-                    }
+                    this.showMessage('Selecciona una canción primero', 'info');
                 }
             }
         });
     }
+    
+    // Configurar botón de cola para mostrar vista completa
+    const queueBtn = document.getElementById('queueButton');
+    if (queueBtn) {
+        queueBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.switchView('fullPlayer'); // ✅ Ir a vista completa
+        });
+    }
 }
-
 /**
  * Mostrar reproductor en vista completa
  */
