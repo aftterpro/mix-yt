@@ -761,8 +761,13 @@ updatePersistentQueue() {
         return;
     }
 
+    //  Validar currentPlayingInfo antes de acceder
+    const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? 
+                        window.currentPlayingInfo?.flattenedIndex ?? 
+                        -1;
+
     const html = flatList.map((video, index) => {
-        const isPlaying = this.state.currentPlayingInfo.flattenedIndex === index;
+        const isPlaying = currentIndex === index;
         const activeClass = isPlaying ? ' playing' : '';
         
         return `
@@ -902,26 +907,33 @@ switchView(viewName) {
  * Mover reproductores a vista completa
  */
 movePlayerToFullView() {
-    const fullVideoContainer = document.getElementById('fullVideoContainer');
-    const player1El = document.getElementById('player1');
-    const player2El = document.getElementById('player2');
-    
-    if (!fullVideoContainer) {
-        console.error('❌ fullVideoContainer no encontrado');
+    // ✅ CORRECCIÓN: Usar el ID correcto del HTML
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    if (!fullPlayerView) {
+        console.error('❌ fullPlayerView no encontrado');
         return;
     }
     
-    const videoWrapper = fullVideoContainer.querySelector('.video-wrapper');
+    // ✅ Buscar video-wrapper dentro de fullPlayerView
+    const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
     if (!videoWrapper) {
-        console.error('❌ video-wrapper no encontrado');
+        console.error('❌ video-wrapper no encontrado en fullPlayerView');
+        return;
+    }
+    
+    const player1El = document.getElementById('player1');
+    const player2El = document.getElementById('player2');
+    
+    if (!player1El || !player2El) {
+        console.error('❌ Reproductores no encontrados');
         return;
     }
     
     // Mover ambos reproductores al contenedor grande
-    if (player1El && !videoWrapper.contains(player1El)) {
+    if (!videoWrapper.contains(player1El)) {
         videoWrapper.appendChild(player1El);
     }
-    if (player2El && !videoWrapper.contains(player2El)) {
+    if (!videoWrapper.contains(player2El)) {
         videoWrapper.appendChild(player2El);
     }
     
@@ -1062,22 +1074,36 @@ handleNext() {
 async playNextVideo() {
     const now = Date.now();
     
-    // ✅ DEBOUNCE CRÍTICO: 500ms entre llamadas
+    // ✅ DEBOUNCE CRÍTICO: 1000ms entre llamadas
     if (now - lastCrossfadeTime < 1000) {
         console.log('🔒 Ignorando llamada duplicada (debounce)');
         return;
     }
     lastCrossfadeTime = now;
     
-    // ✅ PREVENIR MÚLTIPLES TRANSICIONES
+    // ✅ PREVENIR MÚLTIPLES TRANSICIONES (pero permitir retry después de timeout)
     if (isTransitioning || crossfadeInProgress) {
         console.log('🔒 Ya hay transición en progreso');
+        
+        // ✅ TIMEOUT DE SEGURIDAD: Si lleva más de 15s en transición, resetear
+        setTimeout(() => {
+            if (isTransitioning) {
+                console.warn('⚠️ Transición bloqueada detectada, reseteando...');
+                isTransitioning = false;
+                crossfadeInProgress = false;
+            }
+        }, 15000);
+        
         return;
     }
 
-    if (!playersInitialized) return;
+    if (!playersInitialized) {
+        console.error('❌ Reproductores no inicializados');
+        return;
+    }
 
     isTransitioning = true;
+    console.log('🎵 Iniciando playNextVideo...');
 
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
     const flatList = this.getFlattenedPlaylist();
