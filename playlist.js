@@ -1037,7 +1037,7 @@ renderPlaylistContent(playlist) {
     `;
 }
 // Formatear duración
-function formatDuration(duration) {
+formatDuration(duration) {
     if (!duration || isNaN(duration)) return '0:00';
     const minutes = Math.floor(duration / 60);
     const seconds = Math.floor(duration % 60);
