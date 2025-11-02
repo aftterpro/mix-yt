@@ -497,6 +497,251 @@ body {
     transform: translateY(-2px);
     box-shadow: var(--shadow-3);
 }
+/* ===== FIX 2: POPUP DE PLAYLIST ===== */
+.playlist-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 10000; /* MUY ALTO para estar sobre todo */
+    display: flex !important; /* Forzar display flex */
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.playlist-popup-overlay.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+.playlist-popup {
+    background: var(--yt-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    width: 90vw;
+    max-width: 900px;
+    max-height: 85vh;
+    overflow: hidden;
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.9) translateY(30px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.playlist-popup-overlay.show .playlist-popup {
+    transform: scale(1) translateY(0);
+}
+
+/* Header del popup */
+.playlist-popup-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--yt-layer-10);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-lg);
+    background: var(--yt-bg-raised);
+    flex-shrink: 0;
+}
+
+.playlist-header-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    flex: 1;
+    min-width: 0;
+}
+
+.playlist-popup-thumb {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--border-radius);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.playlist-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.playlist-header-text h3 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin: 0 0 var(--spacing-xs) 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playlist-video-count {
+    font-size: 1.4rem;
+    color: var(--yt-text-secondary);
+}
+
+.playlist-popup-close {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--yt-layer-10);
+    border: none;
+    color: var(--yt-text-primary);
+    font-size: 2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-normal);
+    flex-shrink: 0;
+}
+
+.playlist-popup-close:hover {
+    background: var(--yt-layer-20);
+    transform: scale(1.1);
+}
+
+/* Contenido scrolleable */
+.playlist-popup-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Videos del popup */
+.playlist-popup-videos {
+    padding: 0;
+}
+
+.popup-video-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--yt-layer-5);
+    cursor: pointer;
+    transition: background var(--transition-normal);
+}
+
+.popup-video-item:hover {
+    background: var(--yt-layer-10);
+}
+
+.popup-video-item:last-child {
+    border-bottom: none;
+}
+
+.popup-video-index {
+    width: 32px;
+    text-align: center;
+    font-size: 1.4rem;
+    color: var(--yt-text-secondary);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.popup-video-thumbnail {
+    width: 120px;
+    height: 68px;
+    object-fit: cover;
+    border-radius: var(--border-radius);
+    flex-shrink: 0;
+}
+
+.popup-video-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.popup-video-title {
+    font-size: 1.4rem;
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.popup-video-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    font-size: 1.2rem;
+    color: var(--yt-text-secondary);
+}
+
+.popup-video-channel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.popup-video-duration {
+    flex-shrink: 0;
+}
+
+.popup-video-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.popup-video-item:hover .popup-video-actions {
+    opacity: 1;
+}
+
+.popup-video-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--yt-layer-10);
+    border: none;
+    color: var(--yt-text-primary);
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-normal);
+}
+
+.popup-video-action-btn:hover {
+    background: var(--yt-layer-20);
+    transform: scale(1.1);
+}
+
+.popup-video-action-btn.primary {
+    background: var(--yt-brand-red);
+    color: white;
+}
+
+.popup-video-action-btn.primary:hover {
+    background: var(--yt-brand-red-dark);
+}
+
+/* Estado vacío */
+.empty-playlist {
+    text-align: center;
+    padding: var(--spacing-xxl);
+    color: var(--yt-text-secondary);
+}
+
+.empty-playlist i {
+    font-size: 6rem;
+    margin-bottom: var(--spacing-lg);
+    opacity: 0.3;
+}
 
 /* =============================================
    CARRUSELES Y GRIDS - ESTILO YT MUSIC
@@ -530,7 +775,7 @@ body {
 /* ==== RESULTADOS DE BÚSQUEDA ==== */
 .search-results-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 24px;
     padding: 24px;
     max-width: 100%;
@@ -543,17 +788,26 @@ body {
     cursor: pointer;
     transition: all var(--transition-normal);
     border: 1px solid transparent;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.search-result-card:hover {
+   transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: var(--yt-layer-15);
+    background: var(--yt-bg-menu);
 }
 /* Thumbnail */
 .search-result-thumbnail {
     position: relative;
     width: 100%;
-    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    padding-bottom: 56.25%; /* 16:9 */
     background: var(--yt-bg-base);
     overflow: hidden;
 }
 .search-result-thumbnail img {
-    position: absolute;
+   position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -562,7 +816,7 @@ body {
     transition: transform var(--transition-slow);
 }
 .search-result-card:hover .search-result-thumbnail img {
-    transform: scale(1.05);
+   transform: scale(1.05);
 }
 /* Duración */
 .search-result-duration {
@@ -607,12 +861,7 @@ body {
     margin-top: 12px;
 }
 
-.search-result-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-3);
-    border-color: var(--yt-layer-15);
-    background: var(--yt-bg-menu);
-}
+
 .search-result-add-btn,
 .search-result-add-next-btn {
     flex: 1;
@@ -902,23 +1151,47 @@ body {
    BOTTOM PLAYER - ESTILO YT MUSIC
    ============================================= */
 .bottom-player {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--player-height);
-    background: var(--yt-bg-raised);
-    border-top: 1px solid var(--yt-layer-10);
-    display: flex;
-    align-items: center;
-    padding: 0 var(--spacing-lg);
-    gap: var(--spacing-lg);
-    z-index: 200;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 72px !important;
+    background: var(--yt-bg-raised) !important;
+    border-top: 1px solid var(--yt-layer-10) !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 200 !important;
+    pointer-events: auto !important;
+    padding: 0 var(--spacing-lg) !important;
+    gap: var(--spacing-lg) !important;
+    align-items: center !important;
+}
+.bottom-player.hidden,
+.bottom-player[style*="display: none"],
+body.playing .bottom-player {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+/* Los controles SIEMPRE deben funcionar */
+.bottom-player .control-button,
+.bottom-player .volume-slider,
+.bottom-player .progress-bar,
+.bottom-player .player-extras {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+/* Solo el área de info es clickeable cuando hay video */
+.bottom-player .player-info {
     cursor: pointer;
     transition: background var(--transition-fast);
+    border-radius: var(--border-radius);
+    padding: 8px;
+    margin-left: -8px;
 }
-.bottom-player:hover {
-    background: rgba(33, 33, 33, 0.95);
+.bottom-player .player-info:hover {
+    background: var(--yt-layer-10);
 }
 /* Evitar que los botones dentro activen el click del contenedor */
 .bottom-player .control-button,
