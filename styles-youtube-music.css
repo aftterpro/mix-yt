@@ -529,11 +529,11 @@ body {
 }
 /* ==== RESULTADOS DE BÚSQUEDA ==== */
 .search-results-grid {
-display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
-  gap: 20px;
-  box-sizing: border-box;
-  align-items: start;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    padding: 20px;
+    max-width: 100%;
 }
 
 /* CARD DE RESULTADOS */
@@ -1058,6 +1058,17 @@ display: grid;
 /* =============================================
    RESPONSIVE DESIGN
    ============================================= */
+@media (max-width: 1400px) {
+    .search-results-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+@media (max-width: 1024px) {
+    .search-results-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
 @media (max-width: 1200px) {
     :root {
         --sidebar-width: 240px;
@@ -1637,6 +1648,11 @@ display: grid;
     .bottom-player {
         height: 64px !important;
     }
+    .search-results-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding: 12px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1650,6 +1666,10 @@ display: grid;
         width: 32px;
         height: 32px;
         font-size: 14px;
+    }
+        .search-results-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
 }er !important;
 }
