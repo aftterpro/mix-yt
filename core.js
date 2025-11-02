@@ -280,6 +280,16 @@ processYouTubePlaylists(playlists) {
         this.showMessage('Error procesando playlists de YouTube', 'error');
     }
 }
+    clearYouTubeLibrary() {
+    console.log('🧹 Limpiando biblioteca de YouTube');
+    
+    if (window.playlistManager && window.playlistManager.clearYouTubeLibraryPlaylists) {
+        window.playlistManager.clearYouTubeLibraryPlaylists();
+    }
+    
+    this.updatePlaylistsUI();
+    this.showMessage('Biblioteca de YouTube limpiada', 'success');
+}
 async loadTrendingContent() {
     try {
         console.log('🔥 Cargando contenido trending...');
@@ -958,13 +968,19 @@ movePlayersToMini() {
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    if (player1 && miniContainer1 && !miniContainer1.contains(player1)) {
-        miniContainer1.appendChild(player1);
+    // ✅ NO mover si ya están en el mini player
+    if (player1 && miniContainer1) {
+        if (!miniContainer1.contains(player1)) {
+            miniContainer1.appendChild(player1);
+        }
     }
-    if (player2 && miniContainer2 && !miniContainer2.contains(player2)) {
-        miniContainer2.appendChild(player2);
+    if (player2 && miniContainer2) {
+        if (!miniContainer2.contains(player2)) {
+            miniContainer2.appendChild(player2);
+        }
     }
     
+    // Ajustar estilos sin pausar reproducción
     [player1, player2].forEach(player => {
         if (player) {
             player.style.width = '100%';
@@ -974,20 +990,20 @@ movePlayersToMini() {
             player.style.left = '0';
         }
     });
+    
+    console.log('🎬 Reproductores en mini player (sin interrupción)');
 }
     
 /**
  * Mover reproductores a vista completa
  */
 movePlayerToFullView() {
-    // ✅ CORRECCIÓN: Usar el ID correcto del HTML
     const fullPlayerView = document.getElementById('fullPlayerView');
     if (!fullPlayerView) {
         console.error('❌ fullPlayerView no encontrado');
         return;
     }
     
-    // ✅ Buscar video-wrapper dentro de fullPlayerView
     const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
     if (!videoWrapper) {
         console.error('❌ video-wrapper no encontrado en fullPlayerView');
@@ -1002,7 +1018,7 @@ movePlayerToFullView() {
         return;
     }
     
-    // Mover ambos reproductores al contenedor grande
+    // ✅ NO mover si ya están en el wrapper
     if (!videoWrapper.contains(player1El)) {
         videoWrapper.appendChild(player1El);
     }
@@ -1010,7 +1026,7 @@ movePlayerToFullView() {
         videoWrapper.appendChild(player2El);
     }
     
-    // Asegurar estilos correctos
+    // Asegurar estilos correctos sin pausar
     [player1El, player2El].forEach(player => {
         if (player) {
             player.style.position = 'absolute';
@@ -1021,7 +1037,7 @@ movePlayerToFullView() {
         }
     });
     
-    console.log('✅ Reproductores movidos a vista completa');
+    console.log('✅ Reproductores movidos a vista completa (sin interrupción)');
 }
 
     refreshLibraryView() {
