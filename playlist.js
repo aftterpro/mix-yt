@@ -933,118 +933,165 @@ setupQueueItemListeners() {
     /**
      * Crear popup de playlist con detalles
      */
-    async createPlaylistPopup(playlist) {
-        if (playlist.source === 'youtube_library' && !playlist.isLoaded && playlist.videos.length === 0) {
-            await this.loadPlaylistVideos(playlist.id);
-            playlist = this.playlistsData.find(p => p.id === playlist.id);
-        }
-
-        const popup = document.createElement('div');
-        popup.className = 'playlist-popup-overlay';
-        popup.innerHTML = `
-            <div class="playlist-popup">
-                <div class="playlist-popup-header">
-                    <div class="playlist-header-info">
-                        <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" class="playlist-popup-thumb">
-                        <div class="playlist-header-text">
-                            <h3>${playlist.name}</h3>
-                            <p class="playlist-video-count">${playlist.videos.length} videos</p>
-                        </div>
-                    </div>
-                    <button class="playlist-popup-close">×</button>
-                </div>
-                <div class="playlist-popup-content">
-                    ${this.renderPlaylistContent(playlist)}
-                </div>
-            </div>
-        `;
-
-        this.setupPlaylistPopupEvents(popup, playlist);
-        document.body.appendChild(popup);
-        
-        setTimeout(() => popup.classList.add('show'), 10);
+createPlaylistPopup(playlist) {
+    console.log(`📋 Creando popup para: ${playlist.name}`);
+    
+    // Eliminar popup anterior si existe
+    const existingPopup = document.querySelector('.playlist-popup-overlay');
+    if (existingPopup) {
+        existingPopup.remove();
     }
+    
+    // Crear popup
+    const popup = document.createElement('div');
+    popup.className = 'playlist-popup-overlay';
+    popup.innerHTML = `
+        <div class="playlist-popup">
+            <div class="playlist-popup-header">
+                <div class="playlist-header-info">
+                    <img src="${playlist.thumbnailUrl}" 
+                         alt="${this.escapeHTML(playlist.name)}" 
+                         class="playlist-popup-thumb">
+                    <div class="playlist-header-text">
+                        <h3>${this.escapeHTML(playlist.name)}</h3>
+                        <p class="playlist-video-count">${playlist.videos?.length || 0} videos</p>
+                    </div>
+                </div>
+                <button class="playlist-popup-close" title="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="playlist-popup-content">
+                ${this.renderPlaylistContent(playlist)}
+            </div>
+        </div>
+    `;
+
+    // Agregar al body
+    document.body.appendChild(popup);
+    
+    // Mostrar con animación
+    setTimeout(() => popup.classList.add('show'), 10);
+    
+    // Setup event listeners
+    this.setupPlaylistPopupEvents(popup, playlist);
+    
+    console.log(`✅ Popup creado con ${playlist.videos?.length || 0} videos`);
+}
 
     /**
      * Renderizar contenido de playlist
      */
-    renderPlaylistContent(playlist) {
-        if (playlist.videos.length === 0) {
-            return `<div class="empty-playlist">
+renderPlaylistContent(playlist) {
+    if (!playlist.videos || playlist.videos.length === 0) {
+        return `
+            <div class="empty-playlist">
                 <i class="fas fa-music-slash"></i>
                 <h4>Esta playlist está vacía</h4>
                 <p>No se encontraron videos válidos</p>
-            </div>`;
-        }
-
-        return playlist.videos.map((video, index) => {
-            const formattedDuration = video.duration && video.duration > 0 
-                ? this.core?.formatDuration(video.duration) 
-                : '--:--';
-            
-            return `
-            <div class="playlist-video-item" data-index="${index}">
-                <div class="video-number">${index + 1}</div>
-                <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
-                <div class="video-info">
-                    <div class="video-title" title="${video.title}">${video.title}</div>
-                    <div class="video-meta">
-                        <span class="video-duration">${formattedDuration}</span>
-                        ${video.uploaderName ? `<span class="video-author">${video.uploaderName}</span>` : ''}
-                    </div>
-                </div>
-                <div class="video-actions">
-                    <button class="video-play-btn" title="Reproducir ahora" data-video-index="${index}">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button class="video-menu-btn" title="Más opciones" data-video-id="${video.videoId}">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                </div>
             </div>
         `;
-        }).join('');
     }
+
+    return `
+        <div class="playlist-popup-videos">
+            ${playlist.videos.map((video, index) => {
+                const duration = video.duration && video.duration > 0 
+                    ? this.core?.formatDuration(video.duration) 
+                    : '--:--';
+                
+                return `
+                    <div class="popup-video-item" data-index="${index}">
+                        <div class="popup-video-index">${index + 1}</div>
+                        <img src="${video.thumbnail}" 
+                             alt="${this.escapeHTML(video.title)}" 
+                             class="popup-video-thumbnail"
+                             onerror="this.src='./electronic.ico';">
+                        <div class="popup-video-info">
+                            <div class="popup-video-title" title="${this.escapeHTML(video.title)}">
+                                ${this.escapeHTML(video.title)}
+                            </div>
+                            <div class="popup-video-meta">
+                                <span class="popup-video-channel">${this.escapeHTML(video.uploaderName || 'YouTube')}</span>
+                                <span class="popup-video-duration">${duration}</span>
+                            </div>
+                        </div>
+                        <div class="popup-video-actions">
+                            <button class="popup-video-action-btn primary" 
+                                    data-action="play" 
+                                    data-video-id="${video.videoId}"
+                                    title="Reproducir ahora">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button class="popup-video-action-btn" 
+                                    data-action="queue" 
+                                    data-video-id="${video.videoId}"
+                                    title="Añadir a cola">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
 
     /**
      * Configurar eventos del popup de playlist
      */
-    setupPlaylistPopupEvents(popup, playlist) {
-        popup.querySelector('.playlist-popup-close').addEventListener('click', () => {
-            popup.remove();
-        });
+setupPlaylistPopupEvents(popup, playlist) {
+    // Botón cerrar
+    popup.querySelector('.playlist-popup-close')?.addEventListener('click', () => {
+        popup.classList.remove('show');
+        setTimeout(() => popup.remove(), 300);
+    });
 
-        popup.addEventListener('click', (e) => {
-            if (e.target === popup) popup.remove();
-        });
+    // Click fuera del popup
+    popup.addEventListener('click', (e) => {
+        if (e.target === popup) {
+            popup.classList.remove('show');
+            setTimeout(() => popup.remove(), 300);
+        }
+    });
 
-        popup.querySelectorAll('.video-play-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const videoIndex = parseInt(btn.dataset.videoIndex);
-                const video = playlist.videos[videoIndex];
-                
-                this.addPlaylistToQueue(playlist);
-                
-                const flatList = this.core?.getFlattenedPlaylist();
-                const globalIndex = flatList?.findIndex(v => v.videoId === video.videoId);
-                if (globalIndex !== -1) {
-                    this.core?.playVideoAtIndex(globalIndex);
-                    popup.remove();
-                    this.core?.switchView('playing');
-                }
-            });
+    // Botones de acción de videos
+    popup.querySelectorAll('.popup-video-action-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            const action = btn.dataset.action;
+            const videoId = btn.dataset.videoId;
+            const video = playlist.videos.find(v => v.videoId === videoId);
+            
+            if (!video) return;
+            
+            const videoData = {
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                duration: video.duration,
+                uploaderName: video.uploaderName || video.author || 'YouTube',
+                author: video.author || video.uploaderName || 'YouTube'
+            };
+            
+            if (action === 'queue') {
+                await this.addVideoToQueue(videoData);
+            } else if (action === 'play') {
+                await this.addVideoToQueue(videoData);
+                setTimeout(() => {
+                    const flatList = this.core?.getFlattenedPlaylist();
+                    const index = flatList?.findIndex(v => v.videoId === video.videoId);
+                    if (index !== -1 && this.core) {
+                        this.core.playVideoAtIndex(index);
+                        this.core.switchView('fullPlayer');
+                    }
+                }, 100);
+            }
         });
+    });
+}
 
-        popup.querySelectorAll('.video-menu-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const videoId = btn.dataset.videoId;
-                const video = playlist.videos.find(v => v.videoId === videoId);
-                this.showVideoMenu(video, btn);
-            });
-        });
-    }
 
     /**
      * Añadir playlist completa a la cola
