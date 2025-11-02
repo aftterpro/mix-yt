@@ -647,27 +647,35 @@ updatePlaylistsUI() {
 setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de contenedores');
     
+    // CLICK EN BOTTOM PLAYER (en el área de info/título)
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
         // Limpiar listeners anteriores
         const newBottomPlayer = bottomPlayer.cloneNode(true);
         bottomPlayer.parentNode.replaceChild(newBottomPlayer, bottomPlayer);
         
-        // Agregar nuevo listener
-        newBottomPlayer.addEventListener('click', (e) => {
-            // Solo si NO se clickeó en un control
-            if (!e.target.closest('.control-button') && 
-                !e.target.closest('.volume-slider') &&
-                !e.target.closest('.progress-bar') &&
-                !e.target.closest('.control-btn') &&
-                !e.target.closest('.player-extras button')) {
+        // ✅ CLICK EN INFO DEL PLAYER (título/artista)
+        const playerInfo = newBottomPlayer.querySelector('.player-info');
+        if (playerInfo) {
+            playerInfo.style.cursor = 'pointer';
+            playerInfo.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 
-                const cursorStyle = window.getComputedStyle(newBottomPlayer).cursor;
-                if (cursorStyle === 'pointer' && (this.state.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId)) {
+                const hasVideo = this.state?.currentPlayingInfo?.videoId || 
+                                currentPlayingInfo?.videoId;
+                
+                if (hasVideo) {
+                    console.log('🎬 Click en título, abriendo vista completa');
                     this.switchView('fullPlayer');
+                } else {
+                    this.showMessage('Selecciona una canción primero', 'info');
                 }
-            }
-        });
+            });
+        }
+        
+        // ✅ BOTONES DE CONTROL mantienen su funcionalidad
+        // No necesitan listener adicional, ya funcionan
         
         // ✅ ASEGURAR QUE SIEMPRE ESTÉ VISIBLE
         newBottomPlayer.style.display = 'flex';
@@ -675,6 +683,7 @@ setupPlayerContainerHandlers() {
         newBottomPlayer.style.opacity = '1';
     }
     
+    // ✅ BOTÓN DE COLA
     const queueBtn = document.getElementById('queueButton');
     if (queueBtn) {
         queueBtn.addEventListener('click', (e) => {
@@ -683,8 +692,9 @@ setupPlayerContainerHandlers() {
             this.switchView('fullPlayer');
         });
     }
+    
+    console.log('✅ Handlers configurados: click en título abre vista completa');
 }
-
 /**
  * Mostrar reproductor en vista completa
  */
