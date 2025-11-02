@@ -697,135 +697,139 @@ renderQueueContent(flatList) {
     /**
      * Crear tarjeta visual de playlist
      */
-    createPlaylistCard(playlist) {
-        const card = document.createElement('div');
-        card.className = 'playlist-card';
-        card.dataset.playlistId = playlist.id;
+createPlaylistCard(playlist) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card';
+    card.dataset.playlistId = playlist.id;
 
-        const videoCount = playlist.videos?.length || 0;
-        const isYouTubeLibrary = playlist.source === 'youtube_library';
+    const videoCount = playlist.videos?.length || 0;
+    const isYouTubeLibrary = playlist.source === 'youtube_library';
 
-        card.innerHTML = `
-            <div class="playlist-card-image">
-                <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
-                <div class="playlist-card-overlay">
-                    <button class="play-playlist-btn" data-playlist-id="${playlist.id}">
-                        <i class="fas fa-play"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="playlist-card-info">
-                <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
-                <p class="playlist-card-count">${videoCount} videos</p>
-                ${isYouTubeLibrary ? 
-                    '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
-                    '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
-                }
-                <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Eliminar playlist">
-                    <i class="fas fa-trash"></i>
+    card.innerHTML = `
+        <div class="playlist-card-image">
+            <img src="${playlist.thumbnailUrl}" alt="${playlist.name}" loading="lazy">
+            <div class="playlist-card-overlay">
+                <button class="play-playlist-btn" data-playlist-id="${playlist.id}">
+                    <i class="fas fa-play"></i>
                 </button>
             </div>
-        `;
+        </div>
+        <div class="playlist-card-info">
+            <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
+            <p class="playlist-card-count">${videoCount} videos</p>
+            ${isYouTubeLibrary ? 
+                '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
+                '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
+            }
+            <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Eliminar playlist">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
 
-        // Event listener para reproducir playlist
-        const playBtn = card.querySelector('.play-playlist-btn');
-        playBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const playlistId = playBtn.dataset.playlistId;
+    // ✅ Event listener para reproducir playlist
+    const playBtn = card.querySelector('.play-playlist-btn');
+    playBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const playlistId = playBtn.dataset.playlistId;
+        
+        console.log(`🎵 Reproducir playlist: ${playlistId}`);
+        
+        if (isYouTubeLibrary && !playlist.isLoaded) {
+            console.log('📥 Cargando videos de YouTube Library...');
+            await this.loadPlaylistVideos(playlistId);
+        }
+        
+        const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
+        
+        if (updatedPlaylist?.videos?.length > 0) {
+            let addedCount = 0;
             
-            console.log(`🎵 Reproducir playlist: ${playlistId}`);
-            
-            if (isYouTubeLibrary && !playlist.isLoaded) {
-                console.log('📥 Cargando videos de YouTube Library...');
-                await this.loadPlaylistVideos(playlistId);
+            for (const video of updatedPlaylist.videos) {
+                const videoData = {
+                    videoId: video.videoId,
+                    title: video.title,
+                    thumbnail: video.thumbnail,
+                    duration: video.duration,
+                    uploaderName: video.uploaderName || video.author || 'YouTube',
+                    author: video.author || video.uploaderName || 'YouTube'
+                };
+                
+                const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+                const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
+                
+                if (!isDuplicate) {
+                    await this.addVideoToQueue(videoData);
+                    addedCount++;
+                }
             }
             
-            const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
-            
-            if (updatedPlaylist?.videos?.length > 0) {
-                let addedCount = 0;
+            if (addedCount > 0) {
+                this.core?.showMessage(`${addedCount} videos de "${updatedPlaylist.name}" añadidos a cola`, 'success');
                 
-                for (const video of updatedPlaylist.videos) {
-                    const videoData = {
-                        videoId: video.videoId,
-                        title: video.title,
-                        thumbnail: video.thumbnail,
-                        duration: video.duration,
-                        uploaderName: video.uploaderName || video.author || 'YouTube',
-                        author: video.author || video.uploaderName || 'YouTube'
-                    };
-                    
-                    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
-                    const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
-                    
-                    if (!isDuplicate) {
-                        await this.addVideoToQueue(videoData);
-                        addedCount++;
-                    }
-                }
-                
-                if (addedCount > 0) {
-                    this.core?.showMessage(`${addedCount} videos de "${updatedPlaylist.name}" añadidos a cola`, 'success');
-                    
-                    const flatList = this.core?.getFlattenedPlaylist();
-                    if (flatList?.length > 0 && !window.reproduccionIniciada) {
-                        this.core?.playVideoAtIndex(0);
-                        this.core?.switchView('playing');
-                    }
-                } else {
-                    this.core?.showMessage(`Todos los videos de "${updatedPlaylist.name}" ya están en la cola`, 'info');
+                const flatList = this.core?.getFlattenedPlaylist();
+                if (flatList?.length > 0 && !window.reproduccionIniciada) {
+                    this.core?.playVideoAtIndex(0);
+                    this.core?.switchView('playing');
                 }
             } else {
-                console.error('❌ La playlist no tiene videos o no se cargaron correctamente');
-                this.core?.showMessage('No se pudieron cargar los videos de la playlist', 'error');
+                this.core?.showMessage(`Todos los videos de "${updatedPlaylist.name}" ya están en la cola`, 'info');
             }
-        });
-
-        // Event listener para eliminar playlist
-        const deleteBtn = card.querySelector('.delete-playlist-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                const playlistId = deleteBtn.dataset.playlistId;
-                
-                console.log(`🗑️ Solicitud eliminar playlist: ${playlistId}`);
-                
-                const playlistToDelete = this.playlistsData.find(p => p.id === playlistId);
-                if (playlistToDelete) {
-                    const confirmMessage = isYouTubeLibrary 
-                        ? `¿Eliminar "${playlistToDelete.name}" de la biblioteca? (Solo se elimina de la app, no de YouTube)`
-                        : `¿Eliminar la playlist "${playlistToDelete.name}"?`;
-                    
-                    if (confirm(confirmMessage)) {
-                        this.deletePlaylist(playlistId);
-                    }
-                }
-            });
+        } else {
+            console.error('❌ La playlist no tiene videos o no se cargaron correctamente');
+            this.core?.showMessage('No se pudieron cargar los videos de la playlist', 'error');
         }
+    });
 
-        //Click en card para mostrar videos
-        card.addEventListener('click', async (e) => {
-            if (!e.target.closest('.play-playlist-btn') && !e.target.closest('.delete-playlist-btn')) {
-                console.log(`🎵 Click en playlist: ${playlist.name}`);
+    // ✅ Event listener para eliminar playlist
+    const deleteBtn = card.querySelector('.delete-playlist-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const playlistId = deleteBtn.dataset.playlistId;
+            
+            console.log(`🗑️ Solicitud eliminar playlist: ${playlistId}`);
+            
+            const playlistToDelete = this.playlistsData.find(p => p.id === playlistId);
+            if (playlistToDelete) {
+                const confirmMessage = isYouTubeLibrary 
+                    ? `¿Eliminar "${playlistToDelete.name}" de la biblioteca? (Solo se elimina de la app, no de YouTube)`
+                    : `¿Eliminar la playlist "${playlistToDelete.name}"?`;
                 
-                // Si es de YouTube Library y no está cargada, cargar videos
-                if (isYouTubeLibrary && !playlist.isLoaded) {
-                    console.log('📥 Cargando videos de YouTube Library...');
-                    const success = await this.loadPlaylistVideos(playlist.id);
-                    if (!success) {
-                        this.core?.showMessage('Error cargando videos de la playlist', 'error');
-                        return;
-                    }
+                if (confirm(confirmMessage)) {
+                    this.deletePlaylist(playlistId);
                 }
-                
-                // Mostrar popup con videos
-                this.createPlaylistPopup(playlist);
             }
         });
-
-        return card;
     }
+
+    // ✅ CORRECCIÓN: Click en card para mostrar popup
+    card.addEventListener('click', async (e) => {
+        // Verificar que NO se hizo click en botones
+        if (e.target.closest('.play-playlist-btn') || 
+            e.target.closest('.delete-playlist-btn')) {
+            return;
+        }
+        
+        console.log(`🎵 Click en playlist: ${playlist.name}`);
+        
+        // Si es de YouTube Library y no está cargada, cargar videos
+        if (isYouTubeLibrary && !playlist.isLoaded) {
+            console.log('📥 Cargando videos de YouTube Library...');
+            const success = await this.loadPlaylistVideos(playlist.id);
+            if (!success) {
+                this.core?.showMessage('Error cargando videos de la playlist', 'error');
+                return;
+            }
+        }
+        
+        // Mostrar popup con videos
+        this.createPlaylistPopup(playlist);
+    });
+
+    return card;
+}
 
     /**
      * Eliminar playlist
