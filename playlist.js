@@ -1036,7 +1036,13 @@ renderPlaylistContent(playlist) {
         </div>
     `;
 }
-
+// Formatear duración
+function formatDuration(duration) {
+    if (!duration || isNaN(duration)) return '0:00';
+    const minutes = Math.floor(duration / 60);
+    const seconds = Math.floor(duration % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
     /**
      * Configurar eventos del popup de playlist
      */
@@ -1091,8 +1097,6 @@ setupPlaylistPopupEvents(popup, playlist) {
         });
     });
 }
-
-
     /**
      * Añadir playlist completa a la cola
      */
