@@ -532,10 +532,186 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 24px;
-    padding: 20px;
+    padding: 24px;
     max-width: 100%;
 }
+/* Cards de resultados de búsqueda */
+.search-result-card {
+    background: var(--yt-bg-elevated);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    border: 1px solid transparent;
+}
+/* Thumbnail */
+.search-result-thumbnail {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    background: var(--yt-bg-base);
+    overflow: hidden;
+}
+.search-result-thumbnail img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--transition-slow);
+}
+.search-result-card:hover .search-result-thumbnail img {
+    transform: scale(1.05);
+}
+/* Duración */
+.search-result-duration {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+/* Info */
+.search-result-info {
+    padding: 16px;
+}
+.search-result-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--yt-text-primary);
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.4;
+    min-height: 2.8em;
+}
+.search-result-author {
+    font-size: 12px;
+    color: var(--yt-text-secondary);
+    margin-bottom: 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+/* Acciones */
+.search-result-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
 
+.search-result-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-3);
+    border-color: var(--yt-layer-15);
+    background: var(--yt-bg-menu);
+}
+.search-result-add-btn,
+.search-result-add-next-btn {
+    flex: 1;
+    background: rgba(255, 107, 53, 0.1);
+    border: 1px solid rgba(255, 107, 53, 0.3);
+    border-radius: 6px;
+    color: var(--primary-color);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+}
+.search-result-add-next-btn {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+.search-result-card:hover .search-result-add-next-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.search-result-add-btn:hover,
+.search-result-add-next-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.search-result-add-btn i,
+.search-result-add-next-btn i {
+    font-size: 10px;
+}
+
+/* Placeholder */
+.search-placeholder {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 80px 40px;
+    color: var(--yt-text-secondary);
+}
+
+.search-placeholder i {
+    font-size: 64px;
+    margin-bottom: 24px;
+    opacity: 0.3;
+}
+
+.search-placeholder p {
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.search-placeholder small {
+    font-size: 14px;
+    opacity: 0.7;
+}
+
+/* Loading */
+.search-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    color: var(--yt-text-secondary);
+}
+
+.search-loading-more {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 24px;
+    margin: 16px 0;
+}
+
+.search-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--primary-color);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.search-spinner i {
+    font-size: 18px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 /* CARD DE RESULTADOS */
 .search-results-grid .result-card {
   background-color: #181818;
@@ -609,8 +785,7 @@ body {
    MUSIC CARD - ESTILO YT MUSIC
    ============================================= */
 .music-card,
-.playlist-card,
-.search-result-card {
+.playlist-card {
     background: transparent;
     border-radius: var(--border-radius);
     cursor: pointer;
@@ -619,14 +794,12 @@ body {
 }
 
 .music-card:hover,
-.playlist-card:hover,
-.search-result-card:hover {
+.playlist-card:hover{
     background: var(--yt-layer-5);
 }
 
 .card-thumbnail,
-.playlist-card-image,
-.search-result-thumbnail {
+.playlist-card-image {
     position: relative;
     width: 100%;
     padding-bottom: 100%;
@@ -637,8 +810,7 @@ body {
 }
 
 .card-thumbnail img,
-.playlist-card-image img,
-.search-result-thumbnail img {
+.playlist-card-image img {
     position: absolute;
     top: 0;
     left: 0;
@@ -649,8 +821,7 @@ body {
 }
 
 .music-card:hover .card-thumbnail img,
-.playlist-card:hover .playlist-card-image img,
-.search-result-card:hover .search-result-thumbnail img {
+.playlist-card:hover .playlist-card-image img {
     transform: scale(1.05);
 }
 
@@ -1058,26 +1229,33 @@ body {
 /* =============================================
    RESPONSIVE DESIGN
    ============================================= */
-@media (max-width: 1400px) {
+/* Desktop grande */
+@media (min-width: 1600px) {
     .search-results-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+@media (max-width: 1400px) {
+        .search-results-grid {
+        grid-template-columns: repeat(4, 1fr);
     }
 }
 @media (max-width: 1024px) {
-    .search-results-grid {
-        grid-template-columns: repeat(2, 1fr);
+.search-results-grid {
+        grid-template-columns: repeat(3, 1fr);
         gap: 16px;
+        padding: 20px;
     }
 }
 @media (max-width: 1200px) {
     :root {
         --sidebar-width: 240px;
     }
-    
+
     .search-results-grid {
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
     }
-    
     .playlists-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
@@ -1133,7 +1311,26 @@ body {
         display: none;
     }
 }
-
+/* Tablet pequeño */
+@media (max-width: 768px) {
+    .search-results-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding: 16px;
+    }
+    
+    .search-result-info {
+        padding: 12px;
+    }
+    
+    .search-result-title {
+        font-size: 13px;
+    }
+    
+    .search-result-author {
+        font-size: 11px;
+    }
+}
 @media (max-width: 640px) {
     .mobile-search {
         max-width: 150px;
@@ -1196,6 +1393,41 @@ body {
     
     .nav-tab {
         justify-content: center;
+    }
+    .search-results-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 12px;
+    }
+    
+    .search-result-thumbnail {
+        padding-bottom: 75%; /* Más cuadrado en móvil */
+    }
+    
+    .search-result-info {
+        padding: 10px;
+    }
+    
+    .search-result-title {
+        font-size: 12px;
+        -webkit-line-clamp: 2;
+    }
+    
+    .search-result-actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .search-result-add-btn,
+    .search-result-add-next-btn {
+        font-size: 11px;
+        padding: 6px 10px;
+    }
+}
+/* Móvil muy pequeño */
+@media (max-width: 360px) {
+    .search-results-grid {
+        grid-template-columns: 1fr;
     }
 }
 /* =============================================
@@ -1466,8 +1698,7 @@ body {
     margin-top: var(--spacing-sm);
 }
 
-.search-result-add-btn,
-.search-result-add-next-btn {
+.search-result-add-btn {
     flex: 1;
     padding: var(--spacing-sm) var(--spacing-md);
     background: rgba(255, 107, 53, 0.1);
@@ -1484,13 +1715,7 @@ body {
     transition: all var(--transition-fast);
 }
 
-.search-result-add-next-btn {
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.3s ease;
-}
-
-.search-result-card:hover .search-result-add-next-btn {
+.search-result-card:hover {
     opacity: 1;
     transform: translateY(0);
 }
