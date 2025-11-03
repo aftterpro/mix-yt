@@ -1165,10 +1165,9 @@ body {
 
 /* Tablets y pantallas medianas */
 @media (max-width: 1400px) {
-    .search-results-grid {
-        grid-template-columns: repeat(3, 1fr) !important;
+        .search-results-grid {
+        grid-template-columns: repeat(2, 2fr) !important;
     }
-    
     .playlist-popup {
         width: 95%;
     }
@@ -1491,13 +1490,14 @@ body {
 /* =============================================
    COLA PERSISTENTE
    ============================================= */
-.persistent-queue-sidebar {
-  width: 400px;
-  min-width: 400px;
-  background: #181818;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
+persistent-queue-sidebar {
+    background: #181818;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    width: 400px;
+    height: 575px;
+    margin: 8px;
 }
 
 .queue-header {
