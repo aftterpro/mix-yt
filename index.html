@@ -135,27 +135,34 @@
 
         <!-- FULL PLAYER VIEW -->
         <div class="content-view full-player-view" id="fullPlayerView">
-          <div class="player-queue-layout">
-            <div class="video-container-full">
-              <div class="video-wrapper">
-                <div id="player1" class="video-player"></div>
-                <div id="player2" class="video-player hidden"></div>
-              </div>
-              <div class="persistent-queue-sidebar">
-                <div class="queue-header">
-                  <div class="queue-header-title">
-                    <h3>Cola de reproducción</h3>
-                    <span id="queueCount" class="queue-count-badge">0</span>
-                  </div>
-                  <button class="clear-queue-btn" onclick="if(window.playlistManager) window.playlistManager.clearQueue()" title="Limpiar cola">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-                <div id="queueContentList" class="queue-list-content">
-                  <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
-                </div>
-              </div>  
-            </div>
+      <div class="player-queue-layout">
+    <!-- 🎥 CONTENEDOR DE VIDEO -->
+    <div class="video-container-full">
+      <div class="video-wrapper">
+      <div id="player1" class="video-player"></div>
+      <div id="player2" class="video-player hidden"></div>
+    </div>
+  </div>
+
+  <!-- 🎶 COLUMNA DE COLA A LA DERECHA -->
+  <div class="persistent-queue-sidebar">
+    <div class="queue-header">
+      <div class="queue-header-title">
+        <h3>Cola de reproducción</h3>
+        <span id="queueCount" class="queue-count-badge">0</span>
+      </div>
+      <button class="clear-queue-btn"
+              onclick="if(window.playlistManager) window.playlistManager.clearQueue()"
+              title="Limpiar cola">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+
+    <div id="queueContentList" class="queue-list-content">
+      <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+    </div>
+      </div>
+          </div>
           </div>
         </div>
       </div><!-- content-area -->
