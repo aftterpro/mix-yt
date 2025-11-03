@@ -30,6 +30,28 @@
             async defer 
             onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
 </head>
+    <style>
+        .bottom-player {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 80px !important;
+  background: #181818 !important;
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff !important;
+  border-top: 1px solid #333;
+  z-index: 999999 !important; /* 🔥 más alto que cualquier otro */
+}
+
+.app-container,
+.main-content {
+  overflow: visible !important;
+}
+        
+        </style>
 <body class="unified-loading">
     <!-- ESTRUCTURA YT MUSIC -->
     <div class="app-container">
