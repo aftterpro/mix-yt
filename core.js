@@ -1404,13 +1404,15 @@ startCrossfade(prevPlayer, nextPlayer) {
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
     
-    // Configurar elementos visuales
+    //  Asegurar que nextElement sea VISIBLE desde el inicio
     if (nextElement) {
         nextElement.classList.remove('hidden', 'fade-out');
         nextElement.classList.add('fade-in', 'crossfade-enter');
         nextElement.style.display = 'block';
+        nextElement.style.visibility = 'visible'; 
         nextElement.style.opacity = '0';
         nextElement.style.zIndex = '3';
+        nextElement.style.pointerEvents = 'auto'; 
     }
     
     if (prevElement) {
@@ -1418,6 +1420,7 @@ startCrossfade(prevPlayer, nextPlayer) {
         prevElement.classList.add('fade-out', 'crossfade-exit');
         prevElement.style.opacity = '1';
         prevElement.style.zIndex = '2';
+        prevElement.style.visibility = 'visible'; 
     }
     
     const steps = 100;
