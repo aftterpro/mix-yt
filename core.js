@@ -951,7 +951,7 @@ const validViews = ['home', 'search', 'library', 'fullPlayer'];
 // FORZAR VISIBILIDAD DEL BOTTOM PLAYER
 // =============================================
 
-function forceBottomPlayerVisible() {
+ forceBottomPlayerVisible() {
     const bottomPlayer = document.querySelector('.bottom-player');
     
     if (!bottomPlayer) {
