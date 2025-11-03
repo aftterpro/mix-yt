@@ -846,7 +846,7 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-    const validViews = ['home', 'search', 'library', 'fullPlayer'];
+const validViews = ['home', 'search', 'library', 'fullPlayer'];
     if (!validViews.includes(viewName)) {
         console.warn(`⚠️ Vista inválida: ${viewName}`);
         return;
@@ -878,16 +878,18 @@ switchView(viewName) {
     targetView.classList.add('active');
     this.currentView = viewName;
 
-    // ✅ GESTIÓN DE BOTTOM PLAYER Y REPRODUCTORES
+    // ✅ CORRECCIÓN CRÍTICA: BOTTOM PLAYER SIEMPRE VISIBLE
     const bottomPlayer = document.querySelector('.bottom-player');
     const fullPlayerView = document.getElementById('fullPlayerView');
     const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId;
 
-    // ✅ CRÍTICO: BOTTOM PLAYER SIEMPRE VISIBLE
+    // ✅ FORZAR VISIBILIDAD
     if (bottomPlayer) {
         bottomPlayer.style.display = 'flex';
         bottomPlayer.style.visibility = 'visible';
         bottomPlayer.style.opacity = '1';
+        bottomPlayer.style.pointerEvents = 'auto';
+        bottomPlayer.classList.remove('hidden', 'hide');
     }
 
     if (viewName === 'fullPlayer') {
@@ -895,9 +897,10 @@ switchView(viewName) {
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
         }
+        
+        // ✅ BOTTOM PLAYER SIGUE VISIBLE EN VISTA COMPLETA
         if (bottomPlayer) {
             bottomPlayer.style.cursor = 'default';
-            bottomPlayer.style.pointerEvents = 'auto';
         }
         
         this.movePlayerToFullView();
@@ -911,7 +914,7 @@ switchView(viewName) {
             miniPlayer.style.display = 'none';
         }
         
-        console.log('🎬 Vista completa activada');
+        console.log('🎬 Vista completa activada CON bottom player visible');
         
     } else {
         // Otras vistas
@@ -921,7 +924,6 @@ switchView(viewName) {
         
         if (bottomPlayer) {
             bottomPlayer.style.cursor = 'pointer';
-            bottomPlayer.style.pointerEvents = 'auto';
         }
         
         // Mostrar mini player si hay video reproduciéndose
@@ -929,7 +931,7 @@ switchView(viewName) {
             this.showMiniPlayerFloat();
         }
         
-        console.log(`📱 Vista ${viewName}: Mini reproductor activo`);
+        console.log(`📱 Vista ${viewName}: Bottom player visible`);
     }
 
     // Acciones específicas por vista
@@ -941,6 +943,63 @@ switchView(viewName) {
             this.focusSearchInput();
             break;
     }
+    
+    // ✅ VERIFICACIÓN FINAL
+    setTimeout(() => forceBottomPlayerVisible(), 100);
+};
+// =============================================
+// FORZAR VISIBILIDAD DEL BOTTOM PLAYER
+// =============================================
+
+function forceBottomPlayerVisible() {
+    const bottomPlayer = document.querySelector('.bottom-player');
+    
+    if (!bottomPlayer) {
+        console.warn('⚠️ Bottom player no encontrado en el DOM');
+        return;
+    }
+    
+    // Remover TODOS los estilos inline que puedan ocultarlo
+    bottomPlayer.style.removeProperty('display');
+    bottomPlayer.style.removeProperty('visibility');
+    bottomPlayer.style.removeProperty('opacity');
+    
+    // Aplicar estilos forzados
+    bottomPlayer.style.cssText = `
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 300 !important;
+        pointer-events: auto !important;
+    `;
+    
+    // Remover clases que puedan ocultarlo
+    bottomPlayer.classList.remove('hidden', 'hide', 'invisible');
+    
+    console.log('✅ Bottom player forzado a visible');
+}
+
+// Ejecutar inmediatamente cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        forceBottomPlayerVisible();
+        
+        // Verificar cada segundo durante los primeros 10 segundos
+        let checks = 0;
+        const interval = setInterval(() => {
+            forceBottomPlayerVisible();
+            checks++;
+            if (checks >= 10) {
+                clearInterval(interval);
+            }
+        }, 1000);
+    });
+} else {
+    forceBottomPlayerVisible();
 }
 /**
  * SHOW MINI PLAYER FLOAT
