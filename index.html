@@ -1,424 +1,242 @@
 <!DOCTYPE html>
 <html lang="es"> 
 <head>
-    <meta charset="UTF-8">
-    <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title>
-    
-    <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
-    <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw" />
-    <meta name="theme-color" content="#ff6b35">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="./styles-youtube-music.css">
-    <link rel="stylesheet" href="./efecto.css">
-    
-    <link rel="icon" href="./electronic.ico">
-    <!--  Google APIs CON CALLBACKS  -->
-    <script src="https://apis.google.com/js/api.js" 
-            async defer 
-            onload="console.log('✅ GAPI script loaded')"></script>
-    
-    <script src="https://accounts.google.com/gsi/client" 
-            async defer 
-            onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
+  <meta charset="UTF-8">
+  <title>YT CrossMix: Mezclador de Playlists YouTube con Crossfade</title>
+  
+  <meta name="description" content="Crea mezclas perfectas de tus playlists de YouTube. Disfruta de transiciones suaves con crossfade automático entre canciones. Ideal para fiestas y sesiones de música sin interrupciones.">
+  <meta name="keywords" content="mix youtube, playlist mix, youtube crossfade, mezclador youtube, dj youtube, youtube party mix, transiciones youtube, reproductor playlist youtube, yt mix, youtube mixer">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="google-site-verification" content="OT9HeSt-AF8YOPjndOBDMwJfSQ3uTb6NqLy2Ahd3TMw">
+  <meta name="theme-color" content="#ff6b35">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="./styles-youtube-music.css">
+  <link rel="stylesheet" href="./efecto.css">
+  <link rel="icon" href="./electronic.ico">
+
+  <!-- Google APIs -->
+  <script src="https://apis.google.com/js/api.js" async defer onload="console.log('✅ GAPI script loaded')"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
+
+  <style>
+    .bottom-player {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: 90px !important;
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      background: #181818 !important;
+      color: white !important;
+      z-index: 999999 !important;
+      border-top: 1px solid #333 !important;
+      padding: 0 15px !important;
+      box-sizing: border-box !important;
+    }
+    .bottom-player * { flex-shrink: 0 !important; }
+    .player-info, .player-controls, .player-extras {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative !important;
+      min-height: 50px !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+  </style>
 </head>
-    <style>
-       .bottom-player {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 90px !important;           /* 🔥 fuerza tamaño visible */
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  background: #181818 !important;
-  color: white !important;
-  z-index: 999999 !important;
-  border-top: 1px solid #333 !important;
-  padding: 0 15px !important;
-  box-sizing: border-box !important;
-}
-.bottom-player * {
-  flex-shrink: 0 !important;
-}
-.player-info,
-.player-controls,
-.player-extras {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  position: relative !important;
-  height: auto !important;
-  min-height: 50px !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
 
-.player-info img,
-.player-info .player-text,
-.player-controls button,
-.player-extras {
-  display: inline-flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
-.bottom-player {
-  min-height: 90px !important;
-  background: #181818 !important;
-  color: #fff !important;
-  border-top: 2px solid #333 !important;
-  z-index: 999999 !important;
-}
-        
-        </style>
 <body class="unified-loading">
-    <!-- ESTRUCTURA YT MUSIC -->
-    <div class="app-container">
-        
-        <!-- ===== SIDEBAR DESKTOP ===== -->
-        <aside class="desktop-sidebar" id="desktopSidebar">
-            <!-- Header con logo y menú -->
-            <div class="sidebar-header">
-                <button class="menu-toggle-btn" onclick="toggleSidebar()">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <div class="logo">
-                    <i class="fas fa-music"></i>
-                </div>
-                <span class="app-name">YT CrossMix</span>
+  <!-- ESTRUCTURA YT MUSIC -->
+  <div class="app-container">
+
+    <!-- ===== SIDEBAR DESKTOP ===== -->
+    <aside class="desktop-sidebar" id="desktopSidebar">
+      <div class="sidebar-header">
+        <button class="menu-toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <div class="logo"><i class="fas fa-music"></i></div>
+        <span class="app-name">YT CrossMix</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <button class="nav-item active" data-view="home"><i class="fas fa-home"></i><span>Inicio</span></button>
+          <button class="nav-item" data-view="search"><i class="fas fa-search"></i><span>Buscar</span></button>
+          <button class="nav-item" data-view="library"><i class="fas fa-folder"></i><span>Biblioteca</span></button>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+      <header class="top-bar">
+        <div class="sidebar-search">
+          <input type="text" id="sidebarSearchInput" class="sidebar-search-input" placeholder="Buscar música, artistas, playlists...">
+        </div>
+        <div class="user-actions">
+          <button class="auth-btn" id="googleSignInButton"><i class="fab fa-google"></i><span>Conectar</span></button>
+          <button class="auth-btn hidden" id="googleSignOutButton"><i class="fas fa-sign-out-alt"></i><span>Salir</span></button>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <!-- HOME, SEARCH y LIBRARY views -->
+        <div class="content-view active" id="homeView">
+          <div class="welcome-section">
+            <div class="welcome-icon"><i class="fas fa-music"></i></div>
+            <h1 class="welcome-title">Bienvenido a YT CrossMix</h1>
+            <p class="welcome-subtitle">
+              Crea mezclas perfectas con transiciones suaves entre canciones.<br>
+              Conecta tu cuenta de Google para empezar.
+            </p>
+          </div>
+          <div class="carousel-section">
+            <div class="carousel-header"><h2 class="carousel-title">🔥 Escucha Rápida</h2></div>
+            <div class="cards-grid" id="quickPicksGrid"></div>
+          </div>
+        </div>
+
+        <div class="content-view" id="searchView">
+          <div class="carousel-section">
+            <div class="carousel-header"><h2 class="carousel-title">Resultados de Búsqueda</h2></div>
+            <div class="search-results-grid" id="searchResults">
+              <div class="search-placeholder"><i class="fas fa-search"></i><p>Busca música, artistas o playlists</p></div>
             </div>
+          </div>
+        </div>
 
-            <!-- Navegación -->
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <button class="nav-item active" data-view="home">
-                        <i class="fas fa-home"></i>
-                        <span>Inicio</span>
-                    </button>
-                    <button class="nav-item" data-view="search">
-                        <i class="fas fa-search"></i>
-                        <span>Buscar</span>
-                    </button>
-                    <button class="nav-item" data-view="library">
-                        <i class="fas fa-folder"></i>
-                        <span>Biblioteca</span>
-                    </button>
-                </div>
-            </nav>
-        </aside>
+        <div class="content-view" id="libraryView">
+          <div class="carousel-section">
+            <div class="carousel-header"><h2 class="carousel-title">Tu Biblioteca</h2></div>
+            <div class="playlists-grid" id="playlistsGrid"></div>
+          </div>
+        </div>
 
-        <!-- ===== MAIN CONTENT ===== -->
-        <main class="main-content">
-            <!-- Top Bar -->
-            <header class="top-bar">
-                <!-- Búsqueda Desktop -->
-                <div class="sidebar-search">
-                    <input type="text" 
-                           id="sidebarSearchInput" 
-                           class="sidebar-search-input" 
-                           placeholder="Buscar música, artistas, playlists...">
-                         </div>
-                <!-- User Actions -->
-                <div class="user-actions">
-                    <button class="auth-btn" id="googleSignInButton">
-                        <i class="fab fa-google"></i>
-                        <span>Conectar</span>
-                    </button>
-                    <button class="auth-btn hidden" id="googleSignOutButton">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Salir</span>
-                    </button>
-                </div>
-            </header>
+        <!-- MINI PLAYER FLOAT -->
+        <div id="miniPlayerFloat" class="mini-player-float hidden">
+          <div class="mini-player-video">
+            <div id="miniPlayer1Container" class="mini-video-container"></div>
+            <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
+          </div>
+          <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
+            <i class="fas fa-expand"></i>
+          </button>
+        </div>
 
-            <!-- Content Area -->
-            <div class="content-area">
-                
-                <!-- ===== HOME VIEW ===== -->
-                <div class="content-view active" id="homeView">
-                    <div class="welcome-section">
-                        <div class="welcome-icon">
-                            <i class="fas fa-music"></i>
-                        </div>
-                        <h1 class="welcome-title">Bienvenido a YT CrossMix</h1>
-                        <p class="welcome-subtitle">
-                            Crea mezclas perfectas con transiciones suaves entre canciones.<br>
-                            Conecta tu cuenta de Google para empezar.
-                        </p>
-                    </div>
-
-                    <!-- Quick Picks / Trending -->
-                    <div class="carousel-section">
-                        <div class="carousel-header">
-                            <h2 class="carousel-title">🔥 Escucha Rápida</h2>
-                        </div>
-                        <div class="cards-grid" id="quickPicksGrid">
-                            <!-- Cards dinámicas de trending -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ===== SEARCH VIEW ===== -->
-                <div class="content-view" id="searchView">
-                    <div class="carousel-section">
-                        <div class="carousel-header">
-                            <h2 class="carousel-title">Resultados de Búsqueda</h2>
-                        </div>
-                        <div class="search-results-grid" id="searchResults">
-                            <div class="search-placeholder">
-                                <i class="fas fa-search"></i>
-                                <p>Busca música, artistas o playlists</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ===== LIBRARY VIEW ===== -->
-                <div class="content-view" id="libraryView">
-                    <div class="carousel-section">
-                        <div class="carousel-header">
-                            <h2 class="carousel-title">Tu Biblioteca</h2>
-                        </div>
-                        <div class="playlists-grid" id="playlistsGrid">
-                            <!-- Playlists dinámicas -->
-                        </div>
-                    </div>
-                </div>
-              <!-- Mini Player Flotante (se crea dinámicamente) -->
-               <div id="miniPlayerFloat" class="mini-player-float hidden">
-                <div class="mini-player-video">
-                   <div id="miniPlayer1Container" class="mini-video-container"></div>
-                <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
-                </div>
-                    <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
-                <i class="fas fa-expand"></i>
-            </button>
-            </div>
-                <!-- ===== PLAYING VIEW ===== -->
-            <div class="content-view full-player-view" id="fullPlayerView">
-            <div class="player-queue-layout">
-        
-        <!-- Video grande a la izquierda -->
-        <div class="video-container-full">
-            <div class="video-wrapper">
-                <!-- Los reproductores se moverán aquí dinámicamente -->
+        <!-- FULL PLAYER VIEW -->
+        <div class="content-view full-player-view" id="fullPlayerView">
+          <div class="player-queue-layout">
+            <div class="video-container-full">
+              <div class="video-wrapper">
                 <div id="player1" class="video-player"></div>
                 <div id="player2" class="video-player hidden"></div>
-            </div>
-        <!-- Cola persistente a la derecha -->
-        <div class="persistent-queue-sidebar">
-            <div class="queue-header">
-                <div class="queue-header-title">
+              </div>
+              <div class="persistent-queue-sidebar">
+                <div class="queue-header">
+                  <div class="queue-header-title">
                     <h3>Cola de reproducción</h3>
                     <span id="queueCount" class="queue-count-badge">0</span>
-                </div>
-                <button class="clear-queue-btn" 
-                        onclick="if(window.playlistManager) window.playlistManager.clearQueue()"
-                        title="Limpiar cola">
+                  </div>
+                  <button class="clear-queue-btn" onclick="if(window.playlistManager) window.playlistManager.clearQueue()" title="Limpiar cola">
                     <i class="fas fa-trash"></i>
-                </button>
+                  </button>
+                </div>
+                <div id="queueContentList" class="queue-list-content">
+                  <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+                </div>
+              </div>  
             </div>
-            
-            <div id="queueContentList" class="queue-list-content">
-                <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
-            </div>
-        </div>  
-     </div>
-    </div>
-    <!-- ===== BOTTOM PLAYER ===== -->
+          </div>
+        </div>
+      </div><!-- content-area -->
+    </main>
+  </div><!-- cierre de app-container -->
+
+  <!-- ===== BOTTOM PLAYER (fuera del contenedor principal) ===== -->
   <div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
-        <!-- Player Info -->
-        <div class="player-info">
-            <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
-            <div class="player-text">
-                <div class="player-title" id="playerTitle">Selecciona una canción</div>
-                <div class="player-artist" id="playerArtist">YT CrossMix</div>
-            </div>
-        </div>
-
-        <!-- Player Controls -->
-        <div class="player-controls">
-            <div class="controls-buttons">
-                <button class="control-button" id="shuffleBtn" title="Aleatorio" disabled>
-                    <i class="fas fa-random"></i>
-                </button>
-                <button class="control-button" id="prevButton" title="Anterior" disabled>
-                    <i class="fas fa-step-backward"></i>
-                </button>
-                <button class="control-button primary" id="botonPlay" title="Reproducir" disabled>
-                    <i class="fas fa-play"></i>
-                </button>
-                <button class="control-button" id="botonNext" title="Siguiente" disabled>
-                    <i class="fas fa-step-forward"></i>
-                </button>
-                <button class="control-button" id="repeatBtn" title="Repetir" disabled>
-                    <i class="fas fa-redo"></i>
-                </button>
-            </div>
-            
-            <div class="progress-container">
-                <span class="time-display" id="currentTime">0:00</span>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 0%">
-                        <div class="progress-handle"></div>
-                    </div>
-                </div>
-                <span class="time-display" id="totalTime">0:00</span>
-            </div>
-        </div>
-
-        <!-- Player Extras -->
-        <div class="player-extras">
-            <div class="player-volume">
-                <button class="control-button" id="volumeButton" title="Volumen">
-                    <i class="fas fa-volume-up"></i>
-                </button>
-                <div class="volume-slider" id="volumeSlider">
-                    <div class="volume-fill"></div>
-                </div>
-            </div>
-        </div>
+    <div class="player-info">
+      <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
+      <div class="player-text">
+        <div class="player-title" id="playerTitle">Selecciona una canción</div>
+        <div class="player-artist" id="playerArtist">YT CrossMix</div>
+      </div>
     </div>
 
-    <!-- ===== MOBILE HEADER ===== -->
-    <header class="mobile-header">
-        <div class="mobile-logo">
-            <div class="logo-icon">
-                <i class="fas fa-music"></i>
-            </div>
-            <span class="logo-text">CrossMix</span>
-        </div>
-        <div class="mobile-search">
-            <input type="text" 
-                   id="mobileSearchInput" 
-                   class="mobile-search-input" 
-                   placeholder="Buscar...">
-        </div>
-        <div class="mobile-user-actions">
-            <button class="mobile-menu-btn auth-btn" id="mobileSignInButton">
-                <i class="fab fa-google"></i>
-            </button>
-        </div>
-    </header>
+    <div class="player-controls">
+      <div class="controls-buttons">
+        <button class="control-button" id="shuffleBtn" title="Aleatorio" disabled><i class="fas fa-random"></i></button>
+        <button class="control-button" id="prevButton" title="Anterior" disabled><i class="fas fa-step-backward"></i></button>
+        <button class="control-button primary" id="botonPlay" title="Reproducir" disabled><i class="fas fa-play"></i></button>
+        <button class="control-button" id="botonNext" title="Siguiente" disabled><i class="fas fa-step-forward"></i></button>
+        <button class="control-button" id="repeatBtn" title="Repetir" disabled><i class="fas fa-redo"></i></button>
+      </div>
+      <div class="progress-container">
+        <span class="time-display" id="currentTime">0:00</span>
+        <div class="progress-bar"><div class="progress-fill" style="width:0%"><div class="progress-handle"></div></div></div>
+        <span class="time-display" id="totalTime">0:00</span>
+      </div>
+    </div>
 
-    <!-- ===== BOTTOM NAV MOBILE ===== -->
-    <nav class="bottom-nav">
-        <button class="nav-tab active" data-view="home">
-            <i class="fas fa-home"></i>
-            <span>Inicio</span>
-        </button>
-        <button class="nav-tab" data-view="search">
-            <i class="fas fa-search"></i>
-            <span>Buscar</span>
-        </button>
-        <button class="nav-tab" data-view="library">
-            <i class="fas fa-folder"></i>
-            <span>Biblioteca</span>
-        </button>
-    </nav>
-<div id="miniPlayerContainer" class="mini-player-float hidden">
-    <!-- El reproductor se moverá aquí dinámicamente -->
-</div>
-    <!-- ===== FLOATING MESSAGES ===== -->
-    <div class="floating-messages" id="floatingMessageContainer"></div>
+    <div class="player-extras">
+      <div class="player-volume">
+        <button class="control-button" id="volumeButton" title="Volumen"><i class="fas fa-volume-up"></i></button>
+        <div class="volume-slider" id="volumeSlider"><div class="volume-fill"></div></div>
+      </div>
+    </div>
+  </div>
 
-    <!-- ===== FOOTER ===== -->
-    <footer class="page-footer">
-        <p>Powered by <a href="https://sponsor.ajay.app/" target="_blank">SponsorBlock</a> • 
-           <a href="https://piped.video/" target="_blank">Piped API</a></p>
-        <p>Sugerencias: <a href="mailto:aftterpro@gmail.com">aftterpro@gmail.com</a></p>
-    </footer>
-    <script> //  CONFIGURACIÓN PREVIA para evitar errores
-    window.ytCrossMixAPIs = {
-        gapi: false,
-        gis: false,
-        youtube: false,
-        ready: false
-    };
-</script>
-    <script src="init.js"></script>
-    <script src="youtube-client.js"></script>           
-    <script src="core.js"></script>
-    <script src="playlist.js"></script>
-    <script src="auth.js"></script>
-    <script src="mix-effects.js"></script>
+  <!-- ===== FOOTER Y SCRIPTS ===== -->
+  <footer class="page-footer">
+    <p>Powered by <a href="https://sponsor.ajay.app/" target="_blank">SponsorBlock</a> • <a href="https://piped.video/" target="_blank">Piped API</a></p>
+    <p>Sugerencias: <a href="mailto:aftterpro@gmail.com">aftterpro@gmail.com</a></p>
+  </footer>
 
-    <script>
-        // Toggle Sidebar
-        function toggleSidebar() {
-            const sidebar = document.getElementById('desktopSidebar');
-            sidebar.classList.toggle('collapsed');
-        }
+  <script src="init.js"></script>
+  <script src="youtube-client.js"></script>           
+  <script src="core.js"></script>
+  <script src="playlist.js"></script>
+  <script src="auth.js"></script>
+  <script src="mix-effects.js"></script>
 
-        // Navegación unificada
-        document.querySelectorAll('[data-view]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const view = e.currentTarget.dataset.view;
-                
-                // Actualizar activos
-                document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
-                e.currentTarget.classList.add('active');
-                
-                // Cambiar vista
-                if (window.unifiedCore) {
-                    window.unifiedCore.switchView(view);
-                }
-            });
-        });
-    </script>
-    <!-- Script para manejar clicks en bottom player -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const bottomPlayer = document.querySelector('.bottom-player');
-    
-    if (bottomPlayer) {
-        // Prevenir que el click del contenedor se propague a los botones
-        bottomPlayer.addEventListener('click', (e) => {
-            // Solo si NO se clickeó en un control
-            if (!e.target.closest('.control-button') && 
-                !e.target.closest('.volume-slider') &&
-                !e.target.closest('.progress-bar') &&
-                !e.target.closest('.control-btn')) {
-                
-                // Verificar si hay video reproduciéndose
-                if (window.unifiedCore?.state?.currentPlayingInfo?.videoId) {
-                    // Verificar cursor style para saber si es clickeable
-                    const cursorStyle = window.getComputedStyle(bottomPlayer).cursor;
-                    if (cursorStyle === 'pointer') {
-                        window.unifiedCore.switchView('fullPlayer');
-                    }
-                }
-            }
-        });
+  <script>
+    function toggleSidebar() {
+      document.getElementById('desktopSidebar').classList.toggle('collapsed');
     }
-});
-</script>
-                <script>
-window.addEventListener('DOMContentLoaded', () => {
-    const bottomPlayer = document.querySelector('.bottom-player');
-    if (bottomPlayer) {
-        bottomPlayer.style.position = 'fixed';
-        bottomPlayer.style.bottom = '0';
-        bottomPlayer.style.left = '0';
-        bottomPlayer.style.right = '0';
-        bottomPlayer.style.zIndex = '300';
-        bottomPlayer.style.display = 'flex';
-        bottomPlayer.style.visibility = 'visible';
-        bottomPlayer.style.opacity = '1';
-    }
-});
-</script>
 
+    document.querySelectorAll('[data-view]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const view = e.currentTarget.dataset.view;
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        window.unifiedCore?.switchView(view);
+      });
+    });
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const bp = document.querySelector('.bottom-player');
+      if (bp) {
+        bp.style.position = 'fixed';
+        bp.style.bottom = '0';
+        bp.style.left = '0';
+        bp.style.right = '0';
+        bp.style.display = 'flex';
+        bp.style.visibility = 'visible';
+        bp.style.opacity = '1';
+        bp.style.zIndex = '999999';
+      }
+    });
+  </script>
 </body>
 </html>
