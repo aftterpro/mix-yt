@@ -982,25 +982,6 @@ const validViews = ['home', 'search', 'library', 'fullPlayer'];
     
     console.log('✅ Bottom player forzado a visible');
 }
-
-// Ejecutar inmediatamente cuando el DOM esté listo
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        forceBottomPlayerVisible();
-        
-        // Verificar cada segundo durante los primeros 10 segundos
-        let checks = 0;
-        const interval = setInterval(() => {
-            forceBottomPlayerVisible();
-            checks++;
-            if (checks >= 10) {
-                clearInterval(interval);
-            }
-        }, 1000);
-    });
-} else {
-    forceBottomPlayerVisible();
-}
 /**
  * SHOW MINI PLAYER FLOAT
  */
