@@ -1257,12 +1257,7 @@ body {
     .search-results-grid {
         grid-template-columns: repeat(2, 1fr) !important;
         gap: 12px !important;
-    }
-    
-    .bottom-player {
-        display: none !important;
-    }
-    
+    }    
     .mini-player-float {
         bottom: 66px;
         right: 10px;
@@ -1983,3 +1978,16 @@ body {
     background: #000;
     border-radius: 12px;
     overflow: hidden;
+/* OVERRIDE CRÍTICO: Bottom player siempre visible */
+.bottom-player {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+@media (max-width: 768px) {
+    .bottom-player {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+}
