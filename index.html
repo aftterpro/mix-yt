@@ -352,5 +352,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
+                <script>
+window.addEventListener('DOMContentLoaded', () => {
+    const bottomPlayer = document.querySelector('.bottom-player');
+    if (bottomPlayer) {
+        bottomPlayer.style.position = 'fixed';
+        bottomPlayer.style.bottom = '0';
+        bottomPlayer.style.left = '0';
+        bottomPlayer.style.right = '0';
+        bottomPlayer.style.zIndex = '300';
+        bottomPlayer.style.display = 'flex';
+        bottomPlayer.style.visibility = 'visible';
+        bottomPlayer.style.opacity = '1';
+    }
+});
+</script>
+
 </body>
 </html>
