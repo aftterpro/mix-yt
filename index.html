@@ -51,7 +51,35 @@
 .bottom-player * {
   flex-shrink: 0 !important;
 }
+.player-info,
+.player-controls,
+.player-extras {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  height: auto !important;
+  min-height: 50px !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
 
+.player-info img,
+.player-info .player-text,
+.player-controls button,
+.player-extras {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.bottom-player {
+  min-height: 90px !important;
+  background: #181818 !important;
+  color: #fff !important;
+  border-top: 2px solid #333 !important;
+  z-index: 999999 !important;
+}
         
         </style>
 <body class="unified-loading">
