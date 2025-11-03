@@ -136,31 +136,73 @@
         <!-- FULL PLAYER VIEW -->
         <div class="content-view full-player-view" id="fullPlayerView">
       <div class="player-queue-layout">
-    <!-- 🎥 CONTENEDOR DE VIDEO -->
+    <!--  CONTENEDOR DE VIDEO -->
     <div class="video-container-full">
       <div class="video-wrapper">
       <div id="player1" class="video-player"></div>
       <div id="player2" class="video-player hidden"></div>
     </div>
   </div>
-
-  <!-- 🎶 COLUMNA DE COLA A LA DERECHA -->
-  <div class="persistent-queue-sidebar">
+  <!--  COLUMNA DE COLA A LA DERECHA -->
+<div class="persistent-queue-sidebar">
+    <!-- Header de la Cola -->
     <div class="queue-header">
-      <div class="queue-header-title">
-        <h3>Cola de reproducción</h3>
-        <span id="queueCount" class="queue-count-badge">0</span>
-      </div>
-      <button class="clear-queue-btn"
-              onclick="if(window.playlistManager) window.playlistManager.clearQueue()"
-              title="Limpiar cola">
-        <i class="fas fa-trash"></i>
-      </button>
+        <div class="queue-header-title">
+            <h3>Cola de reproducción</h3>
+            <span id="queueCount" class="queue-count-badge">0</span>
+        </div>
+        <button class="clear-queue-btn"
+                onclick="if(window.playlistManager) window.playlistManager.clearQueue()"
+                title="Limpiar cola">
+            <i class="fas fa-trash"></i>
+        </button>
     </div>
 
-    <div id="queueContentList" class="queue-list-content">
-      <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+    <!-- Tabs de Navegación -->
+    <div class="queue-tabs">
+        <button class="queue-tab active" data-tab="next" onclick="window.playlistManager?.switchQueueTab('next')">
+            <i class="fas fa-list"></i>
+            <span>Siguiente</span>
+        </button>
+        <button class="queue-tab" data-tab="lyrics" onclick="window.playlistManager?.switchQueueTab('lyrics')">
+            <i class="fas fa-music"></i>
+            <span>Letras</span>
+        </button>
+        <button class="queue-tab" data-tab="related" onclick="window.playlistManager?.switchQueueTab('related')">
+            <i class="fas fa-sparkles"></i>
+            <span>Relacionado</span>
+        </button>
     </div>
+
+    <!-- CONTENIDO DE LOS TABS -->
+    <div class="queue-tab-content">
+        <!-- Tab: Siguiente (Cola) -->
+        <div id="queueContentList" class="queue-list-content active" data-tab-content="next">
+            <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+        </div>
+
+        <!-- Tab: Letras -->
+        <div id="lyricsContent" class="queue-list-content" data-tab-content="lyrics">
+            <div class="lyrics-container">
+                <div class="lyrics-header">
+                    <i class="fas fa-music"></i>
+                    <p>Letras no disponibles</p>
+                </div>
+                <p class="lyrics-info">Las letras aparecerán aquí cuando estén disponibles</p>
+            </div>
+        </div>
+
+        <!-- Tab: Relacionado -->
+        <div id="relatedContent" class="queue-list-content" data-tab-content="related">
+            <div class="related-container">
+                <div class="related-header">
+                    <i class="fas fa-sparkles"></i>
+                    <p>Videos relacionados</p>
+                </div>
+                <div id="relatedVideosList"></div>
+              </div>
+            </div>
+          </div>
       </div>
           </div>
           </div>
