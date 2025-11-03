@@ -846,7 +846,7 @@ updateQueueCount(count) {
     // GESTIÓN DE VISTAS
     // =============================================
 switchView(viewName) {
-const validViews = ['home', 'search', 'library', 'fullPlayer'];
+    const validViews = ['home', 'search', 'library', 'fullPlayer'];
     if (!validViews.includes(viewName)) {
         console.warn(`⚠️ Vista inválida: ${viewName}`);
         return;
@@ -878,60 +878,65 @@ const validViews = ['home', 'search', 'library', 'fullPlayer'];
     targetView.classList.add('active');
     this.currentView = viewName;
 
-    // ✅ CORRECCIÓN CRÍTICA: BOTTOM PLAYER SIEMPRE VISIBLE
+    // ✅ BOTTOM PLAYER SIEMPRE VISIBLE - FORZADO
     const bottomPlayer = document.querySelector('.bottom-player');
-    const fullPlayerView = document.getElementById('fullPlayerView');
-    const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId;
-
-    // ✅ FORZAR VISIBILIDAD
     if (bottomPlayer) {
         bottomPlayer.style.display = 'flex';
         bottomPlayer.style.visibility = 'visible';
         bottomPlayer.style.opacity = '1';
-        bottomPlayer.style.pointerEvents = 'auto';
-        bottomPlayer.classList.remove('hidden', 'hide');
+        bottomPlayer.style.position = 'fixed';
+        bottomPlayer.style.bottom = '0';
+        bottomPlayer.style.zIndex = '300';
     }
 
+    // ✅ GESTIÓN DE REPRODUCTORES SIN ROMPER LAYOUT
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    const miniPlayerFloat = document.getElementById('miniPlayerFloat');
+    
     if (viewName === 'fullPlayer') {
-        // Vista completa
+        // Vista completa: mover reproductores a video-wrapper
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
+            const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
+            
+            if (videoWrapper) {
+                const player1 = document.getElementById('player1');
+                const player2 = document.getElementById('player2');
+                
+                // Mover solo si no están ya ahí
+                if (player1 && !videoWrapper.contains(player1)) {
+                    videoWrapper.appendChild(player1);
+                }
+                if (player2 && !videoWrapper.contains(player2)) {
+                    videoWrapper.appendChild(player2);
+                }
+            }
         }
         
-        // ✅ BOTTOM PLAYER SIGUE VISIBLE EN VISTA COMPLETA
-        if (bottomPlayer) {
-            bottomPlayer.style.cursor = 'default';
+        // Ocultar mini player
+        if (miniPlayerFloat) {
+            miniPlayerFloat.classList.add('hidden');
+            miniPlayerFloat.style.display = 'none';
         }
         
-        this.movePlayerToFullView();
         this.updatePersistentQueue();
-        this.updateNowPlayingFull();
-        
-        // Ocultar mini player si existe
-        const miniPlayer = document.getElementById('miniPlayerFloat');
-        if (miniPlayer) {
-            miniPlayer.classList.add('hidden');
-            miniPlayer.style.display = 'none';
-        }
-        
-        console.log('🎬 Vista completa activada CON bottom player visible');
+        console.log('🎬 Vista completa activada');
         
     } else {
-        // Otras vistas
+        // Otras vistas: NO mover reproductores
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
         
-        if (bottomPlayer) {
-            bottomPlayer.style.cursor = 'pointer';
+        // Solo mostrar mini player si hay video reproduciéndose
+        const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId;
+        
+        if (isVideoPlaying && miniPlayerFloat) {
+            miniPlayerFloat.classList.remove('hidden');
+            miniPlayerFloat.style.display = 'block';
         }
         
-        // Mostrar mini player si hay video reproduciéndose
-        if (isVideoPlaying) {
-            this.showMiniPlayerFloat();
-        }
-        
-        console.log(`📱 Vista ${viewName}: Bottom player visible`);
+        console.log(`📱 Vista ${viewName} activa`);
     }
 
     // Acciones específicas por vista
@@ -943,10 +948,7 @@ const validViews = ['home', 'search', 'library', 'fullPlayer'];
             this.focusSearchInput();
             break;
     }
-    
-    // ✅ VERIFICACIÓN FINAL
-    setTimeout(() => forceBottomPlayerVisible(), 100);
-};
+}
 // =============================================
 // FORZAR VISIBILIDAD DEL BOTTOM PLAYER
 // =============================================
