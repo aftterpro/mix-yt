@@ -359,6 +359,7 @@ async loadPlaylistVideos(playlistId) {
         return false;
     }
 }
+    
     /**
      * Eliminar video de la cola
      */
@@ -457,6 +458,116 @@ removeVideoFromQueue(videoId) {
     
     console.log('✅ removeVideoFromQueue COMPLETADO');
     return true;
+}
+    // =============================================
+// GESTIÓN DE TABS EN LA COLA
+// =============================================
+/**
+ * Cambiar entre tabs de la cola
+ */
+switchQueueTab(tabName) {
+    console.log(`🔄 Cambiando a tab: ${tabName}`);
+    
+    // Actualizar botones de tabs
+    document.querySelectorAll('.queue-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`.queue-tab[data-tab="${tabName}"]`)?.classList.add('active');
+    
+    // Actualizar contenido de tabs
+    document.querySelectorAll('.queue-list-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.querySelector(`[data-tab-content="${tabName}"]`)?.classList.add('active');
+    
+    // Cargar contenido específico del tab
+    if (tabName === 'related') {
+        this.loadRelatedVideos();
+    } else if (tabName === 'lyrics') {
+        this.loadLyrics();
+    }
+}
+
+/**
+ * Cargar videos relacionados
+ */
+async loadRelatedVideos() {
+    const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
+    if (!currentVideo) {
+        document.getElementById('relatedVideosList').innerHTML = `
+            <p class="related-placeholder">Reproduce una canción para ver videos relacionados</p>
+        `;
+        return;
+    }
+    
+    document.getElementById('relatedVideosList').innerHTML = `
+        <div class="related-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Cargando videos relacionados...</p>
+        </div>
+    `;
+    
+    try {
+        // Simular carga de relacionados (en producción, usar API real)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        document.getElementById('relatedVideosList').innerHTML = `
+            <p class="related-info">
+                <i class="fas fa-info-circle"></i>
+                Videos relacionados estarán disponibles próximamente
+            </p>
+        `;
+    } catch (error) {
+        console.error('❌ Error cargando relacionados:', error);
+        document.getElementById('relatedVideosList').innerHTML = `
+            <p class="related-error">Error cargando videos relacionados</p>
+        `;
+    }
+}
+
+/**
+ * Cargar letras de la canción actual
+ */
+async loadLyrics() {
+    const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
+    if (!currentVideo) {
+        document.getElementById('lyricsContent').innerHTML = `
+            <div class="lyrics-container">
+                <div class="lyrics-header">
+                    <i class="fas fa-music"></i>
+                    <p>Letras no disponibles</p>
+                </div>
+                <p class="lyrics-info">Reproduce una canción para ver las letras</p>
+            </div>
+        `;
+        return;
+    }
+    
+    document.getElementById('lyricsContent').innerHTML = `
+        <div class="lyrics-container">
+            <div class="lyrics-header">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando letras...</p>
+            </div>
+        </div>
+    `;
+    
+    try {
+        // Simular carga de letras (en producción, usar API real)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        document.getElementById('lyricsContent').innerHTML = `
+            <div class="lyrics-container">
+                <div class="lyrics-header">
+                    <i class="fas fa-music"></i>
+                    <p>Letras no disponibles</p>
+                </div>
+                <p class="lyrics-info">Las letras para "${currentVideo.title}" no están disponibles aún</p>
+            </div>
+        `;
+    } catch (error) {
+        console.error('❌ Error cargando letras:', error);
+    }
 }
 /**
  * Actualizar UI de playlists
