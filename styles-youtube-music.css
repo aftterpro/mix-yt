@@ -764,11 +764,13 @@ body {
 }
 
 .video-wrapper {
-  flex: 1;
-  position: relative;
-  background: #000;
-  border-radius: 12px;
-  overflow: hidden;
+    flex: 1;
+    position: relative;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 200px;
+    width: 600px;
 }
 
 .mini-player-float:not(.hidden) {
