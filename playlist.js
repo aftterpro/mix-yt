@@ -584,7 +584,12 @@ updatePlaylistsUI() {
     // Limpiar container
     container.innerHTML = '';
     
-    if (this.playlistsData.length === 0) {
+    // ✅ FILTRAR: NO MOSTRAR LA COLA EN BIBLIOTECA
+    const visiblePlaylists = this.playlistsData.filter(p => 
+        p.id !== 'queue' && !p.isQueue
+    );
+    
+    if (visiblePlaylists.length === 0) {
         container.innerHTML = `
             <div class="search-placeholder">
                 <i class="fas fa-music"></i>
@@ -596,10 +601,10 @@ updatePlaylistsUI() {
         return;
     }
     
-    console.log(`📊 Renderizando ${this.playlistsData.length} playlists`);
+    console.log(`📊 Renderizando ${visiblePlaylists.length} playlists (sin cola)`);
     
-    // Renderizar cada playlist
-    this.playlistsData.forEach((playlist, index) => {
+    // Renderizar cada playlist (excepto cola)
+    visiblePlaylists.forEach((playlist, index) => {
         const card = this.createPlaylistCard(playlist);
         container.appendChild(card);
     });
