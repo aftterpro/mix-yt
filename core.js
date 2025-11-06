@@ -768,17 +768,20 @@ hideMiniPlayer() {
         console.log('🎬 Mini-player oculto');
     }
 }
-
 /**
  * Actualizar cola persistente
  */
 updatePersistentQueue() {
-    if (!window.playlistManager) return;
+    console.log('🔄 Actualizando cola persistente...');
     
     const queueContentList = document.getElementById('queueContentList');
-    if (!queueContentList) return;
+    if (!queueContentList) {
+        console.error('❌ queueContentList no encontrado en el DOM');
+        return;
+    }
 
     const flatList = this.getFlattenedPlaylist();
+    console.log(`📊 Videos en cola: ${flatList.length}`);
     
     if (flatList.length === 0) {
         queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>';
@@ -786,34 +789,43 @@ updatePersistentQueue() {
         return;
     }
 
-    //  Validar currentPlayingInfo antes de acceder
+    // Validar currentPlayingInfo
     const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? 
                         window.currentPlayingInfo?.flattenedIndex ?? 
                         -1;
+
+    console.log(`🎵 Índice actual: ${currentIndex}`);
 
     const html = flatList.map((video, index) => {
         const isPlaying = currentIndex === index;
         const activeClass = isPlaying ? ' playing' : '';
         
+        // VALIDACIÓN: Asegurar que video tiene datos válidos
+        if (!video || !video.videoId) {
+            console.warn(`⚠️ Video inválido en índice ${index}:`, video);
+            return '';
+        }
+        
         return `
             <div class="queue-item${activeClass}" 
                  data-video-id="${video.videoId}" 
                  data-flat-index="${index}"
+                 draggable="true"
                  onclick="window.unifiedCore.playVideoAtIndex(${index})">
                 
                 <div class="queue-item-number">
                     ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
                 </div>
                 
-                <img src="${video.thumbnail}" 
-                     alt="${this.escapeHTML(video.title)}" 
+                <img src="${video.thumbnail || './electronic.ico'}" 
+                     alt="${this.escapeHTML(video.title || 'Sin título')}" 
                      class="queue-item-thumbnail"
                      onerror="this.src='./electronic.ico';">
                 
                 <div class="queue-item-info">
-                    <div class="queue-item-title">${this.escapeHTML(video.title)}</div>
+                    <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
                     <div class="queue-item-meta">
-                        <span class="queue-item-duration">${this.formatDuration(video.duration)}</span>
+                        <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
                         ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
                     </div>
                 </div>
@@ -825,14 +837,21 @@ updatePersistentQueue() {
                 </button>
             </div>
         `;
-    }).join('');
+    }).filter(html => html !== '').join('');
 
     queueContentList.innerHTML = html;
     this.updateQueueCount(flatList.length);
     
-    console.log(`✅ Cola persistente actualizada: ${flatList.length} videos`);
+    //  REINICIAR DRAG & DROP DESPUÉS DE RENDERIZAR
+    setTimeout(() => {
+        if (window.queueDragDrop) {
+            window.queueDragDrop.attachDragListeners();
+        }
+    }, 100);
+    
+    console.log(`✅ Cola persistente actualizada: ${flatList.length} videos renderizados`);
+    console.log(`📊 HTML generado: ${queueContentList.children.length} elementos en el DOM`);
 }
-
 /**
  * Actualizar contador de cola
  */
