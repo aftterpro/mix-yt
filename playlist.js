@@ -746,150 +746,188 @@ findRelatedVideoData(itemElement) {
         return null;
     }
 }  
-    /**
-     * Cargar letras de la canción actual (CON CAMBIO DE PROVEEDOR)
-     */
-    async loadLyrics() {
-        // 1. Limpiar sincronización
-        if (this.lyricsSyncInterval) {
-            clearInterval(this.lyricsSyncInterval);
-            this.lyricsSyncInterval = null;
-        }
-        this.currentLrc = [];
-        const lyricsContainer = document.getElementById('lyricsContent');
-        const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
+/**
+ * Cargar letras de la canción actual (CON CAMBIO DE PROVEEDOR)
+ */
+async loadLyrics() {
+    // 1. Limpiar sincronización
+    if (this.lyricsSyncInterval) {
+        clearInterval(this.lyricsSyncInterval);
+        this.lyricsSyncInterval = null;
+    }
+    this.currentLrc = [];
+    
+    const lyricsContainer = document.getElementById('lyricsContent');
+    const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
 
-        if (!currentVideo) {
+    if (!currentVideo) {
+        lyricsContainer.innerHTML = `
+            <div class="lyrics-container">
+                <div class="lyrics-header"><i class="fas fa-music"></i><p>Letras no disponibles</p></div>
+                <p class="lyrics-info">Reproduce una canción para ver las letras</p>
+            </div>`;
+        return;
+    }
+
+    // 2. Mostrar "Cargando" CON el botón
+    lyricsContainer.innerHTML = `
+        <div class="lyrics-container">
+            <div class="lyrics-header">
+                <i class="fas fa-spinner fa-spin"></i><p>Buscando...</p>
+                <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
+                    <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
+                </button>
+            </div>
+        </div>`;
+    
+    // Añadir listener al botón de "Cargando"
+    this.setupLyricsProviderButton();
+
+    try {
+        // 3. Preparar datos - ✅ LIMPIEZA MEJORADA
+        let artist = (currentVideo.artist || currentVideo.uploaderName || '').trim();
+        let title = (currentVideo.title || '').trim();
+        const duration = Math.round(currentVideo.duration || 0);
+        
+        // ✅ Limpiar título de patrones comunes
+        title = title
+            .replace(/\(official.*?video\)/gi, '')
+            .replace(/\(lyric.*?video\)/gi, '')
+            .replace(/\(visualizer\)/gi, '')
+            .replace(/\(audio\)/gi, '')
+            .replace(/\[.*?\]/g, '')
+            .replace(/\(.*?official.*?\)/gi, '')
+            .trim();
+        
+        // ✅ Si el título incluye el artista, removerlo
+        if (artist && title.toLowerCase().includes(artist.toLowerCase())) {
+            const artistRegex = new RegExp(`^${this.escapeRegExp(artist)}\\s*[-–:]\\s*`, 'i');
+            title = title.replace(artistRegex, '').trim();
+        }
+        
+        // ✅ Si no hay artista válido, extraer del título
+        if (!artist || artist === 'Desconocido' || artist === 'YouTube') {
+            const separatorMatch = title.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
+            if (separatorMatch) {
+                artist = separatorMatch[1].trim();
+                title = separatorMatch[2].trim();
+            }
+        }
+
+        console.log('🎵 Buscando letras:', { artist, title, duration, provider: this.lyricsProvider });
+
+        let match; // Variable para guardar el resultado
+
+        // 4. LÓGICA DE PROVEEDOR
+        if (this.lyricsProvider === 'lrclib') {
+            // --- API 1: lrclib.net ---
+            const lrclibUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${duration}`;
+            console.log('📡 lrclib URL:', lrclibUrl);
+            
+            const response = await fetch(lrclibUrl);
+            
+            if (!response.ok) {
+                throw new Error(`lrclib.net: Error ${response.status}`);
+            }
+            
+            match = await response.json();
+            
+            if (!match || match.code === 404) {
+                throw new Error('No se encontraron letras (lrclib)');
+            }
+            
+            match.source = 'lrclib.net';
+
+        } else {
+            // --- API 2: lujjjh.com ---
+            // ✅ CORRECCIÓN: Usar espacios normales, la API los codifica automáticamente
+            const lujjjUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
+            console.log('📡 lujjjh URL:', lujjjUrl);
+            
+            const response = await fetch(lujjjUrl);
+            
+            if (!response.ok) {
+                throw new Error(`lujjjh.com: Error ${response.status}`);
+            }
+            
+            const text = await response.text();
+            
+            if (!text || text.includes('Error: Not Found')) {
+                throw new Error('No se encontraron letras (lujjjh)');
+            }
+
+            // Esta API devuelve texto plano LRC
+            const artistName = text.match(/\[ar:(.*?)\]/i) ? text.match(/\[ar:(.*?)\]/i)[1] : artist;
+            const trackName = text.match(/\[ti:(.*?)\]/i) ? text.match(/\[ti:(.*?)\]/i)[1] : title;
+            
+            match = {
+                syncedLyrics: text,
+                plainLyrics: text.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '\n').replace(/\[.*?\]/g, '').trim(),
+                trackName: trackName,
+                artistName: artistName,
+                source: 'lujjjh.com'
+            };
+        }
+
+        // 5. Renderizar el resultado
+        const headerHtml = `
+            <div class="lyrics-header">
+                <i class="fas fa-music"></i>
+                <p>${this.escapeHTML(match.trackName)}</p>
+                <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
+                    <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
+                </button>
+            </div>`;
+
+        if (match.syncedLyrics) {
+            this.currentLrc = this.parseLRC(match.syncedLyrics);
+            
+            if (this.currentLrc.length === 0) {
+                throw new Error('Letra encontrada, pero no se pudo parsear LRC.');
+            }
+
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
-                    <div class="lyrics-header"><i class="fas fa-music"></i><p>Letras no disponibles</p></div>
-                    <p class="lyrics-info">Reproduce una canción para ver las letras</p>
+                    ${headerHtml}
+                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                    <div class="lyrics-text synced" id="syncedLyricsContainer">
+                        ${this.currentLrc.map((line) => `<p data-time="${line.time}">${this.escapeHTML(line.text)}</p>`).join('')}
+                    </div>
+                    <p class="lyrics-source">Fuente: ${match.source} (Sincronizado)</p>
                 </div>`;
-            return;
+            this.startLyricsSync();
+
+        } else if (match.plainLyrics) {
+            const formattedLyrics = this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>');
+            lyricsContainer.innerHTML = `
+                <div class="lyrics-container">
+                    ${headerHtml}
+                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                    <p class="lyrics-text">${formattedLyrics}</p>
+                    <p class="lyrics-source">Fuente: ${match.source} (Letra no sincronizada)</p>
+                </div>`;
+        } else {
+            throw new Error('No se encontraron letras (sin datos).');
         }
 
-        // 2. Mostrar "Cargando" CON el botón
+    } catch (error) {
+        console.error('❌ Error cargando letras:', error);
         lyricsContainer.innerHTML = `
             <div class="lyrics-container">
                 <div class="lyrics-header">
-                    <i class="fas fa-spinner fa-spin"></i><p>Buscando...</p>
+                    <i class="fas fa-exclamation-triangle"></i><p>Letras no disponibles</p>
                     <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
                         <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
                     </button>
                 </div>
+                <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
+                <p class="lyrics-info error-details">(Proveedor: ${this.lyricsProvider} | Error: ${error.message})</p>
             </div>`;
-        
-        // Añadir listener al botón de "Cargando"
-        this.setupLyricsProviderButton();
-
-        try {
-            // 3. Preparar datos
-            const artist = (currentVideo.artist || currentVideo.uploaderName || '').trim();
-            const title = (currentVideo.title || '').trim();
-            const duration = Math.round(currentVideo.duration || 0);
-           
-            const cleanTitle = title.replace(/(\(official .*video\)|\(lyric video\)|\(visualizer\)|\(audio\)|\[.*?\]|\(.*?\))/gi, '').trim();
-            // Paso B: Quitar el prefijo del artista si el título lo incluye
-            // (Ej: "Selena Gomez - The Heart...")
-            if (artist && cleanTitle.toLowerCase().startsWith(artist.toLowerCase())) {
-                const artistPrefixRegex = new RegExp(`^${this.escapeRegExp(artist)}\\s*[-–:]\\s*`, 'i');
-                if (artistPrefixRegex.test(cleanTitle)) {
-                    cleanTitle = cleanTitle.replace(artistPrefixRegex, '').trim();
-                }
-            }
-            let match; // Variable para guardar el resultado
-
-            // 4. LÓGICA DE PROVEEDOR
-            if (this.lyricsProvider === 'lrclib') {
-                // --- API 1: lrclib.net ---
-            const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&album_name=&duration=${duration}`);                if (!response.ok) throw new Error(`lrclib.net: Error ${response.status}`);
-                match = await response.json();
-                if (!match || match.code === 404) throw new Error('No se encontraron letras (lrclib)');
-                match.source = 'lrclib.net';
-
-            } else {
-                // --- API 2: lujjh.com ---
-                // Preparamos el formato para esta API (con _ en vez de espacios)
-                const lujjTitle = cleanTitle.replace(/ /g, '_');
-                const lujjArtist = artist.replace(/ /g, '_');
-                
-                const response = await fetch(`https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(lujjArtist)}`);
-                if (!response.ok) throw new Error(`lujjh.com: Error ${response.status}`);
-                
-                const text = await response.text();
-                if (!text || text.includes('Error: Not Found')) {
-                    throw new Error('No se encontraron letras (lujjjh)');
-                }
-
-                // Esta API devuelve texto plano LRC, lo parseamos a un objeto 'match'
-                const artistName = text.match(/\[ar:(.*?)\]/i) ? text.match(/\[ar:(.*?)\]/i)[1] : artist;
-                const trackName = text.match(/\[ti:(.*?)\]/i) ? text.match(/\[ti:(.*?)\]/i)[1] : title;
-                
-                match = {
-                    syncedLyrics: text,
-                    plainLyrics: text.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '\n').replace(/\[.*?\]/g, '').trim(),
-                    trackName: trackName,
-                    artistName: artistName,
-                    source: 'lujjjh.com'
-                };
-            }
-
-            // 5. Renderizar el resultado
-            const headerHtml = `
-                <div class="lyrics-header">
-                    <i class="fas fa-music"></i>
-                    <p>${this.escapeHTML(match.trackName)}</p>
-                    <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
-                        <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
-                    </button>
-                </div>`;
-
-            if (match.syncedLyrics) {
-                this.currentLrc = this.parseLRC(match.syncedLyrics);
-                if (this.currentLrc.length === 0) throw new Error('Letra encontrada, pero no se pudo parsear LRC.');
-
-                lyricsContainer.innerHTML = `
-                    <div class="lyrics-container">
-                        ${headerHtml}
-                        <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
-                        <div class="lyrics-text synced" id="syncedLyricsContainer">
-                            ${this.currentLrc.map((line) => `<p data-time="${line.time}">${this.escapeHTML(line.text)}</p>`).join('')}
-                        </div>
-                        <p class="lyrics-source">Fuente: ${match.source} (Sincronizado)</p>
-                    </div>`;
-                this.startLyricsSync();
-
-            } else if (match.plainLyrics) {
-                const formattedLyrics = this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>');
-                lyricsContainer.innerHTML = `
-                    <div class="lyrics-container">
-                        ${headerHtml}
-                        <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
-                        <p class="lyrics-text">${formattedLyrics}</p>
-                        <p class="lyrics-source">Fuente: ${match.source} (Letra no sincronizada)</p>
-                    </div>`;
-            } else {
-                throw new Error('No se encontraron letras (sin datos).');
-            }
-
-        } catch (error) {
-            console.error('❌ Error cargando letras:', error);
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    <div class="lyrics-header">
-                        <i class="fas fa-exclamation-triangle"></i><p>Letras no disponibles</p>
-                        <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
-                            <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
-                        </button>
-                    </div>
-                    <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
-                    <p class="lyrics-info error-details">(Proveedor: ${this.lyricsProvider} | Error: ${error.message})</p>
-                </div>`;
-        }
-        
-        // 6. Volver a añadir el listener al botón (ya sea en éxito o error)
-        this.setupLyricsProviderButton();
     }
+    
+    // 6. Volver a añadir el listener al botón
+    this.setupLyricsProviderButton();
+}
    /**
      * ✅ NUEVA FUNCIÓN
      * Asigna el evento click al botón de cambio de proveedor
