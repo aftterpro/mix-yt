@@ -2328,3 +2328,13 @@ body {
     opacity: 1;
     transform: scale(1.02); /* Sutil efecto de zoom */
 }
+/* =============================================
+   CORRECCIÓN DE LAYOUT DE BÚSQUEDA
+   ============================================= */
+
+/* Asegura que el contenedor de la cuadrícula de búsqueda
+  ocupe todo el ancho disponible.
+*/
+.carousel-section {
+    width: 100%;
+}
