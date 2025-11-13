@@ -2338,3 +2338,58 @@ body {
 .carousel-section {
     width: 100%;
 }
+/* =============================================
+   BOTÓN DE CAMBIO DE PROVEEDOR DE LETRAS
+   ============================================= */
+
+.lyrics-header {
+    /* Asegura que el botón se alinee a la derecha */
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.lyrics-header p {
+    /* Evita que el título empuje al botón */
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lyrics-provider-btn {
+    /* Mueve el botón a la derecha */
+    margin-left: auto;
+    
+    /* Estilos del botón */
+    flex-shrink: 0;
+    background: var(--yt-layer-10);
+    color: var(--yt-text-secondary);
+    border: 1px solid var(--yt-layer-15);
+    border-radius: var(--border-radius-pill);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.lyrics-provider-btn:hover {
+    background: var(--yt-layer-15);
+    color: var(--yt-text-primary);
+    border-color: var(--yt-layer-20);
+}
+
+.lyrics-provider-btn i {
+    font-size: 10px;
+}
+
+/* Muestra el error en la UI */
+.lyrics-info.error-details {
+    font-size: 11px;
+    color: rgba(255, 100, 100, 0.6);
+    margin-top: 10px;
+}
