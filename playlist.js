@@ -744,7 +744,7 @@ findRelatedVideoData(itemElement) {
         return null;
     }
 }  
-/**
+    /**
      * Cargar letras de la canción actual (CON CAMBIO DE PROVEEDOR)
      */
     async loadLyrics() {
@@ -782,18 +782,25 @@ findRelatedVideoData(itemElement) {
 
         try {
             // 3. Preparar datos
-            const artist = currentVideo.artist || currentVideo.uploaderName || '';
-            const title = currentVideo.title || '';
+            const artist = currentVideo.artist || currentVideo.uploaderName || '').trim();
+            const title = (currentVideo.title || '').trim();
             const duration = Math.round(currentVideo.duration || 0);
+           
             const cleanTitle = title.replace(/(\(official .*video\)|\(lyric video\)|\(visualizer\)|\(audio\)|\[.*?\]|\(.*?\))/gi, '').trim();
-
+            // Paso B: Quitar el prefijo del artista si el título lo incluye
+            // (Ej: "Selena Gomez - The Heart...")
+            if (artist && cleanTitle.toLowerCase().startsWith(artist.toLowerCase())) {
+                const artistPrefixRegex = new RegExp(`^${this.escapeRegExp(artist)}\\s*[-–:]\\s*`, 'i');
+                if (artistPrefixRegex.test(cleanTitle)) {
+                    cleanTitle = cleanTitle.replace(artistPrefixRegex, '').trim();
+                }
+            }
             let match; // Variable para guardar el resultado
 
             // 4. LÓGICA DE PROVEEDOR
             if (this.lyricsProvider === 'lrclib') {
                 // --- API 1: lrclib.net ---
-                const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&album_name=&duration=${duration}`);
-                if (!response.ok) throw new Error(`lrclib.net: Error ${response.status}`);
+            const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&album_name=&duration=${duration}`);                if (!response.ok) throw new Error(`lrclib.net: Error ${response.status}`);
                 match = await response.json();
                 if (!match || match.code === 404) throw new Error('No se encontraron letras (lrclib)');
                 match.source = 'lrclib.net';
@@ -804,7 +811,7 @@ findRelatedVideoData(itemElement) {
                 const lujjTitle = cleanTitle.replace(/ /g, '_');
                 const lujjArtist = artist.replace(/ /g, '_');
                 
-                const response = await fetch(`https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(lujjTitle)}&artist=${encodeURIComponent(lujjArtist)}`);
+                const response = await fetch(`https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(lujjArtist)}`);
                 if (!response.ok) throw new Error(`lujjh.com: Error ${response.status}`);
                 
                 const text = await response.text();
