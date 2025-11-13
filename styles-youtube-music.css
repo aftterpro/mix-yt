@@ -2080,7 +2080,11 @@ body {
 .related-header {
     margin-bottom: 16px;
 }
-
+.lyrics-artist-header {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 20px;
+}
 .lyrics-header i,
 .related-header i {
     font-size: 48px;
