@@ -2136,7 +2136,56 @@ display: grid !important;
     font-size: 11px;
     color: rgba(255, 255, 255, 0.6);
 }
+/* =============================================
+   ESTILOS DE LETRAS
+   ============================================= */
+.lyrics-container {
+    padding: 20px 24px;
+    text-align: left;
+    color: rgba(255, 255, 255, 0.8);
+}
 
+.lyrics-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.lyrics-header i {
+    font-size: 24px;
+    color: var(--primary-color);
+    opacity: 1;
+    display: inline;
+}
+
+.lyrics-header p {
+    font-size: 18px;
+    font-weight: 500;
+    color: #fff;
+}
+
+.lyrics-info {
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+}
+
+.lyrics-text {
+    font-size: 16px;
+    line-height: 2.2;
+    color: #fff;
+    white-space: pre-line; /* Respeta los <br> y saltos de línea */
+}
+
+.lyrics-source {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 32px;
+    font-style: italic;
+    text-align: center;
+}
 /* =============================================
    RESPONSIVE
    ============================================= */
