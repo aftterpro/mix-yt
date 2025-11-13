@@ -257,7 +257,6 @@ validateResponse(data, query, continuation) {
             return { items: [], region, error: error.message };
         }
     }
-
     /**
      * NUEVO: Método para obtener info de un video específico
      */
@@ -290,7 +289,9 @@ validateResponse(data, query, continuation) {
                 uploaderUrl: data.uploaderUrl,
                 thumbnail: data.thumbnailUrl,
                 category: data.category,
-                uploadDate: data.uploadDate
+                uploadDate: data.uploadDate,
+                // ✅ LÍNEA AÑADIDA:
+                relatedStreams: data.relatedStreams || [] 
             };
             
         } catch (error) {
