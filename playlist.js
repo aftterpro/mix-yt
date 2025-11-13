@@ -492,34 +492,72 @@ switchQueueTab(tabName) {
  * Cargar videos relacionados
  */
 async loadRelatedVideos() {
+    const relatedList = document.getElementById('relatedVideosList');
     const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
-    if (!currentVideo) {
-        document.getElementById('relatedVideosList').innerHTML = `
+
+    // 1. Check for playing video
+    if (!currentVideo || !currentVideo.videoId) {
+        relatedList.innerHTML = `
             <p class="related-placeholder">Reproduce una canción para ver videos relacionados</p>
         `;
         return;
     }
-    
-    document.getElementById('relatedVideosList').innerHTML = `
+
+    // 2. Show loading state
+    relatedList.innerHTML = `
         <div class="related-loading">
             <i class="fas fa-spinner fa-spin"></i>
             <p>Cargando videos relacionados...</p>
         </div>
     `;
-    
+
     try {
-        // Simular carga de relacionados (en producción, usar API real)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // 3. Call the updated youtube client
+        if (!window.youtubeJSClient || typeof window.youtubeJSClient.getVideoInfo !== 'function') {
+            throw new Error('YouTube client no está disponible.');
+        }
         
-        document.getElementById('relatedVideosList').innerHTML = `
-            <p class="related-info">
-                <i class="fas fa-info-circle"></i>
-                Videos relacionados estarán disponibles próximamente
-            </p>
-        `;
+        const videoInfo = await window.youtubeJSClient.getVideoInfo(currentVideo.videoId);
+
+        // 4. Check for related streams
+        if (!videoInfo || !videoInfo.relatedStreams || videoInfo.relatedStreams.length === 0) {
+            throw new Error('No se encontraron videos relacionados.');
+        }
+
+        // 5. Render the videos
+        relatedList.innerHTML = videoInfo.relatedStreams
+            .filter(video => video.type === 'stream') // Asegurar que sean videos
+            .slice(0, 15) // Limitar a 15 resultados
+            .map(video => {
+                // Extraer videoId de la URL (Piped lo da en 'url')
+                const videoIdMatch = video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                const videoId = videoIdMatch ? videoIdMatch[1] : null;
+                if (!videoId) return ''; // Omitir si no hay ID
+
+                const duration = this.core?.formatDuration(video.duration) || '';
+
+                return `
+                    <div class="related-video-item" data-video-id="${videoId}" title="${this.escapeHTML(video.title)}">
+                        <img src="${video.thumbnail}" alt="Thumbnail" class="related-video-thumbnail" onerror="this.src='./electronic.ico';">
+                        <div class="related-video-info">
+                            <div class="related-video-title">${this.escapeHTML(video.title)}</div>
+                            <div class="related-video-author">${this.escapeHTML(video.uploaderName)}</div>
+                            <span class="related-video-duration">${duration}</span>
+                        </div>
+                        <button class="related-video-add" data-video-id="${videoId}" title="Añadir a cola">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                `;
+            })
+            .join('');
+        
+        // 6. Add event listeners to the new buttons
+        this.setupRelatedVideosListeners();
+
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
-        document.getElementById('relatedVideosList').innerHTML = `
+        relatedList.innerHTML = `
             <p class="related-error">Error cargando videos relacionados</p>
         `;
     }
