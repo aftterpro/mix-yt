@@ -634,13 +634,12 @@ findRelatedVideoData(itemElement) {
     }
 }  
 /**
- * Cargar letras de la canción actual
+ * Cargar letras de la canción actual (usando API de lewdhutao)
  */
 async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
     const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
     
-    // 1. Mensaje si no hay video
     if (!currentVideo) {
         lyricsContainer.innerHTML = `
             <div class="lyrics-container">
@@ -654,7 +653,6 @@ async loadLyrics() {
         return;
     }
     
-    // 2. Mensaje de "Cargando"
     lyricsContainer.innerHTML = `
         <div class="lyrics-container">
             <div class="lyrics-header">
@@ -664,48 +662,48 @@ async loadLyrics() {
         </div>
     `;
     
-    // 3. Constante de la API (la misma que usa SponsorBlock y Search)
-    const LYRICS_API_URL = 'https://api.piped.private.coffee/lyrics/';
+    // Usamos la API que encontraste: https://lyrics.lewdhutao.my.eu.org
+    const LYRICS_API_URL = 'https://lyrics.lewdhutao.my.eu.org/v2/youtube/lyrics';
     
     try {
-        const response = await fetch(`${LYRICS_API_URL}${currentVideo.videoId}`);
+        // Buscamos usando el trackId (videoId)
+        const response = await fetch(`${LYRICS_API_URL}?trackId=${currentVideo.videoId}`);
         
         if (!response.ok) {
             if(response.status === 404) {
-                throw new Error('No se encontraron letras para esta canción.');
+                throw new Error('No se encontraron letras (404).');
             }
-            throw new Error(`Error de red: ${response.statusText}`);
+            throw new Error(`Error de red: ${response.status}`);
         }
         
-        const data = await response.json();
+        const result = await response.json();
         
-        // 4. Mostrar letras si se encontraron
-        if (data && data.lyrics) {
-            // Formatear las letras (reemplazar saltos de línea)
-            const formattedLyrics = this.escapeHTML(data.lyrics).replace(/\n/g, '<br>');
+        // La API devuelve las letras en result.data.lyrics
+        if (result && result.data && result.data.lyrics) {
+            const formattedLyrics = this.escapeHTML(result.data.lyrics).replace(/\n/g, '<br>');
             
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
                     <div class="lyrics-header">
                         <i class="fas fa-music"></i>
-                        <p>Letras</p>
+                        <p>${this.escapeHTML(result.data.trackName)}</p>
                     </div>
+                    <p class="lyrics-artist-header">por ${this.escapeHTML(result.data.artistName)}</p>
                     <p class="lyrics-text">${formattedLyrics}</p>
-                    <p class="lyrics-source">Fuente: ${data.source || 'Musixmatch'}</p>
+                    <p class="lyrics-source">Fuente: ${result.data.searchEngine || 'API'}</p>
                 </div>
             `;
         } else {
-            throw new Error('No se encontraron letras para esta canción.');
+            throw new Error('No se encontraron letras en la respuesta.');
         }
         
     } catch (error) {
-        // 5. Mostrar error o mensaje de "no disponible"
         console.error('❌ Error cargando letras:', error);
         lyricsContainer.innerHTML = `
             <div class="lyrics-container">
                 <div class="lyrics-header">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Letras no disponibles</p>
+                    <p>Letras no disponibles</Vp>
                 </div>
                 <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
             </div>
