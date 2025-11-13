@@ -587,7 +587,6 @@ async loadRelatedVideos() {
         }
     }   
     /**
-     * ✅ NUEVA FUNCIÓN
      * Parsea un string de formato LRC [00:00.00]texto a un array de objetos
      */
     parseLRC(lrcText) {
@@ -746,7 +745,7 @@ findRelatedVideoData(itemElement) {
     }
 }  
 /**
-     * Cargar letras de la canción actual (usando lrclib.net)
+     * Cargar letras de la canción actual (usando lrclib.net/api/get)
      */
     async loadLyrics() {
         // 1. Limpiar cualquier sincronización anterior
@@ -774,24 +773,30 @@ findRelatedVideoData(itemElement) {
             </div>`;
 
         try {
-            // 3. Preparar datos de búsqueda
+            // 3. Preparar datos de búsqueda (artista, título, duración)
             const artist = currentVideo.artist || currentVideo.uploaderName || '';
             const title = currentVideo.title || '';
-            
+            const duration = Math.round(currentVideo.duration || 0);
+
             // Limpiar el título de etiquetas comunes
             const cleanTitle = title.replace(/(\(official .*video\)|\(lyric video\)|\(visualizer\)|\(audio\)|\[.*?\]|\(.*?\))/gi, '').trim();
 
-            // 4. Buscar en lrclib.net
-            const response = await fetch(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}`);
-            if (!response.ok) throw new Error(`Error ${response.status} en API de búsqueda`);
+            // 4. USAR /api/get COMO INDICA LA DOCUMENTACIÓN
+            // Dejamos album_name vacío, ya que no lo tenemos.
+            const response = await fetch(`https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&album_name=&duration=${duration}`);
             
-            const data = await response.json();
-            
-            if (!data || data.length === 0) {
-                throw new Error('No se encontraron letras en lrclib.net');
+            if (!response.ok) {
+                if (response.status === 404) {
+                     throw new Error('No se encontraron letras (404).');
+                }
+                throw new Error(`Error ${response.status} en API`);
             }
-
-            const match = data[0]; // Tomar el primer resultado
+            
+            const match = await response.json();
+            
+            if (!match || match.code === 404) {
+                 throw new Error('No se encontraron letras para esta combinación de artista/título/duración.');
+            }
 
             // 5. Caso A: ¡Letras Sincronizadas Encontradas!
             if (match.syncedLyrics) {
@@ -837,8 +842,10 @@ findRelatedVideoData(itemElement) {
             console.error('❌ Error cargando letras:', error);
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
-                    <div class="lyrics-header"><i class="fas fa-exclamation-triangle"></i><p>Letras no disponibles</p></div>
+                    <div class="lyrics-header"><i class="fas fa-exclamation-triangle"></i><p>Letras no disponibles</Vp>
+                    </div>
                     <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
+                    <p class="lyrics-info error-details">(Detalle: ${error.message})</p>
                 </div>`;
         }
     }
