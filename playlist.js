@@ -563,6 +563,77 @@ async loadRelatedVideos() {
     }
 }
 /**
+ * Configurar listeners para los videos relacionados
+ */
+setupRelatedVideosListeners() {
+    const relatedList = document.getElementById('relatedVideosList');
+    if (!relatedList) return;
+
+    relatedList.querySelectorAll('.related-video-item').forEach(item => {
+        const videoId = item.dataset.videoId;
+        if (!videoId) return;
+
+        // Click en el item para reproducir (añadir y saltar)
+        item.addEventListener('click', async (e) => {
+            if (e.target.closest('.related-video-add')) return; // No si se hizo click en el '+'
+
+            const video = this.findRelatedVideoData(item);
+            if (!video) return;
+
+            await this.addVideoToQueue(video);
+            setTimeout(() => {
+                const flatList = this.core?.getFlattenedPlaylist();
+                const index = flatList?.findIndex(v => v.videoId === video.videoId);
+                if (index !== -1 && this.core) {
+                    this.core.playVideoAtIndex(index);
+                }
+            }, 100);
+        });
+
+        // Click en el botón '+' para añadir a la cola
+        const addBtn = item.querySelector('.related-video-add');
+        addBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const video = this.findRelatedVideoData(item);
+            if (!video) return;
+            await this.addVideoToQueue(video);
+        });
+    });
+}
+
+/**
+ * Helper para extraer datos del DOM de un item relacionado
+ */
+findRelatedVideoData(itemElement) {
+    try {
+        const videoId = itemElement.dataset.videoId;
+        const title = itemElement.querySelector('.related-video-title').textContent;
+        const thumbnail = itemElement.querySelector('.related-video-thumbnail').src;
+        const author = itemElement.querySelector('.related-video-author').textContent;
+        const durationStr = itemElement.querySelector('.related-video-duration').textContent;
+        
+        // Parsear duración (ej: "3:45") de vuelta a segundos
+        let duration = 0;
+        if (durationStr.includes(':')) {
+            const parts = durationStr.split(':').map(Number);
+            if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+            if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+
+        return {
+            videoId: videoId,
+            title: title,
+            thumbnail: thumbnail,
+            uploaderName: author,
+            author: author,
+            duration: duration
+        };
+    } catch (e) {
+        console.error("Error encontrando datos de video relacionado:", e);
+        return null;
+    }
+}  
+/**
  * Cargar letras de la canción actual
  */
 async loadLyrics() {
