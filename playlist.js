@@ -7,7 +7,8 @@ class PlaylistManager {
     constructor(unifiedCore) {
         this.core = unifiedCore;
         this.playlistsData = unifiedCore.playlistsData;
-        
+        this.lyricsSyncInterval = null; // Para el intervalo de sincronización
+        this.currentLrc = [];           // Para guardar las líneas de [tiempo, texto]
         // Cargar datos persistentes ANTES de inicializar
         this.loadPersistentData();
     }
@@ -467,7 +468,11 @@ removeVideoFromQueue(videoId) {
  */
 switchQueueTab(tabName) {
     console.log(`🔄 Cambiando a tab: ${tabName}`);
-    
+    // Detener sincronización si salimos de 'lyrics'
+        if (tabName !== 'lyrics' && this.lyricsSyncInterval) {
+            clearInterval(this.lyricsSyncInterval);
+            this.lyricsSyncInterval = null;
+        }
     // Actualizar botones de tabs
     document.querySelectorAll('.queue-tab').forEach(tab => {
         tab.classList.remove('active');
@@ -562,6 +567,113 @@ async loadRelatedVideos() {
         `;
     }
 }
+     /**
+     * Actualiza el contenido de la pestaña activa (Letras o Relacionados)
+     * cuando cambia la canción.
+     */
+    refreshActiveQueueTab() {
+        const activeTab = document.querySelector('.queue-tab.active');
+        if (!activeTab) return;
+
+        const tabName = activeTab.dataset.tab;
+        
+        // No recargar la pestaña 'next' (la cola)
+        if (tabName === 'lyrics') {
+            console.log('🎵 Canción cambió, recargando letras...');
+            this.loadLyrics();
+        } else if (tabName === 'related') {
+            console.log('🎵 Canción cambió, recargando relacionados...');
+            this.loadRelatedVideos();
+        }
+    }   
+    /**
+     * ✅ NUEVA FUNCIÓN
+     * Parsea un string de formato LRC [00:00.00]texto a un array de objetos
+     */
+    parseLRC(lrcText) {
+        const lines = lrcText.split('\n');
+        const lrcData = [];
+        const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+        
+        for (const line of lines) {
+            const match = line.match(timeRegex);
+            if (match) {
+                const minutes = parseInt(match[1]);
+                const seconds = parseInt(match[2]);
+                const milliseconds = parseInt(match[3].padEnd(3, '0'));
+                const time = minutes * 60 + seconds + milliseconds / 1000;
+                const text = line.replace(timeRegex, '').trim();
+                
+                // Añadir solo si tiene texto (ignora líneas vacías)
+                if (text) {
+                    lrcData.push({ time, text });
+                }
+            }
+        }
+        return lrcData;
+    }
+
+    /**
+     * ✅ NUEVA FUNCIÓN
+     * Inicia el intervalo que revisa el tiempo de la canción
+     */
+    startLyricsSync() {
+        if (this.lyricsSyncInterval) {
+            clearInterval(this.lyricsSyncInterval);
+        }
+        // Revisa 4 veces por segundo
+        this.lyricsSyncInterval = setInterval(() => {
+            this.syncLyricsLine();
+        }, 250);
+    }
+
+    /**
+     * Sincroniza la línea activa de la letra con el tiempo del video
+     */
+    syncLyricsLine() {
+        if (!this.core || !this.currentLrc || this.currentLrc.length === 0) {
+            return;
+        }
+
+        // Obtener el reproductor activo de core.js
+        const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
+        if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') {
+            return;
+        }
+        
+        const currentTime = activePlayer.getCurrentTime();
+        const container = document.getElementById('syncedLyricsContainer');
+        if (!container) return;
+
+        let activeLineIndex = -1;
+        
+        // Encontrar la línea actual (recorriendo desde el final)
+        for (let i = this.currentLrc.length - 1; i >= 0; i--) {
+            // Dar un pequeño adelanto de 0.2s para que la letra aparezca justo a tiempo
+            if (currentTime >= (this.currentLrc[i].time - 0.2)) {
+                activeLineIndex = i;
+                break;
+            }
+        }
+
+        // Resaltar la línea activa
+        const allLines = container.querySelectorAll('p');
+        allLines.forEach((line, index) => {
+            if (index === activeLineIndex) {
+                if (!line.classList.contains('active')) {
+                    line.classList.add('active');
+                    // Hacer scroll automático a la línea activa
+                    line.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center', 
+                        inline: 'nearest' 
+                    });
+                }
+            } else {
+                line.classList.remove('active');
+            }
+        });
+    }
 /**
  * Configurar listeners para los videos relacionados
  */
@@ -634,82 +746,102 @@ findRelatedVideoData(itemElement) {
     }
 }  
 /**
- * Cargar letras de la canción actual (usando API de lewdhutao)
- */
-async loadLyrics() {
-    const lyricsContainer = document.getElementById('lyricsContent');
-    const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
-    
-    if (!currentVideo) {
-        lyricsContainer.innerHTML = `
-            <div class="lyrics-container">
-                <div class="lyrics-header">
-                    <i class="fas fa-music"></i>
-                    <p>Letras no disponibles</p>
-                </div>
-                <p class="lyrics-info">Reproduce una canción para ver las letras</p>
-            </div>
-        `;
-        return;
-    }
-    
-    lyricsContainer.innerHTML = `
-        <div class="lyrics-container">
-            <div class="lyrics-header">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Buscando letras para "${this.escapeHTML(currentVideo.title)}"...</p>
-            </div>
-        </div>
-    `;
-    
-    // Usamos la API que encontraste: https://lyrics.lewdhutao.my.eu.org
-    const LYRICS_API_URL = 'https://lyrics.lewdhutao.my.eu.org/v2/youtube/lyrics';
-    
-    try {
-        // Buscamos usando el trackId (videoId)
-        const response = await fetch(`${LYRICS_API_URL}?trackId=${currentVideo.videoId}`);
-        
-        if (!response.ok) {
-            if(response.status === 404) {
-                throw new Error('No se encontraron letras (404).');
-            }
-            throw new Error(`Error de red: ${response.status}`);
+     * Cargar letras de la canción actual (usando lrclib.net)
+     */
+    async loadLyrics() {
+        // 1. Limpiar cualquier sincronización anterior
+        if (this.lyricsSyncInterval) {
+            clearInterval(this.lyricsSyncInterval);
+            this.lyricsSyncInterval = null;
         }
-        
-        const result = await response.json();
-        
-        // La API devuelve las letras en result.data.lyrics
-        if (result && result.data && result.data.lyrics) {
-            const formattedLyrics = this.escapeHTML(result.data.lyrics).replace(/\n/g, '<br>');
-            
+        this.currentLrc = [];
+        const lyricsContainer = document.getElementById('lyricsContent');
+        const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
+
+        if (!currentVideo) {
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
-                    <div class="lyrics-header">
-                        <i class="fas fa-music"></i>
-                        <p>${this.escapeHTML(result.data.trackName)}</p>
-                    </div>
-                    <p class="lyrics-artist-header">por ${this.escapeHTML(result.data.artistName)}</p>
-                    <p class="lyrics-text">${formattedLyrics}</p>
-                    <p class="lyrics-source">Fuente: ${result.data.searchEngine || 'API'}</p>
-                </div>
-            `;
-        } else {
-            throw new Error('No se encontraron letras en la respuesta.');
+                    <div class="lyrics-header"><i class="fas fa-music"></i><p>Letras no disponibles</p></div>
+                    <p class="lyrics-info">Reproduce una canción para ver las letras</p>
+                </div>`;
+            return;
         }
-        
-    } catch (error) {
-        console.error('❌ Error cargando letras:', error);
+
+        // 2. Mostrar "Cargando"
         lyricsContainer.innerHTML = `
             <div class="lyrics-container">
-                <div class="lyrics-header">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Letras no disponibles</Vp>
-                </div>
-                <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
-            </div>
-        `;
+                <div class="lyrics-header"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>
+            </div>`;
+
+        try {
+            // 3. Preparar datos de búsqueda
+            const artist = currentVideo.artist || currentVideo.uploaderName || '';
+            const title = currentVideo.title || '';
+            
+            // Limpiar el título de etiquetas comunes
+            const cleanTitle = title.replace(/(\(official .*video\)|\(lyric video\)|\(visualizer\)|\(audio\)|\[.*?\]|\(.*?\))/gi, '').trim();
+
+            // 4. Buscar en lrclib.net
+            const response = await fetch(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}`);
+            if (!response.ok) throw new Error(`Error ${response.status} en API de búsqueda`);
+            
+            const data = await response.json();
+            
+            if (!data || data.length === 0) {
+                throw new Error('No se encontraron letras en lrclib.net');
+            }
+
+            const match = data[0]; // Tomar el primer resultado
+
+            // 5. Caso A: ¡Letras Sincronizadas Encontradas!
+            if (match.syncedLyrics) {
+                this.currentLrc = this.parseLRC(match.syncedLyrics);
+                if (this.currentLrc.length === 0) {
+                    throw new Error('Error al parsear LRC, usando letra plana.');
+                }
+                
+                lyricsContainer.innerHTML = `
+                    <div class="lyrics-container">
+                        <div class="lyrics-header">
+                            <i class="fas fa-music"></i>
+                            <p>${this.escapeHTML(match.trackName)}</p>
+                        </div>
+                        <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                        <div class="lyrics-text synced" id="syncedLyricsContainer">
+                            ${this.currentLrc.map((line, index) => `<p data-time="${line.time}" data-line-index="${index}">${this.escapeHTML(line.text)}</p>`).join('')}
+                        </div>
+                        <p class="lyrics-source">Fuente: lrclib.net (Sincronizado)</p>
+                    </div>
+                `;
+                // Iniciar el motor de sincronización
+                this.startLyricsSync();
+
+            } // 6. Caso B: Solo Letras Planas
+            else if (match.plainLyrics) {
+                const formattedLyrics = this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>');
+                lyricsContainer.innerHTML = `
+                    <div class="lyrics-container">
+                        <div class="lyrics-header">
+                            <i class="fas fa-music"></i><p>${this.escapeHTML(match.trackName)}</p>
+                        </div>
+                        <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                        <p class="lyrics-text">${formattedLyrics}</p>
+                        <p class="lyrics-source">Fuente: lrclib.net (Letra no sincronizada)</p>
+                    </div>
+                `;
+            } else {
+                throw new Error('No se encontraron letras para esta canción.');
+            }
+
+        } catch (error) {
+            console.error('❌ Error cargando letras:', error);
+            lyricsContainer.innerHTML = `
+                <div class="lyrics-container">
+                    <div class="lyrics-header"><i class="fas fa-exclamation-triangle"></i><p>Letras no disponibles</p></div>
+                    <p class="lyrics-info">Lo sentimos, no pudimos encontrar letras para "${this.escapeHTML(currentVideo.title)}".</p>
+                </div>`;
+        }
     }
-}
 /**
  * Actualizar UI de playlists
  */
