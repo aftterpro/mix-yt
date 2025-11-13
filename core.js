@@ -777,6 +777,11 @@ updatePersistentQueue() {
     const queueContentList = document.getElementById('queueContentList');
     if (!queueContentList) {
         console.error('❌ queueContentList no encontrado en el DOM');
+        // Intentar verificar si estamos en la vista correcta
+        const fullPlayerView = document.getElementById('fullPlayerView');
+        if (fullPlayerView && !fullPlayerView.classList.contains('active')) {
+            console.warn('⚠️ fullPlayerView no está activa, cola no visible aún');
+        }
         return;
     }
 
@@ -794,63 +799,91 @@ updatePersistentQueue() {
                         window.currentPlayingInfo?.flattenedIndex ?? 
                         -1;
 
-    console.log(`🎵 Índice actual: ${currentIndex}`);
+    console.log(`🎵 Índice actual: ${currentIndex}, Total videos: ${flatList.length}`);
 
-    const html = flatList.map((video, index) => {
-        const isPlaying = currentIndex === index;
-        const activeClass = isPlaying ? ' playing' : '';
-        
+    // Crear fragment para mejor rendimiento
+    const fragment = document.createDocumentFragment();
+    let validCount = 0;
+
+    flatList.forEach((video, index) => {
         // VALIDACIÓN: Asegurar que video tiene datos válidos
         if (!video || !video.videoId) {
             console.warn(`⚠️ Video inválido en índice ${index}:`, video);
-            return '';
+            return;
         }
         
-        return `
-            <div class="queue-item${activeClass}" 
-                 data-video-id="${video.videoId}" 
-                 data-flat-index="${index}"
-                 draggable="true"
-                 onclick="window.unifiedCore.playVideoAtIndex(${index})">
-                
-                <div class="queue-item-number">
-                    ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
-                </div>
-                
-                <img src="${video.thumbnail || './electronic.ico'}" 
-                     alt="${this.escapeHTML(video.title || 'Sin título')}" 
-                     class="queue-item-thumbnail"
-                     onerror="this.src='./electronic.ico';">
-                
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
-                    <div class="queue-item-meta">
-                        <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
-                        ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
-                    </div>
-                </div>
-                
-                <button class="queue-item-remove" 
-                        onclick="event.stopPropagation(); window.playlistManager.removeVideoFromQueue('${video.videoId}')"
-                        title="Eliminar de la cola">
-                    <i class="fas fa-times"></i>
-                </button>
+        const isPlaying = currentIndex === index;
+        
+        const queueItem = document.createElement('div');
+        queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
+        queueItem.dataset.videoId = video.videoId;
+        queueItem.dataset.flatIndex = index;
+        queueItem.draggable = true;
+        queueItem.onclick = () => this.playVideoAtIndex(index);
+        
+        queueItem.innerHTML = `
+            <div class="queue-item-number">
+                ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
             </div>
+            
+            <img src="${video.thumbnail || './electronic.ico'}" 
+                 alt="${this.escapeHTML(video.title || 'Sin título')}" 
+                 class="queue-item-thumbnail"
+                 onerror="this.src='./electronic.ico';">
+            
+            <div class="queue-item-info">
+                <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
+                <div class="queue-item-meta">
+                    <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
+                    ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
+                </div>
+            </div>
+            
+            <button class="queue-item-remove" 
+                    data-video-id="${video.videoId}"
+                    title="Eliminar de la cola">
+                <i class="fas fa-times"></i>
+            </button>
         `;
-    }).filter(html => html !== '').join('');
+        
+        // Event listener para botón de eliminar
+        const removeBtn = queueItem.querySelector('.queue-item-remove');
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.playlistManager) {
+                window.playlistManager.removeVideoFromQueue(video.videoId);
+            }
+        };
+        
+        fragment.appendChild(queueItem);
+        validCount++;
+    });
 
-    queueContentList.innerHTML = html;
-    this.updateQueueCount(flatList.length);
+    // Limpiar y actualizar de una vez
+    queueContentList.innerHTML = '';
+    queueContentList.appendChild(fragment);
     
-    //  REINICIAR DRAG & DROP DESPUÉS DE RENDERIZAR
+    this.updateQueueCount(validCount);
+    
+    // Reiniciar drag & drop después de renderizar
     setTimeout(() => {
         if (window.queueDragDrop) {
             window.queueDragDrop.attachDragListeners();
         }
     }, 100);
     
-    console.log(`✅ Cola persistente actualizada: ${flatList.length} videos renderizados`);
-    console.log(`📊 HTML generado: ${queueContentList.children.length} elementos en el DOM`);
+    console.log(`✅ Cola persistente actualizada: ${validCount} videos renderizados`);
+    console.log(`📊 Elementos en el DOM: ${queueContentList.children.length}`);
+    
+    // Scroll al item actual si existe
+    if (currentIndex >= 0) {
+        requestAnimationFrame(() => {
+            const playingItem = queueContentList.querySelector('.queue-item.playing');
+            if (playingItem) {
+                playingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
 }
 /**
  * Actualizar contador de cola
