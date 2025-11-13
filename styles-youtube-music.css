@@ -2393,3 +2393,74 @@ body {
     color: rgba(255, 100, 100, 0.6);
     margin-top: 10px;
 }
+/* =============================================
+   MINI PLAYER FLOTANTE - CORREGIDO
+   ============================================= */
+.mini-player-float {
+    position: fixed !important;
+    bottom: calc(var(--player-height) + 20px) !important;
+    right: 20px !important;
+    width: 320px !important;
+    height: 180px !important;
+    background: #000 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
+    z-index: 999998 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: all 0.3s ease !important;
+}
+
+.mini-player-float.hidden {
+    display: none !important;
+    opacity: 0 !important;
+}
+
+.mini-player-video {
+    position: relative !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #000 !important;
+}
+
+.mini-video-container {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.mini-player-expand {
+    position: absolute !important;
+    top: 10px !important;
+    right: 10px !important;
+    width: 36px !important;
+    height: 36px !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    color: white !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+    transition: background 0.2s !important;
+}
+
+.mini-player-expand:hover {
+    background: rgba(255, 107, 53, 0.9) !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .mini-player-float {
+        width: 240px !important;
+        height: 135px !important;
+        bottom: calc(var(--player-height) + 10px) !important;
+        right: 10px !important;
+    }
+}
