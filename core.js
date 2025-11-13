@@ -1895,9 +1895,31 @@ setupImprovedInfiniteScroll(searchResults) {
     this.scrollObserver.observe(trigger);
     console.log('✅ Scroll infinito configurado con trigger');
 }
-
 async loadMoreSearchResults() {
-        console.log('⚠️ En mantenimiento no hay más páginas');
+    if (isLoadingMore || !nextPageContext) {
+        return;
+    }
+
+    console.log('📜 🚀 Cargando más resultados...');
+    isLoadingMore = true;
+
+    const searchResults = document.getElementById('searchResults');
+    let trigger = searchResults.querySelector('.scroll-trigger');
+    if (trigger) {
+        trigger.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+    }
+
+    try {
+        // Llamar a performSearch con el contexto de la siguiente página
+        await this.performSearch(currentSearchQuery, nextPageContext);
+    } catch (error) {
+        console.error('❌ Error cargando más resultados:', error);
+        if (trigger) {
+            trigger.innerHTML = '<p class="related-error">Error al cargar</p>';
+        }
+    }
+    // No necesitamos poner isLoadingMore = false aquí,
+    // porque performSearch() lo hace en su bloque 'finally'
 }
 retryLoadMore() {
     console.log('🔄 Reintentando carga de más resultados...');
