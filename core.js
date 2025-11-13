@@ -930,40 +930,38 @@ switchView(viewName) {
     targetView.classList.add('active');
     this.currentView = viewName;
 
-    // ✅ BOTTOM PLAYER SIEMPRE VISIBLE - FORZADO
+    // ✅ BOTTOM PLAYER SIEMPRE VISIBLE
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
-        bottomPlayer.style.display = 'flex';
-        bottomPlayer.style.visibility = 'visible';
-        bottomPlayer.style.opacity = '1';
-        bottomPlayer.style.position = 'fixed';
-        bottomPlayer.style.bottom = '0';
-        bottomPlayer.style.zIndex = '300';
+        bottomPlayer.style.cssText = `
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999999 !important;
+        `;
     }
 
-    // ✅ GESTIÓN DE REPRODUCTORES SIN ROMPER LAYOUT
+    // ✅ GESTIÓN DE REPRODUCTORES SIN INTERRUMPIR AUDIO
     const fullPlayerView = document.getElementById('fullPlayerView');
     const miniPlayerFloat = document.getElementById('miniPlayerFloat');
     
+    const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || 
+                          window.currentPlayingInfo?.videoId;
+    
     if (viewName === 'fullPlayer') {
-        // Vista completa: mover reproductores a video-wrapper
+        // ✅ VISTA COMPLETA
+        console.log('🎬 Activando vista completa');
+        
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
-            const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
-            
-            if (videoWrapper) {
-                const player1 = document.getElementById('player1');
-                const player2 = document.getElementById('player2');
-                
-                // Mover solo si no están ya ahí
-                if (player1 && !videoWrapper.contains(player1)) {
-                    videoWrapper.appendChild(player1);
-                }
-                if (player2 && !videoWrapper.contains(player2)) {
-                    videoWrapper.appendChild(player2);
-                }
-            }
         }
+        
+        // ✅ MOVER REPRODUCTORES SIN PAUSAR
+        this.movePlayersToFullView();
         
         // Ocultar mini player
         if (miniPlayerFloat) {
@@ -971,28 +969,24 @@ switchView(viewName) {
             miniPlayerFloat.style.display = 'none';
         }
         
+        // Actualizar cola
         this.updatePersistentQueue();
-        console.log('🎬 Vista completa activada');
         
-} else {
-        // Otras vistas: Mover reproductores a mini-player
+    } else {
+        // ✅ OTRAS VISTAS
+        console.log(`📱 Activando vista: ${viewName}`);
+        
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
         
-        // Solo mostrar mini player si hay video reproduciéndose
-        const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId;
-        
+        // ✅ SI HAY VIDEO REPRODUCIÉNDOSE, MOSTRAR MINI PLAYER
         if (isVideoPlaying) {
-            // ✅ CORRECCIÓN: Llamar a la función que mueve los reproductores
-            this.showMiniPlayerFloat(); 
+            this.showMiniPlayerFloat();
         } else if (miniPlayerFloat) {
-            // Ocultar si no hay video
             miniPlayerFloat.classList.add('hidden');
             miniPlayerFloat.style.display = 'none';
         }
-        
-        console.log(`📱 Vista ${viewName} activa`);
     }
 
     // Acciones específicas por vista
@@ -1005,6 +999,54 @@ switchView(viewName) {
             break;
     }
 }
+movePlayersToFullView() {
+    console.log('🎬 Moviendo reproductores a vista completa (SIN interrupción)');
+    
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    if (!fullPlayerView) {
+        console.error('❌ fullPlayerView no encontrado');
+        return;
+    }
+    
+    const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
+    if (!videoWrapper) {
+        console.error('❌ video-wrapper no encontrado');
+        return;
+    }
+    
+    const player1El = document.getElementById('player1');
+    const player2El = document.getElementById('player2');
+    
+    if (!player1El || !player2El) {
+        console.error('❌ Reproductores no encontrados');
+        return;
+    }
+    
+    // ✅ MOVER SOLO SI NO ESTÁN YA EN EL WRAPPER
+    if (!videoWrapper.contains(player1El)) {
+        videoWrapper.appendChild(player1El);
+    }
+    if (!videoWrapper.contains(player2El)) {
+        videoWrapper.appendChild(player2El);
+    }
+    
+    // ✅ ASEGURAR ESTILOS SIN PAUSAR
+    [player1El, player2El].forEach(player => {
+        if (player) {
+            player.style.cssText = `
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                display: block !important;
+                visibility: visible !important;
+            `;
+        }
+    });
+    
+    console.log('✅ Reproductores en vista completa (audio continuo)');
+}    
 // =============================================
 // FORZAR VISIBILIDAD DEL BOTTOM PLAYER
 // =============================================
@@ -1043,8 +1085,9 @@ switchView(viewName) {
 /**
  * SHOW MINI PLAYER FLOAT
  */
-
-    showMiniPlayerFloat() {
+showMiniPlayerFloat() {
+    console.log('🎬 Activando mini player flotante');
+    
     let miniPlayer = document.getElementById('miniPlayerFloat');
     
     if (!miniPlayer) {
@@ -1054,7 +1097,7 @@ switchView(viewName) {
         miniPlayer.innerHTML = `
             <div class="mini-player-video">
                 <div id="miniPlayer1Container" class="mini-video-container"></div>
-                <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
+                <div id="miniPlayer2Container" class="mini-video-container"></div>
             </div>
             <button class="mini-player-expand" onclick="window.unifiedCore.switchView('fullPlayer')">
                 <i class="fas fa-expand"></i>
@@ -1064,42 +1107,53 @@ switchView(viewName) {
     }
     
     miniPlayer.classList.remove('hidden');
-    miniPlayer.style.display = 'block';
+    miniPlayer.style.cssText = `
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    `;
     
     this.movePlayersToMini();
     
-    console.log('🎬 Mini player flotante mostrado');
+    console.log('✅ Mini player flotante visible');
 }
 movePlayersToMini() {
+    console.log('🎬 Moviendo reproductores a mini (SIN interrupción)');
+    
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    // ✅ NO mover si ya están en el mini player
-    if (player1 && miniContainer1) {
-        if (!miniContainer1.contains(player1)) {
-            miniContainer1.appendChild(player1);
-        }
-    }
-    if (player2 && miniContainer2) {
-        if (!miniContainer2.contains(player2)) {
-            miniContainer2.appendChild(player2);
-        }
+    if (!miniContainer1 || !miniContainer2) {
+        console.error('❌ Contenedores mini no encontrados');
+        return;
     }
     
-    // Ajustar estilos sin pausar reproducción
+    // ✅ MOVER SOLO SI NO ESTÁN YA EN EL MINI
+    if (player1 && !miniContainer1.contains(player1)) {
+        miniContainer1.appendChild(player1);
+    }
+    if (player2 && !miniContainer2.contains(player2)) {
+        miniContainer2.appendChild(player2);
+    }
+    
+    // ✅ ASEGURAR ESTILOS SIN PAUSAR
     [player1, player2].forEach(player => {
         if (player) {
-            player.style.width = '100%';
-            player.style.height = '100%';
-            player.style.position = 'absolute';
-            player.style.top = '0';
-            player.style.left = '0';
+            player.style.cssText = `
+                width: 100% !important;
+                height: 100% !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                display: block !important;
+                visibility: visible !important;
+            `;
         }
     });
     
-    console.log('🎬 Reproductores en mini player (sin interrupción)');
+    console.log('✅ Reproductores en mini player (audio continuo)');
 }
     
 /**
