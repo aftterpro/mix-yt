@@ -782,7 +782,7 @@ findRelatedVideoData(itemElement) {
 
         try {
             // 3. Preparar datos
-            const artist = currentVideo.artist || currentVideo.uploaderName || '').trim();
+            const artist = (currentVideo.artist || currentVideo.uploaderName || '').trim();
             const title = (currentVideo.title || '').trim();
             const duration = Math.round(currentVideo.duration || 0);
            
