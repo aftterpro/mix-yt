@@ -56,8 +56,9 @@ class YouTubeSimplifiedClient {
             // Si la continuación es un objeto complejo (como en tu código original), debe ser stringificado
             const continuationString = JSON.stringify(continuation);
             const params = new URLSearchParams({
-                q: query,
-                nextpage: continuationString // Piped espera el objeto nextpage
+            q: query,
+            nextpage: continuationString, // Piped espera el objeto nextpage
+            filter: 'all' // ✅ AÑADIDO: El servidor lo requiere en todas las peticiones
             });
 
             targetUrl = `${this.searchApiUrl}/search?${params.toString()}`;
