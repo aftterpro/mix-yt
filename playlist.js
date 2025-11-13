@@ -267,6 +267,7 @@ class PlaylistManager {
             }
         }, 500);
     }
+    
 /**
  * Cargar videos de una playlist de YouTube
  */
@@ -585,7 +586,8 @@ async loadRelatedVideos() {
             console.log('🎵 Canción cambió, recargando relacionados...');
             this.loadRelatedVideos();
         }
-    }   
+    }  
+
     /**
      * Parsea un string de formato LRC [00:00.00]texto a un array de objetos
      */
@@ -1087,6 +1089,13 @@ escapeHTML(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+/**
+ * Escapar caracteres especiales de RegExp
+ */
+escapeRegExp(string) {
+    if (!string) return '';
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+} 
     /**
  * Renderizar contenido de la cola
  */
