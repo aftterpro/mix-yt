@@ -2296,3 +2296,35 @@ body {
         opacity: 1 !important;
     }
 }
+/* =============================================
+   ESTILOS DE LETRAS SINCRONIZADAS
+   ============================================= */
+
+.lyrics-text.synced {
+    /* Optimiza el scroll en la lista de letras */
+    scroll-behavior: smooth;
+    padding-right: 10px; /* Evita que el scrollbar tape el texto */
+}
+
+.lyrics-text.synced p {
+    font-size: 1.7rem; /* Letra un poco más grande */
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.4); /* Letras inactivas muy tenues */
+    font-weight: 500;
+    padding: 12px 0;
+    margin: 0;
+    border-radius: 8px;
+    opacity: 0.7;
+    transition: 
+        color 0.3s ease,
+        opacity 0.3s ease,
+        transform 0.3s ease;
+}
+
+/* La línea que está sonando ahora */
+.lyrics-text.synced p.active {
+    color: #FFFFFF; /* Letra activa blanca */
+    font-weight: 700;
+    opacity: 1;
+    transform: scale(1.02); /* Sutil efecto de zoom */
+}
