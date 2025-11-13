@@ -2374,6 +2374,10 @@ updateCurrentPlayingIndex() {
                 elements.playerThumbnail.src = currentVideo.thumbnail;
                 elements.playerThumbnail.alt = currentVideo.title;
             }
+           // Notificar al playlistManager que la canción cambió
+    if (window.playlistManager && typeof window.playlistManager.refreshActiveQueueTab === 'function') {
+        window.playlistManager.refreshActiveQueueTab();
+    } 
         }
     }
 /**
