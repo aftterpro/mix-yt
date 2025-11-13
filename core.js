@@ -974,8 +974,8 @@ switchView(viewName) {
         this.updatePersistentQueue();
         console.log('🎬 Vista completa activada');
         
-    } else {
-        // Otras vistas: NO mover reproductores
+} else {
+        // Otras vistas: Mover reproductores a mini-player
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
@@ -983,9 +983,13 @@ switchView(viewName) {
         // Solo mostrar mini player si hay video reproduciéndose
         const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || currentPlayingInfo?.videoId;
         
-        if (isVideoPlaying && miniPlayerFloat) {
-            miniPlayerFloat.classList.remove('hidden');
-            miniPlayerFloat.style.display = 'block';
+        if (isVideoPlaying) {
+            // ✅ CORRECCIÓN: Llamar a la función que mueve los reproductores
+            this.showMiniPlayerFloat(); 
+        } else if (miniPlayerFloat) {
+            // Ocultar si no hay video
+            miniPlayerFloat.classList.add('hidden');
+            miniPlayerFloat.style.display = 'none';
         }
         
         console.log(`📱 Vista ${viewName} activa`);
