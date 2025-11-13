@@ -333,3 +333,83 @@
     filter: brightness(1.2);
   }
 }
+/* =============================================
+   LETRAS SINCRONIZADAS - EFECTO SPOTIFY
+   ============================================= */
+
+.lyrics-text.synced {
+    max-height: 400px;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    padding: 20px;
+    position: relative;
+}
+
+.lyrics-text.synced p {
+    font-size: 1.8rem;
+    line-height: 2.4;
+    color: rgba(255, 255, 255, 0.3); /* Muy tenue por defecto */
+    font-weight: 400;
+    padding: 8px 0;
+    margin: 0;
+    transition: 
+        color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: left center;
+}
+
+/* La línea ACTIVA (estilo Spotify) */
+.lyrics-text.synced p.active {
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    font-size: 2rem !important;
+    opacity: 1 !important;
+    transform: translateX(8px) scale(1.02);
+    text-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+/* Las 2 líneas siguientes se ven un poco */
+.lyrics-text.synced p.active + p,
+.lyrics-text.synced p.active + p + p {
+    color: rgba(255, 255, 255, 0.5);
+    opacity: 0.8;
+}
+
+/* Efecto de glow sutil en la línea activa */
+.lyrics-text.synced p.active::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(180deg, var(--primary-color), transparent);
+    border-radius: 2px;
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+/* Scrollbar personalizado para las letras */
+.lyrics-text.synced::-webkit-scrollbar {
+    width: 8px;
+}
+
+.lyrics-text.synced::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lyrics-text.synced::-webkit-scrollbar-thumb {
+    background: rgba(255, 107, 53, 0.3);
+    border-radius: 4px;
+}
+
+.lyrics-text.synced::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 107, 53, 0.5);
+}
