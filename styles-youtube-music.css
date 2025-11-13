@@ -365,8 +365,13 @@ body {
    BÚSQUEDA - GRID 3x3 CORREGIDO
    ============================================= */
 .search-results-grid {
-display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important; /* 4 columnas */
+    display: grid !importa
+    /* NUEVA REGLA:
+      Crea columnas automáticamente (auto-fill) con un tamaño
+      mínimo de 200px y un máximo de 1 fracción (1fr).
+      Esto llenará el espacio disponible.
+    */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
     gap: 16px !important;
     width: 100% !important;
     padding: 0 !important;
