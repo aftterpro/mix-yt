@@ -837,7 +837,7 @@ async loadLyrics() {
         let match;
 
         if (this.lyricsProvider === 'lrclib') {
-            const lrclibUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${duration}`;
+            const lrclibUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}}`;
             console.log('📡 lrclib URL:', lrclibUrl);
             
             const response = await fetch(lrclibUrl);
