@@ -769,15 +769,18 @@ refreshActiveQueueTab() {
      * ✅ NUEVA FUNCIÓN
      * Inicia el intervalo que revisa el tiempo de la canción
      */
-    startLyricsSync() {
-        if (this.lyricsSyncInterval) {
-            clearInterval(this.lyricsSyncInterval);
-        }
-        // Revisa 4 veces por segundo
-        this.lyricsSyncInterval = setInterval(() => {
-            this.syncLyricsLine();
-        }, 250);
+startLyricsSync() {
+    if (this.lyricsSyncInterval) {
+        clearInterval(this.lyricsSyncInterval);
     }
+    
+    // ✅ Revisa cada 250ms (4 veces por segundo)
+    this.lyricsSyncInterval = setInterval(() => {
+        this.syncLyricsLine();
+    }, 250);
+    
+    console.log('🎵 Sincronización de letras iniciada');
+}
 
     /**
      * Sincroniza la línea activa de la letra con el tiempo del video
@@ -798,7 +801,7 @@ syncLyricsLine() {
 
     let activeLineIndex = -1;
     
-    // Encontrar línea activa con adelanto de 0.3s
+    // ✅ Encontrar línea activa con adelanto de 0.3s
     for (let i = this.currentLrc.length - 1; i >= 0; i--) {
         if (currentTime >= (this.currentLrc[i].time - 0.3)) {
             activeLineIndex = i;
@@ -812,7 +815,7 @@ syncLyricsLine() {
         
         if (index === activeLineIndex) {
             line.classList.add('active');
-            // Scroll suave al centro
+            // ✅ Scroll suave al centro
             line.scrollIntoView({ 
                 behavior: 'smooth', 
                 block: 'center',
@@ -1005,8 +1008,16 @@ async loadLyrics() {
             match.source = 'lrclib.net';
 
         } else {
-            const lujjjUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
-            console.log('📡 lujjjh URL:', lujjjUrl);
+            
+        // ✅ LIMPIAR TÍTULO COMPLETAMENTE - NO enviar "Artista - Título"
+        let cleanedTitle = title
+            .replace(/^.*?\s*[-–—:]\s*/, '') // Eliminar "Artista - " del inicio
+            .replace(/\(.*?\)/g, '') // Eliminar paréntesis
+            .replace(/\[.*?\]/g, '') // Eliminar corchetes
+            .trim();
+
+        const lujjjUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanedTitle)}&artist=${encodeURIComponent(artist)}`;
+        console.log('📡 lujjjh URL limpia:', lujjjUrl);
             
             const response = await fetch(lujjjUrl);
             if (!response.ok) throw new Error(`lujjjh.com: Error ${response.status}`);
