@@ -499,10 +499,24 @@ switchQueueTab(tabName) {
  */
 async loadRelatedVideos() {
     const relatedList = document.getElementById('relatedVideosList');
-    const currentVideo = this.core?.getFlattenedPlaylist()[this.core?.currentPlayingInfo?.flattenedIndex];
+    
+    // ✅ CORRECCIÓN: Obtener índice actual correcto
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
+                        this.core?.currentPlayingInfo?.flattenedIndex ?? 
+                        -1;
+    
+    const flatList = this.core?.getFlattenedPlaylist() || [];
+    const currentVideo = flatList[currentIndex];
+
+    console.log('🎵 loadRelatedVideos:', {
+        currentIndex,
+        totalVideos: flatList.length,
+        currentVideoId: currentVideo?.videoId,
+        currentTitle: currentVideo?.title
+    });
 
     // 1. Check for playing video
-    if (!currentVideo || !currentVideo.videoId) {
+    if (!currentVideo || !currentVideo.videoId || currentIndex < 0) {
         relatedList.innerHTML = `
             <p class="related-placeholder">Reproduce una canción para ver videos relacionados</p>
         `;
@@ -518,12 +532,18 @@ async loadRelatedVideos() {
     `;
 
     try {
-        // 3. Call the updated youtube client
+        // 3. Call the youtube client with correct videoId
         if (!window.youtubeJSClient || typeof window.youtubeJSClient.getVideoInfo !== 'function') {
             throw new Error('YouTube client no está disponible.');
         }
         
+        console.log(`📡 Obteniendo info de video: ${currentVideo.videoId}`);
         const videoInfo = await window.youtubeJSClient.getVideoInfo(currentVideo.videoId);
+
+        console.log('📊 Video info recibida:', {
+            title: videoInfo?.title,
+            relatedCount: videoInfo?.relatedStreams?.length || 0
+        });
 
         // 4. Check for related streams
         if (!videoInfo || !videoInfo.relatedStreams || videoInfo.relatedStreams.length === 0) {
@@ -532,39 +552,67 @@ async loadRelatedVideos() {
 
         // 5. Render the videos
         relatedList.innerHTML = videoInfo.relatedStreams
-            .filter(video => video.type === 'stream') // Asegurar que sean videos
-            .slice(0, 15) // Limitar a 15 resultados
+            .filter(video => video.type === 'stream') // Solo videos
+            .slice(0, 15) // Limitar a 15
             .map(video => {
-                // Extraer videoId de la URL (Piped lo da en 'url')
-                const videoIdMatch = video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-                const videoId = videoIdMatch ? videoIdMatch[1] : null;
-                if (!videoId) return ''; // Omitir si no hay ID
+                // ✅ CORRECCIÓN: Extraer videoId correctamente
+                let videoId = video.videoId;
+                
+                if (!videoId && video.url) {
+                    const videoIdMatch = video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                    videoId = videoIdMatch ? videoIdMatch[1] : null;
+                }
+                
+                if (!videoId) {
+                    console.warn('⚠️ Video sin ID:', video.title);
+                    return '';
+                }
 
                 const duration = this.core?.formatDuration(video.duration) || '';
+                const thumbnail = video.thumbnail || './electronic.ico';
+                const title = video.title || 'Sin título';
+                const uploader = video.uploaderName || 'YouTube';
 
                 return `
-                    <div class="related-video-item" data-video-id="${videoId}" title="${this.escapeHTML(video.title)}">
-                        <img src="${video.thumbnail}" alt="Thumbnail" class="related-video-thumbnail" onerror="this.src='./electronic.ico';">
+                    <div class="related-video-item" 
+                         data-video-id="${videoId}" 
+                         title="${this.escapeHTML(title)}">
+                        <img src="${thumbnail}" 
+                             alt="Thumbnail" 
+                             class="related-video-thumbnail" 
+                             onerror="this.src='./electronic.ico';">
                         <div class="related-video-info">
-                            <div class="related-video-title">${this.escapeHTML(video.title)}</div>
-                            <div class="related-video-author">${this.escapeHTML(video.uploaderName)}</div>
-                            <span class="related-video-duration">${duration}</span>
+                            <div class="related-video-title">${this.escapeHTML(title)}</div>
+                            <div class="related-video-meta">
+                                <span class="related-video-author">${this.escapeHTML(uploader)}</span>
+                                ${duration ? `<span class="related-video-duration">${duration}</span>` : ''}
+                            </div>
                         </div>
-                        <button class="related-video-add" data-video-id="${videoId}" title="Añadir a cola">
+                        <button class="related-video-add" 
+                                data-video-id="${videoId}" 
+                                title="Añadir a cola">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
                 `;
             })
+            .filter(html => html !== '') // Filtrar elementos vacíos
             .join('');
         
-        // 6. Add event listeners to the new buttons
+        // 6. Add event listeners
         this.setupRelatedVideosListeners();
 
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
         relatedList.innerHTML = `
-            <p class="related-error">Error cargando videos relacionados</p>
+            <div class="related-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error cargando videos relacionados</p>
+                <p class="error-details">${error.message}</p>
+                <button onclick="window.playlistManager?.loadRelatedVideos()" class="retry-btn">
+                    <i class="fas fa-redo"></i> Reintentar
+                </button>
+            </div>
         `;
     }
 }
@@ -752,7 +800,7 @@ findRelatedVideoData(itemElement) {
     }
 }  
 /**
- * Cargar letras de la canción actual (CON CAMBIO DE PROVEEDOR)
+ * Cargar letras de la canción actual (CORREGIDO)
  */
 async loadLyrics() {
     // 1. Limpiar sincronización
@@ -775,7 +823,9 @@ async loadLyrics() {
     console.log('🎵 loadLyrics llamado:', { 
         currentIndex, 
         totalVideos: flatList.length,
-        videoTitle: currentVideo?.title 
+        videoTitle: currentVideo?.title,
+        videoArtist: currentVideo?.artist,
+        videoUploader: currentVideo?.uploaderName
     });
 
     if (!currentVideo || currentIndex < 0) {
@@ -802,12 +852,32 @@ async loadLyrics() {
     this.setupLyricsProviderButton();
 
     try {
-        // 3. Preparar datos con limpieza mejorada
-        let artist = (currentVideo.artist || currentVideo.uploaderName || '').trim();
-        let title = (currentVideo.title || '').trim();
-        const duration = Math.round(currentVideo.duration || 0);
+        // 3. ✅ CORRECCIÓN CRÍTICA: Extraer artista y título correctamente
+        let artist = '';
+        let title = '';
         
-        // Limpiar título
+        // Prioridad 1: Si el video ya tiene 'artist' separado (procesado por backend)
+        if (currentVideo.artist && currentVideo.artist !== 'Desconocido' && currentVideo.artist !== 'YouTube') {
+            artist = currentVideo.artist.trim();
+            title = currentVideo.title.trim();
+        } else {
+            // Prioridad 2: Intentar separar del título
+            const fullTitle = currentVideo.title.trim();
+            
+            // Patrones comunes: "Artista - Título", "Artista: Título", etc.
+            const separatorMatch = fullTitle.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
+            
+            if (separatorMatch && separatorMatch[1] && separatorMatch[2]) {
+                artist = separatorMatch[1].trim();
+                title = separatorMatch[2].trim();
+            } else {
+                // Si no hay separador, usar uploaderName como artista
+                artist = currentVideo.uploaderName || 'Desconocido';
+                title = fullTitle;
+            }
+        }
+        
+        // Limpiar título de patrones comunes
         title = title
             .replace(/\(official.*?video\)/gi, '')
             .replace(/\(lyric.*?video\)/gi, '')
@@ -817,27 +887,21 @@ async loadLyrics() {
             .replace(/\(.*?official.*?\)/gi, '')
             .trim();
         
-        // Si el título incluye el artista, removerlo
-        if (artist && title.toLowerCase().includes(artist.toLowerCase())) {
-            const artistRegex = new RegExp(`^${this.escapeRegExp(artist)}\\s*[-–:]\\s*`, 'i');
-            title = title.replace(artistRegex, '').trim();
-        }
+        const duration = Math.round(currentVideo.duration || 0);
         
-        // Si no hay artista válido, extraer del título
-        if (!artist || artist === 'Desconocido' || artist === 'YouTube') {
-            const separatorMatch = title.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
-            if (separatorMatch) {
-                artist = separatorMatch[1].trim();
-                title = separatorMatch[2].trim();
-            }
-        }
-
-        console.log('🎵 Buscando letras para:', { artist, title, duration, provider: this.lyricsProvider });
+        console.log('🎵 Buscando letras con:', { 
+            artist, 
+            title, 
+            duration, 
+            provider: this.lyricsProvider,
+            originalTitle: currentVideo.title 
+        });
 
         let match;
 
         if (this.lyricsProvider === 'lrclib') {
-            const lrclibUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}}`;
+            // ✅ CORRECCIÓN: URL sin llaves adicionales
+            const lrclibUrl = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
             console.log('📡 lrclib URL:', lrclibUrl);
             
             const response = await fetch(lrclibUrl);
@@ -873,7 +937,7 @@ async loadLyrics() {
         const headerHtml = `
             <div class="lyrics-header">
                 <i class="fas fa-music"></i>
-                <p>${this.escapeHTML(match.trackName)}</p>
+                <p>${this.escapeHTML(match.trackName || match.name || title)}</p>
                 <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar Proveedor">
                     <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
                 </button>
@@ -886,7 +950,7 @@ async loadLyrics() {
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
                     ${headerHtml}
-                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName || artist)}</p>
                     <div class="lyrics-text synced" id="syncedLyricsContainer">
                         ${this.currentLrc.map((line) => `<p data-time="${line.time}">${this.escapeHTML(line.text)}</p>`).join('')}
                     </div>
@@ -898,7 +962,7 @@ async loadLyrics() {
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
                     ${headerHtml}
-                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName)}</p>
+                    <p class="lyrics-artist-header">por ${this.escapeHTML(match.artistName || artist)}</p>
                     <p class="lyrics-text">${formattedLyrics}</p>
                     <p class="lyrics-source">Fuente: ${match.source}</p>
                 </div>`;
