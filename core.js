@@ -1501,6 +1501,9 @@ async preLoadNextVideo() {
     }
 }
 
+/**
+ * Crossfade sin pantalla oscura
+ */
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) {
         console.warn('🔒 Crossfade ya en progreso, ignorando');
@@ -1514,23 +1517,28 @@ startCrossfade(prevPlayer, nextPlayer) {
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
     
-    //  Asegurar que nextElement sea VISIBLE desde el inicio
+    // ✅ CRÍTICO: Ambos elementos VISIBLES durante el crossfade
     if (nextElement) {
         nextElement.classList.remove('hidden', 'fade-out');
         nextElement.classList.add('fade-in', 'crossfade-enter');
-        nextElement.style.display = 'block';
-        nextElement.style.visibility = 'visible'; 
-        nextElement.style.opacity = '0';
-        nextElement.style.zIndex = '3';
-        nextElement.style.pointerEvents = 'auto'; 
+        nextElement.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 0;
+            z-index: 3;
+            pointer-events: auto;
+        `;
     }
     
     if (prevElement) {
         prevElement.classList.remove('fade-in', 'hidden');
         prevElement.classList.add('fade-out', 'crossfade-exit');
-        prevElement.style.opacity = '1';
-        prevElement.style.zIndex = '2';
-        prevElement.style.visibility = 'visible'; 
+        prevElement.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1;
+            z-index: 2;
+        `;
     }
     
     const steps = 100;
@@ -1565,6 +1573,7 @@ startCrossfade(prevPlayer, nextPlayer) {
             console.warn("⚠️ Error ajustando volumen:", e);
         }
         
+        // ✅ Actualizar opacidad manualmente (suave)
         if (prevElement) {
             prevElement.style.opacity = (1 - progress).toString();
         }
@@ -1579,7 +1588,7 @@ startCrossfade(prevPlayer, nextPlayer) {
             
             console.log('✅ Crossfade completado');
             
-            // ✅ LIMPIAR Y REINICIAR MONITOREO
+            // ✅ Limpieza final
             setTimeout(() => {
                 try {
                     prevPlayer.stopVideo();
@@ -1587,33 +1596,39 @@ startCrossfade(prevPlayer, nextPlayer) {
                     if (prevElement) {
                         prevElement.classList.add('hidden');
                         prevElement.classList.remove('fade-out', 'crossfade-exit');
-                        prevElement.style.zIndex = '1';
-                        prevElement.style.opacity = '1';
+                        prevElement.style.cssText = `
+                            display: none !important;
+                            visibility: hidden !important;
+                            z-index: 1;
+                            opacity: 1;
+                        `;
                     }
                     
                     if (nextElement) {
                         nextElement.classList.remove('crossfade-enter', 'fade-in');
-                        nextElement.style.opacity = '1';
-                        nextElement.style.zIndex = '2';
+                        nextElement.style.cssText = `
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1;
+                            z-index: 2;
+                        `;
                     }
                     
                     console.log('🧹 Limpieza post-crossfade completada');
                     
-                    // ✅ CRÍTICO: RESETEAR TODOS LOS FLAGS
+                    // Resetear flags
                     hasOutroCrossfadeStarted = false;
                     nextVideoScheduled = false;
                     isTransitioning = false;
                     
-                    // ✅ CRÍTICO: REINICIAR MONITOREO
+                    // Reiniciar monitoreo
                     if (!monitorInterval && window.unifiedCore) {
                         window.unifiedCore.startMonitoring();
-                        console.log('📊 Monitoreo reiniciado después de crossfade');
+                        console.log('📊 Monitoreo reiniciado');
                     }
                     
                 } catch (e) {
                     console.error('❌ Error limpiando crossfade:', e);
-                    
-                    // Forzar reset de flags en caso de error
                     hasOutroCrossfadeStarted = false;
                     nextVideoScheduled = false;
                     isTransitioning = false;
@@ -1622,8 +1637,6 @@ startCrossfade(prevPlayer, nextPlayer) {
         }
     }, stepTime);
 }
-
-
     // =============================================
     // BÚSQUEDA
     // =============================================
