@@ -18,16 +18,19 @@
   height: 100%;
   opacity: 1;
   filter: blur(0px) brightness(1.0) saturate(1.1) contrast(1.05);
-  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  background: #000; /* Fondo negro sólido */
   border-radius: 12px;
   overflow: hidden;
   transition: 
     opacity var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
     filter var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
-    transform var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
-    box-shadow var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1);
-  will-change: opacity, filter, transform, box-shadow;
+    transform var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: opacity, filter, transform;
   z-index: 1;
+  
+  /* ✅ CRÍTICO: Mantener visible durante transición */
+  visibility: visible !important;
+  display: block !important;
   
   /* Sombra dinámica */
   box-shadow: 
@@ -41,8 +44,10 @@
 .video-player.fade-in {
   opacity: 1;
   filter: blur(0px) brightness(1.1) saturate(1.2) contrast(1.1);
-  transform: scale(1) rotateY(0deg);
-  z-index: 3;
+  transform: scale(1);
+  z-index: 3; /* Encima del que sale */
+  visibility: visible !important;
+  display: block !important;
   
   box-shadow: 
     0 16px 64px rgba(255, 107, 53, 0.3),
@@ -79,9 +84,14 @@
    ============================================= */
 .video-player.fade-out {
   opacity: 0;
-  filter: blur(8px) brightness(0.7) saturate(0.8) contrast(0.9);
-  transform: scale(0.95) rotateY(-5deg);
-  z-index: 1;
+  /* ✅ CAMBIO CRÍTICO: Brightness mínimo de 0.85 en lugar de 0.7 */
+  filter: blur(4px) brightness(0.85) saturate(0.9) contrast(0.95);
+  transform: scale(0.98);
+  z-index: 2; /* Debajo del que entra */
+  
+  /* ✅ MANTENER VISIBLE durante fade-out */
+  visibility: visible !important;
+  display: block !important;
   
   box-shadow: 
     0 4px 16px rgba(0, 0, 0, 0.6),
@@ -123,7 +133,8 @@
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
-  z-index: -1 !important;
+  z-index: 0 !important;
+  display: none !important;
   transform: scale(0.9) translateZ(-100px) !important;
   filter: blur(20px) brightness(0.5) !important;
   transition: all 0.3s ease !important;
@@ -200,7 +211,18 @@
     opacity: 0;
   }
 }
-
+/* =============================================
+   CONTENEDOR DE VIDEO: Fondo negro siempre
+   ============================================= */
+.video-wrapper {
+    flex: 1;
+    position: relative;
+    background: #000 !important; /* Negro sólido */
+    border-radius: 12px;
+    overflow: hidden;
+    height: 200px;
+    width: 600px;
+}
 /* =============================================
    EFECTOS DE TRANSICIÓN 3D
    ============================================= */
