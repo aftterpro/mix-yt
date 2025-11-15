@@ -96,92 +96,146 @@ class PlaylistManager {
     // =============================================
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
+    /**
+ * Extraer artista del título correctamente
+ */
+ extractArtistFromTitle(fullTitle) {
+    if (!fullTitle) return 'Desconocido';
     
+    let cleanTitle = fullTitle.trim();
+    
+    // Limpiar patrones comunes primero
+    cleanTitle = cleanTitle
+        .replace(/\(official.*?video\)/gi, '')
+        .replace(/\(lyric.*?video\)/gi, '')
+        .replace(/\(visualizer\)/gi, '')
+        .replace(/\(audio\)/gi, '')
+        .replace(/\[official.*?\]/gi, '')
+        .replace(/\[lyric.*?\]/gi, '')
+        .trim();
+    
+    // Patrones de separación: "Artista - Título", "Artista: Título", etc.
+    const separatorPatterns = [
+        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Guión
+        /^(.+?)\s*:\s*(.+?)$/,       // Dos puntos
+        /^(.+?)\s*\|\s*(.+?)$/,      // Pipe
+    ];
+    
+    for (const pattern of separatorPatterns) {
+        const match = cleanTitle.match(pattern);
+        if (match && match[1] && match[2]) {
+            const artist = match[1].trim();
+            const title = match[2].trim();
+            
+            // Validar que el artista no sea muy largo (probablemente es título completo)
+            if (artist.length < 50 && !artist.toLowerCase().includes('feat')) {
+                return { artist, title };
+            }
+        }
+    }
+    
+    // Si no hay separador, retornar el título completo y artista desconocido
+    return { artist: 'Desconocido', title: cleanTitle };
+}
+
     /**
      * Añadir video a la cola
      */
-    async addVideoToQueue(videoData) {
-        // VALIDACIÓN CRÍTICA
-        if (!videoData || !videoData.videoId) {
-            console.error('❌ addVideoToQueue: videoData o videoId inválido:', videoData);
-            this.core?.showMessage('Error: Video inválido', 'error');
-            return;
-        }
-
-        if (videoData.videoId === 'undefined' || videoData.videoId === undefined) {
-            console.error('❌ addVideoToQueue: videoId es undefined');
-            this.core?.showMessage('Error: ID de video no válido', 'error');
-            return;
-        }
-
-        let queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
-        
-        if (!queuePlaylist) {
-            queuePlaylist = {
-                id: 'queue',
-                name: 'Cola de Reproducción',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true,
-                isQueue: true
-            };
-            this.playlistsData.unshift(queuePlaylist);
-        }
-
-        // Verificar duplicados
-        const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
-        if (isDuplicate) {
-            this.core?.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
-            return;
-        }
-
-        // Obtener duración si no la tiene
-        let duration = videoData.duration || 0;
-        
-        if (!duration && videoData.videoId && window.isAuthorized) {
-            try {
-                const durations = await this.core?.getBatchVideoDurations([videoData.videoId]);
-                duration = durations?.[videoData.videoId] || 0;
-            } catch (error) {
-                console.warn('No se pudo obtener duración para', videoData.videoId);
-            }
-        }
-
-        const videoObject = {
-            videoId: videoData.videoId,
-            title: videoData.title || "Título no disponible",
-            thumbnail: videoData.thumbnail || './electronic.ico',
-            duration: duration,
-            uploaderName: videoData.uploaderName || videoData.author || 'Desconocido',
-            author: videoData.author || videoData.uploaderName || 'Desconocido',
-            sourcePlaylistId: 'queue'
-        };
-
-        console.log('🎵 Video a añadir:', {
-            videoId: videoObject.videoId,
-            title: videoObject.title.substring(0, 50),
-            hasValidId: !!videoObject.videoId && videoObject.videoId !== 'undefined'
-        });
-
-        queuePlaylist.videos.push(videoObject);
-        this.core?.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
-        
-        if (this.updatePlaylistsUI) {
-            this.updatePlaylistsUI();
-            } else if (this.core?.updatePlaylistsUI) {
-                this.core.updatePlaylistsUI();
-            }
-        this.core?.enablePlayButton();
-        
-        console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
-        
-        // Guardar cambios
-        setTimeout(() => {
-            if (typeof window.saveAllData === 'function') {
-                window.saveAllData();
-            }
-        }, 500);
+async addVideoToQueue(videoData) {
+    // VALIDACIÓN CRÍTICA
+    if (!videoData || !videoData.videoId) {
+        console.error('❌ addVideoToQueue: videoData o videoId inválido:', videoData);
+        this.core?.showMessage('Error: Video inválido', 'error');
+        return;
     }
+
+    let queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+    
+    if (!queuePlaylist) {
+        queuePlaylist = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
+        };
+        this.playlistsData.unshift(queuePlaylist);
+    }
+
+    // Verificar duplicados
+    const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
+    if (isDuplicate) {
+        this.core?.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
+        return;
+    }
+
+    // ✅ CORRECCIÓN: Extraer artista del título si no viene procesado
+    let artist = 'Desconocido';
+    let cleanTitle = videoData.title || 'Título Desconocido';
+    
+    // Si el backend ya procesó y separó artista y título
+    if (videoData.artist && videoData.artist !== 'Desconocido' && videoData.artist !== 'YouTube') {
+        artist = videoData.artist;
+    } else if (videoData.uploaderName && 
+               videoData.uploaderName !== 'Desconocido' && 
+               videoData.uploaderName !== 'YouTube' &&
+               !videoData.uploaderName.includes('VEVO') &&
+               !videoData.uploaderName.toLowerCase().includes('official')) {
+        // Si uploaderName parece ser el artista real (no un canal genérico)
+        artist = videoData.uploaderName;
+    } else {
+        // Intentar extraer del título
+        const extracted = extractArtistFromTitle(videoData.title);
+        artist = extracted.artist;
+        cleanTitle = extracted.title;
+    }
+
+    // Obtener duración
+    let duration = videoData.duration || 0;
+    
+    if (!duration && videoData.videoId && window.isAuthorized) {
+        try {
+            const durations = await this.core?.getBatchVideoDurations([videoData.videoId]);
+            duration = durations?.[videoData.videoId] || 0;
+        } catch (error) {
+            console.warn('No se pudo obtener duración para', videoData.videoId);
+        }
+    }
+
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: cleanTitle,
+        thumbnail: videoData.thumbnail || './electronic.ico',
+        duration: duration,
+        uploaderName: artist, // ✅ Usar artista extraído
+        author: artist,
+        artist: artist, // ✅ Agregar campo artist explícito
+        sourcePlaylistId: 'queue'
+    };
+
+    console.log('🎵 Video procesado:', {
+        videoId: videoObject.videoId,
+        title: videoObject.title.substring(0, 50),
+        artist: videoObject.artist,
+        uploaderName: videoObject.uploaderName
+    });
+
+    queuePlaylist.videos.push(videoObject);
+    this.core?.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
+    
+    this.updatePlaylistsUI();
+    this.core?.enablePlayButton();
+    
+    console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
+    
+    // Guardar cambios
+    setTimeout(() => {
+        if (typeof window.saveAllData === 'function') {
+            window.saveAllData();
+        }
+    }, 500);
+}
 
     /**
      * Añadir video después del video actual
@@ -500,7 +554,6 @@ switchQueueTab(tabName) {
 async loadRelatedVideos() {
     const relatedList = document.getElementById('relatedVideosList');
     
-    // ✅ CORRECCIÓN: Obtener índice actual correcto
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
                         this.core?.currentPlayingInfo?.flattenedIndex ?? 
                         -1;
@@ -510,12 +563,10 @@ async loadRelatedVideos() {
 
     console.log('🎵 loadRelatedVideos:', {
         currentIndex,
-        totalVideos: flatList.length,
         currentVideoId: currentVideo?.videoId,
         currentTitle: currentVideo?.title
     });
 
-    // 1. Check for playing video
     if (!currentVideo || !currentVideo.videoId || currentIndex < 0) {
         relatedList.innerHTML = `
             <p class="related-placeholder">Reproduce una canción para ver videos relacionados</p>
@@ -523,7 +574,6 @@ async loadRelatedVideos() {
         return;
     }
 
-    // 2. Show loading state
     relatedList.innerHTML = `
         <div class="related-loading">
             <i class="fas fa-spinner fa-spin"></i>
@@ -532,7 +582,6 @@ async loadRelatedVideos() {
     `;
 
     try {
-        // 3. Call the youtube client with correct videoId
         if (!window.youtubeJSClient || typeof window.youtubeJSClient.getVideoInfo !== 'function') {
             throw new Error('YouTube client no está disponible.');
         }
@@ -540,81 +589,108 @@ async loadRelatedVideos() {
         console.log(`📡 Obteniendo info de video: ${currentVideo.videoId}`);
         const videoInfo = await window.youtubeJSClient.getVideoInfo(currentVideo.videoId);
 
-        console.log('📊 Video info recibida:', {
-            title: videoInfo?.title,
-            relatedCount: videoInfo?.relatedStreams?.length || 0
-        });
-
-        // 4. Check for related streams
         if (!videoInfo || !videoInfo.relatedStreams || videoInfo.relatedStreams.length === 0) {
             throw new Error('No se encontraron videos relacionados.');
         }
 
-        // 5. Render the videos
-        relatedList.innerHTML = videoInfo.relatedStreams
-            .filter(video => video.type === 'stream') // Solo videos
-            .slice(0, 15) // Limitar a 15
-            .map(video => {
-                // ✅ CORRECCIÓN: Extraer videoId correctamente
-                let videoId = video.videoId;
-                
-                if (!videoId && video.url) {
-                    const videoIdMatch = video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-                    videoId = videoIdMatch ? videoIdMatch[1] : null;
-                }
-                
-                if (!videoId) {
-                    console.warn('⚠️ Video sin ID:', video.title);
-                    return '';
-                }
-
-                const duration = this.core?.formatDuration(video.duration) || '';
-                const thumbnail = video.thumbnail || './electronic.ico';
-                const title = video.title || 'Sin título';
-                const uploader = video.uploaderName || 'YouTube';
-
-                return `
-                    <div class="related-video-item" 
-                         data-video-id="${videoId}" 
-                         title="${this.escapeHTML(title)}">
-                        <img src="${thumbnail}" 
-                             alt="Thumbnail" 
-                             class="related-video-thumbnail" 
-                             onerror="this.src='./electronic.ico';">
-                        <div class="related-video-info">
-                            <div class="related-video-title">${this.escapeHTML(title)}</div>
-                            <div class="related-video-meta">
-                                <span class="related-video-author">${this.escapeHTML(uploader)}</span>
-                                ${duration ? `<span class="related-video-duration">${duration}</span>` : ''}
-                            </div>
-                        </div>
-                        <button class="related-video-add" 
-                                data-video-id="${videoId}" 
-                                title="Añadir a cola">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </div>
-                `;
-            })
-            .filter(html => html !== '') // Filtrar elementos vacíos
-            .join('');
-        
-        // 6. Add event listeners
-        this.setupRelatedVideosListeners();
+        // Renderizar videos
+        this.renderRelatedVideos(videoInfo.relatedStreams, relatedList);
 
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
-        relatedList.innerHTML = `
-            <div class="related-error">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>Error cargando videos relacionados</p>
-                <p class="error-details">${error.message}</p>
-                <button onclick="window.playlistManager?.loadRelatedVideos()" class="retry-btn">
-                    <i class="fas fa-redo"></i> Reintentar
-                </button>
-            </div>
-        `;
+        
+        // ✅ FALLBACK: Usar búsqueda en lugar de API /streams
+        try {
+            await this.loadRelatedVideosFallback(currentVideo, relatedList);
+        } catch (fallbackError) {
+            console.error('❌ Error en fallback:', fallbackError);
+            relatedList.innerHTML = `
+                <div class="related-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>No se pudieron cargar videos relacionados</p>
+                    <p class="error-details">Intenta con otra canción</p>
+                </div>
+            `;
+        }
     }
+}
+    
+/**
+ * ✅ NUEVO: Fallback usando búsqueda
+ */
+async loadRelatedVideosFallback(currentVideo, relatedList) {
+    console.log('🔄 Usando fallback para videos relacionados...');
+    
+    // Extraer artista del título
+    const extracted = extractArtistFromTitle(currentVideo.title);
+    const searchQuery = extracted.artist !== 'Desconocido' 
+        ? extracted.artist 
+        : currentVideo.title.split('-')[0].trim();
+    
+    console.log(`🔍 Buscando: "${searchQuery}"`);
+    
+    const searchResults = await window.youtubeJSClient.search(searchQuery);
+    
+    if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
+        throw new Error('No se encontraron resultados en búsqueda');
+    }
+    
+    // Filtrar el video actual
+    const relatedVideos = searchResults.items
+        .filter(video => video.videoId !== currentVideo.videoId)
+        .slice(0, 15);
+    
+    this.renderRelatedVideos(relatedVideos, relatedList);
+}
+
+/**
+ * ✅ NUEVO: Renderizar videos relacionados
+ */
+renderRelatedVideos(videos, container) {
+    const html = videos
+        .map(video => {
+            let videoId = video.videoId;
+            
+            if (!videoId && video.url) {
+                const match = video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+                videoId = match ? match[1] : null;
+            }
+            
+            if (!videoId) return '';
+
+            const duration = this.core?.formatDuration(video.duration) || '';
+            const thumbnail = video.thumbnail || './electronic.ico';
+            const title = video.title || 'Sin título';
+            const uploader = video.uploaderName || 'YouTube';
+
+            return `
+                <div class="related-video-item" 
+                     data-video-id="${videoId}" 
+                     title="${this.escapeHTML(title)}">
+                    <img src="${thumbnail}" 
+                         alt="Thumbnail" 
+                         class="related-video-thumbnail" 
+                         onerror="this.src='./electronic.ico';">
+                    <div class="related-video-info">
+                        <div class="related-video-title">${this.escapeHTML(title)}</div>
+                        <div class="related-video-meta">
+                            <span class="related-video-author">${this.escapeHTML(uploader)}</span>
+                            ${duration ? `<span class="related-video-duration">${duration}</span>` : ''}
+                        </div>
+                    </div>
+                    <button class="related-video-add" 
+                            data-video-id="${videoId}" 
+                            title="Añadir a cola">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            `;
+        })
+        .filter(html => html !== '')
+        .join('');
+    
+    container.innerHTML = html;
+    this.setupRelatedVideosListeners();
 }
 /**
  * Actualiza el contenido de la pestaña activa cuando cambia la canción
