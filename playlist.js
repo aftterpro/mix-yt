@@ -701,25 +701,42 @@ refreshActiveQueueTab() {
 
     const tabName = activeTab.dataset.tab;
     
-    // ✅ CRÍTICO: Obtener el índice ACTUAL del video reproduciéndose
+    // ✅ CORRECCIÓN: Obtener el índice ACTUAL
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
                         this.core?.currentPlayingInfo?.flattenedIndex ?? 
                         -1;
     
+    const flatList = this.core?.getFlattenedPlaylist() || [];
+    const currentVideo = flatList[currentIndex];
+    
     console.log('🎵 refreshActiveQueueTab:', { 
         tabName, 
         currentIndex,
-        videoId: window.currentPlayingInfo?.videoId 
+        videoId: currentVideo?.videoId,
+        title: currentVideo?.title
     });
     
-    // No recargar la pestaña 'next' (la cola)
+    // ✅ CRÍTICO: Verificar que hay un video válido
+    if (!currentVideo || currentIndex < 0) {
+        console.warn('⚠️ No hay video actual para refrescar tab');
+        return;
+    }
+    
+    // Refrescar según el tab activo
     if (tabName === 'lyrics') {
         console.log('🎵 Canción cambió, recargando letras...');
-        // ✅ Forzar recarga con el índice correcto
-        this.loadLyrics();
+        // ✅ Esperar un poco para que el estado se actualice
+        setTimeout(() => {
+            this.loadLyrics();
+        }, 500);
     } else if (tabName === 'related') {
         console.log('🎵 Canción cambió, recargando relacionados...');
-        this.loadRelatedVideos();
+        setTimeout(() => {
+            this.loadRelatedVideos();
+        }, 500);
+    } else if (tabName === 'next') {
+        // La cola se actualiza automáticamente
+        console.log('🎵 Cola de reproducción actualizada');
     }
 }
     /**
