@@ -476,16 +476,38 @@ do {
                                    './electronic.ico';
                     }
                     
-                    videos.push({
-                        videoId: videoId,
-                        title: title,
-                        uploaderName: item.snippet?.channelTitle || 'YouTube',
-                        duration: 0, // Se obtendrá después en lote
-                        thumbnail: thumbnail,
-                        source: 'youtube_library',
-                        playlistId: playlistId,
-                        dateAdded: Date.now()
-                    });
+                   // ✅ EXTRAER ARTISTA DEL TÍTULO
+let artist = 'YouTube';
+let cleanTitle = title;
+
+// Intentar separar "Artista - Título"
+const separatorMatch = title.match(/^(.+?)\s*[-–—:]\s*(.+?)$/);
+if (separatorMatch && separatorMatch[1] && separatorMatch[2]) {
+    artist = separatorMatch[1].trim();
+    cleanTitle = separatorMatch[2].trim();
+} else if (item.snippet?.videoOwnerChannelTitle) {
+    artist = item.snippet.videoOwnerChannelTitle;
+}
+
+// Limpiar patrones comunes del título
+cleanTitle = cleanTitle
+    .replace(/\(official.*?video\)/gi, '')
+    .replace(/\(lyric.*?video\)/gi, '')
+    .replace(/\(audio\)/gi, '')
+    .replace(/\[.*?\]/g, '')
+    .trim();
+
+videos.push({
+    videoId: videoId,
+    title: cleanTitle,
+    artist: artist,
+    uploaderName: artist,
+    author: artist,
+    thumbnail: thumbnail,
+    source: 'youtube_library',
+    playlistId: playlistId,
+    dateAdded: Date.now()
+});
                 } else if (videoId) {
                     console.warn(`⚠️ Video eliminado detectado: "${title}" (${videoId})`);
                 }
