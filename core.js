@@ -913,6 +913,7 @@ updateQueueCount(count) {
     // =============================================
     // GESTIÓN DE VISTAS
     // =============================================
+
 switchView(viewName) {
     const validViews = ['home', 'search', 'library', 'fullPlayer'];
     if (!validViews.includes(viewName)) {
@@ -969,7 +970,9 @@ switchView(viewName) {
                           window.currentPlayingInfo?.videoId;
     
     if (viewName === 'fullPlayer') {
-        // ✅ VISTA COMPLETA
+        // =============================================
+        // VISTA COMPLETA
+        // =============================================
         console.log('🎬 Activando vista completa');
         
         if (fullPlayerView) {
@@ -988,18 +991,29 @@ switchView(viewName) {
         // Actualizar cola
         this.updatePersistentQueue();
         
+        // Refrescar tab activa si hay playlistManager
+        if (window.playlistManager && window.playlistManager.refreshActiveQueueTab) {
+            setTimeout(() => {
+                window.playlistManager.refreshActiveQueueTab();
+            }, 300);
+        }
+        
     } else {
-        // ✅ OTRAS VISTAS
+        // =============================================
+        // OTRAS VISTAS
+        // =============================================
         console.log(`📱 Activando vista: ${viewName}`);
         
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
         
-        // ✅ SI HAY VIDEO REPRODUCIÉNDOSE, MOSTRAR MINI PLAYER
+        // ✅ SI HAY VIDEO REPRODUCIÉNDOSE
         if (isVideoPlaying) {
+            console.log('📱 Video reproduciéndose, mostrar mini player');
             this.showMiniPlayerFloat();
         } else if (miniPlayerFloat) {
+            console.log('⏸️ Sin video, ocultar mini player');
             miniPlayerFloat.classList.add('hidden');
             miniPlayerFloat.style.display = 'none';
         }
@@ -1014,6 +1028,9 @@ switchView(viewName) {
             this.focusSearchInput();
             break;
     }
+
+    // ✅ SIEMPRE FORZAR BOTTOM PLAYER VISIBLE
+    this.forceBottomPlayerVisible();
 }
 movePlayersToFullView() {
     console.log('🎬 Moviendo reproductores a vista completa (SIN interrupción)');
@@ -1047,7 +1064,7 @@ movePlayersToFullView() {
     }
     
     // ✅ ASEGURAR ESTILOS SIN PAUSAR
-    [player1El, player2El].forEach(player => {
+    [player1El, player2El].forEach((player, index) => {
         if (player) {
             player.style.cssText = `
                 position: absolute !important;
@@ -1062,12 +1079,12 @@ movePlayersToFullView() {
     });
     
     console.log('✅ Reproductores en vista completa (audio continuo)');
-}    
+}
 // =============================================
 // FORZAR VISIBILIDAD DEL BOTTOM PLAYER
 // =============================================
 
- forceBottomPlayerVisible() {
+forceBottomPlayerVisible() {
     const bottomPlayer = document.querySelector('.bottom-player');
     
     if (!bottomPlayer) {
@@ -1075,12 +1092,10 @@ movePlayersToFullView() {
         return;
     }
     
-    // Remover TODOS los estilos inline que puedan ocultarlo
     bottomPlayer.style.removeProperty('display');
     bottomPlayer.style.removeProperty('visibility');
     bottomPlayer.style.removeProperty('opacity');
     
-    // Aplicar estilos forzados
     bottomPlayer.style.cssText = `
         display: flex !important;
         visibility: visible !important;
@@ -1093,10 +1108,23 @@ movePlayersToFullView() {
         pointer-events: auto !important;
     `;
     
-    // Remover clases que puedan ocultarlo
     bottomPlayer.classList.remove('hidden', 'hide', 'invisible');
-    
-    console.log('✅ Bottom player forzado a visible');
+}
+/**
+ * Refrescar vista de biblioteca
+ */
+refreshLibraryView() {
+    this.updatePlaylistsUI();
+}
+/**
+ * Enfocar input de búsqueda
+ */
+focusSearchInput() {
+    const searchInput = document.getElementById('sidebarSearchInput') || 
+                      document.getElementById('searchInput');
+    if (searchInput) {
+        setTimeout(() => searchInput.focus(), 100);
+    }
 }
 /**
  * SHOW MINI PLAYER FLOAT
@@ -1154,9 +1182,11 @@ movePlayersToMini() {
         miniContainer2.appendChild(player2);
     }
     
-    // ✅ ASEGURAR ESTILOS SIN PAUSAR
-    [player1, player2].forEach(player => {
+    // ✅ ASEGURAR ESTILOS CORRECTOS
+    [player1, player2].forEach((player, index) => {
         if (player) {
+            const isActive = window.currentPlayer === (index + 1);
+            
             player.style.cssText = `
                 width: 100% !important;
                 height: 100% !important;
@@ -1164,14 +1194,22 @@ movePlayersToMini() {
                 top: 0 !important;
                 left: 0 !important;
                 display: block !important;
-                visibility: visible !important;
+                visibility: ${isActive ? 'visible' : 'hidden'} !important;
+                opacity: ${isActive ? '1' : '0'} !important;
+                z-index: ${isActive ? '2' : '1'} !important;
+                border: none !important;
             `;
+            
+            if (isActive) {
+                player.classList.remove('hidden');
+            } else {
+                player.classList.add('hidden');
+            }
         }
     });
     
     console.log('✅ Reproductores en mini player (audio continuo)');
 }
-    
 /**
  * Mover reproductores a vista completa
  */
