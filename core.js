@@ -408,20 +408,36 @@ async loadTrendingContent() {
     }
 
     onPlayerStateChange(event) {
-        const player = event.target;
-        const state = event.data;
+    const player = event.target;
+    const state = event.data;
+    
+    if (state === YT.PlayerState.ENDED) {
+        console.log('📻 Video terminado, reproduciendo siguiente...');
+        this.playNextVideo();
+    } else if (state === YT.PlayerState.PLAYING) {
+        hasOutroCrossfadeStarted = false;
+        this.updateCurrentPlayingIndex();
         
-        if (state === YT.PlayerState.ENDED) {
-            console.log('📻 Video terminado, reproduciendo siguiente...');
-            this.playNextVideo();
-        } else if (state === YT.PlayerState.PLAYING) {
-            hasOutroCrossfadeStarted = false;
-            this.updateCurrentPlayingIndex();
-            // Guardar estado cuando se reproduce
-            setTimeout(() => saveAllData(), 1000);
-        }
+        // ✅ NUEVO: Actualizar tabs cuando empieza a reproducir
+        this.refreshActiveQueueTab();
+        
+        // Guardar estado cuando se reproduce
+        setTimeout(() => saveAllData(), 1000);
     }
+    }
+refreshActiveQueueTab() {
+    const activeTab = document.querySelector('.queue-tab.active');
+    if (!activeTab) return;
 
+    const tabName = activeTab.dataset.tab;
+    
+    console.log('🔄 Refrescando tab activa:', tabName);
+    
+    // Delegar a playlistManager
+    if (window.playlistManager && window.playlistManager.refreshActiveQueueTab) {
+        window.playlistManager.refreshActiveQueueTab();
+    }
+}
     onPlayerError(event) {
         console.error('❌ Error en reproductor:', event.data);
         this.showMessage(`Error en reproductor: ${event.data}`, 'error');
@@ -1432,10 +1448,14 @@ async playNextVideo() {
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
         
         // ✅ ACTUALIZAR UI
-        setTimeout(() => {
+         setTimeout(() => {
+            // Actualizar UI
             if (window.playlistManager) {
                 window.playlistManager.updateQueuePopup();
                 window.playlistManager.syncQueueIndicator();
+                
+                //Refrescar tab activa
+                window.playlistManager.refreshActiveQueueTab();
             }
         }, 200);
         
@@ -2570,34 +2590,39 @@ updateNowPlayingFull() {
         }
     }
 
-    playVideoAtIndex(index) {
-        const flatList = this.getFlattenedPlaylist();
-        if (index < 0 || index >= flatList.length) return;
+playVideoAtIndex(index) {
+    const flatList = this.getFlattenedPlaylist();
+    if (index < 0 || index >= flatList.length) return;
 
-        const video = flatList[index];
-        console.log(`🎵 Reproduciendo video en índice ${index}: ${video.title}`);
+    const video = flatList[index];
+    console.log(`🎵 Reproduciendo video en índice ${index}: ${video.title}`);
 
-        currentPlayingInfo = {
-            flattenedIndex: index,
-            videoId: video.videoId,
-            playlistId: video.sourcePlaylistId
-        };
+    currentPlayingInfo = {
+        flattenedIndex: index,
+        videoId: video.videoId,
+        playlistId: video.sourcePlaylistId
+    };
 
-        try {
-            const activePlayer = currentPlayer === 1 ? player1 : player2;
-            activePlayer.loadVideoById(video.videoId);
-            
-            reproduccionIniciada = true;
-            this.updatePlayButton('pause');
-            this.startMonitoring();
-            this.updateNowPlaying();
-            this.updatePlaylistsUI();
-            
-        } catch (error) {
-            console.error("Error reproduciendo video:", error);
-            this.showMessage("Error al reproducir video", 'error');
-        }
+    try {
+        const activePlayer = currentPlayer === 1 ? player1 : player2;
+        activePlayer.loadVideoById(video.videoId);
+        
+        reproduccionIniciada = true;
+        this.updatePlayButton('pause');
+        this.startMonitoring();
+        this.updateNowPlaying();
+        this.updatePlaylistsUI();
+        
+        // ✅ NUEVO: Refrescar tabs
+        setTimeout(() => {
+            this.refreshActiveQueueTab();
+        }, 1000);
+        
+    } catch (error) {
+        console.error("Error reproduciendo video:", error);
+        this.showMessage("Error al reproducir video", 'error');
     }
+}
 
     // =============================================
     // SISTEMA DE MENSAJES Y DEBUG
