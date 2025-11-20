@@ -1208,53 +1208,56 @@ showMiniPlayerFloat() {
     console.log('✅ Mini player flotante visible');
 }
 movePlayersToMini() {
-    console.log('🎬 Moviendo reproductores a mini (SIN interrupción)');
+    console.log('🎬 Moviendo reproductores a mini (Modo Seguro)');
     
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    if (!miniContainer1 || !miniContainer2) {
-        console.error('❌ Contenedores mini no encontrados');
-        return;
-    }
+    if (!miniContainer1 || !miniContainer2) return;
     
-    // ✅ MOVER SOLO SI NO ESTÁN YA EN EL MINI
-    if (player1 && !miniContainer1.contains(player1)) {
-        miniContainer1.appendChild(player1);
-    }
-    if (player2 && !miniContainer2.contains(player2)) {
-        miniContainer2.appendChild(player2);
-    }
+    // Mover elementos al DOM del mini player
+    if (player1 && !miniContainer1.contains(player1)) miniContainer1.appendChild(player1);
+    if (player2 && !miniContainer2.contains(player2)) miniContainer2.appendChild(player2);
     
-    // ✅ ASEGURAR ESTILOS CORRECTOS
+    // LIMPIEZA PROFUNDA DE CLASES Y ESTILOS
+    // Esto asegura que se vean aunque vengan de una transición fade-out
     [player1, player2].forEach((player, index) => {
         if (player) {
             const isActive = window.currentPlayer === (index + 1);
             
-            player.style.cssText = `
-                width: 100% !important;
-                height: 100% !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                display: block !important;
-                visibility: ${isActive ? 'visible' : 'hidden'} !important;
-                opacity: ${isActive ? '1' : '0'} !important;
-                z-index: ${isActive ? '2' : '1'} !important;
-                border: none !important;
-            `;
+            // 1. Quitar TODAS las clases de efectos que puedan ocultarlo
+            player.classList.remove('fade-in', 'fade-out', 'crossfade-enter', 'crossfade-exit', 'hidden');
             
+            // 2. Resetear transición para que aparezca instantáneamente
+            player.style.transition = 'none';
+            
+            // 3. Aplicar estilos forzados
             if (isActive) {
-                player.classList.remove('hidden');
+                player.style.cssText = `
+                    width: 100% !important;
+                    height: 100% !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    display: block !important;
+                    visibility: visible !important;
+                    opacity: 1 !important;
+                    z-index: 10 !important;
+                `;
             } else {
+                player.style.cssText = `
+                    display: none !important;
+                    opacity: 0 !important;
+                    z-index: 0 !important;
+                `;
                 player.classList.add('hidden');
             }
         }
     });
     
-    console.log('✅ Reproductores en mini player (audio continuo)');
+    console.log('✅ Reproductores anclados al Mini Player');
 }
 /**
  * Mover reproductores a vista completa
@@ -1613,129 +1616,104 @@ startCrossfade(prevPlayer, nextPlayer) {
         console.warn('🔒 Crossfade ya en progreso, ignorando');
         return;
     }
-    
+
     const CROSSFADE_DURATION_MS = CROSSFADE_DURATION * 1000;
     console.log(`🎨 Iniciando crossfade de ${CROSSFADE_DURATION}s...`);
     crossfadeInProgress = true;
-    
+
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
-    
-    // ✅ CRÍTICO: Ambos elementos VISIBLES durante el crossfade
+
+    // 1. PREPARACIÓN: Quitar transiciones CSS para que JS tenga el control total
+    // Esto soluciona el problema de la pantalla negra
     if (nextElement) {
+        nextElement.style.transition = 'none'; // ⛔ ANULA CSS
         nextElement.classList.remove('hidden', 'fade-out');
-        nextElement.classList.add('fade-in', 'crossfade-enter');
         nextElement.style.cssText = `
             display: block !important;
             visibility: visible !important;
             opacity: 0;
             z-index: 3;
             pointer-events: auto;
+            transition: none !important; /* Importante para que no pelee con CSS */
         `;
     }
-    
+
     if (prevElement) {
-        prevElement.classList.remove('fade-in', 'hidden');
-        prevElement.classList.add('fade-out', 'crossfade-exit');
+        prevElement.style.transition = 'none'; // ⛔ ANULA CSS
+        prevElement.classList.remove('hidden', 'fade-in');
         prevElement.style.cssText = `
             display: block !important;
             visibility: visible !important;
             opacity: 1;
             z-index: 2;
+            transition: none !important;
         `;
     }
-    
+
     const steps = 100;
     const stepTime = CROSSFADE_DURATION_MS / steps;
     let step = 0;
-    
+
     // Iniciar siguiente video
     try {
         nextPlayer.playVideo();
         nextPlayer.setVolume(0);
-        console.log('▶️ Siguiente video iniciado en background');
     } catch (e) {
         console.warn('⚠️ Error iniciando siguiente video:', e);
     }
-    
+
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
+        // Curva de audio exponencial para mantener la energía
         const audioProgress = Math.pow(progress, 0.8);
-        
+
         const prevVolume = Math.max(0, Math.round(100 * (1 - audioProgress)));
         const nextVolume = Math.min(100, Math.round(100 * audioProgress));
-        
+
         try {
             prevPlayer.setVolume(prevVolume);
             nextPlayer.setVolume(nextVolume);
-            
-            if (step % 20 === 0) {
-                console.log(`🎚️ Crossfade [${step}/${steps}]: Prev=${prevVolume}%, Next=${nextVolume}%`);
-            }
-        } catch (e) {
-            console.warn("⚠️ Error ajustando volumen:", e);
-        }
-        
-        // ✅ Actualizar opacidad manualmente (suave)
-        if (prevElement) {
-            prevElement.style.opacity = (1 - progress).toString();
-        }
-        if (nextElement) {
-            nextElement.style.opacity = progress.toString();
-        }
-        
+        } catch (e) {}
+
+        // Actualizar opacidad visual
+        if (prevElement) prevElement.style.opacity = (1 - progress).toFixed(2);
+        if (nextElement) nextElement.style.opacity = progress.toFixed(2);
+
         if (step >= steps) {
             clearInterval(crossfadeInterval);
             crossfadeInterval = null;
             crossfadeInProgress = false;
-            
             console.log('✅ Crossfade completado');
-            
-            // ✅ Limpieza final
+
+            // LIMPIEZA FINAL
             setTimeout(() => {
                 try {
                     prevPlayer.stopVideo();
-                    
                     if (prevElement) {
                         prevElement.classList.add('hidden');
-                        prevElement.classList.remove('fade-out', 'crossfade-exit');
-                        prevElement.style.cssText = `
-                            display: none !important;
-                            visibility: hidden !important;
-                            z-index: 1;
-                            opacity: 1;
-                        `;
+                        // Restaurar estilos base pero oculto
+                        prevElement.style.cssText = 'display: none !important; opacity: 0; z-index: 1;';
                     }
-                    
                     if (nextElement) {
-                        nextElement.classList.remove('crossfade-enter', 'fade-in');
-                        nextElement.style.cssText = `
-                            display: block !important;
-                            visibility: visible !important;
-                            opacity: 1;
-                            z-index: 2;
-                        `;
+                        // Restaurar estilos para reproducción normal
+                        nextElement.style.cssText = 'display: block !important; opacity: 1; z-index: 2; width: 100%; height: 100%;';
+                        // Reactivar transiciones CSS para otros efectos si los hay
+                        nextElement.style.transition = ''; 
                     }
-                    
-                    console.log('🧹 Limpieza post-crossfade completada');
                     
                     // Resetear flags
                     hasOutroCrossfadeStarted = false;
                     nextVideoScheduled = false;
                     isTransitioning = false;
-                    
+
                     // Reiniciar monitoreo
                     if (!monitorInterval && window.unifiedCore) {
                         window.unifiedCore.startMonitoring();
-                        console.log('📊 Monitoreo reiniciado');
                     }
-                    
                 } catch (e) {
                     console.error('❌ Error limpiando crossfade:', e);
-                    hasOutroCrossfadeStarted = false;
-                    nextVideoScheduled = false;
-                    isTransitioning = false;
                 }
             }, 100);
         }
