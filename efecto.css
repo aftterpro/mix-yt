@@ -16,28 +16,20 @@
   left: 0;
   width: 100%; 
   height: 100%;
-  opacity: 1;
-  filter: blur(0px) brightness(1.0) saturate(1.1) contrast(1.05);
-  background: #000; /* Fondo negro sólido */
+  background: #000;
+  z-index: 1;
   border-radius: 12px;
   overflow: hidden;
-  transition: 
-    opacity var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
-    filter var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
-    transform var(--crossfade-duration) cubic-bezier(0.25, 0.8, 0.25, 1);
-  will-change: opacity, filter, transform;
-  z-index: 1;
+  transition: filter 0.5s ease; 
   
-  /* ✅ CRÍTICO: Mantener visible durante transición */
   visibility: visible !important;
   display: block !important;
-  
-  /* Sombra dinámica */
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    0 2px 8px rgba(255, 107, 53, 0.1);
 }
-
+/* Solo aplicar transición larga de opacidad si NO estamos en medio de un crossfade JS manual */
+/* Esto permite que CSS maneje efectos visuales sutiles pero no bloquee el crossfade */
+.video-player:not([style*="transition: none"]) {
+    transition: filter 0.5s ease, transform 0.5s ease;
+}
 /* =============================================
    ENTRADA VISUAL IMPACTANTE
    ============================================= */
@@ -133,11 +125,8 @@
   opacity: 0 !important;
   visibility: hidden !important;
   pointer-events: none !important;
-  z-index: 0 !important;
+  z-index: -1 !important;
   display: none !important;
-  transform: scale(0.9) translateZ(-100px) !important;
-  filter: blur(20px) brightness(0.5) !important;
-  transition: all 0.3s ease !important;
 }
 
 /* =============================================
@@ -215,13 +204,7 @@
    CONTENEDOR DE VIDEO: Fondo negro siempre
    ============================================= */
 .video-wrapper {
-    flex: 1;
-    position: relative;
-    background: #000 !important; /* Negro sólido */
-    border-radius: 12px;
-    overflow: hidden;
-    height: 200px;
-    width: 600px;
+background-color: #000 !important;
 }
 /* =============================================
    EFECTOS DE TRANSICIÓN 3D
