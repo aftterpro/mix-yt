@@ -786,41 +786,52 @@ startLyricsSync() {
      * Sincroniza la línea activa de la letra con el tiempo del video
      */
 syncLyricsLine() {
-    if (!this.core || !this.currentLrc || this.currentLrc.length === 0) {
-        return;
-    }
+    // Validaciones básicas
+    if (!this.core || !this.currentLrc || this.currentLrc.length === 0) return;
 
+    // Detectar qué reproductor está sonando realmente
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
-    if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') {
-        return;
-    }
     
+    // Asegurar que el reproductor está activo y tiene la función getCurrentTime
+    if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') return;
+
     const currentTime = activePlayer.getCurrentTime();
     const container = document.getElementById('syncedLyricsContainer');
     if (!container) return;
 
+    // Encontrar la línea activa (con una compensación de 0.2s para que se sienta a tiempo)
     let activeLineIndex = -1;
-    
-    // ✅ Encontrar línea activa con adelanto de 0.3s
     for (let i = this.currentLrc.length - 1; i >= 0; i--) {
-        if (currentTime >= (this.currentLrc[i].time - 0.3)) {
+        if (currentTime >= (this.currentLrc[i].time - 0.2)) {
             activeLineIndex = i;
             break;
         }
     }
 
+    // OPTIMIZACIÓN CLAVE: Solo actualizar el DOM si la línea cambió
+    // Esto evita que se "trabe" o parpadee
+    if (this.lastActiveLineIndex === activeLineIndex) return;
+    this.lastActiveLineIndex = activeLineIndex;
+
     const allLines = container.querySelectorAll('p');
+    
     allLines.forEach((line, index) => {
-        line.classList.remove('active');
-        
+        // Limpiar clases anteriores
+        line.className = ''; 
+
         if (index === activeLineIndex) {
             line.classList.add('active');
-            // ✅ Scroll suave al centro
+            
+            // Scroll suave tipo Spotify: siempre al centro
             line.scrollIntoView({ 
                 behavior: 'smooth', 
                 block: 'center',
                 inline: 'nearest'
             });
+        } else if (index < activeLineIndex) {
+            line.classList.add('past'); // Líneas ya cantadas
+        } else {
+            line.classList.add('future'); // Líneas futuras
         }
     });
 }
