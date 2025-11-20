@@ -366,11 +366,11 @@ body {
    ============================================= */
 .search-results-grid {
    display: grid !important;
-    grid-template-columns: repeat(4, 1fr) !important; /* 4 columnas fijas */
-    gap: 16px !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* 3 columnas para más espacio */
+    gap: 24px !important;
     width: 100% !important;
     padding: 0 !important;
-    max-height: none; /* Permitir expansión con scroll */
+    max-height: none;
 }
 
 .search-result-card {
@@ -382,8 +382,8 @@ body {
     border: 1px solid transparent;
     display: flex;
     flex-direction: column;
-    /* Tamaño más compacto */
     max-width: 100%;
+    min-height: 320px; /* Altura mínima para tarjetas más grandes */
 }
 
 .search-result-card:hover {
@@ -394,15 +394,16 @@ body {
 }
 
 .search-result-thumbnail {
-    position: relative;
+ position: relative;
     width: 100%;
-    padding-bottom: 56.25%;
+    padding-bottom: 56.25%; /* Mantiene ratio 16:9 */
     background: var(--yt-bg-base);
     overflow: hidden;
+    min-height: 180px; /* Altura mínima visible */
 }
 
 .search-result-thumbnail img {
-    position: absolute;
+     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -410,7 +411,6 @@ body {
     object-fit: cover;
     transition: transform var(--transition-slow);
 }
-
 .search-result-card:hover .search-result-thumbnail img {
     transform: scale(1.05);
 }
@@ -1173,19 +1173,19 @@ body {
        .search-results-grid {
         grid-template-columns: repeat(3, 1fr) !important;
     }
-    }
     .playlist-popup {
         width: 95%;
     }
 }
 
 @media (max-width: 1024px) {
-    :root {
+     :root {
         --sidebar-width: 200px;
     }
     
     .search-results-grid {
         grid-template-columns: repeat(2, 1fr) !important;
+        gap: 20px !important;
     }
     
     .persistent-queue-sidebar {
