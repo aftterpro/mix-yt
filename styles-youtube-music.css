@@ -366,24 +366,24 @@ body {
    ============================================= */
 .search-results-grid {
    display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important; /* 3 columnas para más espacio */
-    gap: 24px !important;
+    /* Forzar exactamente 4 columnas que ocupen el 100% del ancho */
+    grid-template-columns: repeat(4, 1fr) !important; 
+    gap: 16px !important; /* Espacio entre baldosas */
     width: 100% !important;
     padding: 0 !important;
-    max-height: none;
+    margin: 0 !important;
+    box-sizing: border-box;
 }
 
 .search-result-card {
-    background: var(--yt-bg-elevated);
-    border-radius: var(--border-radius-lg);
-    overflow: hidden;
-    cursor: pointer;
-    transition: all var(--transition-normal);
-    border: 1px solid transparent;
+   width: 100%;
     display: flex;
     flex-direction: column;
-    max-width: 100%;
-    min-height: 320px; /* Altura mínima para tarjetas más grandes */
+    background: var(--yt-bg-elevated);
+    border-radius: 8px;
+    transition: transform 0.2s ease, background 0.2s ease;
+    /* Altura balanceada para que sean "medianas" */
+    min-height: 260px;
 }
 
 .search-result-card:hover {
@@ -394,12 +394,12 @@ body {
 }
 
 .search-result-thumbnail {
- position: relative;
     width: 100%;
-    padding-bottom: 56.25%; /* Mantiene ratio 16:9 */
-    background: var(--yt-bg-base);
+    /* Ratio 16:9 estándar para videos */
+    padding-bottom: 56.25%; 
+    position: relative;
     overflow: hidden;
-    min-height: 180px; /* Altura mínima visible */
+    border-radius: 8px 8px 0 0;
 }
 
 .search-result-thumbnail img {
@@ -2267,7 +2267,21 @@ body {
         padding: 12px 8px;
     }
 }
-
+@media (max-width: 1200px) {
+    .search-results-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+}
+@media (max-width: 800px) {
+    .search-results-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+@media (max-width: 500px) {
+    .search-results-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
 /* =============================================
    MINI PLAYER FLOTANTE
    ============================================= */
@@ -2366,37 +2380,66 @@ body {
         right: 10px !important;
     }
 }
+@media (max-width: 768px) {
+    .mini-player-float {
+        width: 240px !important;
+        height: 135px !important;
+        bottom: calc(var(--player-height) + 10px) !important;
+        right: 10px !important;
+    }
+}
 /* =============================================
    ESTILOS DE LETRAS SINCRONIZADAS
    ============================================= */
 
 .lyrics-text.synced {
-    /* Optimiza el scroll en la lista de letras */
+   height: 60vh; /* Altura fija para permitir scroll */
+    overflow-y: auto;
     scroll-behavior: smooth;
-    padding-right: 10px; /* Evita que el scrollbar tape el texto */
+    padding: 20px 10px;
+    /* Ocultar scrollbar para estética limpia */
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
 }
-
+.lyrics-text.synced::-webkit-scrollbar { 
+    display: none; 
+}
 .lyrics-text.synced p {
-    font-size: 1.7rem; /* Letra un poco más grande */
-    line-height: 1.8;
-    color: rgba(255, 255, 255, 0.4); /* Letras inactivas muy tenues */
+font-size: 1.5rem; /* Tamaño base */
+    line-height: 1.6;
     font-weight: 500;
-    padding: 12px 0;
-    margin: 0;
-    border-radius: 8px;
-    opacity: 0.7;
-    transition: 
-        color 0.3s ease,
-        opacity 0.3s ease,
-        transform 0.3s ease;
+    margin: 24px 0; /* Separación amplia */
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform-origin: left center;
+    
+    /* Estado por defecto (futuro) */
+    color: rgba(255, 255, 255, 0.3); 
+    filter: blur(0.5px);
+    transform: scale(0.95);
 }
 
 /* La línea que está sonando ahora */
 .lyrics-text.synced p.active {
-    color: #FFFFFF; /* Letra activa blanca */
-    font-weight: 700;
+color: #FFFFFF !important;
+    font-size: 2.2rem !important; /* Mucho más grande */
+    font-weight: 700 !important;
+    filter: blur(0);
     opacity: 1;
-    transform: scale(1.02); /* Sutil efecto de zoom */
+    transform: scale(1) translateX(10px); /* Un poco a la derecha */
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+/* Líneas Pasadas */
+.lyrics-text.synced p.past {
+    color: rgba(255, 255, 255, 0.2);
+    opacity: 0.5;
+}
+
+/* Hover para leer */
+.lyrics-text.synced p:hover {
+    color: rgba(255, 255, 255, 0.8);
+    filter: blur(0);
 }
 /* =============================================
    CORRECCIÓN DE LAYOUT DE BÚSQUEDA
@@ -2525,12 +2568,23 @@ body {
     background: rgba(255, 107, 53, 0.9) !important;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .mini-player-float {
-        width: 240px !important;
-        height: 135px !important;
-        bottom: calc(var(--player-height) + 10px) !important;
-        right: 10px !important;
-    }
+
+/* Regla de máxima prioridad para mostrar el mini player */
+#miniPlayerFloat:not(.hidden) {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    /* Asegurar posición por si el JS falla en ponerla */
+    position: fixed !important;
+    bottom: 100px !important; 
+    right: 20px !important;
+    z-index: 999999 !important;
+}
+
+/* Asegurar que el contenido interno también sea visible */
+#miniPlayerFloat .mini-player-video,
+#miniPlayerFloat .mini-video-container {
+    display: block !important;
+    visibility: visible !important;
+    height: 100% !important;
 }
