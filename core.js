@@ -993,7 +993,7 @@ switchView(viewName) {
     targetView.classList.add('active');
     this.currentView = viewName;
 
-    // ✅ BOTTOM PLAYER SIEMPRE VISIBLE
+    // BOTTOM PLAYER SIEMPRE VISIBLE
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
         bottomPlayer.style.cssText = `
@@ -1008,24 +1008,24 @@ switchView(viewName) {
         `;
     }
 
-    // ✅ GESTIÓN DE REPRODUCTORES SIN INTERRUMPIR AUDIO
+    // GESTIÓN DE REPRODUCTORES SIN INTERRUMPIR AUDIO
     const fullPlayerView = document.getElementById('fullPlayerView');
     const miniPlayerFloat = document.getElementById('miniPlayerFloat');
     
     const isVideoPlaying = this.state?.currentPlayingInfo?.videoId || 
-                          window.currentPlayingInfo?.videoId;
+                           window.currentPlayingInfo?.videoId;
     
     if (viewName === 'fullPlayer') {
         // =============================================
         // VISTA COMPLETA
         // =============================================
-        console.log('🎬 Activando vista completa');
+        console.log(' Activando vista completa');
         
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
         }
         
-        // ✅ MOVER REPRODUCTORES SIN PAUSAR
+        // MOVER REPRODUCTORES SIN PAUSAR
         this.movePlayersToFullView();
         
         // Ocultar mini player
@@ -1046,7 +1046,7 @@ switchView(viewName) {
         
     } else {
         // =============================================
-        // OTRAS VISTAS
+        // OTRAS VISTAS (HOME, SEARCH, LIBRARY)
         // =============================================
         console.log(`📱 Activando vista: ${viewName}`);
         
@@ -1054,10 +1054,13 @@ switchView(viewName) {
             fullPlayerView.classList.remove('active');
         }
         
-        // ✅ SI HAY VIDEO REPRODUCIÉNDOSE
+        // CORRECCIÓN CRÍTICA PARA EL MINI PLAYER
         if (isVideoPlaying) {
-            console.log('📱 Video reproduciéndose, mostrar mini player');
-            this.showMiniPlayerFloat();
+            console.log('📱 Video reproduciéndose, invocando showMiniPlayerFloat...');
+            // Pequeño delay para asegurar que el DOM esté listo y anule estilos inline
+            setTimeout(() => {
+                this.showMiniPlayerFloat(); 
+            }, 50);
         } else if (miniPlayerFloat) {
             console.log('⏸️ Sin video, ocultar mini player');
             miniPlayerFloat.classList.add('hidden');
@@ -1075,7 +1078,7 @@ switchView(viewName) {
             break;
     }
 
-    // ✅ SIEMPRE FORZAR BOTTOM PLAYER VISIBLE
+    // SIEMPRE FORZAR BOTTOM PLAYER VISIBLE
     this.forceBottomPlayerVisible();
 }
 movePlayersToFullView() {
@@ -1176,11 +1179,13 @@ focusSearchInput() {
  * SHOW MINI PLAYER FLOAT
  */
 showMiniPlayerFloat() {
-    console.log('🎬 Activando mini player flotante');
+    console.log('🎬 Activando mini player flotante (FORZADO)');
     
     let miniPlayer = document.getElementById('miniPlayerFloat');
     
+    // Si no existe, créalo (prevención de errores)
     if (!miniPlayer) {
+        console.warn('⚠️ Mini player no existía en DOM, creando...');
         miniPlayer = document.createElement('div');
         miniPlayer.id = 'miniPlayerFloat';
         miniPlayer.className = 'mini-player-float';
@@ -1196,16 +1201,32 @@ showMiniPlayerFloat() {
         document.body.appendChild(miniPlayer);
     }
     
+    // 1. Limpiar clases que ocultan
     miniPlayer.classList.remove('hidden');
+    
+    // 2. 🛑 ELIMINAR EL STYLE INLINE "display: none" (Esta es la causa raíz)
+    miniPlayer.style.removeProperty('display');
+    miniPlayer.style.display = ''; 
+
+    // 3. Aplicar estilos forzados para garantizar visibilidad y posición
     miniPlayer.style.cssText = `
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
+        position: fixed !important;
+        bottom: 100px !important; /* Encima del reproductor inferior */
+        right: 20px !important;
+        width: 320px !important;
+        height: 180px !important;
+        z-index: 2147483647 !important; /* Z-index máximo posible */
+        background: #000 !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.8) !important;
     `;
     
+    // Mover los iframes dentro
     this.movePlayersToMini();
     
-    console.log('✅ Mini player flotante visible');
+    console.log('✅ Mini player flotante visible y estilizado');
 }
 movePlayersToMini() {
     console.log('🎬 Moviendo reproductores a mini (Modo Seguro)');
