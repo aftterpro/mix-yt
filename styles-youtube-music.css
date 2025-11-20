@@ -2267,43 +2267,21 @@ body {
         padding: 12px 8px;
     }
 }
-</style>
+
 /* =============================================
    MINI PLAYER FLOTANTE
    ============================================= */
 .mini-player-float {
-    position: fixed !important;
-    bottom: calc(var(--player-height) + 20px) !important;
-    right: 20px !important;
-    width: 320px !important;
-    height: 180px !important;
-    background: #000 !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
-    z-index: 999998 !important;
+    z-index: 999999 !important; /* Máxima prioridad */
+    background: #000 !important; /* Fondo negro por si el video tarda en cargar */
+    opacity: 1 !important; /* Forzar visibilidad del contenedor */
     display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    transition: all 0.3s ease !important;
 }
-.mini-player-float {
-    position: fixed !important;
-    bottom: calc(var(--player-height) + 20px) !important;
-    right: 20px !important;
-    width: 320px !important;
-    height: 180px !important;
-    background: #000 !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
-    z-index: 999998 !important;
-    display: block !important;
-    visibility: visible !important;
+/* Asegurar que el contenido del mini player siempre sea visible */
+.mini-player-video, .mini-video-container {
     opacity: 1 !important;
-    transition: all 0.3s ease !important;
+    visibility: visible !important;
 }
-
 .mini-player-float.hidden {
     display: none !important;
     opacity: 0 !important;
