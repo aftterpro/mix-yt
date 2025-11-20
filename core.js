@@ -407,7 +407,7 @@ async loadTrendingContent() {
         }
     }
 
-    onPlayerStateChange(event) {
+   onPlayerStateChange(event) {
     const player = event.target;
     const state = event.data;
     
@@ -416,6 +416,20 @@ async loadTrendingContent() {
         this.playNextVideo();
     } else if (state === YT.PlayerState.PLAYING) {
         hasOutroCrossfadeStarted = false;
+        
+        // ✅ CRÍTICO: Actualizar índice ANTES de refrescar tabs
+        const videoData = player.getVideoData();
+        if (videoData?.video_id) {
+            const flatList = this.getFlattenedPlaylist();
+            const index = flatList.findIndex(v => v.videoId === videoData.video_id);
+            
+            if (index !== -1) {
+                currentPlayingInfo.flattenedIndex = index;
+                currentPlayingInfo.videoId = videoData.video_id;
+                console.log(`✅ Índice actualizado: ${index} (${videoData.video_id})`);
+            }
+        }
+        
         this.updateCurrentPlayingIndex();
         
         // ✅ NUEVO: Actualizar tabs cuando empieza a reproducir
@@ -425,17 +439,49 @@ async loadTrendingContent() {
         setTimeout(() => saveAllData(), 1000);
     }
     }
+/**
+ * Actualiza el contenido de la pestaña activa cuando cambia la canción
+ */
 refreshActiveQueueTab() {
     const activeTab = document.querySelector('.queue-tab.active');
     if (!activeTab) return;
 
     const tabName = activeTab.dataset.tab;
     
-    console.log('🔄 Refrescando tab activa:', tabName);
+    // ✅ CORRECCIÓN: Obtener el índice ACTUAL desde currentPlayingInfo
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
     
-    // Delegar a playlistManager
-    if (window.playlistManager && window.playlistManager.refreshActiveQueueTab) {
-        window.playlistManager.refreshActiveQueueTab();
+    const flatList = this.core?.getFlattenedPlaylist() || [];
+    const currentVideo = currentIndex >= 0 ? flatList[currentIndex] : null;
+    
+    console.log('🎵 refreshActiveQueueTab:', { 
+        tabName, 
+        currentIndex,
+        videoId: currentVideo?.videoId,
+        title: currentVideo?.title?.substring(0, 40)
+    });
+    
+    // ✅ CRÍTICO: Verificar que hay un video válido
+    if (!currentVideo || currentIndex < 0) {
+        console.warn('⚠️ No hay video actual para refrescar tab');
+        return;
+    }
+    
+    // Refrescar según el tab activo
+    if (tabName === 'lyrics') {
+        console.log('🎵 Canción cambió, recargando letras...');
+        // ✅ Esperar un poco para que el estado se actualice
+        setTimeout(() => {
+            this.loadLyrics();
+        }, 500);
+    } else if (tabName === 'related') {
+        console.log('🎵 Canción cambió, recargando relacionados...');
+        setTimeout(() => {
+            this.loadRelatedVideos();
+        }, 500);
+    } else if (tabName === 'next') {
+        // La cola se actualiza automáticamente
+        console.log('🎵 Cola de reproducción actualizada');
     }
 }
     onPlayerError(event) {
