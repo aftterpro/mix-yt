@@ -21,7 +21,7 @@ class PlaylistManager {
         console.log('📂 Cargando datos persistentes...');
         
         // Esperar un momento para que las funciones de core.js se carguen
-        await new Promise(resolve => setTimeout(resolve, 500));
+      //  await new Promise(resolve => setTimeout(resolve, 500));
         
         // Cargar playlists persistentes
         if (typeof window.loadPlaylistsDataPersistent === 'function') {
