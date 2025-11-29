@@ -1226,24 +1226,18 @@ showMiniPlayerFloat() {
     console.log('✅ Mini player flotante activado');
 }
 movePlayersToMini() {
-    console.log('🎬 Moviendo reproductores a mini (Modo Seguro Reforzado)');
+    console.log('🎬 Moviendo reproductores a mini (FORZADO)');
     
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    // ✅ CORRECCIÓN 1: Asegurar que los contenedores existan y sean visibles
-    if (miniContainer1) {
-        miniContainer1.classList.remove('hidden');
-        miniContainer1.style.display = 'block';
-    }
-    if (miniContainer2) {
-        miniContainer2.classList.remove('hidden');
-        miniContainer2.style.display = 'block';
-    }
-    
-    // Mover elementos al DOM del mini player
+    // Asegurar que los contenedores receptores estén limpios
+    if (miniContainer1) miniContainer1.style.display = 'block';
+    if (miniContainer2) miniContainer2.style.display = 'block';
+
+    // Mover elementos
     if (player1 && miniContainer1 && !miniContainer1.contains(player1)) {
         miniContainer1.appendChild(player1);
     }
@@ -1251,43 +1245,31 @@ movePlayersToMini() {
         miniContainer2.appendChild(player2);
     }
     
-    // LIMPIEZA PROFUNDA DE CLASES Y ESTILOS
+    // LIMPIEZA DE ESTILOS AGRESIVA
     [player1, player2].forEach((player, index) => {
         if (player) {
             const isActive = window.currentPlayer === (index + 1);
             
-            // 1. Quitar TODAS las clases de efectos que puedan ocultarlo
-            player.classList.remove('fade-in', 'fade-out', 'crossfade-enter', 'crossfade-exit', 'hidden');
+            // Eliminar TODAS las clases de animación que puedan ocultarlo
+            player.className = 'video-player'; 
+            if (!isActive) player.classList.add('hidden');
+
+            player.style.cssText = ''; // Resetear estilos inline
             
-            // 2. Resetear transición
-            player.style.transition = 'none';
-            
-            // 3. Aplicar estilos forzados para el mini player
             if (isActive) {
                 player.style.cssText = `
                     width: 100% !important;
                     height: 100% !important;
-                    position: absolute !important;
-                    top: 0 !important;
-                    left: 0 !important;
                     display: block !important;
                     visibility: visible !important;
                     opacity: 1 !important;
                     z-index: 10 !important;
-                    background: #000 !important; /* Fondo negro para evitar transparencias */
                 `;
             } else {
-                player.style.cssText = `
-                    display: none !important;
-                    opacity: 0 !important;
-                    z-index: 0 !important;
-                `;
-                player.classList.add('hidden');
+                player.style.display = 'none';
             }
         }
     });
-    
-    console.log('✅ Reproductores anclados al Mini Player y contenedores visibles');
 }
 /**
  * Mover reproductores a vista completa
@@ -1393,42 +1375,48 @@ handlePlayPause() {
 }
 
 handleNext() {
-    if (!reproduccionIniciada) {
-        this.showMessage("Selecciona una canción primero", 'warning');
-        return;
-    }
-    
-    // ✅ VERIFICAR SI HAY TRANSICIÓN
-    if (isTransitioning || crossfadeInProgress) {
-        this.showMessage("Transición en progreso, espera...", 'info');
-        return;
-    }
-    
+    // 1. Obtener la lista actual
     const flatList = this.getFlattenedPlaylist();
+    
+    // 2. Validar si hay videos
     if (flatList.length === 0) {
         this.showMessage("No hay videos en la cola", 'warning');
         return;
     }
+
+    // 3. Obtener índice actual
+    let currentIndex = this.state.currentPlayingInfo.flattenedIndex;
     
-    console.log(`⏭️ Botón Next presionado en índice ${currentPlayingInfo.flattenedIndex}`);
-    
-    // ✅ DETENER MONITOREO Y SINCRONIZACIÓN
-    if (monitorInterval) {
-        clearInterval(monitorInterval);
-        monitorInterval = null;
+    // LOGICA CORREGIDA: Si no hay reproducción activa (-1), reproducir el primero
+    if (currentIndex === -1 || currentIndex === undefined) {
+        console.log('⏭️ Estado detenido, reproduciendo primer video de la cola');
+        this.playVideoAtIndex(0);
+        return;
     }
-    
-    if (window.playlistManager?.lyricsSyncInterval) {
-        clearInterval(window.playlistManager.lyricsSyncInterval);
-        window.playlistManager.lyricsSyncInterval = null;
-        console.log('🎵 Sincronización de letras pausada para salto manual');
+
+    // 4. Calcular siguiente índice
+    let nextIndex = currentIndex + 1;
+
+    // 5. Verificar fin de lista
+    if (nextIndex >= flatList.length) {
+        console.log('End of playlist reached');
+        // Opcional: Volver al inicio
+        // nextIndex = 0; 
+        this.showMessage("Fin de la lista de reproducción", 'info');
+        return;
     }
+
+    // 6. Ejecutar cambio
+    console.log(`⏭️ Saltando al índice: ${nextIndex}`);
     
-    // ✅ MARCAR FLAGS
-    hasOutroCrossfadeStarted = true;
+    // Detener monitoreo temporalmente
+    if (monitorInterval) clearInterval(monitorInterval);
+    
+    // Activar banderas de transición
+    hasOutroCrossfadeStarted = true; 
     nextVideoScheduled = true;
     
-    // Ejecutar playNextVideo
+    // Llamar a la función que hace el trabajo sucio
     this.playNextVideo();
 }
 
