@@ -1195,76 +1195,66 @@ showMiniPlayerFloat() {
     let miniPlayer = document.getElementById('miniPlayerFloat');
     
     if (!miniPlayer) {
-        console.warn('⚠️ Mini player no existía en DOM, creando...');
-        miniPlayer = document.createElement('div');
-        miniPlayer.id = 'miniPlayerFloat';
-        miniPlayer.className = 'mini-player-float';
-        miniPlayer.innerHTML = `
-            <div class="mini-player-video">
-                <div id="miniPlayer1Container" class="mini-video-container"></div>
-                <div id="miniPlayer2Container" class="mini-video-container"></div>
-            </div>
-            <button class="mini-player-expand" onclick="window.unifiedCore.switchView('fullPlayer')">
-                <i class="fas fa-expand"></i>
-            </button>
-        `;
-        document.body.appendChild(miniPlayer);
+        console.warn('⚠️ Mini player no existía en DOM, ignorando...');
+        return;
     }
     
     // ✅ FORZAR VISIBILIDAD COMPLETA
     miniPlayer.classList.remove('hidden');
-    miniPlayer.style.removeProperty('display');
     
-    // ✅ APLICAR ESTILOS CRÍTICOS
-    miniPlayer.style.cssText = `
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: fixed !important;
-        bottom: 110px !important;
-        right: 20px !important;
-        width: 320px !important;
-        height: 180px !important;
-        z-index: 999998 !important;
-        background: #000 !important;
-        border-radius: 12px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.8) !important;
-        pointer-events: auto !important;
-    `;
-    
-    // ✅ ASEGURAR CONTENEDOR INTERNO
-    const miniVideo = miniPlayer.querySelector('.mini-player-video');
-    if (miniVideo) {
-        miniVideo.style.cssText = `
-            position: relative !important;
-            width: 100% !important;
-            height: 100% !important;
+    // ✅ APLICAR ESTILOS CRÍTICOS DIRECTAMENTE
+    // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio de vista primero
+    requestAnimationFrame(() => {
+        miniPlayer.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: fixed !important;
+            bottom: 110px !important; /* Ajustado para estar sobre el bottom player */
+            right: 20px !important;
+            width: 320px !important;
+            height: 180px !important;
+            z-index: 999998 !important;
             background: #000 !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.8) !important;
+            pointer-events: auto !important;
         `;
-    }
+        
+        // Mover los reproductores ahora que el contenedor es visible
+        this.movePlayersToMini();
+    });
     
-    // Mover reproductores
-    this.movePlayersToMini();
-    
-    console.log('✅ Mini player flotante visible y forzado en Z-Index máximo');
+    console.log('✅ Mini player flotante activado');
 }
 movePlayersToMini() {
-    console.log('🎬 Moviendo reproductores a mini (Modo Seguro)');
+    console.log('🎬 Moviendo reproductores a mini (Modo Seguro Reforzado)');
     
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    if (!miniContainer1 || !miniContainer2) return;
+    // ✅ CORRECCIÓN 1: Asegurar que los contenedores existan y sean visibles
+    if (miniContainer1) {
+        miniContainer1.classList.remove('hidden');
+        miniContainer1.style.display = 'block';
+    }
+    if (miniContainer2) {
+        miniContainer2.classList.remove('hidden');
+        miniContainer2.style.display = 'block';
+    }
     
     // Mover elementos al DOM del mini player
-    if (player1 && !miniContainer1.contains(player1)) miniContainer1.appendChild(player1);
-    if (player2 && !miniContainer2.contains(player2)) miniContainer2.appendChild(player2);
+    if (player1 && miniContainer1 && !miniContainer1.contains(player1)) {
+        miniContainer1.appendChild(player1);
+    }
+    if (player2 && miniContainer2 && !miniContainer2.contains(player2)) {
+        miniContainer2.appendChild(player2);
+    }
     
     // LIMPIEZA PROFUNDA DE CLASES Y ESTILOS
-    // Esto asegura que se vean aunque vengan de una transición fade-out
     [player1, player2].forEach((player, index) => {
         if (player) {
             const isActive = window.currentPlayer === (index + 1);
@@ -1272,10 +1262,10 @@ movePlayersToMini() {
             // 1. Quitar TODAS las clases de efectos que puedan ocultarlo
             player.classList.remove('fade-in', 'fade-out', 'crossfade-enter', 'crossfade-exit', 'hidden');
             
-            // 2. Resetear transición para que aparezca instantáneamente
+            // 2. Resetear transición
             player.style.transition = 'none';
             
-            // 3. Aplicar estilos forzados
+            // 3. Aplicar estilos forzados para el mini player
             if (isActive) {
                 player.style.cssText = `
                     width: 100% !important;
@@ -1287,6 +1277,7 @@ movePlayersToMini() {
                     visibility: visible !important;
                     opacity: 1 !important;
                     z-index: 10 !important;
+                    background: #000 !important; /* Fondo negro para evitar transparencias */
                 `;
             } else {
                 player.style.cssText = `
@@ -1299,7 +1290,7 @@ movePlayersToMini() {
         }
     });
     
-    console.log('✅ Reproductores anclados al Mini Player');
+    console.log('✅ Reproductores anclados al Mini Player y contenedores visibles');
 }
 /**
  * Mover reproductores a vista completa
