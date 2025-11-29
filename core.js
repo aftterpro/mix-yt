@@ -407,7 +407,7 @@ async loadTrendingContent() {
         }
     }
 
-   onPlayerStateChange(event) {
+onPlayerStateChange(event) {
     const player = event.target;
     const state = event.data;
     
@@ -432,13 +432,24 @@ async loadTrendingContent() {
         
         this.updateCurrentPlayingIndex();
         
-        // ✅ NUEVO: Actualizar tabs cuando empieza a reproducir
-        this.refreshActiveQueueTab();
+        // ✅ CRÍTICO: Reiniciar sincronización de letras si es tab activo
+        if (window.playlistManager) {
+            const activeTab = document.querySelector('.queue-tab.active');
+            if (activeTab?.dataset.tab === 'lyrics') {
+                console.log('🎵 Reiniciando sincronización de letras...');
+                setTimeout(() => {
+                    window.playlistManager.loadLyrics();
+                }, 1000);
+            }
+            
+            // Actualizar tabs cuando empieza a reproducir
+            this.refreshActiveQueueTab();
+        }
         
         // Guardar estado cuando se reproduce
         setTimeout(() => saveAllData(), 1000);
     }
-    }
+}
 /**
  * Actualiza el contenido de la pestaña activa cuando cambia la canción
  */
@@ -1183,7 +1194,6 @@ showMiniPlayerFloat() {
     
     let miniPlayer = document.getElementById('miniPlayerFloat');
     
-    // Si no existe, créalo (prevención de errores)
     if (!miniPlayer) {
         console.warn('⚠️ Mini player no existía en DOM, creando...');
         miniPlayer = document.createElement('div');
@@ -1201,32 +1211,43 @@ showMiniPlayerFloat() {
         document.body.appendChild(miniPlayer);
     }
     
-    // 1. Limpiar clases que ocultan
+    // ✅ FORZAR VISIBILIDAD COMPLETA
     miniPlayer.classList.remove('hidden');
-    
-    // 2. 🛑 ELIMINAR EL STYLE INLINE "display: none" (Esta es la causa raíz)
     miniPlayer.style.removeProperty('display');
-    miniPlayer.style.display = ''; 
-
-    // 3. Aplicar estilos forzados para garantizar visibilidad y posición
+    
+    // ✅ APLICAR ESTILOS CRÍTICOS
     miniPlayer.style.cssText = `
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
         position: fixed !important;
-        bottom: 100px !important; /* Encima del reproductor inferior */
+        bottom: 110px !important;
         right: 20px !important;
         width: 320px !important;
         height: 180px !important;
-        z-index: 2147483647 !important; /* Z-index máximo posible */
+        z-index: 999998 !important;
         background: #000 !important;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.8) !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.8) !important;
+        pointer-events: auto !important;
     `;
     
-    // Mover los iframes dentro
+    // ✅ ASEGURAR CONTENEDOR INTERNO
+    const miniVideo = miniPlayer.querySelector('.mini-player-video');
+    if (miniVideo) {
+        miniVideo.style.cssText = `
+            position: relative !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: #000 !important;
+        `;
+    }
+    
+    // Mover reproductores
     this.movePlayersToMini();
     
-    console.log('✅ Mini player flotante visible y estilizado');
+    console.log('✅ Mini player flotante visible y forzado en Z-Index máximo');
 }
 movePlayersToMini() {
     console.log('🎬 Moviendo reproductores a mini (Modo Seguro)');
@@ -1393,11 +1414,16 @@ handleNext() {
     
     console.log(`⏭️ Botón Next presionado en índice ${currentPlayingInfo.flattenedIndex}`);
     
-    // ✅ DETENER MONITOREO ANTES DE SALTAR
+    // ✅ DETENER MONITOREO Y SINCRONIZACIÓN
     if (monitorInterval) {
         clearInterval(monitorInterval);
         monitorInterval = null;
-        console.log('📊 Monitoreo pausado para salto manual');
+    }
+    
+    if (window.playlistManager?.lyricsSyncInterval) {
+        clearInterval(window.playlistManager.lyricsSyncInterval);
+        window.playlistManager.lyricsSyncInterval = null;
+        console.log('🎵 Sincronización de letras pausada para salto manual');
     }
     
     // ✅ MARCAR FLAGS
@@ -1645,10 +1671,9 @@ startCrossfade(prevPlayer, nextPlayer) {
     const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
     const nextElement = document.getElementById(`player${currentPlayer}`);
 
-    // 1. PREPARACIÓN: Quitar transiciones CSS para que JS tenga el control total
-    // Esto soluciona el problema de la pantalla negra
+    // ✅ PREPARACIÓN: Ambos visibles durante crossfade
     if (nextElement) {
-        nextElement.style.transition = 'none'; // ⛔ ANULA CSS
+        nextElement.style.transition = 'none';
         nextElement.classList.remove('hidden', 'fade-out');
         nextElement.style.cssText = `
             display: block !important;
@@ -1656,19 +1681,29 @@ startCrossfade(prevPlayer, nextPlayer) {
             opacity: 0;
             z-index: 3;
             pointer-events: auto;
-            transition: none !important; /* Importante para que no pelee con CSS */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: opacity ${CROSSFADE_DURATION}s linear !important;
         `;
     }
 
     if (prevElement) {
-        prevElement.style.transition = 'none'; // ⛔ ANULA CSS
+        prevElement.style.transition = 'none';
         prevElement.classList.remove('hidden', 'fade-in');
         prevElement.style.cssText = `
             display: block !important;
             visibility: visible !important;
             opacity: 1;
             z-index: 2;
-            transition: none !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: opacity ${CROSSFADE_DURATION}s linear !important;
         `;
     }
 
@@ -1687,7 +1722,6 @@ startCrossfade(prevPlayer, nextPlayer) {
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
-        // Curva de audio exponencial para mantener la energía
         const audioProgress = Math.pow(progress, 0.8);
 
         const prevVolume = Math.max(0, Math.round(100 * (1 - audioProgress)));
@@ -1698,9 +1732,13 @@ startCrossfade(prevPlayer, nextPlayer) {
             nextPlayer.setVolume(nextVolume);
         } catch (e) {}
 
-        // Actualizar opacidad visual
-        if (prevElement) prevElement.style.opacity = (1 - progress).toFixed(2);
-        if (nextElement) nextElement.style.opacity = progress.toFixed(2);
+        // ✅ ACTUALIZAR OPACIDAD SIN OCULTAR
+        if (prevElement) {
+            prevElement.style.opacity = (1 - progress).toFixed(2);
+        }
+        if (nextElement) {
+            nextElement.style.opacity = progress.toFixed(2);
+        }
 
         if (step >= steps) {
             clearInterval(crossfadeInterval);
@@ -1708,28 +1746,36 @@ startCrossfade(prevPlayer, nextPlayer) {
             crossfadeInProgress = false;
             console.log('✅ Crossfade completado');
 
-            // LIMPIEZA FINAL
             setTimeout(() => {
                 try {
                     prevPlayer.stopVideo();
                     if (prevElement) {
                         prevElement.classList.add('hidden');
-                        // Restaurar estilos base pero oculto
-                        prevElement.style.cssText = 'display: none !important; opacity: 0; z-index: 1;';
+                        prevElement.style.cssText = `
+                            display: none !important;
+                            opacity: 0;
+                            z-index: 1;
+                        `;
                     }
                     if (nextElement) {
-                        // Restaurar estilos para reproducción normal
-                        nextElement.style.cssText = 'display: block !important; opacity: 1; z-index: 2; width: 100%; height: 100%;';
-                        // Reactivar transiciones CSS para otros efectos si los hay
-                        nextElement.style.transition = ''; 
+                        nextElement.classList.remove('hidden');
+                        nextElement.style.cssText = `
+                            display: block !important;
+                            visibility: visible !important;
+                            opacity: 1;
+                            z-index: 2;
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                        `;
                     }
                     
-                    // Resetear flags
                     hasOutroCrossfadeStarted = false;
                     nextVideoScheduled = false;
                     isTransitioning = false;
 
-                    // Reiniciar monitoreo
                     if (!monitorInterval && window.unifiedCore) {
                         window.unifiedCore.startMonitoring();
                     }
