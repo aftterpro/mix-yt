@@ -1226,18 +1226,40 @@ showMiniPlayerFloat() {
     console.log('✅ Mini player flotante activado');
 }
 movePlayersToMini() {
-    console.log('🎬 Moviendo reproductores a mini (FORZADO)');
+    console.log('🎬 Moviendo reproductores a mini (FORZADO FINAL)');
     
+    // 1. Obtener elementos
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
+    const miniFloat = document.getElementById('miniPlayerFloat');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    // Asegurar que los contenedores receptores estén limpios
-    if (miniContainer1) miniContainer1.style.display = 'block';
-    if (miniContainer2) miniContainer2.style.display = 'block';
+    // 2. FORZAR VISIBILIDAD DEL CONTENEDOR PRINCIPAL
+    if (miniFloat) {
+        miniFloat.classList.remove('hidden');
+        miniFloat.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 9999999 !important;
+            bottom: 110px !important;
+            right: 20px !important;
+            position: fixed !important;
+        `;
+    }
 
-    // Mover elementos
+    // 3. FORZAR VISIBILIDAD DE CONTENEDORES INTERNOS
+    if (miniContainer1) {
+        miniContainer1.style.display = 'block';
+        miniContainer1.style.visibility = 'visible';
+    }
+    if (miniContainer2) {
+        miniContainer2.style.display = 'block';
+        miniContainer2.style.visibility = 'visible';
+    }
+    
+    // 4. MOVER ELEMENTOS (Solo si no están ya ahí)
     if (player1 && miniContainer1 && !miniContainer1.contains(player1)) {
         miniContainer1.appendChild(player1);
     }
@@ -1245,31 +1267,43 @@ movePlayersToMini() {
         miniContainer2.appendChild(player2);
     }
     
-    // LIMPIEZA DE ESTILOS AGRESIVA
+    // 5. APLICAR ESTILOS A LOS REPRODUCTORES (IFRAMES)
+    // Esto es lo más importante: limpiar estilos de Full Screen
     [player1, player2].forEach((player, index) => {
         if (player) {
             const isActive = window.currentPlayer === (index + 1);
             
-            // Eliminar TODAS las clases de animación que puedan ocultarlo
-            player.className = 'video-player'; 
-            if (!isActive) player.classList.add('hidden');
-
-            player.style.cssText = ''; // Resetear estilos inline
+            // Limpiar clases
+            player.className = 'video-player';
             
             if (isActive) {
+                // ESTILOS ACTIVOS
                 player.style.cssText = `
                     width: 100% !important;
                     height: 100% !important;
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
                     display: block !important;
                     visibility: visible !important;
                     opacity: 1 !important;
                     z-index: 10 !important;
+                    background: #000 !important;
                 `;
+                player.classList.remove('hidden');
             } else {
-                player.style.display = 'none';
+                // ESTILOS INACTIVOS (Oculto pero presente)
+                player.style.cssText = `
+                    display: none !important;
+                    opacity: 0 !important;
+                    z-index: 0 !important;
+                `;
+                player.classList.add('hidden');
             }
         }
     });
+    
+    console.log('✅ Mini Player forzado correctamente');
 }
 /**
  * Mover reproductores a vista completa
