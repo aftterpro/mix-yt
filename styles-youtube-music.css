@@ -2507,11 +2507,11 @@ color: #FFFFFF !important;
     margin-top: 10px;
 }
 /* =============================================
-   MINI PLAYER FLOTANTE - CORREGIDO
+   MINI PLAYER FLOTANTE - MÁXIMA PRIORIDAD
    ============================================= */
-.mini-player-float {
+#miniPlayerFloat {
     position: fixed !important;
-    bottom: calc(var(--player-height) + 20px) !important;
+    bottom: 110px !important;
     right: 20px !important;
     width: 320px !important;
     height: 180px !important;
@@ -2524,21 +2524,23 @@ color: #FFFFFF !important;
     visibility: visible !important;
     opacity: 1 !important;
     transition: all 0.3s ease !important;
+    pointer-events: auto !important;
 }
 
-.mini-player-float.hidden {
+#miniPlayerFloat.hidden {
     display: none !important;
     opacity: 0 !important;
+    visibility: hidden !important;
 }
 
-.mini-player-video {
+#miniPlayerFloat .mini-player-video {
     position: relative !important;
     width: 100% !important;
     height: 100% !important;
     background: #000 !important;
 }
 
-.mini-video-container {
+#miniPlayerFloat .mini-video-container {
     position: absolute !important;
     top: 0 !important;
     left: 0 !important;
@@ -2546,7 +2548,28 @@ color: #FFFFFF !important;
     height: 100% !important;
 }
 
-.mini-player-expand {
+/* ✅ ASEGURAR QUE LOS PLAYERS DENTRO DEL MINI SEAN VISIBLES */
+#miniPlayerFloat .mini-video-container iframe,
+#miniPlayerFloat .mini-video-container #player1,
+#miniPlayerFloat .mini-video-container #player2 {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+    visibility: visible !important;
+    border: none !important;
+}
+
+/* ✅ PLAYER ACTIVO EN MINI */
+#miniPlayerFloat .video-player:not(.hidden) {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#miniPlayerFloat .mini-player-expand {
     position: absolute !important;
     top: 10px !important;
     right: 10px !important;
@@ -2564,27 +2587,13 @@ color: #FFFFFF !important;
     transition: background 0.2s !important;
 }
 
-.mini-player-expand:hover {
+#miniPlayerFloat .mini-player-expand:hover {
     background: rgba(255, 107, 53, 0.9) !important;
 }
 
-
-/* Regla de máxima prioridad para mostrar el mini player */
-#miniPlayerFloat:not(.hidden) {
+/* ✅ REGLA DE MÁXIMA ESPECIFICIDAD */
+body #miniPlayerFloat:not(.hidden) {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    /* Asegurar posición por si el JS falla en ponerla */
-    position: fixed !important;
-    bottom: 100px !important; 
-    right: 20px !important;
-    z-index: 999999 !important;
-}
-
-/* Asegurar que el contenido interno también sea visible */
-#miniPlayerFloat .mini-player-video,
-#miniPlayerFloat .mini-video-container {
-    display: block !important;
-    visibility: visible !important;
-    height: 100% !important;
 }
