@@ -2597,3 +2597,14 @@ body #miniPlayerFloat:not(.hidden) {
     visibility: visible !important;
     opacity: 1 !important;
 }
+/* Forzar que los contenedores internos del mini player siempre sean visibles */
+#miniPlayer1Container, #miniPlayer2Container {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Solo ocultar el reproductor que NO esté activo, no el contenedor */
+.mini-video-container .video-player.hidden {
+    display: none !important;
+}
