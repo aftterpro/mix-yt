@@ -964,29 +964,31 @@ findRelatedVideoData(itemElement) {
         this.setupLyricsProviderButton();
 
         try {
-            // ==========================================
-            // PREPARACIÓN DE DATOS
-            // ==========================================
-            let artist = '';
-            let rawTitle = currentVideo.title;
+        // ==========================================
+        // PREPARACIÓN DE DATOS (CORREGIDO)
+        // ==========================================
+        let artist = '';
+        let rawTitle = currentVideo.title;
 
-            // 1. Intentar obtener Artista limpio
-            if (currentVideo.artist && currentVideo.artist !== 'Desconocido' && currentVideo.artist !== 'YouTube') {
-                artist = currentVideo.artist;
+        // 1. Intentar obtener Artista
+        if (currentVideo.artist && currentVideo.artist !== 'Desconocido' && currentVideo.artist !== 'YouTube') {
+            artist = currentVideo.artist;
+        } else {
+            const separatorMatch = rawTitle.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
+            if (separatorMatch) {
+                artist = separatorMatch[1].trim();
+                rawTitle = separatorMatch[2].trim();
             } else {
-                // Separar "Artista - Título"
-                const separatorMatch = rawTitle.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
-                if (separatorMatch) {
-                    artist = separatorMatch[1].trim();
-                    rawTitle = separatorMatch[2].trim();
-                } else {
-                    artist = currentVideo.uploaderName || 'Desconocido';
-                }
+                artist = currentVideo.uploaderName || 'Desconocido';
             }
+        }
 
-            // Limpieza básica del artista (quitar VEVO, Official)
-            artist = artist.replace(/\s*VEVO$/i, '').replace(/\s*Official$/i, '').trim();
-
+        // ✅ CORRECCIÓN CLAVE: Eliminar " - Topic", "VEVO", "Official"
+        artist = artist
+            .replace(/\s*-\s*Topic$/i, '') // Elimina " - Topic" al final
+            .replace(/\s*VEVO$/i, '')       // Elimina "VEVO"
+            .replace(/\s*Official$/i, '')   // Elimina "Official"
+            .trim();
             // ==========================================
             // LÓGICA DE BÚSQUEDA (INTENTO 1 vs INTENTO 2)
             // ==========================================
