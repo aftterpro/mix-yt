@@ -523,11 +523,16 @@ removeVideoFromQueue(videoId) {
  */
 switchQueueTab(tabName) {
     console.log(`🔄 Cambiando a tab: ${tabName}`);
-    // Detener sincronización si salimos de 'lyrics'
-        if (tabName !== 'lyrics' && this.lyricsSyncInterval) {
+    
+    // ✅ CRÍTICO: Detener sincronización al salir de letras
+    if (tabName !== 'lyrics') {
+        if (this.lyricsSyncInterval) {
             clearInterval(this.lyricsSyncInterval);
             this.lyricsSyncInterval = null;
+            console.log('⏸️ Sincronización de letras detenida');
         }
+    }
+    
     // Actualizar botones de tabs
     document.querySelectorAll('.queue-tab').forEach(tab => {
         tab.classList.remove('active');
@@ -540,10 +545,11 @@ switchQueueTab(tabName) {
     });
     document.querySelector(`[data-tab-content="${tabName}"]`)?.classList.add('active');
     
-    // Cargar contenido específico del tab
+    // ✅ CARGAR CONTENIDO Y REINICIAR SINCRONIZACIÓN
     if (tabName === 'related') {
         this.loadRelatedVideos();
     } else if (tabName === 'lyrics') {
+        // Cargar letras Y reiniciar sincronización
         this.loadLyrics();
     }
 }
@@ -770,16 +776,23 @@ refreshActiveQueueTab() {
      * Inicia el intervalo que revisa el tiempo de la canción
      */
 startLyricsSync() {
+    // ✅ CRÍTICO: Limpiar intervalo anterior si existe
     if (this.lyricsSyncInterval) {
         clearInterval(this.lyricsSyncInterval);
+        this.lyricsSyncInterval = null;
     }
+    
+    // ✅ Resetear índice anterior
+    this.lastActiveLineIndex = -1;
+    
+    console.log('🎵 Iniciando sincronización de letras...');
     
     // ✅ Revisa cada 250ms (4 veces por segundo)
     this.lyricsSyncInterval = setInterval(() => {
         this.syncLyricsLine();
     }, 250);
     
-    console.log('🎵 Sincronización de letras iniciada');
+    console.log('✅ Sincronización de letras activa (ID:', this.lyricsSyncInterval, ')');
 }
 
     /**
