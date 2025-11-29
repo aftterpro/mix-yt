@@ -222,6 +222,7 @@ function checkAndUpdateUI() {
 // =============================================
 
 function handleAuthResult(accessToken) {
+    // 1. Verificación básica
     if (!accessToken) {
         isAuthorized = false;
         console.log('❌ No hay token de autenticación válido.');
@@ -229,22 +230,33 @@ function handleAuthResult(accessToken) {
         return;
     }
 
+    // 2. Establecer credenciales
     gapi.client.setToken({ access_token: accessToken });
     isAuthorized = true;
     saveAuthData(accessToken);
     
     console.log('✅ Usuario autenticado. Token establecido.');
     
+    // 3. Actualizar estado del Core (si ya existe)
     if (window.unifiedCore) {
         window.unifiedCore.state.authReady = true;
     }
     
+    // 4. Actualizar UI INMEDIATAMENTE (Botones Conectar/Salir)
     updateAuthUI();
     
-    // ✅ ESPERAR A QUE CORE Y PLAYLISTMANAGER ESTÉN LISTOS
+    // 5. Cargar Playlists en SEGUNDO PLANO (Non-blocking)
+    // Usamos .then() en lugar de await para no detener la carga de la página
     waitForSystemReady().then(() => {
-        console.log('📡 Sistema listo, cargando playlists...');
-        loadUserPlaylistsAndStore();
+        console.log('📡 Sistema listo, iniciando carga de playlists en segundo plano...');
+        
+        // Llamada asíncrona: La interfaz ya es usable mientras esto ocurre
+        window.loadUserPlaylistsAndStore().then(() => {
+            console.log('✅ Carga de playlists en segundo plano terminada');
+        }).catch(err => {
+            console.warn('⚠️ Error en carga de playlists (segundo plano):', err);
+        });
+
     }).catch(err => {
         console.error('❌ Error esperando sistema:', err);
     });
