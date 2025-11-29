@@ -213,46 +213,40 @@ setupAutomaticSaving() {
     console.log('💾 Guardado automático configurado (cada 60s)');
 }
 
- async init() {
+async init() {
     console.log('🔧 Inicializando Sistema Unificado...');
-    this.updateStatusIndicator('Inicializando...', 'loading');
-       
+    
+    // ✅ CORRECCIÓN 1: Mostrar la interfaz INMEDIATAMENTE
+    // No esperamos a las APIs para mostrar el esqueleto de la web
+    this.enableUnifiedElements(); 
+    this.updateStatusIndicator('Cargando motor de audio...', 'loading');
+        
     // Configurar debug
     if (this.debugMode) {
         this.enableDebugMode();
     }
     
-    // Inicializar componentes
-    await this.initializeComponents();
-    
-    // Configurar eventos
+    // Configurar eventos básicos (UI)
     this.setupEventListeners();
     
-    // Cargar datos iniciales
+    // Cargar datos iniciales (localStorage)
     this.loadInitialData();
-    
-    // Inicializar playlist manager
+
+    // Inicializar playlist manager (sin esperar)
     this.initializePlaylistManager();
+
+    // ⏳ AHORA sí cargamos las cosas pesadas en segundo plano
+    await this.initializeComponents();
     
     this.state.initialized = true;
     this.updateStatusIndicator('Sistema Listo', 'success');
-    this.enableUnifiedElements();
     
-    // NUEVO: Procesar playlists pendientes si las hay
+    // Procesar playlists pendientes si las hay
     if (window.pendingYouTubePlaylists) {
         console.log("🔄 Procesando playlists de YouTube pendientes");
         this.processYouTubePlaylists(window.pendingYouTubePlaylists);
         window.pendingYouTubePlaylists = null;
     }
-    
-    setTimeout(() => {
-        if (!window.playlistManager) {
-            console.error("❌ CRÍTICO: playlistManager no está disponible después de la inicialización");
-            this.showMessage("Error: Gestor de playlists no disponible", 'error');
-        } else {
-            console.log("✅ playlistManager verificado y disponible");
-        }
-    }, 1000); // Reducido de 3000ms a 1000ms
     
     console.log('✅ Sistema Unificado Inicializado');
 }
