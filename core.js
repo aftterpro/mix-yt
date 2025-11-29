@@ -1059,17 +1059,20 @@ switchView(viewName) {
             fullPlayerView.classList.remove('active');
         }
         
-        // CORRECCIÓN CRÍTICA PARA EL MINI PLAYER
-        if (isVideoPlaying) {
-            console.log('📱 Video reproduciéndose, invocando showMiniPlayerFloat...');
-            // Pequeño delay para asegurar que el DOM esté listo y anule estilos inline
-            setTimeout(() => {
-                this.showMiniPlayerFloat(); 
-            }, 50);
-        } else if (miniPlayerFloat) {
-            console.log('⏸️ Sin video, ocultar mini player');
-            miniPlayerFloat.classList.add('hidden');
-            miniPlayerFloat.style.display = 'none';
+        // ✅ CORRECCIÓN CRÍTICA PARA MINI PLAYER
+        // Verificar si hay video O si hay cola con índice válido
+        const hasActiveVideo = this.state?.currentPlayingInfo?.flattenedIndex >= 0;
+        
+        if (hasActiveVideo) {
+            console.log('📱 Video activo detectado, forzando Mini Player...');
+            // Usar requestAnimationFrame para asegurar que el DOM se pintó
+            requestAnimationFrame(() => {
+               this.showMiniPlayerFloat(); 
+            });
+        } else {
+            if (miniPlayerFloat) {
+                miniPlayerFloat.classList.add('hidden');
+            }
         }
     }
 
@@ -1354,30 +1357,40 @@ refreshPlayingView() {
     // =============================================
     // SISTEMA DE REPRODUCCIÓN
     // =============================================
-    handlePlayPause() {
-        if (!playersInitialized) {
-            this.showMessage("Los reproductores no están listos", 'error');
-            return;
-        }
-
-        const activePlayer = currentPlayer === 1 ? player1 : player2;
-        
-        if (!reproduccionIniciada) {
-            this.playFirstVideo();
-        } else {
-            const playerState = activePlayer.getPlayerState();
-            
-            if (playerState === YT.PlayerState.PLAYING) {
-                activePlayer.pauseVideo();
-                this.updatePlayButton('play');
-                this.stopMonitoring();
-            } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
-                activePlayer.playVideo();
-                this.updatePlayButton('pause');
-                this.startMonitoring();
-            }
-        }
+handlePlayPause() {
+    if (!playersInitialized) {
+        this.showMessage("Los reproductores no están listos", 'error');
+        return;
     }
+
+    const flatList = this.getFlattenedPlaylist();
+    const currentIndex = currentPlayingInfo.flattenedIndex;
+
+    // ✅ CORRECCIÓN: Si no hay reproducción iniciada O el índice es -1, pero hay videos
+    if (!reproduccionIniciada || currentIndex === -1) {
+        if (flatList.length > 0) {
+            console.log('▶️ Cola detectada, iniciando desde el principio...');
+            this.playVideoAtIndex(0); // Forzar inicio del primero
+        } else {
+            this.showMessage("La cola está vacía", 'warning');
+        }
+        return;
+    }
+
+    // Lógica normal de Pausa/Play
+    const activePlayer = currentPlayer === 1 ? player1 : player2;
+    const playerState = activePlayer.getPlayerState();
+    
+    if (playerState === YT.PlayerState.PLAYING) {
+        activePlayer.pauseVideo();
+        this.updatePlayButton('play');
+        this.stopMonitoring();
+    } else {
+        activePlayer.playVideo();
+        this.updatePlayButton('pause');
+        this.startMonitoring();
+    }
+}
 
 handleNext() {
     if (!reproduccionIniciada) {
