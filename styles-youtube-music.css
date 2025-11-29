@@ -2665,3 +2665,27 @@ body #miniPlayerFloat:not(.hidden) {
     display: none !important;
     opacity: 0 !important;
 }
+/* PARCHE FINAL MINI PLAYER */
+#miniPlayerFloat {
+    width: 320px !important;
+    height: 180px !important;
+    background: #000 !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8) !important;
+}
+
+/* Asegurar que el contenido interno ocupe espacio */
+#miniPlayerFloat .mini-player-video {
+    width: 100% !important;
+    height: 100% !important;
+    position: relative !important;
+    display: block !important;
+}
+
+#miniPlayer1Container, 
+#miniPlayer2Container {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0; left: 0;
+}
