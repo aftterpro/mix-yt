@@ -26,17 +26,23 @@ function getClientIdForDomain() {
     
     let clientId = clientIds[hostname];
     
+    // Fallback para subdominios de Netlify
     if (!clientId && hostname.includes('netlify.app')) {
          clientId = clientIds['mix-yt.netlify.app']; 
     }
     
+    // ✅ NUEVO: Fallback para Cloudflare Pages
+    if (!clientId && hostname.includes('pages.dev')) {
+         clientId = clientIds['mix-yt.pages.dev']; 
+    }
+    
     if (!clientId) {
-        console.warn('⚠️ CLIENT_ID no encontrado para el dominio actual. Usando fallback de Netlify.');
+        console.warn('⚠️ CLIENT_ID no encontrado para el dominio actual. Usando fallback.');
         clientId = clientIds['mix-yt.netlify.app'];
     }
     
     CLIENT_ID = clientId;
-    console.log(`🔑 CLIENT_ID detectado: ${CLIENT_ID}`);
+    console.log(`🔑 CLIENT_ID detectado para ${hostname}:`, CLIENT_ID);
 }
 
 // =============================================
