@@ -6,16 +6,39 @@ class LyricsUploader {
         this.setupUI();
     }
 
-    setupUI() {
-        // Añadir botón de subida en la pestaña de letras
-        document.addEventListener('DOMContentLoaded', () => {
-            const lyricsTab = document.querySelector('[data-tab-content="lyrics"]');
-            if (lyricsTab) {
-                this.injectUploadButton(lyricsTab);
-            }
-        });
-    }
+setupUI() {
+    // Añadir botón de subida en la pestaña de letras
+    document.addEventListener('DOMContentLoaded', () => {
+        // CORRECCIÓN: Usar una función de espera para asegurar que la vista se renderizó.
+        // La vista de la cola es dinámica.
+        this.waitForLyricsTab(); 
+    });
+}
 
+waitForLyricsTab(attempts = 0) {
+    const lyricsTab = document.querySelector('[data-tab-content="lyrics"]');
+    
+    if (lyricsTab && attempts < 20) {
+        // Aseguramos que el tab tiene la estructura esperada
+        if (lyricsTab.querySelector('.lyrics-container')) {
+             console.log('✅ Tab de letras encontrado, inyectando botón.');
+             this.injectUploadButton(lyricsTab);
+        } else {
+             // Si solo existe el tab, intentamos de nuevo por si se está llenando
+             if (attempts < 5) {
+                setTimeout(() => this.waitForLyricsTab(attempts + 1), 100);
+             } else {
+                // Si el tab existe, inyectar el botón directamente
+                this.injectUploadButton(lyricsTab);
+             }
+        }
+    } else if (attempts < 20) {
+        // Intenta hasta 20 veces (2 segundos)
+        setTimeout(() => this.waitForLyricsTab(attempts + 1), 100);
+    } else {
+        console.error('❌ No se encontró el tab de letras después de varios intentos.');
+    }
+}
     injectUploadButton(container) {
         const uploadBtn = document.createElement('button');
         uploadBtn.className = 'upload-lyrics-btn';
