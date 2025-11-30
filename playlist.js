@@ -1301,12 +1301,13 @@ updateQueuePopup() {
         this.core.updatePersistentQueue();
     }
 }
-    /**
+/**
  * Sincronizar cola después de cambio de video
  */
 syncQueueIndicator() {
     const queueItems = document.querySelectorAll('.queue-item');
     
+    // ✅ CORRECCIÓN: Usar siempre window.currentPlayingInfo
     const currentVideoId = window.currentPlayingInfo?.videoId;
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
     
