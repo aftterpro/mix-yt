@@ -667,21 +667,45 @@ updatePlaylistsUI() {
         }, true);
     }
 
-    setupControlButtons() {
-        const playBtn = document.getElementById('botonPlay');
-        const nextBtn = document.getElementById('botonNext');
-        const prevBtn = document.getElementById('prevButton');
+setupControlButtons() {
+    const playBtn = document.getElementById('botonPlay');
+    const nextBtn = document.getElementById('botonNext');
+    const prevBtn = document.getElementById('prevButton');
 
-        if (playBtn) {
-            playBtn.addEventListener('click', () => this.handlePlayPause());
-        }
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => this.handleNext());
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => this.handlePrevious());
-        }
+    if (playBtn) {
+        // Limpiar listener anterior
+        const newPlayBtn = playBtn.cloneNode(true);
+        playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+        
+        newPlayBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handlePlayPause();
+        });
     }
+    
+    if (nextBtn) {
+        const newNextBtn = nextBtn.cloneNode(true);
+        nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+        
+        newNextBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleNext();
+        });
+    }
+    
+    if (prevBtn) {
+        const newPrevBtn = prevBtn.cloneNode(true);
+        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+        
+        newPrevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handlePrevious();
+        });
+    }
+}
 
     setupSearch() {
         const searchInputs = [
@@ -1036,17 +1060,27 @@ switchView(viewName) {
                            window.currentPlayingInfo?.videoId;
     
     if (viewName === 'fullPlayer') {
-        // =============================================
         // VISTA COMPLETA
-        // =============================================
-        console.log(' Activando vista completa');
+        console.log('🎬 Activando vista completa');
         
         if (fullPlayerView) {
             fullPlayerView.classList.add('active');
         }
         
-        // MOVER REPRODUCTORES SIN PAUSAR
-        this.movePlayersToFullView();
+        // ✅ CORRECCIÓN: NO MOVER reproductores, solo cambiar visibilidad
+        const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
+        const player1El = document.getElementById('player1');
+        const player2El = document.getElementById('player2');
+        
+        if (videoWrapper && player1El && player2El) {
+            // Asegurar que están dentro del wrapper (solo la primera vez)
+            if (!videoWrapper.contains(player1El)) {
+                videoWrapper.appendChild(player1El);
+            }
+            if (!videoWrapper.contains(player2El)) {
+                videoWrapper.appendChild(player2El);
+            }
+        }
         
         // Ocultar mini player
         if (miniPlayerFloat) {
@@ -1057,7 +1091,7 @@ switchView(viewName) {
         // Actualizar cola
         this.updatePersistentQueue();
         
-        // Refrescar tab activa si hay playlistManager
+        // Refrescar tab activa
         if (window.playlistManager && window.playlistManager.refreshActiveQueueTab) {
             setTimeout(() => {
                 window.playlistManager.refreshActiveQueueTab();
@@ -1065,16 +1099,13 @@ switchView(viewName) {
         }
         
    } else {
-        // =============================================
-        // OTRAS VISTAS (HOME, SEARCH, LIBRARY)
-        // =============================================
+        // OTRAS VISTAS
         console.log(`📱 Activando vista: ${viewName}`);
         
         if (fullPlayerView) {
             fullPlayerView.classList.remove('active');
         }
         
-        // ✅ CORRECCIÓN CRÍTICA: Verificar si hay reproducción ACTIVA
         const hasActiveVideo = (
             window.reproduccionIniciada && 
             (this.state?.currentPlayingInfo?.flattenedIndex >= 0 || 
@@ -1084,10 +1115,13 @@ switchView(viewName) {
         if (hasActiveVideo) {
             console.log('📱 Reproducción activa detectada, mostrando Mini Player...');
             
-            // ✅ Usar múltiples requestAnimationFrame para asegurar que el DOM se actualiza
+            // ✅ CORRECCIÓN: NO mover reproductores al mini, usar CSS para mostrar/ocultar
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    this.showMiniPlayerFloat();
+                    if (miniPlayerFloat) {
+                        miniPlayerFloat.classList.remove('hidden');
+                        miniPlayerFloat.style.display = 'block';
+                    }
                 });
             });
         } else {
@@ -1111,6 +1145,7 @@ switchView(viewName) {
 
     // SIEMPRE FORZAR BOTTOM PLAYER VISIBLE
     this.forceBottomPlayerVisible();
+    this.setupControlButtons();
 }
 movePlayersToFullView() {
     console.log('🎬 Moviendo reproductores a vista completa (SIN interrupción)');
