@@ -1,12 +1,22 @@
-
 [build]
   functions = "functions/"  # Directorio de tus funciones Netlify
   publish = "."             # Directorio a publicar (tu sitio estático)
   command = "npm run build" # Comando para construir tu sitio (si aplica)
 
-# Regla para dirigir las llamadas /api/* a la función sponsorblock
+# Regla para dirigir las llamadas /api/sponsorblock/* a la función sponsorblock
 [[redirects]]
-  from = "/api/*"                             # Cualquier ruta que empiece con /api/
-  to = "/.netlify/functions/sponsorblock/:splat" # Dirígela a la función sponsorblock.js
-  status = 200                                # Código 200 para que funcione como un rewrite/proxy
-  # force = true                              # Descomenta si es necesario para forzar esta regla sobre otras
+  from = "/api/sponsorblock/:splat" # Ruta para la función existente
+  to = "/.netlify/functions/sponsorblock/:splat"
+  status = 200
+
+# NUEVA REGLA: Redirige /api/lyrics/* a la nueva función
+[[redirects]]
+  from = "/api/lyrics/:splat"
+  to = "/.netlify/functions/publish-lyrics" # Apunta al nombre de tu nuevo archivo JS (sin extensión)
+  status = 200
+
+# Regla para el proxy CORS (la URL base de tu proxy)
+[[redirects]]
+  from = "/.netlify/functions/cors-proxy/*"
+  to = "/.netlify/functions/cors-proxy/:splat"
+  status = 200
