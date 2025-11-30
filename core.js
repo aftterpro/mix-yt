@@ -1049,7 +1049,7 @@ switchView(viewName) {
             }, 300);
         }
         
-    } else {
+   } else {
         // =============================================
         // OTRAS VISTAS (HOME, SEARCH, LIBRARY)
         // =============================================
@@ -1059,19 +1059,27 @@ switchView(viewName) {
             fullPlayerView.classList.remove('active');
         }
         
-        // ✅ CORRECCIÓN CRÍTICA PARA MINI PLAYER
-        // Verificar si hay video O si hay cola con índice válido
-        const hasActiveVideo = this.state?.currentPlayingInfo?.flattenedIndex >= 0;
+        // ✅ CORRECCIÓN CRÍTICA: Verificar si hay reproducción ACTIVA
+        const hasActiveVideo = (
+            window.reproduccionIniciada && 
+            (this.state?.currentPlayingInfo?.flattenedIndex >= 0 || 
+             window.currentPlayingInfo?.flattenedIndex >= 0)
+        );
         
         if (hasActiveVideo) {
-            console.log('📱 Video activo detectado, forzando Mini Player...');
-            // Usar requestAnimationFrame para asegurar que el DOM se pintó
+            console.log('📱 Reproducción activa detectada, mostrando Mini Player...');
+            
+            // ✅ Usar múltiples requestAnimationFrame para asegurar que el DOM se actualiza
             requestAnimationFrame(() => {
-               this.showMiniPlayerFloat(); 
+                requestAnimationFrame(() => {
+                    this.showMiniPlayerFloat();
+                });
             });
         } else {
+            console.log('⚠️ No hay reproducción activa, mini player oculto');
             if (miniPlayerFloat) {
                 miniPlayerFloat.classList.add('hidden');
+                miniPlayerFloat.style.display = 'none';
             }
         }
     }
@@ -1187,27 +1195,36 @@ focusSearchInput() {
  * SHOW MINI PLAYER FLOAT
  */
 showMiniPlayerFloat() {
-    console.log('🎬 Activando mini player flotante (FORZADO)');
+    console.log('🎬 Activando mini player flotante...');
+    
+    // ✅ VALIDACIÓN CRÍTICA: Verificar que hay video activo
+    const hasActiveVideo = this.state?.currentPlayingInfo?.flattenedIndex >= 0 || 
+                          window.currentPlayingInfo?.flattenedIndex >= 0 ||
+                          window.reproduccionIniciada;
+    
+    if (!hasActiveVideo) {
+        console.warn('⚠️ No hay video activo, mini player no se mostrará');
+        return;
+    }
     
     let miniPlayer = document.getElementById('miniPlayerFloat');
     
     if (!miniPlayer) {
-        console.warn('⚠️ Mini player no existía en DOM, ignorando...');
+        console.warn('⚠️ Mini player no existe en DOM');
         return;
     }
     
     // ✅ FORZAR VISIBILIDAD COMPLETA
     miniPlayer.classList.remove('hidden');
     
-    // ✅ APLICAR ESTILOS CRÍTICOS DIRECTAMENTE
-    // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio de vista primero
+    // ✅ Esperar que el DOM se actualice antes de mover reproductores
     requestAnimationFrame(() => {
         miniPlayer.style.cssText = `
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
             position: fixed !important;
-            bottom: 110px !important; /* Ajustado para estar sobre el bottom player */
+            bottom: 110px !important;
             right: 20px !important;
             width: 320px !important;
             height: 180px !important;
@@ -1219,11 +1236,12 @@ showMiniPlayerFloat() {
             pointer-events: auto !important;
         `;
         
-        // Mover los reproductores ahora que el contenedor es visible
-        this.movePlayersToMini();
+        // ✅ SEGUNDO requestAnimationFrame para asegurar que CSS se aplicó
+        requestAnimationFrame(() => {
+            this.movePlayersToMini();
+            console.log('✅ Mini player flotante activado con video activo');
+        });
     });
-    
-    console.log('✅ Mini player flotante activado');
 }
 movePlayersToMini() {
     console.log('🎬 Moviendo reproductores a mini (FORZADO FINAL)');
@@ -1235,40 +1253,44 @@ movePlayersToMini() {
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    // 2. FORZAR VISIBILIDAD DEL CONTENEDOR PRINCIPAL
-    if (miniFloat) {
-        miniFloat.classList.remove('hidden');
-        miniFloat.style.cssText = `
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            z-index: 9999999 !important;
-            bottom: 110px !important;
-            right: 20px !important;
-            position: fixed !important;
-        `;
-    }
-
-    // 3. FORZAR VISIBILIDAD DE CONTENEDORES INTERNOS
-    if (miniContainer1) {
-        miniContainer1.style.display = 'block';
-        miniContainer1.style.visibility = 'visible';
-    }
-    if (miniContainer2) {
-        miniContainer2.style.display = 'block';
-        miniContainer2.style.visibility = 'visible';
+    // ✅ VALIDACIÓN: Verificar que existen los elementos
+    if (!miniFloat || !miniContainer1 || !miniContainer2) {
+        console.error('❌ Contenedores del mini player no encontrados');
+        return;
     }
     
+    if (!player1 || !player2) {
+        console.error('❌ Reproductores no encontrados');
+        return;
+    }
+    
+    // 2. FORZAR VISIBILIDAD DEL CONTENEDOR PRINCIPAL
+    miniFloat.classList.remove('hidden');
+    miniFloat.style.cssText = `
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 999998 !important;
+        bottom: 110px !important;
+        right: 20px !important;
+        position: fixed !important;
+    `;
+
+    // 3. FORZAR VISIBILIDAD DE CONTENEDORES INTERNOS
+    miniContainer1.style.display = 'block';
+    miniContainer1.style.visibility = 'visible';
+    miniContainer2.style.display = 'block';
+    miniContainer2.style.visibility = 'visible';
+    
     // 4. MOVER ELEMENTOS (Solo si no están ya ahí)
-    if (player1 && miniContainer1 && !miniContainer1.contains(player1)) {
+    if (!miniContainer1.contains(player1)) {
         miniContainer1.appendChild(player1);
     }
-    if (player2 && miniContainer2 && !miniContainer2.contains(player2)) {
+    if (!miniContainer2.contains(player2)) {
         miniContainer2.appendChild(player2);
     }
     
     // 5. APLICAR ESTILOS A LOS REPRODUCTORES (IFRAMES)
-    // Esto es lo más importante: limpiar estilos de Full Screen
     [player1, player2].forEach((player, index) => {
         if (player) {
             const isActive = window.currentPlayer === (index + 1);
@@ -1382,32 +1404,44 @@ handlePlayPause() {
     const flatList = this.getFlattenedPlaylist();
     const currentIndex = currentPlayingInfo.flattenedIndex;
 
-    // ✅ CORRECCIÓN: Si no hay reproducción iniciada O el índice es -1, pero hay videos
-    if (!reproduccionIniciada || currentIndex === -1) {
-        if (flatList.length > 0) {
-            console.log('▶️ Cola detectada, iniciando desde el principio...');
-            this.playVideoAtIndex(0); // Forzar inicio del primero
-        } else {
-            this.showMessage("La cola está vacía", 'warning');
+    // ✅ CORRECCIÓN 1: Si NO hay reproducción activa, iniciar
+    if (!reproduccionIniciada || currentIndex === -1 || currentIndex === undefined) {
+        if (flatList.length === 0) {
+            this.showMessage("La cola está vacía. Añade canciones primero.", 'warning');
+            return;
         }
+        
+        console.log('▶️ Iniciando reproducción desde el principio...');
+        this.playVideoAtIndex(0);
         return;
     }
 
-    // Lógica normal de Pausa/Play
+    // ✅ CORRECCIÓN 2: Si hay reproducción activa, toggle play/pause
     const activePlayer = currentPlayer === 1 ? player1 : player2;
-    const playerState = activePlayer.getPlayerState();
     
-    if (playerState === YT.PlayerState.PLAYING) {
-        activePlayer.pauseVideo();
-        this.updatePlayButton('play');
-        this.stopMonitoring();
-    } else {
-        activePlayer.playVideo();
-        this.updatePlayButton('pause');
-        this.startMonitoring();
+    try {
+        const playerState = activePlayer.getPlayerState();
+        
+        if (playerState === YT.PlayerState.PLAYING) {
+            console.log('⏸️ Pausando reproducción...');
+            activePlayer.pauseVideo();
+            this.updatePlayButton('play');
+            this.stopMonitoring();
+        } else if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
+            console.log('▶️ Reanudando reproducción...');
+            activePlayer.playVideo();
+            this.updatePlayButton('pause');
+            this.startMonitoring();
+        } else {
+            // Estado desconocido, reiniciar
+            console.warn('⚠️ Estado desconocido del reproductor, reiniciando...');
+            this.playVideoAtIndex(currentIndex);
+        }
+    } catch (error) {
+        console.error('❌ Error en handlePlayPause:', error);
+        this.showMessage('Error controlando reproducción', 'error');
     }
 }
-
 handleNext() {
     // 1. Obtener la lista actual
     const flatList = this.getFlattenedPlaylist();
@@ -2741,7 +2775,10 @@ updateNowPlayingFull() {
 
 playVideoAtIndex(index) {
     const flatList = this.getFlattenedPlaylist();
-    if (index < 0 || index >= flatList.length) return;
+    if (index < 0 || index >= flatList.length) {
+        console.error(`❌ Índice fuera de rango: ${index} (Total: ${flatList.length})`);
+        return;
+    }
 
     const video = flatList[index];
     console.log(`🎵 Reproduciendo video en índice ${index}: ${video.title}`);
@@ -2756,20 +2793,30 @@ playVideoAtIndex(index) {
         const activePlayer = currentPlayer === 1 ? player1 : player2;
         activePlayer.loadVideoById(video.videoId);
         
-        reproduccionIniciada = true;
+        reproduccionIniciada = true; // ✅ Marcar que la reproducción está activa
+        
         this.updatePlayButton('pause');
         this.startMonitoring();
         this.updateNowPlaying();
         this.updatePlaylistsUI();
         
-        // ✅ NUEVO: Refrescar tabs
+        // ✅ NUEVO: Asegurar que el mini player se muestre si no estamos en fullPlayer
+        if (this.currentView !== 'fullPlayer') {
+            setTimeout(() => {
+                this.showMiniPlayerFloat();
+            }, 500);
+        }
+        
+        // ✅ Refrescar tabs
         setTimeout(() => {
             this.refreshActiveQueueTab();
         }, 1000);
         
     } catch (error) {
-        console.error("Error reproduciendo video:", error);
+        console.error("❌ Error reproduciendo video:", error);
         this.showMessage("Error al reproducir video", 'error');
+        reproduccionIniciada = false; // ✅ Resetear en caso de error
+        this.updatePlayButton('play');
     }
 }
 
