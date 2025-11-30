@@ -1306,34 +1306,42 @@ updateQueuePopup() {
  */
 syncQueueIndicator() {
     const queueItems = document.querySelectorAll('.queue-item');
-    const currentVideoId = window.currentPlayingInfo?.videoId;
     
-    if (!currentVideoId) {
+    const currentVideoId = window.currentPlayingInfo?.videoId;
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    
+    if (!currentVideoId || currentIndex < 0) {
         console.log('⚠️ No hay video actual para sincronizar');
         return;
     }
     
-    console.log(`🎵 Sincronizando indicador para: ${currentVideoId}`);
+    console.log(`🎵 Sincronizando indicador:`, {
+        videoId: currentVideoId,
+        index: currentIndex,
+        totalItems: queueItems.length
+    });
     
     let foundPlaying = false;
     
-    queueItems.forEach(item => {
+    queueItems.forEach((item, idx) => {
         const itemVideoId = item.dataset.videoId;
+        const itemIndex = parseInt(item.dataset.flatIndex);
         
-        if (itemVideoId === currentVideoId) {
-            // ✅ MARCAR COMO REPRODUCIENDO
+        // Verificar por índice Y por videoId (doble verificación)
+        const isPlaying = (itemIndex === currentIndex) && (itemVideoId === currentVideoId);
+        
+        if (isPlaying) {
             item.classList.add('playing');
             
-            // ✅ ACTUALIZAR NÚMERO A ICONO
             const numberEl = item.querySelector('.queue-item-number');
             if (numberEl) {
                 numberEl.innerHTML = '<i class="fas fa-play-circle queue-item-playing"></i>';
             }
             
             foundPlaying = true;
-            console.log(`✅ Marcado como playing: ${itemVideoId}`);
+            console.log(`✅ Marcado como playing: índice ${itemIndex}, videoId ${itemVideoId}`);
             
-            // ✅ SCROLL SUAVE AL ITEM
+            // Scroll suave
             requestAnimationFrame(() => {
                 item.scrollIntoView({ 
                     behavior: 'smooth', 
@@ -1341,20 +1349,17 @@ syncQueueIndicator() {
                 });
             });
         } else {
-            // ✅ REMOVER MARCA
             item.classList.remove('playing');
             
-            // ✅ RESTAURAR NÚMERO
             const numberEl = item.querySelector('.queue-item-number');
-            const index = parseInt(item.dataset.flatIndex);
-            if (numberEl && !isNaN(index)) {
-                numberEl.textContent = index + 1;
+            if (numberEl && !isNaN(itemIndex)) {
+                numberEl.textContent = itemIndex + 1;
             }
         }
     });
     
     if (!foundPlaying) {
-        console.warn(`⚠️ No se encontró item con videoId: ${currentVideoId}`);
+        console.warn(`⚠️ No se encontró item activo. Índice: ${currentIndex}, VideoId: ${currentVideoId}`);
     }
 }
 /**
