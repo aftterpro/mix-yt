@@ -1,340 +1,99 @@
-console.log('🎵 Cargando módulo de subida de letras...');
+async uploadLyrics(form, dialog) {
+    const statusDiv = dialog.querySelector('#uploadStatus');
+    statusDiv.textContent = 'Preparando datos...';
+    statusDiv.style.color = 'blue';
 
-class LyricsUploader {
-    constructor() {
-        this.apiUrl = 'https://lrclib.net/api';
-        this.setupUI();
+    // ✅ OBTENER VIDEO ACTUAL
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    const flatList = window.unifiedCore?.getFlattenedPlaylist() || [];
+    const currentVideo = flatList[currentIndex];
+
+    if (!currentVideo) {
+        statusDiv.textContent = '❌ No hay video reproduciéndose';
+        statusDiv.style.color = 'red';
+        return;
     }
 
-    setupUI() {
-        // Añadir botón de subida en la pestaña de letras
-        document.addEventListener('DOMContentLoaded', () => {
-            const lyricsTab = document.querySelector('[data-tab-content="lyrics"]');
-            if (lyricsTab) {
-                this.injectUploadButton(lyricsTab);
-            }
+    const formData = {
+        trackName: form.querySelector('#trackName').value.trim(),
+        artistName: form.querySelector('#artistName').value.trim(),
+        albumName: form.querySelector('#albumName').value.trim(),
+        duration: parseInt(form.querySelector('#duration').value),
+        syncedLyrics: form.querySelector('#syncedLyrics').value.trim(),
+        plainLyrics: form.querySelector('#plainLyrics').value.trim()
+    };
+
+    // ✅ AÑADIR METADATA DEL VIDEO
+    console.log('📝 Subiendo letras para:', {
+        videoId: currentVideo.videoId,
+        title: formData.trackName,
+        artist: formData.artistName,
+        duration: formData.duration
+    });
+
+    // Validaciones
+    if (!formData.trackName || !formData.artistName || !formData.duration) {
+        statusDiv.textContent = '❌ Faltan campos requeridos';
+        statusDiv.style.color = 'red';
+        return;
+    }
+
+    if (!formData.syncedLyrics && !formData.plainLyrics) {
+        const confirmInstrumental = confirm('No hay letras. ¿Marcar como instrumental?');
+        if (!confirmInstrumental) return;
+    }
+
+    try {
+        // Paso 1: Obtener desafío
+        statusDiv.textContent = '🔐 Obteniendo desafío...';
+        const challengeResponse = await fetch(`${this.apiUrl}/request-challenge`, {
+            method: 'POST'
         });
-    }
 
-    injectUploadButton(container) {
-        const uploadBtn = document.createElement('button');
-        uploadBtn.className = 'upload-lyrics-btn';
-        uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Subir Letras';
-        uploadBtn.style.cssText = `
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            z-index: 10;
-        `;
+        if (!challengeResponse.ok) {
+            throw new Error('No se pudo obtener el desafío');
+        }
+
+        const challenge = await challengeResponse.json();
+        console.log('✅ Desafío obtenido:', challenge);
         
-        uploadBtn.addEventListener('click', () => this.showUploadDialog());
-        container.style.position = 'relative';
-        container.appendChild(uploadBtn);
-    }
-
-    showUploadDialog() {
-        // Obtener info del video actual
-        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-        const flatList = window.unifiedCore?.getFlattenedPlaylist() || [];
-        const currentVideo = flatList[currentIndex];
-
-        if (!currentVideo) {
-            alert('No hay canción reproduciéndose');
-            return;
-        }
-
-        const dialog = document.createElement('div');
-        dialog.className = 'lyrics-upload-dialog';
-        dialog.innerHTML = `
-            <div class="lyrics-upload-overlay" onclick="this.parentElement.remove()"></div>
-            <div class="lyrics-upload-content">
-                <h2>Subir Letras a LRCLIB</h2>
-                <form id="lyricsUploadForm">
-                    <div class="form-group">
-                        <label>Canción:</label>
-                        <input type="text" id="trackName" value="${this.escapeHTML(currentVideo.title)}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Artista:</label>
-                        <input type="text" id="artistName" value="${this.escapeHTML(currentVideo.artist || currentVideo.uploaderName)}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Álbum (opcional):</label>
-                        <input type="text" id="albumName">
-                    </div>
-                    <div class="form-group">
-                        <label>Duración (segundos):</label>
-                        <input type="number" id="duration" value="${currentVideo.duration || 0}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Letras Sincronizadas (LRC):</label>
-                        <textarea id="syncedLyrics" rows="10" placeholder="[00:12.00]Primera línea
-[00:17.20]Segunda línea"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Letras Planas (opcional):</label>
-                        <textarea id="plainLyrics" rows="5" placeholder="Primera línea
-Segunda línea"></textarea>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" onclick="this.closest('.lyrics-upload-dialog').remove()">Cancelar</button>
-                        <button type="submit" class="primary-btn">Subir</button>
-                    </div>
-                </form>
-                <div id="uploadStatus"></div>
-            </div>
-        `;
-
-        document.body.appendChild(dialog);
-
-        const form = dialog.querySelector('#lyricsUploadForm');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.uploadLyrics(form, dialog);
+        // Paso 2: Resolver PoW
+        statusDiv.textContent = '⚙️ Resolviendo prueba de trabajo (puede tardar)...';
+        const publishToken = await this.solveProofOfWork(challenge.prefix, challenge.target);
+        console.log('✅ PoW resuelto');
+        
+        // Paso 3: Publicar letras
+        statusDiv.textContent = '📤 Publicando letras...';
+        const publishResponse = await fetch(`${this.apiUrl}/publish`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Publish-Token': publishToken
+            },
+            body: JSON.stringify(formData)
         });
-    }
 
-    async uploadLyrics(form, dialog) {
-        const statusDiv = dialog.querySelector('#uploadStatus');
-        statusDiv.textContent = 'Solicitando desafío...';
-        statusDiv.style.color = 'blue';
-
-        const formData = {
-            trackName: form.querySelector('#trackName').value.trim(),
-            artistName: form.querySelector('#artistName').value.trim(),
-            albumName: form.querySelector('#albumName').value.trim(),
-            duration: parseInt(form.querySelector('#duration').value),
-            syncedLyrics: form.querySelector('#syncedLyrics').value.trim(),
-            plainLyrics: form.querySelector('#plainLyrics').value.trim()
-        };
-
-        // Validaciones
-        if (!formData.trackName || !formData.artistName || !formData.duration) {
-            statusDiv.textContent = 'Faltan campos requeridos';
-            statusDiv.style.color = 'red';
-            return;
-        }
-
-        if (!formData.syncedLyrics && !formData.plainLyrics) {
-            formData.instrumental = true;
-        }
-
-        try {
-            // Paso 1: Obtener desafío
-            statusDiv.textContent = 'Obteniendo desafío...';
-            const challengeResponse = await fetch(`${this.apiUrl}/request-challenge`, {
-                method: 'POST'
-            });
-
-            if (!challengeResponse.ok) {
-                throw new Error('No se pudo obtener el desafío');
-            }
-
-            const challenge = await challengeResponse.json();
+        if (publishResponse.status === 201) {
+            statusDiv.textContent = '✅ ¡Letras publicadas con éxito!';
+            statusDiv.style.color = 'green';
             
-            // Paso 2: Resolver PoW
-            statusDiv.textContent = 'Resolviendo prueba de trabajo...';
-            const publishToken = await this.solveProofOfWork(challenge.prefix, challenge.target);
+            console.log('✅ Letras subidas exitosamente para:', currentVideo.videoId);
             
-            // Paso 3: Publicar letras
-            statusDiv.textContent = 'Publicando letras...';
-            const publishResponse = await fetch(`${this.apiUrl}/publish`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Publish-Token': publishToken
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (publishResponse.status === 201) {
-                statusDiv.textContent = '✅ Letras publicadas con éxito!';
-                statusDiv.style.color = 'green';
-                
-                setTimeout(() => {
-                    dialog.remove();
-                    // Recargar letras
-                    if (window.playlistManager) {
-                        window.playlistManager.loadLyrics();
-                    }
-                }, 2000);
-            } else {
-                const errorData = await publishResponse.json();
-                throw new Error(errorData.message || 'Error al publicar');
-            }
-
-        } catch (error) {
-            console.error('❌ Error:', error);
-            statusDiv.textContent = `❌ Error: ${error.message}`;
-            statusDiv.style.color = 'red';
-        }
-    }
-
-    async solveProofOfWork(prefix, target) {
-        return new Promise((resolve, reject) => {
-            const worker = new Worker(URL.createObjectURL(new Blob([`
-                self.onmessage = async function(e) {
-                    const { prefix, target } = e.data;
-                    let nonce = 0;
-                    
-                    while (true) {
-                        const token = prefix + ':' + nonce;
-                        const hashBuffer = await crypto.subtle.digest(
-                            'SHA-256',
-                            new TextEncoder().encode(token)
-                        );
-                        const hashArray = Array.from(new Uint8Array(hashBuffer));
-                        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                        
-                        if (hashHex.startsWith(target.slice(0, 8).toLowerCase())) {
-                            self.postMessage({ success: true, token });
-                            break;
-                        }
-                        
-                        nonce++;
-                        
-                        if (nonce % 10000 === 0) {
-                            self.postMessage({ progress: nonce });
-                        }
-                    }
-                };
-            `], { type: 'application/javascript' })));
-
-            worker.onmessage = (e) => {
-                if (e.data.success) {
-                    worker.terminate();
-                    resolve(e.data.token);
-                }
-            };
-
-            worker.onerror = (error) => {
-                worker.terminate();
-                reject(error);
-            };
-
-            worker.postMessage({ prefix, target });
-
-            // Timeout de 2 minutos
             setTimeout(() => {
-                worker.terminate();
-                reject(new Error('Timeout resolviendo PoW'));
-            }, 120000);
-        });
-    }
+                dialog.remove();
+                // Recargar letras
+                if (window.playlistManager) {
+                    window.playlistManager.loadLyrics();
+                }
+            }, 2000);
+        } else {
+            const errorData = await publishResponse.json();
+            throw new Error(errorData.message || `Error HTTP ${publishResponse.status}`);
+        }
 
-    escapeHTML(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    } catch (error) {
+        console.error('❌ Error subiendo letras:', error);
+        statusDiv.textContent = `❌ Error: ${error.message}`;
+        statusDiv.style.color = 'red';
     }
 }
-
-// CSS para el diálogo
-const style = document.createElement('style');
-style.textContent = `
-    .lyrics-upload-dialog {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 10000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .lyrics-upload-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(5px);
-    }
-
-    .lyrics-upload-content {
-        position: relative;
-        background: var(--yt-bg-raised);
-        border-radius: 12px;
-        padding: 24px;
-        max-width: 600px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    }
-
-    .lyrics-upload-content h2 {
-        margin-top: 0;
-        color: var(--yt-text-primary);
-    }
-
-    .form-group {
-        margin-bottom: 16px;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        color: var(--yt-text-secondary);
-        font-size: 14px;
-    }
-
-    .form-group input,
-    .form-group textarea {
-        width: 100%;
-        padding: 10px;
-        background: var(--yt-bg-elevated);
-        border: 1px solid var(--yt-layer-20);
-        border-radius: 6px;
-        color: var(--yt-text-primary);
-        font-family: monospace;
-        font-size: 13px;
-    }
-
-    .form-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        margin-top: 24px;
-    }
-
-    .form-actions button {
-        padding: 10px 20px;
-        border-radius: 6px;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .form-actions .primary-btn {
-        background: var(--primary-color);
-        color: white;
-    }
-
-    #uploadStatus {
-        margin-top: 16px;
-        padding: 12px;
-        border-radius: 6px;
-        background: var(--yt-bg-elevated);
-        text-align: center;
-    }
-`;
-document.head.appendChild(style);
-
-// Inicializar
-window.lyricsUploader = new LyricsUploader();
-console.log('✅ Módulo de subida de letras cargado');
