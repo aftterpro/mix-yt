@@ -4,6 +4,16 @@ console.log('Core cargando...');
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
 const CROSSFADE_DURATION = 10; // Duración del crossfade en segundos
+// ✅ CRÍTICO: Variables globales expuestas
+window.player1 = null;
+window.player2 = null;
+window.currentPlayer = 1;
+window.reproduccionIniciada = false;
+window.currentPlayingInfo = {
+    playlistId: null,
+    videoId: null,
+    flattenedIndex: -1
+};
 
 let player1, player2;
 let currentPlayer = 1;
@@ -390,16 +400,21 @@ async loadTrendingContent() {
         player1 = new YT.Player('player1', playerConfig);
         player2 = new YT.Player('player2', playerConfig);
     }
-
-    onPlayerReady(event) {
-        console.log('✅ Reproductor listo');
-        if (player1 && player2) {
-            playersInitialized = true;
-            this.state.playersReady = true;
-            this.updatePlayersStatus('Reproductores listos');
-            this.enablePlayButton();
-        }
+onPlayerReady(event) {
+    console.log('✅ Reproductor listo');
+    if (player1 && player2) {
+        playersInitialized = true;
+        this.state.playersReady = true;
+        
+        // ✅ NUEVO: Exponer globalmente
+        window.player1 = player1;
+        window.player2 = player2;
+        window.currentPlayer = currentPlayer;
+        
+        this.updatePlayersStatus('Reproductores listos');
+        this.enablePlayButton();
     }
+}
 
 onPlayerStateChange(event) {
     const player = event.target;
@@ -1396,16 +1411,16 @@ refreshPlayingView() {
     // SISTEMA DE REPRODUCCIÓN
     // =============================================
 handlePlayPause() {
-    if (!playersInitialized) {
+    if (!playersInitialized || !window.player1 || !window.player2) {
         this.showMessage("Los reproductores no están listos", 'error');
         return;
     }
 
     const flatList = this.getFlattenedPlaylist();
-    const currentIndex = currentPlayingInfo.flattenedIndex;
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
 
-    // ✅ CORRECCIÓN 1: Si NO hay reproducción activa, iniciar
-    if (!reproduccionIniciada || currentIndex === -1 || currentIndex === undefined) {
+    // ✅ Usar window.reproduccionIniciada
+    if (!window.reproduccionIniciada || currentIndex === -1 || currentIndex === undefined) {
         if (flatList.length === 0) {
             this.showMessage("La cola está vacía. Añade canciones primero.", 'warning');
             return;
@@ -1416,8 +1431,8 @@ handlePlayPause() {
         return;
     }
 
-    // ✅ CORRECCIÓN 2: Si hay reproducción activa, toggle play/pause
-    const activePlayer = currentPlayer === 1 ? player1 : player2;
+    // ✅ Usar window.currentPlayer
+    const activePlayer = window.currentPlayer === 1 ? window.player1 : window.player2;
     
     try {
         const playerState = activePlayer.getPlayerState();
@@ -2783,31 +2798,36 @@ playVideoAtIndex(index) {
     const video = flatList[index];
     console.log(`🎵 Reproduciendo video en índice ${index}: ${video.title}`);
 
+    // ✅ ACTUALIZAR VARIABLES LOCALES
     currentPlayingInfo = {
         flattenedIndex: index,
         videoId: video.videoId,
         playlistId: video.sourcePlaylistId
     };
+    
+    // ✅ NUEVO: ACTUALIZAR VARIABLES GLOBALES
+    window.currentPlayingInfo = currentPlayingInfo;
+    window.reproduccionIniciada = true;
 
     try {
         const activePlayer = currentPlayer === 1 ? player1 : player2;
         activePlayer.loadVideoById(video.videoId);
         
-        reproduccionIniciada = true; // ✅ Marcar que la reproducción está activa
+        reproduccionIniciada = true; // Variable local también
         
         this.updatePlayButton('pause');
         this.startMonitoring();
         this.updateNowPlaying();
         this.updatePlaylistsUI();
         
-        // ✅ NUEVO: Asegurar que el mini player se muestre si no estamos en fullPlayer
+        // Asegurar que el mini player se muestre si no estamos en fullPlayer
         if (this.currentView !== 'fullPlayer') {
             setTimeout(() => {
                 this.showMiniPlayerFloat();
             }, 500);
         }
         
-        // ✅ Refrescar tabs
+        // Refrescar tabs
         setTimeout(() => {
             this.refreshActiveQueueTab();
         }, 1000);
@@ -2815,11 +2835,11 @@ playVideoAtIndex(index) {
     } catch (error) {
         console.error("❌ Error reproduciendo video:", error);
         this.showMessage("Error al reproducir video", 'error');
-        reproduccionIniciada = false; // ✅ Resetear en caso de error
+        reproduccionIniciada = false;
+        window.reproduccionIniciada = false; // ✅ También global
         this.updatePlayButton('play');
     }
 }
-
     // =============================================
     // SISTEMA DE MENSAJES Y DEBUG
     // =============================================
