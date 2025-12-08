@@ -828,30 +828,39 @@ setupControlButtons() {
  * Configurar handlers para cambio de contenedor
  */
 setupPlayerContainerHandlers() {
-    console.log('🎬 Configurando handlers de contenedores');
+    console.log('🎬 Configurando handlers de barra inferior');
     
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
-        // Clonar para limpiar eventos previos
+        // Clonar para limpiar eventos previos y asegurar limpieza
         const newBottomPlayer = bottomPlayer.cloneNode(true);
         bottomPlayer.parentNode.replaceChild(newBottomPlayer, bottomPlayer);
         
-        // ✅ CLICK EN TODA LA BARRA (excepto botones)
+        // Estilo cursor para indicar clic
+        newBottomPlayer.style.cursor = 'pointer';
+        
+        // EVENTO CLIC EN TODA LA BARRA
         newBottomPlayer.addEventListener('click', (e) => {
-            // Si el click fue en un botón o slider, no hacer nada
-            if (e.target.closest('button') || e.target.closest('.volume-slider') || e.target.closest('.player-controls')) {
+            // IGNORAR clic si fue en un botón, slider o control
+            if (e.target.closest('button') || 
+                e.target.closest('.volume-slider') || 
+                e.target.closest('.player-controls') ||
+                e.target.closest('.control-button')) {
                 return;
             }
             
+            // Verificar si hay video para expandir
             const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
             
             if (hasVideo) {
-                console.log('🎬 Click en barra inferior, abriendo vista completa');
+                console.log('🎬 Click en barra -> Full Player');
                 this.switchView('fullPlayer');
             }
         });
         
-        // Asegurar visibilidad
+        // Re-asignar eventos a los botones (porque el cloneNode los borró)
+        // Esto es necesario porque clonamos la barra entera
+        this.setupControlButtons(); // Asegúrate de llamar a esto para reactivar play/pause/next
         this.forceBottomPlayerVisible();
     }
 }
