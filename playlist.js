@@ -1005,33 +1005,27 @@ findRelatedVideoData(itemElement) {
                 
                 let response = await fetch(url1);
 
-                // --- INTENTO 2: Optimizado (Si falla el 1) ---
+                                // --- INTENTO 2: Optimizado (Si falla el 1) ---
                 if (response.status === 404) {
-                    console.warn('⚠️ [Lyrics] Falló Intento 1. Probando optimización...');
-                    
-                    // 1. Quitar duración (YouTube vs Spotify suelen diferir)
-                    // 2. Quitar el nombre del artista si está dentro del título
-                    // 3. Quitar comillas y cosas raras
+                    console.warn('⚠️ [Lyrics] Falló Intento 1. Probando optimización agresiva...');
                     
                     let titleClean2 = rawTitle;
                     
-                    // Quitar el artista del título (ej: "Tañita Cardona - Amor Mio" -> "Amor Mio")
+                    // 1. Quitar el nombre del artista si está repetido dentro del título
                     if (artist.length > 2) {
                         const artistRegex = new RegExp(this.escapeRegExp(artist), 'gi');
                         titleClean2 = titleClean2.replace(artistRegex, '');
                     }
                     
-                    // Limpieza profunda (tu función + extras)
+                    // 2. Aplicar la nueva limpieza agresiva
                     titleClean2 = this.cleanTrackTitle(titleClean2);
-                    titleClean2 = titleClean2.replace(/["“”]/g, '').trim(); // Quitar comillas
                     
-                    // URL SIN DURACIÓN
+                    // URL SIN DURACIÓN (para que la API sea más flexible)
                     const url2 = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(titleClean2)}`;
                     console.log('📡 [Lyrics] Intento 2 (Optimizado):', url2);
                     
                     response = await fetch(url2);
                 }
-
                 if (!response.ok) throw new Error('No encontradas en LRCLIB');
                 match = await response.json();
                 match.source = 'lrclib.net';
