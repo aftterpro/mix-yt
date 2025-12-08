@@ -426,36 +426,43 @@ onPlayerStateChange(event) {
     } else if (state === YT.PlayerState.PLAYING) {
         hasOutroCrossfadeStarted = false;
         
-        // ✅ CRÍTICO: Actualizar índice ANTES de refrescar tabs
+        // 1. ACTUALIZAR INDICE GLOBAL
         const videoData = player.getVideoData();
         if (videoData?.video_id) {
             const flatList = this.getFlattenedPlaylist();
             const index = flatList.findIndex(v => v.videoId === videoData.video_id);
             
             if (index !== -1) {
-                currentPlayingInfo.flattenedIndex = index;
-                currentPlayingInfo.videoId = videoData.video_id;
-                console.log(`✅ Índice actualizado: ${index} (${videoData.video_id})`);
+                // Actualizar TODAS las referencias globales
+                window.currentPlayingInfo.flattenedIndex = index;
+                window.currentPlayingInfo.videoId = videoData.video_id;
+                this.state.currentPlayingInfo = window.currentPlayingInfo;
+                console.log(`✅ Índice sincronizado: ${index} (${videoData.video_id})`);
             }
         }
         
         this.updateCurrentPlayingIndex();
+        this.updateNowPlaying(); // Actualizar textos del reproductor
         
-        // ✅ CRÍTICO: Reiniciar sincronización de letras si es tab activo
+        // 2. FORZAR ACTUALIZACIÓN DE COLA Y PESTAÑAS (CRÍTICO)
         if (window.playlistManager) {
-            const activeTab = document.querySelector('.queue-tab.active');
-            if (activeTab?.dataset.tab === 'lyrics') {
-                console.log('🎵 Reiniciando sincronización de letras...');
-                setTimeout(() => {
-                    window.playlistManager.loadLyrics();
-                }, 1000);
-            }
+            console.log('🔄 Forzando actualización de UI y Pestañas...');
             
-            // Actualizar tabs cuando empieza a reproducir
-            this.refreshActiveQueueTab();
+            // Actualizar lista de cola visual (Pestaña "Siguiente")
+            this.updatePersistentQueue(); 
+            
+            // Actualizar indicador visual en cola
+            if (window.playlistManager.syncQueueIndicator) {
+                window.playlistManager.syncQueueIndicator();
+            }
+
+            // Recargar contenido de la pestaña activa (LETRAS o RELACIONADOS)
+            // Esto es lo que hace que cargue la nueva letra
+            if (window.playlistManager.refreshActiveQueueTab) {
+                window.playlistManager.refreshActiveQueueTab();
+            }
         }
         
-        // Guardar estado cuando se reproduce
         setTimeout(() => saveAllData(), 1000);
     }
 }
@@ -1302,31 +1309,33 @@ movePlayersToMini() {
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
+    // Validación
     if (!miniFloat || !miniContainer1 || !miniContainer2 || !player1 || !player2) {
         return;
     }
     
-    // 1. Mostrar contenedor principal
+    // 1. FORZAR VISIBILIDAD DEL CONTENEDOR PRINCIPAL
     miniFloat.classList.remove('hidden');
     miniFloat.style.display = 'block';
     
-    // 2. Mover elementos si no están ahí
+    // 2. MOVER ELEMENTOS (Solo si no están ya ahí)
     if (!miniContainer1.contains(player1)) miniContainer1.appendChild(player1);
     if (!miniContainer2.contains(player2)) miniContainer2.appendChild(player2);
     
     // 3. IDENTIFICAR JUGADOR ACTIVO
     const activePlayerNum = window.currentPlayer;
     
+    // 4. APLICAR ESTILOS A LOS REPRODUCTORES
     [player1, player2].forEach((player, index) => {
         const isPlayer1 = index === 0;
         const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
         
-        // Limpiar clases de transición que puedan estar ocultándolo
-        player.classList.remove('fade-out', 'hidden', 'crossfade-exit');
+        // Limpiar clases que puedan ocultarlo
+        player.className = 'video-player'; 
+        player.classList.remove('hidden', 'fade-out', 'crossfade-exit');
         
         if (isActive) {
-            player.classList.add('fade-in');
-            // FORZAR ESTILOS VISIBLES
+            // ESTILOS ACTIVOS: Ocupar 100% y ser visible
             player.style.cssText = `
                 width: 100% !important;
                 height: 100% !important;
@@ -1338,15 +1347,19 @@ movePlayersToMini() {
                 opacity: 1 !important;
                 z-index: 10 !important;
                 background: #000 !important;
+                pointer-events: auto !important;
             `;
         } else {
-            // El inactivo se oculta
-            player.style.display = 'none';
-            player.style.opacity = '0';
+            // ESTILOS INACTIVOS: Oculto
+            player.style.cssText = `
+                display: none !important;
+                opacity: 0 !important;
+                z-index: 0 !important;
+            `;
         }
     });
     
-    console.log('✅ Mini Player forzado correctamente');
+    console.log('✅ Mini Player corregido y visible');
 }
 /**
  * Mover reproductores a vista completa
