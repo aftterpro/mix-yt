@@ -1140,31 +1140,50 @@ findRelatedVideoData(itemElement) {
             </div>`;
     }
 /**
- * ✅ NUEVA FUNCIÓN DE LIMPIEZA PROFUNDA DE TÍTULOS
- * Elimina basura como (Video Oficial), ft., [4K], etc.
+ * ✅ NUEVA FUNCIÓN OPTIMIZADA DE LIMPIEZA PROFUNDA
+ * Elimina RMX, BPM, Remix, Live, ft., paréntesis técnicos, etc.
  */
 cleanTrackTitle(title) {
     if (!title) return '';
     
     let clean = title;
 
-    // 1. Eliminar colaboraciones "ft.", "feat.", "featuring" y lo que sigue
-    // Ejemplo: "Cancion ft. Bad Bunny" -> "Cancion"
-    clean = clean.replace(/\s(ft\.|feat\.|featuring)\s.*/i, '');
+    // 1. Eliminar colaboraciones "ft.", "feat.", "featuring", "vs.", "x", "with" y lo que sigue
+    clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with)\s.*/i, '');
     
-    // 2. Eliminar texto entre paréntesis/corchetes que contenga palabras clave de "ruido"
-    // Palabras: Video, Oficial, Official, Audio, Lyric, Visualizer, Version, HD, HQ, 4K, Live, Vivo
-    // Regex explicada: Busca ( o [ + cualquier cosa + palabra clave + cualquier cosa + ) o ]
-    const noisePattern = /[\(\[](?:[^)\]]*?)(?:video|oficial|official|audio|lyric|visualizer|hd|hq|4k|live|vivo|version|remaster)(?:[^)\]]*?)[\)\]]?/gi;
-    clean = clean.replace(noisePattern, '');
+    // 2. Eliminar "Prod. by" y lo que sigue
+    clean = clean.replace(/\s(prod\.|produced by)\s.*/i, '');
 
-    // 3. Eliminar cosas como "| Official Video" (usando pipe o guión al final)
-    clean = clean.split('|')[0]; // Toma lo de antes del pipe
+    // 3. Eliminar texto entre paréntesis/corchetes que contenga palabras clave de "ruido"
+    // LISTA AMPLIADA: bpm, rmx, remix, mix, edit, mashup, cover, etc.
+    const noiseKeywords = [
+        'video', 'oficial', 'official', 'audio', 'lyric', 'visualizer',
+        'hd', 'hq', '4k', '8k', 'live', 'vivo', 'version', 'remaster',
+        'extended', 'radio', 'original', 'cover', 'acoustic', 'instrumental',
+        'karaoke', 'bpm', 'remix', 'rmx', 'mix', 'edit', 'mashup', 'bootleg'
+    ].join('|');
+
+    // Regex: Busca ( o [ + cualquier cosa + palabra clave + cualquier cosa + ) o ]
+    // Ejemplo: Elimina "(115 Bpm)" porque contiene "Bpm"
+    const bracketPattern = new RegExp(`[\(\\[](?:[^)\\]]*?)(?:${noiseKeywords})(?:[^)\\]]*?)[\)\\]]?`, 'gi');
+    clean = clean.replace(bracketPattern, '');
+
+    // 4. Eliminar sufijos sueltos SIN paréntesis al final del título
+    // Ejemplo: "Cancion RMX" -> "Cancion"
+    const suffixPattern = /\s(-)?\s*(RMX|Remix|Mix|Live|Edit|Mashup|Remastered|Bpm|Bootleg)\b/gi;
+    clean = clean.replace(suffixPattern, '');
+
+    // 5. Eliminar cosas como "| Official Video" (usando pipe)
+    clean = clean.split('|')[0]; 
     
-    // 4. Eliminar paréntesis vacíos que puedan haber quedado "()"
+    // 6. Eliminar paréntesis vacíos "()" o "[]" que hayan quedado
     clean = clean.replace(/\(\s*\)|\[\s*\]/g, '');
 
-    // 5. Trim final
+    // 7. Limpieza cosmética final
+    clean = clean.replace(/["“”]/g, ''); // Quitar comillas
+    clean = clean.replace(/\s+/g, ' ');   // Quitar espacios dobles
+    clean = clean.replace(/[-:]\s*$/, ''); // Quitar guiones o dos puntos al final si quedaron
+
     return clean.trim();
 }
    /**
