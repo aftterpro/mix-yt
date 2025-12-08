@@ -1,74 +1,92 @@
-console.log('🎵 Cargando módulo de subida de letras avanzado...');
+console.log('🎵 Cargando módulo de subida de letras (Auto-inyección)...');
 
 class LyricsUploader {
     constructor() {
-        this.apiUrl = 'https://lrclib.net/api';
-        this.setupUI();
+        this.apiUrl = '/.netlify/functions/publish-lyrics'; // Ruta corregida a tu función
+        this.observer = null;
+        this.setupAutoInjection();
     }
 
-    setupUI() {
+    // Usar MutationObserver para detectar cuando se renderiza el tab de letras
+    setupAutoInjection() {
         document.addEventListener('DOMContentLoaded', () => {
-            this.waitForLyricsTab(); 
+            const lyricsContent = document.getElementById('lyricsContent');
+            
+            if (lyricsContent) {
+                // Observar cambios en el contenedor de letras
+                this.observer = new MutationObserver(() => {
+                    this.tryInjectButton();
+                });
+                
+                this.observer.observe(lyricsContent, { 
+                    childList: true, 
+                    subtree: true 
+                });
+                
+                // Intento inicial
+                this.tryInjectButton();
+            } else {
+                console.warn('❌ Contenedor lyricsContent no encontrado al inicio');
+                // Reintentar si el DOM carga lento
+                setTimeout(() => this.setupAutoInjection(), 1000);
+            }
         });
     }
 
-    waitForLyricsTab(attempts = 0) {
-        const lyricsTab = document.querySelector('[data-tab-content="lyrics"]');
-        if (lyricsTab && attempts < 20) {
-            // Verificar si el contenedor interno existe, sino esperar
-            if (lyricsTab.querySelector('.lyrics-container') || attempts > 5) {
-                 this.injectUploadButton(lyricsTab);
-            } else {
-                setTimeout(() => this.waitForLyricsTab(attempts + 1), 200);
-            }
-        } else if (attempts < 20) {
-            setTimeout(() => this.waitForLyricsTab(attempts + 1), 200);
+    tryInjectButton() {
+        // Buscar el contenedor interno donde debe ir el botón
+        const container = document.querySelector('.lyrics-container .lyrics-header');
+        
+        // Si existe el header y NO tiene ya el botón
+        if (container && !container.querySelector('.upload-lyrics-btn')) {
+            this.injectUploadButton(container);
         }
     }
 
-    injectUploadButton(container) {
-        // Evitar duplicados
-        if (container.querySelector('.upload-lyrics-btn')) return;
-
+    injectUploadButton(headerContainer) {
+        console.log('💉 Inyectando botón de subir letras...');
+        
         const uploadBtn = document.createElement('button');
         uploadBtn.className = 'upload-lyrics-btn';
-        uploadBtn.innerHTML = '<i class="fas fa-file-upload"></i> Subir / Corregir';
+        uploadBtn.innerHTML = '<i class="fas fa-file-upload"></i>';
+        uploadBtn.title = "Subir o Corregir Letras";
+        
+        // Estilos integrados para que se vea bien en el header
         uploadBtn.style.cssText = `
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #aaa;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            z-index: 20;
+            background: transparent;
+            color: var(--text-secondary, #aaa);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; margin-left: 8px;
             transition: all 0.2s;
         `;
         
-        uploadBtn.addEventListener('mouseenter', () => {
-            uploadBtn.style.background = 'var(--primary-color)';
-            uploadBtn.style.color = 'white';
+        uploadBtn.onmouseenter = () => {
+            uploadBtn.style.color = '#fff';
             uploadBtn.style.borderColor = 'var(--primary-color)';
-        });
+            uploadBtn.style.background = 'rgba(255, 107, 53, 0.1)';
+        };
         
-        uploadBtn.addEventListener('mouseleave', () => {
-            uploadBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+        uploadBtn.onmouseleave = () => {
             uploadBtn.style.color = '#aaa';
-            uploadBtn.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-        });
+            uploadBtn.style.borderColor = 'rgba(255,255,255,0.2)';
+            uploadBtn.style.background = 'transparent';
+        };
 
-        uploadBtn.addEventListener('click', () => this.showUploadDialog());
-        container.appendChild(uploadBtn);
+        uploadBtn.onclick = (e) => {
+            e.stopPropagation(); // Evitar colapso si está en un acordeón
+            this.showUploadDialog();
+        };
+
+        // Insertar al final del header
+        headerContainer.appendChild(uploadBtn);
     }
 
     showUploadDialog() {
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+        // Obtener la lista aplanada desde el core
         const flatList = window.unifiedCore?.getFlattenedPlaylist() || [];
         const currentVideo = flatList[currentIndex];
 
@@ -83,162 +101,119 @@ class LyricsUploader {
             <div class="lyrics-upload-overlay"></div>
             <div class="lyrics-upload-content">
                 <div class="dialog-header">
-                    <h2><i class="fas fa-edit"></i> Editor de Letras</h2>
+                    <h3><i class="fas fa-edit"></i> Editor de Letras</h3>
                     <button class="close-dialog"><i class="fas fa-times"></i></button>
                 </div>
                 
-                <div class="upload-split-view">
-                    <div class="upload-form-section">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Canción</label>
-                                <input type="text" id="trackName" value="${this.escapeHTML(currentVideo.title)}" class="dark-input">
-                            </div>
-                            <div class="form-group">
-                                <label>Artista</label>
-                                <input type="text" id="artistName" value="${this.escapeHTML(currentVideo.artist || currentVideo.uploaderName)}" class="dark-input">
-                            </div>
+                <div class="upload-form-body">
+                    <div class="form-row">
+                        <div class="form-group" style="flex:2">
+                            <label>Canción</label>
+                            <input type="text" id="trackName" value="${this.escapeHTML(currentVideo.title)}" class="dark-input">
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Álbum</label>
-                                <input type="text" id="albumName" placeholder="Opcional" class="dark-input">
-                            </div>
-                            <div class="form-group small">
-                                <label>Duración (s)</label>
-                                <input type="number" id="duration" value="${currentVideo.duration || 0}" class="dark-input" readonly style="opacity:0.7">
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" style="flex:1; display:flex; flex-direction:column;">
-                            <label>Letras Sincronizadas (LRC)</label>
-                            <textarea id="syncedLyrics" class="lyrics-editor" placeholder="[00:12.00] Primera línea..."></textarea>
+                        <div class="form-group" style="flex:1">
+                            <label>Duración (s)</label>
+                            <input type="number" id="duration" value="${Math.round(currentVideo.duration || 0)}" class="dark-input" readonly>
                         </div>
                     </div>
-
-                    <div class="upload-preview-section">
-                        <label>Previsualización en tiempo real</label>
-                        <div id="previewContainer" class="lyrics-preview-box">
-                            <p class="preview-placeholder">Escribe o pega el LRC para ver la vista previa...</p>
-                        </div>
+                    <div class="form-group">
+                        <label>Artista</label>
+                        <input type="text" id="artistName" value="${this.escapeHTML(currentVideo.artist || currentVideo.uploaderName)}" class="dark-input">
+                    </div>
+                    
+                    <div class="form-group" style="flex:1; display:flex; flex-direction:column;">
+                        <label>Letras Sincronizadas (LRC)</label>
+                        <textarea id="syncedLyrics" class="lyrics-editor" placeholder="[00:12.00] Primera línea..."></textarea>
+                    </div>
+                    
+                    <div class="preview-box" id="previewBox">
+                        <small>Vista previa en vivo:</small>
+                        <div id="previewLine" style="color:var(--primary-color); font-weight:bold; min-height:20px;">--</div>
                     </div>
                 </div>
 
                 <div class="dialog-footer">
                     <span id="uploadStatus"></span>
-                    <button class="preview-btn" id="btnPreviewAction"><i class="fas fa-play"></i> Probar Sincronización</button>
-                    <button class="submit-btn" id="btnSubmitAction"><i class="fas fa-cloud-upload-alt"></i> Publicar</button>
+                    <button class="preview-btn" id="btnTestSync"><i class="fas fa-play"></i> Probar</button>
+                    <button class="submit-btn" id="btnSubmit"><i class="fas fa-cloud-upload-alt"></i> Enviar</button>
                 </div>
             </div>
         `;
 
         document.body.appendChild(dialog);
 
-        // Event Listeners
+        // Lógica del modal
         const textarea = dialog.querySelector('#syncedLyrics');
-        const previewContainer = dialog.querySelector('#previewContainer');
-        const closeBtn = dialog.querySelector('.close-dialog');
-        const overlay = dialog.querySelector('.lyrics-upload-overlay');
-        const submitBtn = dialog.querySelector('#btnSubmitAction');
-        const previewActionBtn = dialog.querySelector('#btnPreviewAction');
-
+        const previewLine = dialog.querySelector('#previewLine');
+        
         // Cerrar
-        const close = () => dialog.remove();
-        closeBtn.onclick = close;
-        overlay.onclick = close;
+        const close = () => {
+            if(this.testInterval) clearInterval(this.testInterval);
+            dialog.remove();
+        };
+        dialog.querySelector('.close-dialog').onclick = close;
+        dialog.querySelector('.lyrics-upload-overlay').onclick = close;
 
-        // Previsualización en vivo (al escribir)
-        textarea.addEventListener('input', () => {
-            this.updatePreview(textarea.value, previewContainer);
-        });
-
-        // Botón "Probar Sincronización" (Sincroniza con el audio actual)
-        previewActionBtn.onclick = () => {
-            this.startLivePreview(textarea.value, previewContainer);
+        // Probar sincronización
+        dialog.querySelector('#btnTestSync').onclick = () => {
+            this.startSyncTest(textarea.value, previewLine);
         };
 
         // Enviar
-        submitBtn.onclick = () => {
-            const formData = {
+        dialog.querySelector('#btnSubmit').onclick = () => {
+            const data = {
                 trackName: dialog.querySelector('#trackName').value,
                 artistName: dialog.querySelector('#artistName').value,
-                albumName: dialog.querySelector('#albumName').value,
                 duration: dialog.querySelector('#duration').value,
                 syncedLyrics: textarea.value,
                 plainLyrics: textarea.value.replace(/\[.*?\]/g, '').trim()
             };
-            this.uploadLyrics(formData, dialog);
+            this.uploadLyrics(data, dialog);
         };
     }
 
-    updatePreview(lrcText, container) {
-        if (!lrcText.trim()) {
-            container.innerHTML = '<p class="preview-placeholder">Escribe LRC para visualizar...</p>';
+    startSyncTest(lrcText, displayElement) {
+        if(this.testInterval) clearInterval(this.testInterval);
+        
+        const lines = this.parseLRC(lrcText);
+        if(!lines.length) {
+            displayElement.textContent = "No hay líneas LRC válidas";
             return;
         }
-        
-        const lines = this.parseLRC(lrcText);
-        container.innerHTML = lines.map(line => 
-            `<p class="preview-line" data-time="${line.time}">
-                <span class="timestamp">[${this.formatTime(line.time)}]</span> ${line.text}
-            </p>`
-        ).join('');
-    }
 
-    startLivePreview(lrcText, container) {
-        if (!lrcText.trim()) return;
-        
-        // Detener intervalo anterior si existe
-        if (this.previewInterval) clearInterval(this.previewInterval);
-        
-        const lines = this.parseLRC(lrcText);
-        this.updatePreview(lrcText, container);
-        const domLines = container.querySelectorAll('.preview-line');
-        
-        this.previewInterval = setInterval(() => {
-            // Obtener tiempo del reproductor real
-            const player = window.player1?.getPlayerState() === 1 ? window.player1 : window.player2;
-            if (!player) return;
+        this.testInterval = setInterval(() => {
+            const player = (window.currentPlayer === 1) ? window.player1 : window.player2;
+            if (!player || typeof player.getCurrentTime !== 'function') return;
             
-            const currentTime = player.getCurrentTime();
+            const time = player.getCurrentTime();
             
-            // Encontrar línea activa
-            let activeIndex = -1;
+            // Buscar línea activa
+            let currentText = "...";
             for (let i = lines.length - 1; i >= 0; i--) {
-                if (currentTime >= lines[i].time) {
-                    activeIndex = i;
+                if (time >= lines[i].time) {
+                    currentText = lines[i].text;
                     break;
                 }
             }
-            
-            // Actualizar clases
-            domLines.forEach((el, idx) => {
-                el.classList.remove('active', 'past');
-                if (idx === activeIndex) {
-                    el.classList.add('active');
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                } else if (idx < activeIndex) {
-                    el.classList.add('past');
-                }
-            });
-        }, 200);
+            displayElement.textContent = `[${time.toFixed(1)}s] ${currentText}`;
+        }, 100);
     }
 
     async uploadLyrics(formData, dialog) {
         const statusDiv = dialog.querySelector('#uploadStatus');
-        statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publicando...';
-        statusDiv.className = 'status-loading';
+        statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        statusDiv.style.color = '#3498db';
 
         try {
             // 1. Obtener Challenge
             const challengeRes = await fetch(`${this.apiUrl}/request-challenge`, { method: 'POST' });
-            if (!challengeRes.ok) throw new Error('Error de conexión con LRCLIB');
+            if (!challengeRes.ok) throw new Error('Error de conexión');
             const challenge = await challengeRes.json();
 
-            // 2. Solver PoW (Web Worker simple inline)
-            const token = await this.solveProofOfWork(challenge.prefix, challenge.target);
+            // 2. Resolver PoW (Worker inline)
+            const token = await this.solvePoW(challenge.prefix, challenge.target);
 
-            // 3. Publicar
+            // 3. Enviar
             const res = await fetch(`${this.apiUrl}/publish`, {
                 method: 'POST',
                 headers: {
@@ -249,89 +224,87 @@ class LyricsUploader {
             });
 
             if (res.status === 201) {
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> ¡Enviado!';
-                statusDiv.className = 'status-success';
-                setTimeout(() => dialog.remove(), 1500);
+                statusDiv.innerHTML = '¡Enviado!';
+                statusDiv.style.color = '#2ecc71';
+                setTimeout(() => {
+                    if(this.testInterval) clearInterval(this.testInterval);
+                    dialog.remove();
+                    if(window.playlistManager) window.playlistManager.loadLyrics();
+                }, 1500);
             } else {
-                throw new Error('Error al publicar');
+                throw new Error('Error al guardar');
             }
-
         } catch (e) {
-            statusDiv.innerHTML = `<i class="fas fa-times-circle"></i> ${e.message}`;
-            statusDiv.className = 'status-error';
+            statusDiv.innerHTML = `Error: ${e.message}`;
+            statusDiv.style.color = '#e74c3c';
         }
     }
 
-    // Utilidades
     parseLRC(text) {
-        const lines = text.split('\n');
-        const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
-        return lines.map(line => {
-            const match = line.match(regex);
+        return text.split('\n').map(line => {
+            const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
             if (!match) return null;
-            const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseFloat(`0.${match[3]}`);
+            const time = parseInt(match[1])*60 + parseInt(match[2]) + parseFloat(`0.${match[3]}`);
             return { time, text: match[4].trim() };
         }).filter(x => x);
     }
 
-    formatTime(seconds) {
-        const min = Math.floor(seconds / 60);
-        const sec = Math.floor(seconds % 60);
-        const ms = Math.floor((seconds % 1) * 100);
-        return `${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`;
-    }
-
-    async solveProofOfWork(prefix, target) {
-        // Implementación simplificada para el ejemplo (deberías usar tu worker existente)
-        // Aquí asumimos que tienes el worker del archivo anterior
-        return window.lyricsUploader.solveProofOfWork(prefix, target); 
+    async solvePoW(prefix, target) {
+        // Implementación simple de PoW
+        return new Promise((resolve) => {
+            const workerCode = `
+                self.onmessage = async ({data}) => {
+                    const {prefix, target} = data;
+                    let nonce = 0;
+                    while(true) {
+                        const str = prefix + ':' + nonce;
+                        const buf = new TextEncoder().encode(str);
+                        const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+                        const hashArr = Array.from(new Uint8Array(hashBuf));
+                        const hex = hashArr.map(b => b.toString(16).padStart(2,'0')).join('');
+                        if(hex.startsWith(target.toLowerCase().substr(0, 6))) { // Target aproximado
+                            self.postMessage(prefix + ':' + nonce);
+                            break;
+                        }
+                        nonce++;
+                    }
+                };
+            `;
+            const blob = new Blob([workerCode], {type: 'application/javascript'});
+            const worker = new Worker(URL.createObjectURL(blob));
+            worker.onmessage = (e) => {
+                worker.terminate();
+                resolve(e.data);
+            };
+            worker.postMessage({prefix, target});
+        });
     }
 
     escapeHTML(str) {
-        if(!str) return '';
-        return str.replace(/[&<>'"]/g, tag => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-        }[tag]));
+        return str ? str.replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t])) : '';
     }
 }
 
-// Estilos necesarios para el nuevo modal
-const style = document.createElement('style');
-style.textContent = `
-    .lyrics-upload-dialog { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; display: flex; align-items: center; justify-content: center; }
-    .lyrics-upload-overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
-    .lyrics-upload-content { position: relative; width: 900px; height: 80vh; background: #181818; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #333; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-    
-    .dialog-header { padding: 15px 20px; background: #202020; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-    .dialog-header h2 { margin: 0; font-size: 18px; color: #fff; }
-    .close-dialog { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; }
-    
-    .upload-split-view { display: flex; flex: 1; overflow: hidden; }
-    .upload-form-section { flex: 1; padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #333; gap: 15px; }
-    .upload-preview-section { flex: 1; padding: 20px; display: flex; flex-direction: column; background: #121212; }
-    
-    .form-row { display: flex; gap: 15px; }
-    .form-group { flex: 1; }
-    .form-group.small { flex: 0 0 100px; }
-    .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
-    .dark-input { width: 100%; background: #2a2a2a; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; }
-    .lyrics-editor { width: 100%; flex: 1; background: #2a2a2a; border: 1px solid #444; color: #eee; padding: 10px; border-radius: 4px; font-family: monospace; resize: none; line-height: 1.5; }
-    
-    .lyrics-preview-box { flex: 1; background: #000; border-radius: 8px; padding: 15px; overflow-y: auto; font-family: sans-serif; }
-    .preview-line { padding: 8px 10px; margin: 0; border-radius: 4px; color: #666; font-size: 14px; transition: all 0.2s; }
-    .preview-line .timestamp { font-family: monospace; color: #444; font-size: 11px; margin-right: 10px; }
-    .preview-line.active { background: #222; color: #fff; font-weight: bold; font-size: 16px; border-left: 3px solid var(--primary-color); }
-    .preview-line.past { color: #444; }
-    
-    .dialog-footer { padding: 15px 20px; background: #202020; border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
-    .preview-btn { background: #333; color: #fff; border: 1px solid #555; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-    .submit-btn { background: var(--primary-color); color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-    
-    .status-loading { color: #3498db; margin-right: auto; }
-    .status-success { color: #2ecc71; margin-right: auto; }
-    .status-error { color: #e74c3c; margin-right: auto; font-size: 12px; }
+// Estilos CSS necesarios para el modal
+const css = `
+.lyrics-upload-dialog { position: fixed; top:0; left:0; width:100%; height:100%; z-index:99999; display:flex; align-items:center; justify-content:center; }
+.lyrics-upload-overlay { position: absolute; width:100%; height:100%; background:rgba(0,0,0,0.8); backdrop-filter:blur(5px); }
+.lyrics-upload-content { position: relative; width:90%; max-width:600px; background:#181818; border-radius:12px; border:1px solid #333; padding:20px; box-shadow:0 10px 40px rgba(0,0,0,0.5); }
+.dialog-header { display:flex; justify-content:space-between; margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px; }
+.dialog-header h3 { margin:0; color:#fff; }
+.close-dialog { background:none; border:none; color:#fff; font-size:20px; cursor:pointer; }
+.form-row { display:flex; gap:10px; margin-bottom:10px; }
+.form-group label { display:block; font-size:12px; color:#888; margin-bottom:5px; }
+.dark-input, .lyrics-editor { width:100%; background:#2a2a2a; border:1px solid #444; color:#fff; padding:8px; border-radius:4px; box-sizing:border-box; }
+.lyrics-editor { height:200px; font-family:monospace; line-height:1.4; resize:vertical; }
+.dialog-footer { margin-top:15px; display:flex; justify-content:flex-end; gap:10px; align-items:center; }
+.submit-btn { background:var(--primary-color); color:#fff; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-weight:bold; }
+.preview-btn { background:#333; color:#fff; border:1px solid #555; padding:8px 15px; border-radius:4px; cursor:pointer; }
+.preview-box { background:#000; padding:10px; border-radius:4px; margin-top:10px; font-family:monospace; text-align:center; }
 `;
+const style = document.createElement('style');
+style.textContent = css;
 document.head.appendChild(style);
 
-// Inicializar
+// Iniciar
 window.lyricsUploader = new LyricsUploader();
