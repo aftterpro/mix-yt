@@ -1139,8 +1139,8 @@ findRelatedVideoData(itemElement) {
             </div>`;
     }
 /**
- * ✅ NUEVA FUNCIÓN OPTIMIZADA DE LIMPIEZA PROFUNDA
- * Elimina RMX, BPM, Emojis, ft., paréntesis técnicos, etc.
+ * ✅ LIMPIEZA PROFUNDA DE TÍTULOS (Soporte Last.fm style)
+ * Maneja: "Cancion (Dj Rayner)HD 🔊", "Artista 'Apodo' Titulo", etc.
  */
 cleanTrackTitle(title) {
     if (!title) return '';
@@ -1148,38 +1148,42 @@ cleanTrackTitle(title) {
     let clean = title;
 
     // 1. ELIMINAR EMOJIS (Rango Unicode completo)
-    // Esto elimina 🔊, 🔥, 🎵, etc.
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 2. Eliminar colaboraciones "ft.", "feat.", "featuring", "vs.", "x", "with" y lo que sigue
+    // 2. Eliminar colaboraciones "ft.", "feat.", "featuring"
     clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with)\s.*/i, '');
     
-    // 3. Eliminar "Prod. by" y lo que sigue
+    // 3. Eliminar "Prod. by"
     clean = clean.replace(/\s(prod\.|produced by)\s.*/i, '');
 
-    // 4. Eliminar texto entre paréntesis/corchetes que contenga palabras clave de "ruido"
+    // 4. Eliminar texto entre paréntesis/corchetes con palabras clave de "ruido"
+    // Incluye DJ, Rayner, HD, HQ, Video, Oficial, etc.
     const noiseKeywords = [
         'video', 'oficial', 'official', 'audio', 'lyric', 'visualizer',
         'hd', 'hq', '4k', '8k', 'live', 'vivo', 'version', 'remaster',
         'extended', 'radio', 'original', 'cover', 'acoustic', 'instrumental',
         'karaoke', 'bpm', 'remix', 'rmx', 'mix', 'edit', 'mashup', 'bootleg',
-        'dj', 'set'
+        'dj', 'set', 'session'
     ].join('|');
 
+    // Regex agresivo para paréntesis
     const bracketPattern = new RegExp(`[\(\\[](?:[^)\\]]*?)(?:${noiseKeywords})(?:[^)\\]]*?)[\)\\]]?`, 'gi');
     clean = clean.replace(bracketPattern, '');
 
-    // 5. Eliminar sufijos sueltos SIN paréntesis
-    const suffixPattern = /\s(-)?\s*(RMX|Remix|Mix|Live|Edit|Mashup|Remastered|Bpm|Bootleg|HD|HQ)\b/gi;
-    clean = clean.replace(suffixPattern, '');
+    // 5. Eliminar sufijos sueltos o pegados (ej: ")HD")
+    clean = clean.replace(/(\)|\])?\s*(HD|HQ|4K|Official|RMX)\b/gi, '');
 
-    // 6. Eliminar cosas como "| Official Video" o "- Video"
+    // 6. Eliminar apodos entre comillas si es el artista (ej: Tañita "La Reina")
+    // Esto es un heurístico: si hay comillas dobles, las quitamos
+    clean = clean.replace(/["“”]/g, '');
+
+    // 7. Eliminar separadores como "| Video" o "- Video"
     clean = clean.split('|')[0]; 
-    
-    // 7. Limpieza cosmética final
+    clean = clean.split(' - ')[1] ? clean.split(' - ')[1] : clean; // Intentar quedarse solo con el título si hay guión (Artista - Titulo)
+
+    // 8. Limpieza final
     clean = clean.replace(/\(\s*\)|\[\s*\]/g, ''); // Paréntesis vacíos
-    clean = clean.replace(/["“”]/g, ''); // Comillas
     clean = clean.replace(/\s+/g, ' ');   // Espacios dobles
     clean = clean.replace(/[-:]\s*$/, ''); // Guiones al final
 
