@@ -2689,3 +2689,9 @@ body #miniPlayerFloat:not(.hidden) {
     position: absolute !important;
     top: 0; left: 0;
 }
+/* FORZAR VISIBILIDAD DE IFRAME EN MINI PLAYER */
+#miniPlayerFloat iframe {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
