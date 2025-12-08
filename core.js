@@ -257,7 +257,15 @@ async init() {
         this.processYouTubePlaylists(window.pendingYouTubePlaylists);
         window.pendingYouTubePlaylists = null;
     }
-    
+    window.addEventListener('resize', () => {
+    if (window.unifiedCore) {
+        if (window.unifiedCore.currentView === 'fullPlayer') {
+            window.unifiedCore.updatePlayerPosition('videoWrapper');
+        } else if (window.reproduccionIniciada) {
+            window.unifiedCore.updatePlayerPosition('miniPlayerFloat');
+        }
+    }
+});
     console.log('✅ Sistema Unificado Inicializado');
 }
 processYouTubePlaylists(playlists) {
@@ -634,6 +642,68 @@ async initializePlaylistManager() {
         return false;
     }
 }
+    /**
+ * Mueve visualmente el contenedor de video SIN recargar el iframe
+ */
+updatePlayerPosition(targetContainerId) {
+    const playersLayer = document.getElementById('persistent-player-layer');
+    const targetContainer = document.getElementById(targetContainerId);
+    
+    // Crear la capa persistente si no existe
+    if (!playersLayer) {
+        console.log('🔧 Creando capa persistente de video...');
+        const layer = document.createElement('div');
+        layer.id = 'persistent-player-layer';
+        layer.style.cssText = `
+            position: fixed;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            background: #000;
+            overflow: hidden;
+            pointer-events: none; /* Permitir clicks passthrough durante transiciones */
+        `;
+        document.body.appendChild(layer);
+        
+        // Mover reproductores a esta capa UNA SOLA VEZ
+        const p1 = document.getElementById('player1');
+        const p2 = document.getElementById('player2');
+        if (p1) layer.appendChild(p1);
+        if (p2) layer.appendChild(p2);
+        
+        return this.updatePlayerPosition(targetContainerId); // Reintentar
+    }
+
+    // Si no hay contenedor destino (ej: inicio sin reproducir), ocultar
+    if (!targetContainer || targetContainer.classList.contains('hidden')) {
+        playersLayer.style.opacity = '0';
+        playersLayer.style.pointerEvents = 'none';
+        return;
+    }
+
+    // OBTENER COORDENADAS DEL DESTINO
+    const rect = targetContainer.getBoundingClientRect();
+    
+    // Si el destino está oculto (display: none), no actualizar
+    if (rect.width === 0 && rect.height === 0) return;
+
+    // APLICAR COORDENADAS
+    playersLayer.style.top = `${rect.top}px`;
+    playersLayer.style.left = `${rect.left}px`;
+    playersLayer.style.width = `${rect.width}px`;
+    playersLayer.style.height = `${rect.height}px`;
+    playersLayer.style.opacity = '1';
+    
+    // Habilitar interacción solo si es grande
+    if (targetContainerId === 'videoWrapper') {
+         playersLayer.style.pointerEvents = 'auto';
+         playersLayer.style.borderRadius = '0';
+    } else {
+         // En mini player, a veces queremos clicks passthrough o no
+         playersLayer.style.pointerEvents = 'auto';
+         playersLayer.style.borderRadius = '12px'; // Coincidir con estilo mini
+         playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+    }
+}
     // Actualizar UI de playlists (delegado)
 updatePlaylistsUI() {
     if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
@@ -760,53 +830,30 @@ setupControlButtons() {
 setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de contenedores');
     
-    // CLICK EN BOTTOM PLAYER (en el área de info/título)
     const bottomPlayer = document.querySelector('.bottom-player');
     if (bottomPlayer) {
-        // Limpiar listeners anteriores
+        // Clonar para limpiar eventos previos
         const newBottomPlayer = bottomPlayer.cloneNode(true);
         bottomPlayer.parentNode.replaceChild(newBottomPlayer, bottomPlayer);
         
-        // ✅ CLICK EN INFO DEL PLAYER (título/artista)
-        const playerInfo = newBottomPlayer.querySelector('.player-info');
-        if (playerInfo) {
-            playerInfo.style.cursor = 'pointer';
-            playerInfo.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const hasVideo = this.state?.currentPlayingInfo?.videoId || 
-                                currentPlayingInfo?.videoId;
-                
-                if (hasVideo) {
-                    console.log('🎬 Click en título, abriendo vista completa');
-                    this.switchView('fullPlayer');
-                } else {
-                    this.showMessage('Selecciona una canción primero', 'info');
-                }
-            });
-        }
-        
-        // ✅ BOTONES DE CONTROL mantienen su funcionalidad
-        // No necesitan listener adicional, ya funcionan
-        
-        // ✅ ASEGURAR QUE SIEMPRE ESTÉ VISIBLE
-        newBottomPlayer.style.display = 'flex';
-        newBottomPlayer.style.visibility = 'visible';
-        newBottomPlayer.style.opacity = '1';
-    }
-    
-    // ✅ BOTÓN DE COLA
-    const queueBtn = document.getElementById('queueButton');
-    if (queueBtn) {
-        queueBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.switchView('fullPlayer');
+        // ✅ CLICK EN TODA LA BARRA (excepto botones)
+        newBottomPlayer.addEventListener('click', (e) => {
+            // Si el click fue en un botón o slider, no hacer nada
+            if (e.target.closest('button') || e.target.closest('.volume-slider') || e.target.closest('.player-controls')) {
+                return;
+            }
+            
+            const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
+            
+            if (hasVideo) {
+                console.log('🎬 Click en barra inferior, abriendo vista completa');
+                this.switchView('fullPlayer');
+            }
         });
+        
+        // Asegurar visibilidad
+        this.forceBottomPlayerVisible();
     }
-    
-    console.log('✅ Handlers configurados: click en título abre vista completa');
 }
 /**
  * Mostrar reproductor en vista completa
@@ -1010,90 +1057,64 @@ updateQueueCount(count) {
     // =============================================
     // GESTIÓN DE VISTAS
     // =============================================
-
 switchView(viewName) {
-    const validViews = ['home', 'search', 'library', 'fullPlayer', 'playing']; // Agregado 'playing' por si acaso
-    if (!validViews.includes(viewName)) {
-        console.warn(`⚠️ Vista inválida: ${viewName}`);
-        return;
-    }
+    const validViews = ['home', 'search', 'library', 'fullPlayer'];
+    if (!validViews.includes(viewName)) return;
 
     console.log(`🔄 Cambiando a vista: ${viewName}`);
 
-    // Actualizar navegación activa
+    // UI Updates (Navegación)
     document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
         item.classList.remove('active');
-        if(item.dataset.view === viewName) item.classList.add('active');
+        if (item.dataset.view === viewName) item.classList.add('active');
     });
 
-    // Ocultar todas las vistas
-    document.querySelectorAll('.content-view').forEach(view => {
-        view.classList.remove('active');
-    });
-
-    // Mostrar vista seleccionada
-    let targetView = document.getElementById(`${viewName}View`);
+    document.querySelectorAll('.content-view').forEach(view => view.classList.remove('active'));
+    const targetView = document.getElementById(`${viewName}View`);
     if (targetView) targetView.classList.add('active');
     
     this.currentView = viewName;
 
-    // GESTIÓN DE REPRODUCTORES
-    const fullPlayerView = document.getElementById('fullPlayerView');
+    // LÓGICA DE VIDEO PERSISTENTE
+    const hasActiveVideo = window.reproduccionIniciada;
     const miniPlayerFloat = document.getElementById('miniPlayerFloat');
     
-    // Verificar si hay algo reproduciéndose (usando la variable global robusta)
-    const hasActiveVideo = (window.reproduccionIniciada === true);
+    // Necesitamos asegurarnos que el contenedor "VideoWrapper" (el hueco en el diseño Full) tenga ID
+    const fullView = document.getElementById('fullPlayerView');
+    let videoWrapper = fullView.querySelector('.video-wrapper');
+    if(videoWrapper && !videoWrapper.id) videoWrapper.id = 'videoWrapper';
 
     if (viewName === 'fullPlayer') {
-        // --- MODO VISTA COMPLETA ---
-        console.log('🎬 Activando vista completa');
+        // VISTA COMPLETA
+        // 1. Ocultar mini player fantasma
+        if (miniPlayerFloat) miniPlayerFloat.classList.add('hidden');
         
-        // 1. Asegurar contenedor visible
-        if (fullPlayerView) fullPlayerView.classList.add('active');
+        // 2. Mover la capa persistente sobre el hueco del full player
+        // Usamos setTimeout para dar tiempo al navegador a renderizar el layout full
+        requestAnimationFrame(() => {
+            this.updatePlayerPosition('videoWrapper');
+        });
         
-        // 2. Mover reproductores AL GRANDE
-        this.movePlayersToFullView(); 
-        
-        // 3. Ocultar mini player
-        if (miniPlayerFloat) {
-            miniPlayerFloat.classList.add('hidden');
-            miniPlayerFloat.style.display = 'none';
-        }
-        
-        this.updatePersistentQueue();
-
     } else {
-        // --- MODO VISTA NORMAL (Home, Library, Search) ---
-        console.log(`📱 Activando vista normal: ${viewName}`);
-        
-        if (fullPlayerView) fullPlayerView.classList.remove('active');
-        
+        // VISTA MINI
         if (hasActiveVideo) {
-            console.log('📱 Reproducción activa, moviendo a Mini Player...');
-            
-            // 1. Mostrar contenedor mini
+            // 1. Mostrar el mini player "fantasma" (placeholder)
             if (miniPlayerFloat) {
                 miniPlayerFloat.classList.remove('hidden');
                 miniPlayerFloat.style.display = 'block';
             }
             
-            // 2. MOVER FISICAMENTE LOS REPRODUCTORES (¡ESTO FALTABA!)
-            this.movePlayersToMini();
-            
+            // 2. Mover la capa persistente sobre el mini player
+            requestAnimationFrame(() => {
+                this.updatePlayerPosition('miniPlayerFloat');
+            });
         } else {
-            if (miniPlayerFloat) {
-                miniPlayerFloat.classList.add('hidden');
-                miniPlayerFloat.style.display = 'none';
-            }
+            // Ocultar todo
+            if (miniPlayerFloat) miniPlayerFloat.classList.add('hidden');
+            const layer = document.getElementById('persistent-player-layer');
+            if (layer) layer.style.opacity = '0';
         }
     }
-
-    // Acciones específicas por vista
-    if (viewName === 'library') this.refreshLibraryView();
-    if (viewName === 'search') this.focusSearchInput();
-
-    // SIEMPRE FORZAR BOTTOM PLAYER VISIBLE
-    this.forceBottomPlayerVisible();
 }
 movePlayersToFullView() {
     console.log('🎬 Moviendo reproductores a vista completa (SIN interrupción)');
