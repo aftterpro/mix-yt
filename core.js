@@ -1296,82 +1296,53 @@ showMiniPlayerFloat() {
 movePlayersToMini() {
     console.log('🎬 Moviendo reproductores a mini (FORZADO FINAL)');
     
-    // 1. Obtener elementos
     const player1 = document.getElementById('player1');
     const player2 = document.getElementById('player2');
     const miniFloat = document.getElementById('miniPlayerFloat');
     const miniContainer1 = document.getElementById('miniPlayer1Container');
     const miniContainer2 = document.getElementById('miniPlayer2Container');
     
-    // ✅ VALIDACIÓN: Verificar que existen los elementos
-    if (!miniFloat || !miniContainer1 || !miniContainer2) {
-        console.error('❌ Contenedores del mini player no encontrados');
+    if (!miniFloat || !miniContainer1 || !miniContainer2 || !player1 || !player2) {
         return;
     }
     
-    if (!player1 || !player2) {
-        console.error('❌ Reproductores no encontrados');
-        return;
-    }
-    
-    // 2. FORZAR VISIBILIDAD DEL CONTENEDOR PRINCIPAL
+    // 1. Mostrar contenedor principal
     miniFloat.classList.remove('hidden');
-    miniFloat.style.cssText = `
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 999998 !important;
-        bottom: 110px !important;
-        right: 20px !important;
-        position: fixed !important;
-    `;
-
-    // 3. FORZAR VISIBILIDAD DE CONTENEDORES INTERNOS
-    miniContainer1.style.display = 'block';
-    miniContainer1.style.visibility = 'visible';
-    miniContainer2.style.display = 'block';
-    miniContainer2.style.visibility = 'visible';
+    miniFloat.style.display = 'block';
     
-    // 4. MOVER ELEMENTOS (Solo si no están ya ahí)
-    if (!miniContainer1.contains(player1)) {
-        miniContainer1.appendChild(player1);
-    }
-    if (!miniContainer2.contains(player2)) {
-        miniContainer2.appendChild(player2);
-    }
+    // 2. Mover elementos si no están ahí
+    if (!miniContainer1.contains(player1)) miniContainer1.appendChild(player1);
+    if (!miniContainer2.contains(player2)) miniContainer2.appendChild(player2);
     
-    // 5. APLICAR ESTILOS A LOS REPRODUCTORES (IFRAMES)
+    // 3. IDENTIFICAR JUGADOR ACTIVO
+    const activePlayerNum = window.currentPlayer;
+    
     [player1, player2].forEach((player, index) => {
-        if (player) {
-            const isActive = window.currentPlayer === (index + 1);
-            
-            // Limpiar clases
-            player.className = 'video-player';
-            
-            if (isActive) {
-                // ESTILOS ACTIVOS
-                player.style.cssText = `
-                    width: 100% !important;
-                    height: 100% !important;
-                    position: absolute !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    display: block !important;
-                    visibility: visible !important;
-                    opacity: 1 !important;
-                    z-index: 10 !important;
-                    background: #000 !important;
-                `;
-                player.classList.remove('hidden');
-            } else {
-                // ESTILOS INACTIVOS (Oculto pero presente)
-                player.style.cssText = `
-                    display: none !important;
-                    opacity: 0 !important;
-                    z-index: 0 !important;
-                `;
-                player.classList.add('hidden');
-            }
+        const isPlayer1 = index === 0;
+        const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
+        
+        // Limpiar clases de transición que puedan estar ocultándolo
+        player.classList.remove('fade-out', 'hidden', 'crossfade-exit');
+        
+        if (isActive) {
+            player.classList.add('fade-in');
+            // FORZAR ESTILOS VISIBLES
+            player.style.cssText = `
+                width: 100% !important;
+                height: 100% !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 10 !important;
+                background: #000 !important;
+            `;
+        } else {
+            // El inactivo se oculta
+            player.style.display = 'none';
+            player.style.opacity = '0';
         }
     });
     
@@ -1502,11 +1473,19 @@ handleNext() {
         return;
     }
 
-    // 3. Obtener índice actual
-    let currentIndex = this.state.currentPlayingInfo.flattenedIndex;
+    // --- CORRECCIÓN DEL ERROR ---
+    // Usamos window.currentPlayingInfo como fuente de verdad y aseguramos un valor por defecto
+    const currentInfo = window.currentPlayingInfo || { flattenedIndex: -1 };
+    let currentIndex = currentInfo.flattenedIndex;
     
-    // LOGICA CORREGIDA: Si no hay reproducción activa (-1), reproducir el primero
-    if (currentIndex === -1 || currentIndex === undefined) {
+    // Si es undefined o null, lo tratamos como -1
+    if (currentIndex === undefined || currentIndex === null) {
+        currentIndex = -1;
+    }
+    // -----------------------------
+
+    // LOGICA CORREGIDA: Si no hay reproducción activa, reproducir el primero
+    if (currentIndex === -1) {
         console.log('⏭️ Estado detenido, reproduciendo primer video de la cola');
         this.playVideoAtIndex(0);
         return;
@@ -1518,8 +1497,6 @@ handleNext() {
     // 5. Verificar fin de lista
     if (nextIndex >= flatList.length) {
         console.log('End of playlist reached');
-        // Opcional: Volver al inicio
-        // nextIndex = 0; 
         this.showMessage("Fin de la lista de reproducción", 'info');
         return;
     }
