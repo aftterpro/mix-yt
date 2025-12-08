@@ -964,16 +964,18 @@ findRelatedVideoData(itemElement) {
         this.setupLyricsProviderButton();
 
         try {
+
         // ==========================================
         // PREPARACIÓN DE DATOS (CORREGIDO)
         // ==========================================
         let artist = '';
         let rawTitle = currentVideo.title;
 
-        // 1. Intentar obtener Artista
+        // ... (lógica de obtención de artista igual que antes) ...
         if (currentVideo.artist && currentVideo.artist !== 'Desconocido' && currentVideo.artist !== 'YouTube') {
             artist = currentVideo.artist;
         } else {
+            // ... (lógica de extracción fallback) ...
             const separatorMatch = rawTitle.match(/^(.+?)\s*[-–:]\s*(.+?)$/);
             if (separatorMatch) {
                 artist = separatorMatch[1].trim();
@@ -983,11 +985,14 @@ findRelatedVideoData(itemElement) {
             }
         }
 
-        // ✅ CORRECCIÓN CLAVE: Eliminar " - Topic", "VEVO", "Official"
+        // ✅ LIMPIEZA DE ARTISTA (Emojis y palabras clave)
+        const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
+        artist = artist.replace(emojiRegex, ''); // Quitar emojis del artista
+        
         artist = artist
-            .replace(/\s*-\s*Topic$/i, '') // Elimina " - Topic" al final
-            .replace(/\s*VEVO$/i, '')       // Elimina "VEVO"
-            .replace(/\s*Official$/i, '')   // Elimina "Official"
+            .replace(/\s*-\s*Topic$/i, '')
+            .replace(/\s*VEVO$/i, '')
+            .replace(/\s*Official$/i, '')
             .trim();
             // ==========================================
             // LÓGICA DE BÚSQUEDA (INTENTO 1 vs INTENTO 2)
@@ -1135,48 +1140,48 @@ findRelatedVideoData(itemElement) {
     }
 /**
  * ✅ NUEVA FUNCIÓN OPTIMIZADA DE LIMPIEZA PROFUNDA
- * Elimina RMX, BPM, Remix, Live, ft., paréntesis técnicos, etc.
+ * Elimina RMX, BPM, Emojis, ft., paréntesis técnicos, etc.
  */
 cleanTrackTitle(title) {
     if (!title) return '';
     
     let clean = title;
 
-    // 1. Eliminar colaboraciones "ft.", "feat.", "featuring", "vs.", "x", "with" y lo que sigue
+    // 1. ELIMINAR EMOJIS (Rango Unicode completo)
+    // Esto elimina 🔊, 🔥, 🎵, etc.
+    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
+    clean = clean.replace(emojiRegex, '');
+
+    // 2. Eliminar colaboraciones "ft.", "feat.", "featuring", "vs.", "x", "with" y lo que sigue
     clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with)\s.*/i, '');
     
-    // 2. Eliminar "Prod. by" y lo que sigue
+    // 3. Eliminar "Prod. by" y lo que sigue
     clean = clean.replace(/\s(prod\.|produced by)\s.*/i, '');
 
-    // 3. Eliminar texto entre paréntesis/corchetes que contenga palabras clave de "ruido"
-    // LISTA AMPLIADA: bpm, rmx, remix, mix, edit, mashup, cover, etc.
+    // 4. Eliminar texto entre paréntesis/corchetes que contenga palabras clave de "ruido"
     const noiseKeywords = [
         'video', 'oficial', 'official', 'audio', 'lyric', 'visualizer',
         'hd', 'hq', '4k', '8k', 'live', 'vivo', 'version', 'remaster',
         'extended', 'radio', 'original', 'cover', 'acoustic', 'instrumental',
-        'karaoke', 'bpm', 'remix', 'rmx', 'mix', 'edit', 'mashup', 'bootleg'
+        'karaoke', 'bpm', 'remix', 'rmx', 'mix', 'edit', 'mashup', 'bootleg',
+        'dj', 'set'
     ].join('|');
 
-    // Regex: Busca ( o [ + cualquier cosa + palabra clave + cualquier cosa + ) o ]
-    // Ejemplo: Elimina "(115 Bpm)" porque contiene "Bpm"
     const bracketPattern = new RegExp(`[\(\\[](?:[^)\\]]*?)(?:${noiseKeywords})(?:[^)\\]]*?)[\)\\]]?`, 'gi');
     clean = clean.replace(bracketPattern, '');
 
-    // 4. Eliminar sufijos sueltos SIN paréntesis al final del título
-    // Ejemplo: "Cancion RMX" -> "Cancion"
-    const suffixPattern = /\s(-)?\s*(RMX|Remix|Mix|Live|Edit|Mashup|Remastered|Bpm|Bootleg)\b/gi;
+    // 5. Eliminar sufijos sueltos SIN paréntesis
+    const suffixPattern = /\s(-)?\s*(RMX|Remix|Mix|Live|Edit|Mashup|Remastered|Bpm|Bootleg|HD|HQ)\b/gi;
     clean = clean.replace(suffixPattern, '');
 
-    // 5. Eliminar cosas como "| Official Video" (usando pipe)
+    // 6. Eliminar cosas como "| Official Video" o "- Video"
     clean = clean.split('|')[0]; 
     
-    // 6. Eliminar paréntesis vacíos "()" o "[]" que hayan quedado
-    clean = clean.replace(/\(\s*\)|\[\s*\]/g, '');
-
     // 7. Limpieza cosmética final
-    clean = clean.replace(/["“”]/g, ''); // Quitar comillas
-    clean = clean.replace(/\s+/g, ' ');   // Quitar espacios dobles
-    clean = clean.replace(/[-:]\s*$/, ''); // Quitar guiones o dos puntos al final si quedaron
+    clean = clean.replace(/\(\s*\)|\[\s*\]/g, ''); // Paréntesis vacíos
+    clean = clean.replace(/["“”]/g, ''); // Comillas
+    clean = clean.replace(/\s+/g, ' ');   // Espacios dobles
+    clean = clean.replace(/[-:]\s*$/, ''); // Guiones al final
 
     return clean.trim();
 }
