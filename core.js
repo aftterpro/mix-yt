@@ -1943,7 +1943,7 @@ async performSearchFallback(query, nextPage) {
         }
     }
 }
-    function parseDurationToSeconds(durationStr) {
+    parseDurationToSeconds(durationStr) {
     if (!durationStr) return 0;
     
     const parts = durationStr.split(':').map(Number);
