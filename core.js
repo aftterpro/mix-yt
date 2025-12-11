@@ -2013,6 +2013,8 @@ async performSearchFallback(query, nextPage) {
 }
 displaySearchResults(data) {
     console.log('📊 displaySearchResults, log netlify con', data);
+    
+    // 🛠️ CORRECCIÓN DE ID: Usar 'searchResults' según el HTML
     const resultsContainer = document.getElementById('searchResults'); 
 
     // Verificación de seguridad
@@ -2031,7 +2033,7 @@ displaySearchResults(data) {
 
     data.items.forEach(video => {
         // --- PROCESAMIENTO DE DURACIÓN ---
-        // 🛠️ CORRECCIÓN CLAVE: AGREGAR 'this.'
+        // 🛠️ CORRECCIÓN: Usar 'this.' para llamar al método de la clase
         const segundos = this.parseDurationToSeconds(video.duration); 
 
         // CREACIÓN DEL ELEMENTO HTML
@@ -2041,11 +2043,9 @@ displaySearchResults(data) {
         // ATRIBUTOS DE DATOS
         trackDiv.dataset.videoId = video.videoId;
         trackDiv.dataset.durationText = video.duration; 
-        trackDiv.dataset.durationSeconds = segundos;     // <--- DURACIÓN NUMÉRICA CORREGIDA
-        
-        // El resto del código de displaySearchResults sigue igual...
-        
-        // ESTRUCTURA INTERNA (Ajusta esto a tu estilo real de 'card-track')
+        trackDiv.dataset.durationSeconds = segundos;     // <-- Dato numérico para el reproductor
+
+        // ESTRUCTURA INTERNA
         trackDiv.innerHTML = `
             <img src="${video.thumbnail}" alt="${video.title}" class="track-thumbnail">
             <div class="track-details">
@@ -2053,14 +2053,42 @@ displaySearchResults(data) {
                 <p class="track-artist">${video.artist}</p>
                 <span class="track-duration">${video.duration}</span>
             </div>
-            <button class="add-to-queue-btn" title="Añadir a la cola"><i class="fas fa-plus"></i></button>
+            <button class="add-to-queue-btn" title="Añadir a la cola" data-video-id="${video.videoId}">
+              <i class="fas fa-plus"></i>
+            </button>
         `;
         
-        // --- EVENTO CLICK (REPRODUCIR) ---
+        // --- 🛠️ CORRECCIÓN DE LÓGICA 1: Listener para el Botón de Añadir a Cola ---
+        const addButton = trackDiv.querySelector('.add-to-queue-btn');
+        if (addButton) {
+            addButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation(); // CRÍTICO: Evita que el clic se propague al trackDiv principal
+
+                const videoId = addButton.dataset.videoId;
+                
+                const videoData = {
+                    videoId: videoId,
+                    title: video.title,
+                    thumbnail: video.thumbnail,
+                    duration: segundos, // Usamos los segundos calculados
+                    uploaderName: video.uploaderName,
+                    artist: video.artist
+                };
+                
+                // Llama a la función de añadir a la cola
+                if (window.unifiedCore && typeof window.unifiedCore.addVideoToQueue === 'function') {
+                     window.unifiedCore.addVideoToQueue(videoData); 
+                } else {
+                     console.error('❌ addVideoToQueue no definido en unifiedCore');
+                }
+            });
+        }
+        
+        // --- 🛠️ CORRECCIÓN DE LÓGICA 2: Listener de Reproducción (Clic en el DIV principal) ---
         trackDiv.addEventListener('click', function(e) {
-            // Prevenir que el clic en el botón '+' dispare la reproducción (si existe)
+            // Ya verificamos que no fue un clic en el botón '+'
             if (e.target.closest('.add-to-queue-btn')) {
-                // Aquí iría tu lógica de añadir a la cola
                 return;
             }
 
@@ -2072,10 +2100,17 @@ displaySearchResults(data) {
 
             // LLAMADA A TU FUNCIÓN DE REPRODUCCIÓN
             if (window.unifiedCore && typeof window.unifiedCore.playTrack === 'function') {
+                // Aquí debes pasar la duración para inicializar la barra de progreso
                 window.unifiedCore.playTrack(videoId, durationInSeconds); 
             } else {
-                // Si tienes otra función global para el reproductor, úsala aquí
-                // Ej: window.player.loadVideo(videoId, durationInSeconds);
+                // Si la función playTrack no existe, usamos playVideoAtIndex
+                if (window.unifiedCore && typeof window.unifiedCore.playVideoAtIndex === 'function') {
+                    // Nota: playVideoAtIndex necesita el índice, lo cual es más complejo aquí.
+                    // Si no usas índices, debes asegurarte de que playTrack maneje la carga.
+                    window.unifiedCore.playTrack(videoId, durationInSeconds); 
+                } else {
+                    console.error('❌ playTrack o playVideoAtIndex no definido en unifiedCore');
+                }
             }
         });
 
