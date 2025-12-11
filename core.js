@@ -2862,29 +2862,27 @@ playVideoAtIndex(index) {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES - CORREGIDAS
 // =============================================
-
 /**
  * Obtener segmentos SponsorBlock
  */
 async function obtenerSegmentosSponsorBlock(videoId) {
-    // Si ya hay segmentos en caché (es un array) o ya se está obteniendo ('fetching'), no hacer nada.
+    // Si ya hay segmentos en caché o se están obteniendo, salir
     if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) {
-         // console.log(`SB Fetch: Segmentos ya en caché o obteniendo para ${videoId}. Saliendo.`);
          return null; 
     }
 
-    // Si llegamos aquí, segmentosCache[videoId] es undefined.
-    // Marcar el estado como 'fetching' SINCRÓNICAMENTE ANTES de la llamada await fetch.
-    segmentosCache[videoId] = 'fetching';
-    console.log(`SB Fetch: Iniciando obtención para ${videoId}. Marcando estado 'fetching'.`);
+    // Usar tu ID de usuario fijo para SponsorBlock
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
 
-    // NOTA: Asegúrate de tener tu userId configurado o pasarlo como argumento
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // Tu userId del backup
-    const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-    console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
+    // 🛠️ 1. CORRECCIÓN DE URL ABSOLUTA Y SIMPLE (Opción B)
+    const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`; 
+    
+    // Marcar estado como 'fetching' ANTES del await
+    segmentosCache[videoId] = 'fetching';
+    console.log(`SB Fetch: Iniciando obtención para ${videoId}. Llamando a: ${apiUrl}`);
 
     try {
-        // Tu llamada fetch con el encabezado X-UserID
+        // 🛠️ 2. CORRECCIÓN DE ENCABEZADOS: Añadir X-UserID
         const response = await fetch(apiUrl, {
             headers: {
                 'X-UserID': userId 
@@ -2893,29 +2891,30 @@ async function obtenerSegmentosSponsorBlock(videoId) {
 
         if (!response.ok) {
              console.error(`SB Fetch: Error desde la API SB (${apiUrl}): ${response.status} ${response.statusText}`);
-             throw new Error(`API SB Error: ${response.status} ${response.statusText}`);
+             // La función de Netlify debería devolver 200 con [] incluso si falla, 
+             // pero esto atrapa fallos de red o errores de servidor (5xx).
+             throw new Error(`API SB Error: ${response.status}`);
         }
 
         const data = await response.json();
 
+        // 3. Validar si la respuesta es un array (la salida correcta)
         if (!Array.isArray(data)) {
-             console.warn(`SB Fetch: La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
-              throw new Error(`API SB Error: Respuesta no es un array`);
+             console.warn(`SB Fetch: La API SB (${apiUrl}) devolvió formato incorrecto (no es array).`, data);
+             // Asumimos array vacío si el formato es erróneo
+             return []; 
         }
 
-        console.log(`SB Fetch: Segmentos recibidos de API SB para ${videoId} (crudos): ${data.length}`);
+        console.log(`SB Fetch: Segmentos recibidos para ${videoId}: ${data.length}`);
 
-        // --- LÓGICA DE VALIDACIÓN ---
+        // --- Lógica de Validación y Filtrado (Mantener tu lógica actual) ---
         const validSegments = data.filter(segment => {
             if (!segment || typeof segment.startTime === 'undefined' || typeof segment.endTime === 'undefined') {
                 return false; 
             }
             const start = parseFloat(segment.startTime);
             const end = parseFloat(segment.endTime);
-
-            if (isNaN(start) || isNaN(end)) return false;
-            if (start < 0 || end < 0 || end < start) return false;
-
+            if (isNaN(start) || isNaN(end) || end < start) return false;
             return true;
         });
 
@@ -2924,8 +2923,8 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         return validSegments; 
 
     } catch (error) {
-        console.error(`SB Fetch: Error en fetch/procesamiento SB para ${apiUrl}:`, error);
-        segmentosCache[videoId] = null; // Devolver null para indicar el fallo
+        console.error(`SB Fetch: Error en fetch/procesamiento SB para ${videoId}:`, error);
+        segmentosCache[videoId] = null; // Marcar como fallido
         return null; 
     }
 }
