@@ -1,7 +1,6 @@
-const YouTube = require("youtube-sr").default;
+const youtubesearchapi = require("youtube-search-api");
 
 exports.handler = async function(event, context) {
-    // Headers CORS para permitir peticiones desde tu web
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -13,29 +12,29 @@ exports.handler = async function(event, context) {
     }
 
     try {
+        // Detectar si es una búsqueda nueva o "Cargar más" (nextpage)
+        let result;
         const q = event.queryStringParameters?.q;
-        
-        if (!q) {
-            return { statusCode: 400, headers, body: JSON.stringify({ error: "Falta el parámetro 'q'" }) };
+        const nextPageToken = event.queryStringParameters?.nextpage;
+
+        if (nextPageToken) {
+            // CARGAR MÁS RESULTADOS (Paginación)
+            // nextpage viene del frontend cuando haces scroll
+            result = await youtubesearchapi.NextPage(nextPageToken, true); 
+        } else {
+            // BÚSQUEDA NUEVA
+            // GetListByKeyword(query, playlistBool, limit)
+            result = await youtubesearchapi.GetListByKeyword(q, false, 20);
         }
 
-        // Buscamos 50 videos de una vez (SafeSearch desactivado para música)
-        // youtube-sr hace el scraping internamente
-        const videos = await YouTube.search(q, { 
-            limit: 50,
-            type: 'video',
-            safeSearch: false 
-        });
-
-        // Formateamos los datos para que tu frontend (core.js) los entienda
-        // Mapeamos a la estructura que espera tu app
-        const items = videos.map(v => ({
-            videoId: v.id,
-            title: v.title,
-            thumbnail: v.thumbnail?.url || v.thumbnail,
-            uploaderName: v.channel?.name || "Desconocido",
-            duration: v.duration / 1000, // youtube-sr devuelve ms, tu app suele usar segundos
-            url: v.url
+        // Formatear respuesta
+        const items = result.items.map(item => ({
+            videoId: item.id,
+            title: item.title,
+            thumbnail: item.thumbnail && item.thumbnail[0] ? item.thumbnail[0].url : '',
+            uploaderName: item.channelTitle,
+            duration: item.length?.simpleText || "0:00", // Esta librería devuelve texto ej "3:45"
+            isLive: item.isLive
         }));
 
         return {
@@ -43,18 +42,17 @@ exports.handler = async function(event, context) {
             headers,
             body: JSON.stringify({
                 items: items,
-                // youtube-sr no da token, así que enviamos null para que el frontend sepa que no hay "página 2" real
-                // Opcional: podrías implementar lógica para devolver "nextpage" simulado si guardaras esto en caché
-                nextpage: null 
+                // Enviamos el token para que el frontend pueda pedir la siguiente página
+                nextpage: result.nextPage?.nextPageToken || null 
             })
         };
 
     } catch (error) {
-        console.error("Error en búsqueda:", error);
+        console.error("Error:", error);
         return {
             statusCode: 500,
             headers,
-            body: JSON.stringify({ error: "Error interno en la búsqueda", details: error.message })
+            body: JSON.stringify({ error: error.message })
         };
     }
 };
