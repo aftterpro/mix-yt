@@ -26,6 +26,12 @@
   <script src="https://accounts.google.com/gsi/client" async defer onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
 
   <style>
+  #miniPlayerFloat,
+  .mini-player-video,
+  .mini-video-container {
+    background-color: transparent !important;
+    border: none !important; /* Asegúrate de que no haya bordes negros */
+    }
     .bottom-player {
       position: fixed !important;
       bottom: 0 !important;
