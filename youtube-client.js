@@ -104,6 +104,22 @@ class YouTubeSimplifiedClient {
             return null;
         }
     }
+    // Función para convertir "3:04" o "1:02:30" a segundos totales
+    function parseDurationToSeconds(durationStr) {
+    if (!durationStr) return 0;
+    
+    const parts = durationStr.split(':').map(Number);
+    
+    if (parts.length === 2) {
+        // Formato MM:SS (ej: 3:04)
+        return (parts[0] * 60) + parts[1];
+    } else if (parts.length === 3) {
+        // Formato HH:MM:SS (ej: 1:02:30)
+        return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    }
+    
+    return 0;
+}
 }
 
 // =============================================
