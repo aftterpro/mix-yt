@@ -2012,7 +2012,6 @@ async performSearchFallback(query, nextPage) {
     window.playlistManager.updateQueuePopup();
 }
 displaySearchResults(data) {
-    
     console.log('📊 displaySearchResults, log netlify con', data);
     const resultsContainer = document.getElementById('searchResults'); 
 
