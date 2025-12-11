@@ -1,14 +1,12 @@
 const youtubesearchapi = require("youtube-search-api");
 
 exports.handler = async function(event, context) {
-    // Headers para permitir que tu web acceda a la función
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     };
 
-    // Responder a pre-flight CORS
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
@@ -18,31 +16,37 @@ exports.handler = async function(event, context) {
         let nextPageData = event.queryStringParameters?.nextpage;
         let result;
 
-        // --- LÓGICA DE BÚSQUEDA ---
+        console.log(`🚀 Nueva petición. Query: "${q}", NextPage: ${!!nextPageData}`);
+
         if (nextPageData) {
             // -- PAGINACIÓN --
             let tokenObject;
             try {
-                // Intentar limpiar y parsear el token
                 if (typeof nextPageData === 'string' && nextPageData.startsWith('%')) {
                     nextPageData = decodeURIComponent(nextPageData);
                 }
                 tokenObject = JSON.parse(nextPageData);
             } catch (e) {
-                // Si no es JSON válido, intentar usarlo como string raw (fallback)
                 tokenObject = nextPageData;
             }
             
-            // Llamar a la librería con el token
+            console.log("📄 Cargando página siguiente...");
             result = await youtubesearchapi.NextPage(tokenObject, true);
+            
         } else {
             // -- BÚSQUEDA INICIAL --
-            // Pedir 25 resultados para intentar llenar la pantalla y evitar scroll loop
+            console.log(`🔍 Buscando "${q}"...`);
             result = await youtubesearchapi.GetListByKeyword(q, false, 25);
         }
 
-        // --- VALIDACIÓN DE RESPUESTA ---
-        // Si la librería falla o no devuelve nada, enviar array vacío (NO ERROR 500)
+        // --- 🔍 DEBUG: VER DATOS CRUDOS DE LA API ---
+        if (result && result.items && result.items.length > 0) {
+            console.log("📦 Primer item CRUDO recibido de la librería:", JSON.stringify(result.items[0], null, 2));
+        } else {
+            console.warn("⚠️ La librería devolvió 0 items o resultado nulo.");
+        }
+
+        // VALIDACIÓN
         if (!result || !result.items) {
              return {
                 statusCode: 200,
@@ -51,10 +55,14 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // --- MAPEO DE DATOS (Arreglo de Fotos, Duración y Artista) ---
-        const items = result.items.map(item => {
-            // 1. IMAGEN: Buscar en array o propiedad directa
-            let thumb = './electronic.ico'; // Fallback
+        // MAPEO DE DATOS
+        const items = result.items.map((item, index) => {
+            // LOGUEAR SI FALTA INFO CLAVE EN ALGUNOS ITEMS
+            if (!item.thumbnail && index < 3) console.log(`⚠️ Item ${index} sin thumbnail directo.`);
+            if (!item.length && index < 3) console.log(`⚠️ Item ${index} sin length (duración).`);
+
+            // 1. IMAGEN
+            let thumb = './electronic.ico';
             if (item.thumbnail) {
                 if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
                     thumb = item.thumbnail[0].url;
@@ -65,28 +73,29 @@ exports.handler = async function(event, context) {
                 }
             }
 
-            // 2. DURACIÓN: Buscar en simpleText o texto directo
+            // 2. DURACIÓN
             let dur = "0:00";
             if (item.length) {
                 if (item.length.simpleText) dur = item.length.simpleText;
                 else if (typeof item.length === 'string') dur = item.length;
             }
 
-            // 3. ARTISTA: Buscar en channelTitle o author
+            // 3. ARTISTA
             const author = item.channelTitle || item.author || "Autor Desconocido";
 
             return {
                 videoId: item.id,
                 title: item.title || "Sin título",
                 thumbnail: thumb,
-                artist: author,       // Campo explícito para core.js
-                uploaderName: author, // Campo de respaldo
+                artist: author,
+                uploaderName: author,
                 duration: dur,
                 isLive: item.isLive || false
             };
-        }).filter(item => item.videoId); // Eliminar si no tiene ID
+        }).filter(item => item.videoId);
 
-        // Serializar token para la próxima página
+        console.log(`✅ Procesados ${items.length} videos válidos.`);
+
         const nextTokenSerialized = result.nextPage ? JSON.stringify(result.nextPage) : null;
 
         return {
@@ -99,16 +108,14 @@ exports.handler = async function(event, context) {
         };
 
     } catch (error) {
-        console.error("Error controlado en search.js:", error);
-        // IMPORTANTE: Devolver 200 con array vacío en vez de 500
-        // Esto evita que el frontend muestre "SyntaxError" y rompa el scroll
+        console.error("❌ ERROR CRÍTICO EN SEARCH:", error);
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({ 
                 items: [], 
                 nextpage: null, 
-                error: "Sin resultados o error temporal" 
+                error: "Error interno: " + error.message 
             })
         };
     }
