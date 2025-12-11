@@ -4,7 +4,6 @@ console.log('Core cargando...');
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
 const CROSSFADE_DURATION = 10; // Duración del crossfade en segundos
-// ✅ CRÍTICO: Variables globales expuestas
 window.player1 = null;
 window.player2 = null;
 window.currentPlayer = 1;
@@ -2011,73 +2010,76 @@ async performSearchFallback(query, nextPage) {
     }
     
     window.playlistManager.updateQueuePopup();
-}  
+}
 displaySearchResults(data) {
     console.log('📊 displaySearchResults, log netlify con', data);
+    const resultsContainer = document.getElementById('searchResults'); 
 
-    const resultsContainer = document.getElementById('results-container'); // O el ID de tu contenedor
-    resultsContainer.innerHTML = ''; // Limpiar resultados anteriores
+    // Verificación de seguridad
+    if (!resultsContainer) {
+        console.error("❌ ERROR: No se encontró el elemento HTML con ID 'searchResults'.");
+        return; 
+    }
     
+    // Limpiamos y eliminamos el placeholder
+    resultsContainer.innerHTML = ''; 
+
     if (!data.items || data.items.length === 0) {
-        resultsContainer.innerHTML = '<p>No se encontraron videos.</p>';
+        resultsContainer.innerHTML = '<div class="search-placeholder"><i class="fas fa-search"></i><p>No se encontraron videos.</p></div>';
         return;
     }
 
     data.items.forEach(video => {
-        // --- 1. PROCESAMIENTO DE DURACIÓN ---
+        // --- PROCESAMIENTO DE DURACIÓN ---
         const segundos = parseDurationToSeconds(video.duration); 
 
-        // 2. CREACIÓN DEL ELEMENTO HTML (Aquí necesitas tu estructura exacta)
+        // CREACIÓN DEL ELEMENTO HTML
         const trackDiv = document.createElement('div');
-        trackDiv.className = 'track-item'; // Asegúrate que esta es la clase de tus resultados
+        trackDiv.className = 'track-item card-track'; 
 
-        // 3. ATRIBUTOS DE DATOS (DATASET)
-        // Guardamos el videoId y la duración en segundos para el reproductor
+        // ATRIBUTOS DE DATOS
         trackDiv.dataset.videoId = video.videoId;
-        trackDiv.dataset.durationText = video.duration; // Texto "3:04"
-        trackDiv.dataset.durationSeconds = segundos;     // Número 184 (CLAVE para la duración)
+        trackDiv.dataset.durationText = video.duration; 
+        trackDiv.dataset.durationSeconds = segundos;     // <--- DURACIÓN NUMÉRICA CORREGIDA
 
-        // 4. ESTRUCTURA INTERNA
-        // *************************************************************
-        // Reemplaza el contenido de abajo con tu estructura HTML real
-        // *************************************************************
+        // ESTRUCTURA INTERNA (Ajusta esto a tu estilo real de 'card-track')
         trackDiv.innerHTML = `
             <img src="${video.thumbnail}" alt="${video.title}" class="track-thumbnail">
             <div class="track-details">
                 <p class="track-title">${video.title}</p>
                 <p class="track-artist">${video.artist}</p>
-                <p class="track-duration">${video.duration}</p> 
+                <span class="track-duration">${video.duration}</span>
             </div>
-            `;
+            <button class="add-to-queue-btn" title="Añadir a la cola"><i class="fas fa-plus"></i></button>
+        `;
         
-        // --- 5. EVENTO CLICK (DONDE DAS PLAY) ---
-        trackDiv.addEventListener('click', function() {
-            // Obtenemos los datos del dataset del elemento clickeado
-            const videoId = this.dataset.videoId;
-            const durationInSeconds = parseInt(this.dataset.durationSeconds); // Recogemos el número
+        // --- EVENTO CLICK (REPRODUCIR) ---
+        trackDiv.addEventListener('click', function(e) {
+            // Prevenir que el clic en el botón '+' dispare la reproducción (si existe)
+            if (e.target.closest('.add-to-queue-btn')) {
+                // Aquí iría tu lógica de añadir a la cola
+                return;
+            }
 
-            // Verifica en consola (opcional)
+            const videoId = this.dataset.videoId;
+            // Obtenemos el número entero de segundos
+            const durationInSeconds = parseInt(this.dataset.durationSeconds); 
+
             console.log(`▶️ Reproduciendo video ID: ${videoId} con duración: ${durationInSeconds}s`);
 
-            // LLAMA A TU FUNCIÓN DE REPRODUCCIÓN AQUÍ
-            // Asegúrate de pasarle la duración en segundos al reproductor
-            // EL NOMBRE DE TU FUNCIÓN DE REPRODUCCIÓN PUEDE SER DIFERENTE
-            // Por ejemplo:
-            // player.loadVideo(videoId, durationInSeconds);
-            // setTrackDuration(durationInSeconds); 
-            
-            // --- Reemplaza esta línea con tu llamada real ---
-            handlePlayTrack(videoId, durationInSeconds); // <--- Usa el nombre real de tu función
-            // ------------------------------------------------
-            
+            // LLAMADA A TU FUNCIÓN DE REPRODUCCIÓN
+            if (window.unifiedCore && typeof window.unifiedCore.playTrack === 'function') {
+                window.unifiedCore.playTrack(videoId, durationInSeconds); 
+            } else {
+                // Si tienes otra función global para el reproductor, úsala aquí
+                // Ej: window.player.loadVideo(videoId, durationInSeconds);
+            }
         });
 
         // Añadir el elemento al contenedor
         resultsContainer.appendChild(trackDiv);
     });
-
-    // Manejo de paginación si aplica...
-}       
+}
 
 setupImprovedInfiniteScroll(searchResults) {
     if (!nextPageContext) {
@@ -2170,14 +2172,6 @@ createSearchResultCard(video, videoId) {
         emptyCard.style.display = 'none';
         return emptyCard;
     }
-
-    console.log('🎵 Creando card para:', {
-        videoId,
-        title: video.title?.substring(0, 30),
-        artist: video.artist,
-        backendProcessed: !!video.artist
-    });
-
     const card = document.createElement('div');
     card.className = 'search-result-card';
     card.dataset.videoId = videoId;
