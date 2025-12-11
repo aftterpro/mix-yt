@@ -16,107 +16,94 @@ exports.handler = async function(event, context) {
         let nextPageData = event.queryStringParameters?.nextpage;
         let result;
 
-        console.log(`🚀 Nueva petición. Query: "${q}", NextPage: ${!!nextPageData}`);
+        console.log(`🚀 [NETLIFY] Nueva petición. Query: "${q}"`);
 
         if (nextPageData) {
-            // -- PAGINACIÓN --
-            let tokenObject;
+            console.log("📄 [NETLIFY] Paginación solicitada");
+            // Intentar parsear el token
             try {
                 if (typeof nextPageData === 'string' && nextPageData.startsWith('%')) {
                     nextPageData = decodeURIComponent(nextPageData);
                 }
-                tokenObject = JSON.parse(nextPageData);
+                const tokenObject = JSON.parse(nextPageData);
+                result = await youtubesearchapi.NextPage(tokenObject, true);
             } catch (e) {
-                tokenObject = nextPageData;
+                console.warn("⚠️ Error parseando token, usando raw:", e.message);
+                result = await youtubesearchapi.NextPage(nextPageData, true);
             }
-            
-            console.log("📄 Cargando página siguiente...");
-            result = await youtubesearchapi.NextPage(tokenObject, true);
-            
         } else {
-            // -- BÚSQUEDA INICIAL --
-            console.log(`🔍 Buscando "${q}"...`);
+            console.log("🔍 [NETLIFY] Búsqueda inicial");
             result = await youtubesearchapi.GetListByKeyword(q, false, 25);
         }
 
-        // --- 🔍 DEBUG: VER DATOS CRUDOS DE LA API ---
+        // --- 🔍 DEBUG: IMPRIMIR EL PRIMER ITEM CRUDO ---
+        // Esto aparecerá en tus logs de Netlify. Busca "ITEM_CRUDO"
         if (result && result.items && result.items.length > 0) {
-            console.log("📦 Primer item CRUDO recibido de la librería:", JSON.stringify(result.items[0], null, 2));
+            console.log("📦 [ITEM_CRUDO_0]:", JSON.stringify(result.items[0], null, 2));
         } else {
-            console.warn("⚠️ La librería devolvió 0 items o resultado nulo.");
-        }
-
-        // VALIDACIÓN
-        if (!result || !result.items) {
-             return {
+            console.log("⚠️ [NETLIFY] La librería devolvió 0 items.");
+            return {
                 statusCode: 200,
                 headers,
                 body: JSON.stringify({ items: [], nextpage: null })
             };
         }
 
-        // MAPEO DE DATOS
+        // Procesamiento de datos
         const items = result.items.map((item, index) => {
-            // LOGUEAR SI FALTA INFO CLAVE EN ALGUNOS ITEMS
-            if (!item.thumbnail && index < 3) console.log(`⚠️ Item ${index} sin thumbnail directo.`);
-            if (!item.length && index < 3) console.log(`⚠️ Item ${index} sin length (duración).`);
+            // Loguear problemas en los primeros 3 items
+            if (index < 3) {
+                if (!item.thumbnail) console.log(`⚠️ Item ${index} NO tiene propiedad 'thumbnail'`);
+                if (!item.length) console.log(`⚠️ Item ${index} NO tiene propiedad 'length' (duración)`);
+            }
 
-            // 1. IMAGEN
+            // 1. EXTRACTOR DE IMAGEN (Inteligente)
             let thumb = './electronic.ico';
             if (item.thumbnail) {
                 if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
-                    thumb = item.thumbnail[0].url;
+                    thumb = item.thumbnail[0].url; // Caso común
                 } else if (item.thumbnail.thumbnails && Array.isArray(item.thumbnail.thumbnails)) {
-                    thumb = item.thumbnail.thumbnails[0].url;
+                    thumb = item.thumbnail.thumbnails[0].url; // Caso anidado
                 } else if (typeof item.thumbnail === 'string') {
-                    thumb = item.thumbnail;
+                    thumb = item.thumbnail; // Caso string directo
                 }
             }
 
-            // 2. DURACIÓN
+            // 2. EXTRACTOR DE DURACIÓN
             let dur = "0:00";
             if (item.length) {
-                if (item.length.simpleText) dur = item.length.simpleText;
+                if (item.length.simpleText) dur = item.length.simpleText; // Caso común: "3:45"
                 else if (typeof item.length === 'string') dur = item.length;
             }
-
-            // 3. ARTISTA
-            const author = item.channelTitle || item.author || "Autor Desconocido";
 
             return {
                 videoId: item.id,
                 title: item.title || "Sin título",
                 thumbnail: thumb,
-                artist: author,
-                uploaderName: author,
+                artist: item.channelTitle || item.author || "Desconocido",
+                uploaderName: item.channelTitle || "Desconocido",
                 duration: dur,
                 isLive: item.isLive || false
             };
-        }).filter(item => item.videoId);
+        }).filter(i => i.videoId);
 
-        console.log(`✅ Procesados ${items.length} videos válidos.`);
-
-        const nextTokenSerialized = result.nextPage ? JSON.stringify(result.nextPage) : null;
+        console.log(`✅ [NETLIFY] Respondiendo con ${items.length} videos procesados.`);
 
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 items: items,
-                nextpage: nextTokenSerialized
+                nextpage: result.nextPage ? JSON.stringify(result.nextPage) : null
             })
         };
 
     } catch (error) {
-        console.error("❌ ERROR CRÍTICO EN SEARCH:", error);
+        console.error("❌ [ERROR FATAL]:", error);
         return {
-            statusCode: 200,
+            statusCode: 200, // No devolver 500 para evitar que el frontend explote
             headers,
-            body: JSON.stringify({ 
-                items: [], 
-                nextpage: null, 
-                error: "Error interno: " + error.message 
-            })
+            body: JSON.stringify({ items: [], nextpage: null, error: error.message })
         };
     }
 };
