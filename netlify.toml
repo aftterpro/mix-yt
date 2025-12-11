@@ -20,3 +20,8 @@
   from = "/.netlify/functions/cors-proxy/*"
   to = "/.netlify/functions/cors-proxy/:splat"
   status = 200
+# Nueva regla para SponsorBlock (segments)
+[[redirects]]
+  from = "/api/segments/*"
+  to = "/.netlify/functions/sponsorblock/api/segments/:splat"
+  status = 200
