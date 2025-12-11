@@ -1854,6 +1854,7 @@ startCrossfade(prevPlayer, nextPlayer) {
     // =============================================
     // BÚSQUEDA
     // =============================================
+    
 async performSearch(query, continuation = null) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
@@ -1942,6 +1943,19 @@ async performSearchFallback(query, nextPage) {
         }
     }
 }
+    function parseDurationToSeconds(durationStr) {
+    if (!durationStr) return 0;
+    
+    const parts = durationStr.split(':').map(Number);
+    
+    if (parts.length === 2) {
+        return (parts[0] * 60) + parts[1];
+    } else if (parts.length === 3) {
+        return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    }
+    
+    return 0;
+}
     // =============================================
 // DELEGACIÓN A PLAYLIST MANAGER
 // ==
@@ -1998,138 +2012,72 @@ async performSearchFallback(query, nextPage) {
     
     window.playlistManager.updateQueuePopup();
 }  
-// Asegurar que displaySearchResults tenga scroll infinito:
-displaySearchResults(results, append = false) {
-    const searchResults = document.getElementById('searchResults');
-    if (!searchResults) {
-        console.error('❌ Elemento searchResults no encontrado');
+function displaySearchResults(data) {
+    console.log('📊 displaySearchResults, log netlify con', data);
+
+    const resultsContainer = document.getElementById('results-container'); // O el ID de tu contenedor
+    resultsContainer.innerHTML = ''; // Limpiar resultados anteriores
+    
+    if (!data.items || data.items.length === 0) {
+        resultsContainer.innerHTML = '<p>No se encontraron videos.</p>';
         return;
     }
 
-    console.log('📊 displaySearchResults:', {
-        itemsReceived: results?.items?.length || 0,
-        append: append,
-        hasNextPage: !!results?.nextpage,
-        firstItem: results?.items?.[0]
-    });
+    data.items.forEach(video => {
+        // --- 1. PROCESAMIENTO DE DURACIÓN ---
+        const segundos = parseDurationToSeconds(video.duration); 
 
-    // Limpieza inicial
-    if (!append) {
-        currentSearchQuery = results.query || currentSearchQuery;
-        searchResults.innerHTML = '';
-        
-        if (this.scrollObserver) {
-            this.scrollObserver.disconnect();
-            this.scrollObserver = null;
-        }
-    }
+        // 2. CREACIÓN DEL ELEMENTO HTML (Aquí necesitas tu estructura exacta)
+        const trackDiv = document.createElement('div');
+        trackDiv.className = 'track-item'; // Asegúrate que esta es la clase de tus resultados
 
-    // Manejar resultados vacíos
-    if (!results?.items?.length) {
-        if (!append) {
-            searchResults.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>No se encontraron resultados para "${currentSearchQuery}"</p>
-                    <p><small>Intenta con otros términos de búsqueda</small></p>
-                </div>
+        // 3. ATRIBUTOS DE DATOS (DATASET)
+        // Guardamos el videoId y la duración en segundos para el reproductor
+        trackDiv.dataset.videoId = video.videoId;
+        trackDiv.dataset.durationText = video.duration; // Texto "3:04"
+        trackDiv.dataset.durationSeconds = segundos;     // Número 184 (CLAVE para la duración)
+
+        // 4. ESTRUCTURA INTERNA
+        // *************************************************************
+        // Reemplaza el contenido de abajo con tu estructura HTML real
+        // *************************************************************
+        trackDiv.innerHTML = `
+            <img src="${video.thumbnail}" alt="${video.title}" class="track-thumbnail">
+            <div class="track-details">
+                <p class="track-title">${video.title}</p>
+                <p class="track-artist">${video.artist}</p>
+                <p class="track-duration">${video.duration}</p> 
+            </div>
             `;
-        }
-        return;
-    }
-
-    // Actualizar nextPage
-    if (results.nextpage) {
-        nextPageContext = results.nextpage;
-        console.log('📄 NextPage actualizado');
-    } else {
-        nextPageContext = null;
-        console.log('📄 No hay más páginas');
-    }
-
-    // Crear/obtener grid
-    let grid = searchResults.querySelector('.search-results-grid');
-    if (!grid) {
-        grid = this.createSearchGrid();
-        searchResults.appendChild(grid);
-    }
-
-    // CORRECCIÓN: No filtrar en primera carga, solo en paginación
-    let videoItems = results.items;
-    
-    if (append) {
-        // Solo filtrar duplicados en paginación
-        videoItems = results.items.filter(video => {
-            const videoId = video.videoId;
-            if (!videoId) return false;
-            return !grid.querySelector(`[data-video-id="${videoId}"]`);
-        });
-    }
-
-    console.log(`📊 Videos a renderizar: ${videoItems.length} de ${results.items.length}`);
-
-    if (videoItems.length === 0 && append) {
-        console.log('🚫 No hay videos nuevos para agregar');
-        return;
-    }
-
-    // Renderizar videos
-    const fragment = document.createDocumentFragment();
-    let renderedCount = 0;
-    
-    videoItems.forEach((video, index) => {
-        // VALIDACIÓN CRÍTICA antes de crear card
-        if (!video.videoId) {
-            console.warn(`❌ Video ${index} sin videoId, saltando:`, {
-                title: video.title?.substring(0, 30),
-                videoId: video.videoId
-            });
-            return;
-        }
-
-        try {
-            const card = this.createSearchResultCard(video, video.videoId);
-            if (card && card.children.length > 0) { // Verificar que la card se creó correctamente
-                fragment.appendChild(card);
-                renderedCount++;
-            }
-        } catch (error) {
-            console.error(`❌ Error creando card para video ${index}:`, error);
-        }
-    });
-    
-    console.log(`✅ Cards creadas: ${renderedCount}`);
-    
-    if (renderedCount > 0) {
-        grid.appendChild(fragment);
-        console.log(`✅ ${renderedCount} cards añadidas al DOM`);
-    }
-
-    // Configurar scroll infinito
-    if (nextPageContext) {
-        this.setupImprovedInfiniteScroll(searchResults);
-        console.log(`✅ Renderizado completo - Scroll infinito activo`);
-    } else {
-        console.log(`✅ Renderizado completo - Sin más páginas`);
-    }
-
-    // Debug final del DOM
-    setTimeout(() => {
-        const totalCards = grid.querySelectorAll('.search-result-card').length;
-        console.log(`🎯 Total de cards en DOM: ${totalCards}`);
         
-        if (totalCards === 0 && results.items.length > 0) {
-            console.error('❌ PROBLEMA: Se recibieron items pero no hay cards en el DOM');
-            console.error('Debug info:', {
-                receivedItems: results.items.length,
-                processedItems: videoItems.length,
-                renderedCards: renderedCount,
-                gridExists: !!grid,
-                gridContent: grid.innerHTML.substring(0, 100)
-            });
-        }
-    }, 100);
-}
+        // --- 5. EVENTO CLICK (DONDE DAS PLAY) ---
+        trackDiv.addEventListener('click', function() {
+            // Obtenemos los datos del dataset del elemento clickeado
+            const videoId = this.dataset.videoId;
+            const durationInSeconds = parseInt(this.dataset.durationSeconds); // Recogemos el número
+
+            // Verifica en consola (opcional)
+            console.log(`▶️ Reproduciendo video ID: ${videoId} con duración: ${durationInSeconds}s`);
+
+            // LLAMA A TU FUNCIÓN DE REPRODUCCIÓN AQUÍ
+            // Asegúrate de pasarle la duración en segundos al reproductor
+            // EL NOMBRE DE TU FUNCIÓN DE REPRODUCCIÓN PUEDE SER DIFERENTE
+            // Por ejemplo:
+            // player.loadVideo(videoId, durationInSeconds);
+            // setTrackDuration(durationInSeconds); 
+            
+            // --- Reemplaza esta línea con tu llamada real ---
+            handlePlayTrack(videoId, durationInSeconds); // <--- Usa el nombre real de tu función
+            // ------------------------------------------------
+            
+        });
+
+        // Añadir el elemento al contenedor
+        resultsContainer.appendChild(trackDiv);
+    });
+
+    // Manejo de paginación si aplica...
+}       
 
 setupImprovedInfiniteScroll(searchResults) {
     if (!nextPageContext) {
