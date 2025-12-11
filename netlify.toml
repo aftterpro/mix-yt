@@ -5,23 +5,21 @@
 
 # Regla para dirigir las llamadas /api/sponsorblock/* a la función sponsorblock
 [[redirects]]
-  from = "/api/sponsorblock/:splat" # Ruta para la función existente
+  from = "/api/sponsorblock/:splat"
   to = "/.netlify/functions/sponsorblock/:splat"
   status = 200
 
-# NUEVA REGLA: Redirige /api/lyrics/* a la nueva función
+# Regla para redirigir /api/lyrics/* a la nueva función
 [[redirects]]
   from = "/api/lyrics/:splat"
-  to = "/.netlify/functions/publish-lyrics" # Apunta al nombre de tu nuevo archivo JS (sin extensión)
+  to = "/.netlify/functions/publish-lyrics"
   status = 200
 
-# Regla para el proxy CORS (la URL base de tu proxy)
-[[redirects]]
-  from = "/.netlify/functions/cors-proxy/*"
-  to = "/.netlify/functions/cors-proxy/:splat"
-  status = 200
-# Nueva regla para SponsorBlock (segments)
+# Regla nueva para SponsorBlock (segments) que faltaba agregar según tu solicitud anterior
 [[redirects]]
   from = "/api/segments/*"
   to = "/.netlify/functions/sponsorblock/api/segments/:splat"
   status = 200
+
+# NOTA: Se eliminó la regla inválida de cors-proxy. 
+# No es necesaria, la función ya es accesible en /.netlify/functions/cors-proxy/ automáticamente.
