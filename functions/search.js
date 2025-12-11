@@ -14,29 +14,31 @@ exports.handler = async function(event, context) {
     try {
         let result;
         const q = event.queryStringParameters?.q;
-        const nextPageData = event.queryStringParameters?.nextpage;
+        let nextPageData = event.queryStringParameters?.nextpage;
 
         if (nextPageData) {
             // CARGAR MÁS RESULTADOS (Paginación)
-            // Intentamos parsear el token porque ahora enviamos un objeto JSON completo
             let tokenObject;
             try {
+                // Decodificar por si viene codificado como URL (%7B...)
+                if (typeof nextPageData === 'string' && nextPageData.startsWith('%')) {
+                    nextPageData = decodeURIComponent(nextPageData);
+                }
                 tokenObject = JSON.parse(nextPageData);
             } catch (e) {
-                // Si falla el parseo, asumimos que es un string antiguo (intento de fallback)
+                console.warn("Fallo al parsear token JSON, usando raw:", e);
                 tokenObject = nextPageData;
             }
             
-            // Pasamos el objeto completo a la librería
+            // Llamada segura a la librería
             result = await youtubesearchapi.NextPage(tokenObject, true);
             
         } else {
-            // BÚSQUEDA NUEVA
-            // GetListByKeyword(query, playlistBool, limit, options)
+            // BÚSQUEDA NUEVA (20 resultados)
             result = await youtubesearchapi.GetListByKeyword(q, false, 20);
         }
 
-        // VALIDACIÓN: Si la librería no devuelve items, devolver array vacío para no romper el frontend
+        // VALIDACIÓN DE SEGURIDAD
         if (!result || !result.items) {
              return {
                 statusCode: 200,
@@ -45,9 +47,9 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // MAPEO ROBUSTO DE DATOS
+        // MAPEO DE DATOS (Arregla fotos y artistas)
         const items = result.items.map(item => {
-            // Intentar obtener la mejor imagen disponible
+            // 1. Obtener mejor imagen
             let thumb = './electronic.ico';
             if (item.thumbnail) {
                 if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
@@ -57,21 +59,27 @@ exports.handler = async function(event, context) {
                 }
             }
 
+            // 2. Obtener duración (youtube-search-api la devuelve en 'length.simpleText')
+            let dur = "0:00";
+            if (item.length && item.length.simpleText) {
+                dur = item.length.simpleText;
+            } else if (typeof item.length === 'string') {
+                dur = item.length; // A veces viene directo
+            }
+
             return {
                 videoId: item.id,
                 title: item.title || "Sin título",
-                // Manejo seguro de imagen
                 thumbnail: thumb,
-                // Manejo seguro de autor
-                uploaderName: item.channelTitle || "Autor Desconocido", 
-                // Manejo seguro de duración
-                duration: item.length?.simpleText || "0:00", 
+                // ✅ IMPORTANTE: Enviar 'artist' explícitamente para core.js
+                artist: item.channelTitle || "Autor Desconocido",
+                uploaderName: item.channelTitle || "Autor Desconocido",
+                duration: dur,
                 isLive: item.isLive || false
             };
-        }).filter(item => item.videoId); // Filtrar resultados sin ID
+        }).filter(item => item.videoId); 
 
-        // PREPARAR TOKEN DE SIGUIENTE PÁGINA
-        // Serializamos todo el objeto nextPage (token + contexto) si existe
+        // Preparar token para la siguiente página
         const nextTokenSerialized = result.nextPage ? JSON.stringify(result.nextPage) : null;
 
         return {
@@ -84,9 +92,10 @@ exports.handler = async function(event, context) {
         };
 
     } catch (error) {
-        console.error("Error en function search:", error);
+        console.error("Error CRITICO en function search:", error);
+        // Devolver JSON vacío en vez de error 500 para que la app no muestre alertas rojas
         return {
-            statusCode: 500, // Cambiar a 200 con error vacío para que la UI no muestre alerta roja fea
+            statusCode: 200, 
             headers,
             body: JSON.stringify({ items: [], nextpage: null, error: error.message })
         };
