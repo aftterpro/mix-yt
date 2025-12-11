@@ -3,8 +3,10 @@ console.log('🎵 Cargando YouTube Client (Conectado a Netlify Functions)...');
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
-        // Ahora apuntamos a TU función en Netlify, no a Piped
-        this.searchApiUrl = '/.netlify/functions/search'; 
+        
+        // 🛠️ CORRECCIÓN CLAVE: Usar la URL absoluta de Netlify.
+        // Esto asegura que mix-yt.pages.dev llame correctamente a mix-yt.netlify.app.
+        this.searchApiUrl = 'https://mix-yt.netlify.app/.netlify/functions/search'; 
     }
 
     async init() {
@@ -32,13 +34,16 @@ class YouTubeSimplifiedClient {
                 params.append('nextpage', continuation);
             }
 
+            // Aquí targetUrl ahora usará la URL absoluta
             const targetUrl = `${this.searchApiUrl}?${params.toString()}`;
             console.log(`📡 Llamando a: ${targetUrl}`);
 
             const response = await fetch(targetUrl);
 
             if (!response.ok) {
-                throw new Error(`Error del servidor: ${response.status}`);
+                // Si la respuesta no es OK, leemos el error como texto (podría ser HTML 404)
+                const errorText = await response.text();
+                throw new Error(`Error del servidor (${response.status}): ${errorText.substring(0, 100)}...`);
             }
 
             const data = await response.json();
