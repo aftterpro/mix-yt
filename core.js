@@ -2923,45 +2923,66 @@ playVideoAtIndex(index) {
  * Obtener segmentos SponsorBlock
  */
 async function obtenerSegmentosSponsorBlock(videoId) {
-    if (window.unifiedCore.state.debugMode) console.log(`📡 Solicitando segmentos SponsorBlock para: ${videoId}`);
-
-    // 🚨 CORRECCIÓN CLAVE: Usamos 'segmentosCache' directamente (sin window.) y añadimos chequeo de existencia
-    if (segmentosCache && segmentosCache[videoId]) {
-        if (window.unifiedCore.state.debugMode) console.log(`✅ Segmentos encontrados en caché para ${videoId}`);
-        return segmentosCache[videoId];
+    // Si ya hay segmentos en caché (es un array) o ya se está obteniendo ('fetching'), no hacer nada.
+    if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) {
+         // console.log(`SB Fetch: Segmentos ya en caché o obteniendo para ${videoId}. Saliendo.`);
+         return null; 
     }
-    
+
+    // Si llegamos aquí, segmentosCache[videoId] es undefined.
+    // Marcar el estado como 'fetching' SINCRÓNICAMENTE ANTES de la llamada await fetch.
+    segmentosCache[videoId] = 'fetching';
+    console.log(`SB Fetch: Iniciando obtención para ${videoId}. Marcando estado 'fetching'.`);
+
+    // NOTA: Asegúrate de tener tu userId configurado o pasarlo como argumento
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // Tu userId del backup
+    const apiUrl = `/api/segments/${videoId}`; // URL relativa a tu función Netlify
+    console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
+
     try {
-        const categories = ["sponsor", "selfpromo", "intermission", "music_offtopic"];
-        const fetchUrl = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?category=${encodeURIComponent(JSON.stringify(categories))}`;
-        
-        const response = await fetch(fetchUrl);
+        // Tu llamada fetch con el encabezado X-UserID
+        const response = await fetch(apiUrl, {
+            headers: {
+                'X-UserID': userId 
+            }
+        });
 
         if (!response.ok) {
-            throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json(); 
-        
-        let segments = [];
-        
-        // Manejo de la Respuesta
-        if (data.segments && Array.isArray(data.segments)) {
-            segments = data.segments;
-        } else if (Array.isArray(data)) {
-            segments = data;
-        } else {
-             segments = []; 
+             console.error(`SB Fetch: Error desde la API SB (${apiUrl}): ${response.status} ${response.statusText}`);
+             throw new Error(`API SB Error: ${response.status} ${response.statusText}`);
         }
 
-        // 🚨 CORRECCIÓN CLAVE: Asignamos usando la variable de alcance de archivo
-        segmentosCache[videoId] = segments; 
-        console.log(`✅ Segmentos SponsorBlock cargados. Total: ${segments.length}`);
-        return segments;
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+             console.warn(`SB Fetch: La API SB (${apiUrl}) no devolvió un array para ${videoId}. Respuesta:`, data);
+              throw new Error(`API SB Error: Respuesta no es un array`);
+        }
+
+        console.log(`SB Fetch: Segmentos recibidos de API SB para ${videoId} (crudos): ${data.length}`);
+
+        // --- LÓGICA DE VALIDACIÓN ---
+        const validSegments = data.filter(segment => {
+            if (!segment || typeof segment.startTime === 'undefined' || typeof segment.endTime === 'undefined') {
+                return false; 
+            }
+            const start = parseFloat(segment.startTime);
+            const end = parseFloat(segment.endTime);
+
+            if (isNaN(start) || isNaN(end)) return false;
+            if (start < 0 || end < 0 || end < start) return false;
+
+            return true;
+        });
+
+        // Almacenar los SEGMENTOS VÁLIDOS en caché
+        segmentosCache[videoId] = validSegments; 
+        return validSegments; 
 
     } catch (error) {
-        console.error(`❌ Error obteniendo segmentos SponsorBlock para ${videoId}:`, error);
-        return [];
+        console.error(`SB Fetch: Error en fetch/procesamiento SB para ${apiUrl}:`, error);
+        segmentosCache[videoId] = null; // Devolver null para indicar el fallo
+        return null; 
     }
 }
 /**
