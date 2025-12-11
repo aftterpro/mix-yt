@@ -2880,7 +2880,7 @@ async function obtenerSegmentosSponsorBlock(videoId) {
 
     // NOTA: Asegúrate de tener tu userId configurado o pasarlo como argumento
     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; // Tu userId del backup
-    const apiUrl = `/api/segments/${videoId}`; // URL relativa a tu función Netlify
+    const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
     console.log(`SB Fetch: Llamando a la API local SB: ${apiUrl}`);
 
     try {
