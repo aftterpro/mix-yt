@@ -1,65 +1,46 @@
-const express = require('express');
-const serverless = require('serverless-http');
 const { SponsorBlock } = require('sponsorblock-api');
 
+exports.handler = async function(event, context) {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, X-UserID',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+    };
 
-const app = express();
-const router = express.Router();
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
+    }
 
-// Middleware para configurar los encabezados CORS
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-UserID');
-    next();
-});
+    // El videoId vendrá en el queryStringParameters
+    const videoId = event.queryStringParameters.videoId;
+    const userId = event.headers['x-userid'];
 
-router.get('/segments/:videoId', async (req, res) => {
-    console.log(' Solicitud GET recibida para:', req.params.videoId);
-    const videoId = req.params.videoId;
-    console.log('Video ID:', videoId);
+    if (!videoId || !userId) {
+        return { 
+            statusCode: 400, 
+            headers, 
+            body: JSON.stringify({ error: 'Faltan videoId o X-UserID' })
+        };
+    }
 
     try {
-        // Obtener el userID del encabezado de la solicitud
-        const userId = req.headers['x-userid'];
-
-        // Verificar si se proporcionó el userID
-        if (!userId) {
-        console.error('❌ userID es requerido:', userId);
-            return res.status(400).json({ error: 'userID es requerido.' });
-        }
-
-        // Crear una instancia de SponsorBlock con el userID recibido
         const sponsorBlock = new SponsorBlock(userId);
-
         const segments = await sponsorBlock.getSegments(videoId, [
-            "sponsor",
-            "intro",
-            "outro",
-            "selfpromo",
-            "interaction",
-            "poi",
-            "music_offtopic", 
+            "sponsor", "intro", "outro", "music_offtopic", // Categorías necesarias
         ]);
-        console.log(`Function: Segmentos obtenidos para ${videoId}: ${segments.length}`);
-        // Asegúrate de devolver un array vacío si no se encontraron segmentos (manejo de 404)
-        res.json(segments || []); // Devolver segmentos o array vacío
 
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(segments || []) // Debe devolver un array
+        };
+        
     } catch (error) {
-        console.error(`Function Error procesando ${videoId}:`, error);
-
-        // Mejorar manejo de error 404 de la librería sponsorblock-api
-        if (error.status === 404 || (error.message && error.message.includes('404'))) {
-            console.log(`Function: No se encontraron segmentos SB para ${videoId}. Devolviendo array vacío.`);
-            return res.json([]); // Devolver array vacío para 404
-        }
-
-        // Otros errores
-        const statusCode = error.status || 500;
-        return res.status(statusCode).json({ error: 'Error al obtener segmentos de SponsorBlock', details: error.message });
+        console.error(`Error SB para ${videoId}:`, error);
+        return { 
+            statusCode: 200, // Devolver 200 para no fallar el cliente
+            headers,
+            body: JSON.stringify([]) // Devolver array vacío en caso de error
+        };
     }
-});
-
-app.use('/', router); // Esto crea /sponsorblock/segments/:videoId
-
-module.exports.handler = serverless(app);
+};
