@@ -1,44 +1,48 @@
 const youtubesearchapi = require("youtube-search-api");
 
 exports.handler = async function(event, context) {
+    // Headers para permitir que tu web acceda a la función
     const headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     };
 
+    // Responder a pre-flight CORS
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
 
     try {
-        let result;
         const q = event.queryStringParameters?.q;
         let nextPageData = event.queryStringParameters?.nextpage;
+        let result;
 
+        // --- LÓGICA DE BÚSQUEDA ---
         if (nextPageData) {
-            // CARGAR MÁS RESULTADOS (Paginación)
+            // -- PAGINACIÓN --
             let tokenObject;
             try {
-                // Decodificar por si viene codificado como URL (%7B...)
+                // Intentar limpiar y parsear el token
                 if (typeof nextPageData === 'string' && nextPageData.startsWith('%')) {
                     nextPageData = decodeURIComponent(nextPageData);
                 }
                 tokenObject = JSON.parse(nextPageData);
             } catch (e) {
-                console.warn("Fallo al parsear token JSON, usando raw:", e);
+                // Si no es JSON válido, intentar usarlo como string raw (fallback)
                 tokenObject = nextPageData;
             }
             
-            // Llamada segura a la librería
+            // Llamar a la librería con el token
             result = await youtubesearchapi.NextPage(tokenObject, true);
-            
         } else {
-            // BÚSQUEDA NUEVA (20 resultados)
-            result = await youtubesearchapi.GetListByKeyword(q, false, 20);
+            // -- BÚSQUEDA INICIAL --
+            // Pedir 25 resultados para intentar llenar la pantalla y evitar scroll loop
+            result = await youtubesearchapi.GetListByKeyword(q, false, 25);
         }
 
-        // VALIDACIÓN DE SEGURIDAD
+        // --- VALIDACIÓN DE RESPUESTA ---
+        // Si la librería falla o no devuelve nada, enviar array vacío (NO ERROR 500)
         if (!result || !result.items) {
              return {
                 statusCode: 200,
@@ -47,39 +51,42 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // MAPEO DE DATOS (Arregla fotos y artistas)
+        // --- MAPEO DE DATOS (Arreglo de Fotos, Duración y Artista) ---
         const items = result.items.map(item => {
-            // 1. Obtener mejor imagen
-            let thumb = './electronic.ico';
+            // 1. IMAGEN: Buscar en array o propiedad directa
+            let thumb = './electronic.ico'; // Fallback
             if (item.thumbnail) {
                 if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
                     thumb = item.thumbnail[0].url;
+                } else if (item.thumbnail.thumbnails && Array.isArray(item.thumbnail.thumbnails)) {
+                    thumb = item.thumbnail.thumbnails[0].url;
                 } else if (typeof item.thumbnail === 'string') {
                     thumb = item.thumbnail;
                 }
             }
 
-            // 2. Obtener duración (youtube-search-api la devuelve en 'length.simpleText')
+            // 2. DURACIÓN: Buscar en simpleText o texto directo
             let dur = "0:00";
-            if (item.length && item.length.simpleText) {
-                dur = item.length.simpleText;
-            } else if (typeof item.length === 'string') {
-                dur = item.length; // A veces viene directo
+            if (item.length) {
+                if (item.length.simpleText) dur = item.length.simpleText;
+                else if (typeof item.length === 'string') dur = item.length;
             }
+
+            // 3. ARTISTA: Buscar en channelTitle o author
+            const author = item.channelTitle || item.author || "Autor Desconocido";
 
             return {
                 videoId: item.id,
                 title: item.title || "Sin título",
                 thumbnail: thumb,
-                // ✅ IMPORTANTE: Enviar 'artist' explícitamente para core.js
-                artist: item.channelTitle || "Autor Desconocido",
-                uploaderName: item.channelTitle || "Autor Desconocido",
+                artist: author,       // Campo explícito para core.js
+                uploaderName: author, // Campo de respaldo
                 duration: dur,
                 isLive: item.isLive || false
             };
-        }).filter(item => item.videoId); 
+        }).filter(item => item.videoId); // Eliminar si no tiene ID
 
-        // Preparar token para la siguiente página
+        // Serializar token para la próxima página
         const nextTokenSerialized = result.nextPage ? JSON.stringify(result.nextPage) : null;
 
         return {
@@ -92,12 +99,17 @@ exports.handler = async function(event, context) {
         };
 
     } catch (error) {
-        console.error("Error CRITICO en function search:", error);
-        // Devolver JSON vacío en vez de error 500 para que la app no muestre alertas rojas
+        console.error("Error controlado en search.js:", error);
+        // IMPORTANTE: Devolver 200 con array vacío en vez de 500
+        // Esto evita que el frontend muestre "SyntaxError" y rompa el scroll
         return {
-            statusCode: 200, 
+            statusCode: 200,
             headers,
-            body: JSON.stringify({ items: [], nextpage: null, error: error.message })
+            body: JSON.stringify({ 
+                items: [], 
+                nextpage: null, 
+                error: "Sin resultados o error temporal" 
+            })
         };
     }
 };
