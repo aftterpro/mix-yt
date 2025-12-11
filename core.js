@@ -2031,7 +2031,8 @@ displaySearchResults(data) {
 
     data.items.forEach(video => {
         // --- PROCESAMIENTO DE DURACIÓN ---
-        const segundos = parseDurationToSeconds(video.duration); 
+        // 🛠️ CORRECCIÓN CLAVE: AGREGAR 'this.'
+        const segundos = this.parseDurationToSeconds(video.duration); 
 
         // CREACIÓN DEL ELEMENTO HTML
         const trackDiv = document.createElement('div');
@@ -2041,7 +2042,9 @@ displaySearchResults(data) {
         trackDiv.dataset.videoId = video.videoId;
         trackDiv.dataset.durationText = video.duration; 
         trackDiv.dataset.durationSeconds = segundos;     // <--- DURACIÓN NUMÉRICA CORREGIDA
-
+        
+        // El resto del código de displaySearchResults sigue igual...
+        
         // ESTRUCTURA INTERNA (Ajusta esto a tu estilo real de 'card-track')
         trackDiv.innerHTML = `
             <img src="${video.thumbnail}" alt="${video.title}" class="track-thumbnail">
@@ -2080,7 +2083,6 @@ displaySearchResults(data) {
         resultsContainer.appendChild(trackDiv);
     });
 }
-
 setupImprovedInfiniteScroll(searchResults) {
     if (!nextPageContext) {
         console.log('📜 Sin más páginas disponibles para scroll infinito');
