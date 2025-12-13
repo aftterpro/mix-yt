@@ -37,9 +37,11 @@ let currentPlayingInfo = {
     flattenedIndex: -1
 };
 
+// Variables para búsqueda y scroll infinito
 let isLoadingMore = false;
 let nextPageContext = null;
 let currentSearchQuery = '';
+let searchScrollObserver = null; // Nuevo observador para scroll
 
 let segmentosCache = {};
 let lastSeekEndTime = -1;
@@ -187,13 +189,14 @@ class UnifiedCore {
         this.currentView = 'home';
         this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
         this.playlistsData = playlistsData;
+        this.scrollObserver = null; // Inicializar observador de scroll
         
         // Inicializar
         this.init();
         this.setupAutomaticSaving();
         this.setupPlayerContainerHandlers();
 
-        // Exportar funciones globales vinculadas a esta instancia (Corrigiendo el error de sintaxis)
+        // Exportar funciones globales vinculadas a esta instancia
         window.forceMiniPlayerVisibility = this.forceMiniPlayerVisibility.bind(this);
         window.setupSearchButtonListeners = this.setupSearchButtonListeners.bind(this);
         window.checkAndShowMiniPlayer = this.checkAndShowMiniPlayer.bind(this);
@@ -230,7 +233,7 @@ class UnifiedCore {
 
         await this.initializeComponents();
         
-        // ✅ Inicialización diferida de UI movida aquí (Corrección del error de sintaxis)
+        // ✅ Inicialización diferida de UI
         setTimeout(() => {
             this.setupSearchButtonListeners();
             this.setupMiniPlayerObserver();
@@ -260,6 +263,10 @@ class UnifiedCore {
         document.addEventListener('viewChanged', (e) => {
             console.log('🔄 Vista cambió:', e.detail);
             setTimeout(() => this.checkAndShowMiniPlayer(), 300);
+            // Asegurar posición correcta al entrar a fullPlayer
+            if (e.detail === 'fullPlayer') {
+                 requestAnimationFrame(() => this.movePlayerToFullView());
+            }
         });
 
         document.addEventListener('playbackStarted', () => {
@@ -676,7 +683,7 @@ class UnifiedCore {
                 if (query.length > 2) {
                     debouncedSearch(query);
                     if (this.currentView !== 'search') {
-                        this.switchView('search'); // Fixed variable name
+                        this.switchView('search'); 
                     }
                 } else {
                     this.clearSearchResults();
@@ -897,18 +904,23 @@ class UnifiedCore {
 
         let targetContainer;
         if (target === 'full') {
-            targetContainer = document.getElementById('fullVideoContainer');
+            targetContainer = document.getElementById('fullVideoContainer') || document.getElementById('videoWrapper');
         } else if (target === 'mini') {
             targetContainer = document.getElementById('miniPlayerContainer');
         }
 
         if (targetContainer) {
             targetContainer.appendChild(activePlayerElement);
+            // Asegurar que el contenedor tenga posición relativa para que el absoluto funcione
+            if (getComputedStyle(targetContainer).position === 'static') {
+                 targetContainer.style.position = 'relative';
+            }
             activePlayerElement.style.width = '100%';
             activePlayerElement.style.height = '100%';
             activePlayerElement.style.position = 'absolute';
             activePlayerElement.style.top = '0';
             activePlayerElement.style.left = '0';
+            activePlayerElement.style.zIndex = '10'; // Asegurar que esté encima
         }
     }
 
@@ -1036,30 +1048,53 @@ class UnifiedCore {
         }
     }
 
+    // Función corregida para mover reproductores al contenedor full view
     movePlayersToFullView() {
         const fullPlayerView = document.getElementById('fullPlayerView');
         if (!fullPlayerView) return;
-        const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
-        if (!videoWrapper) return;
+        
+        // Intentar encontrar el wrapper por clase o ID
+        const videoWrapper = fullPlayerView.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
+        if (!videoWrapper) {
+            console.error("No se encontró el contenedor .video-wrapper en fullPlayerView");
+            return;
+        }
+
+        // Asegurar que el contenedor tenga posición relativa
+        if (getComputedStyle(videoWrapper).position === 'static') {
+             videoWrapper.style.position = 'relative';
+        }
         
         const player1El = document.getElementById('player1');
         const player2El = document.getElementById('player2');
-        if (!player1El || !player2El) return;
         
-        if (!videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
-        if (!videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
+        if (player1El && !videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
+        if (player2El && !videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
         
-        [player1El, player2El].forEach(player => {
+        const activePlayerNum = window.currentPlayer || 1;
+
+        [player1El, player2El].forEach((player, index) => {
             if (player) {
-                player.style.cssText = `
-                    position: absolute !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    width: 100% !important;
-                    height: 100% !important;
-                    display: block !important;
-                    visibility: visible !important;
-                `;
+                // Aplicar estilos críticos inline para forzar que se quede dentro
+                player.style.position = 'absolute';
+                player.style.top = '0';
+                player.style.left = '0';
+                player.style.width = '100%';
+                player.style.height = '100%';
+                player.style.objectFit = 'cover';
+                
+                const isPlayer1 = index === 0;
+                const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
+
+                if (isActive) {
+                    player.style.display = 'block';
+                    player.style.visibility = 'visible';
+                    player.style.opacity = '1';
+                    player.style.zIndex = '10';
+                } else {
+                     player.style.display = 'none';
+                     player.style.zIndex = '0';
+                }
             }
         });
     }
@@ -1174,27 +1209,7 @@ class UnifiedCore {
     }
 
     movePlayerToFullView() {
-        const fullPlayerView = document.getElementById('fullPlayerView');
-        if (!fullPlayerView) return;
-        const videoWrapper = fullPlayerView.querySelector('.video-wrapper');
-        if (!videoWrapper) return;
-        
-        const player1El = document.getElementById('player1');
-        const player2El = document.getElementById('player2');
-        if (!player1El || !player2El) return;
-        
-        if (!videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
-        if (!videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
-        
-        [player1El, player2El].forEach(player => {
-            if (player) {
-                player.style.position = 'absolute';
-                player.style.top = '0';
-                player.style.left = '0';
-                player.style.width = '100%';
-                player.style.height = '100%';
-            }
-        });
+        this.movePlayersToFullView(); // Usar la versión corregida arriba
     }
 
     refreshPlayingView() {
@@ -1510,25 +1525,45 @@ class UnifiedCore {
         }, stepTime);
     }
 
+    // ==========================================
+    // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
+    // ==========================================
+
     async performSearch(query, continuation = null) {
         const searchResults = document.getElementById('searchResults');
         if (!searchResults) return;
 
+        // Si es una búsqueda nueva, limpiar y resetear
         if (!continuation) {
             currentSearchQuery = query;
             nextPageContext = null;
             searchResults.innerHTML = '<div class="search-loading">🔍 Buscando música...</div>';
             
-            if (this.scrollObserver) {
-                this.scrollObserver.disconnect();
-                this.scrollObserver = null;
+            // Desconectar observador anterior si existe
+            if (this.searchScrollObserver) {
+                this.searchScrollObserver.disconnect();
+                this.searchScrollObserver = null;
             }
+        } else {
+            // Si es paginación, mostrar loading pequeño al final
+            const loadingMore = document.createElement('div');
+            loadingMore.className = 'search-loading-more';
+            loadingMore.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
+            searchResults.appendChild(loadingMore);
         }
 
         isLoadingMore = true;
 
         try {
             const data = await window.youtubeJSClient.search(query, continuation);
+            
+            // Guardar el token para la siguiente página
+            if (data.continuation) {
+                nextPageContext = data.continuation;
+            } else {
+                nextPageContext = null;
+            }
+
             this.displaySearchResults(data, !!continuation);
         } catch (error) {
             console.error("❌ Error en búsqueda:", error);
@@ -1540,11 +1575,170 @@ class UnifiedCore {
                     </div>
                 `;
             } else {
+                // Eliminar loading spinner si falla la paginación
+                const loadingMore = searchResults.querySelector('.search-loading-more');
+                if(loadingMore) loadingMore.remove();
                 this.showMessage('Error cargando más resultados', 'error');
             }
         } finally {
             isLoadingMore = false;
         }
+    }
+
+    displaySearchResults(data, isContinuation) {
+        const resultsContainer = document.getElementById('searchResults');
+        if (!resultsContainer) return;
+        
+        // Si no es continuación, limpiar el contenedor primero
+        if (!isContinuation) {
+             resultsContainer.innerHTML = '';
+        } else {
+             // Si es continuación, eliminar el spinner de carga y el centinela anterior
+             const loadingMore = resultsContainer.querySelector('.search-loading-more');
+             if(loadingMore) loadingMore.remove();
+             const existingSentinel = document.getElementById('search-sentinel');
+             if(existingSentinel) existingSentinel.remove();
+        }
+
+        if (!data.items || data.items.length === 0) {
+            if (!isContinuation) {
+                 resultsContainer.innerHTML = '<div class="search-placeholder"><i class="fas fa-search"></i><p>No se encontraron videos.</p></div>';
+            }
+            return;
+        }
+
+        // Crear fragmento para mejor rendimiento
+        const fragment = document.createDocumentFragment();
+
+        data.items.forEach(video => {
+            const segundos = this.parseDurationToSeconds(video.duration); 
+            const trackDiv = document.createElement('div');
+            trackDiv.className = 'track-item card-track search-result-card'; 
+            trackDiv.dataset.videoId = video.videoId;
+            trackDiv.dataset.durationText = video.duration; 
+            trackDiv.dataset.durationSeconds = segundos;
+
+            trackDiv.innerHTML = `
+                <div class="search-result-thumbnail">
+                    <img src="${video.thumbnail}" alt="${this.escapeHTML(video.title)}" loading="lazy" onerror="this.src='./electronic.ico';">
+                    <span class="search-result-duration">${video.duration || '0:00'}</span>
+                </div>
+                <div class="search-result-info">
+                    <h3 class="search-result-title">${this.escapeHTML(video.title)}</h3>
+                    <p class="search-result-author">${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}</p>
+                </div>
+                <button class="add-to-queue-btn" 
+                        title="Añadir a continuación" 
+                        data-video-id="${video.videoId}"
+                        data-title="${this.escapeHTML(video.title)}"
+                        data-thumbnail="${video.thumbnail}"
+                        data-duration="${segundos}"
+                        data-author="${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}">
+                    <i class="fas fa-plus"></i>
+                </button>
+            `;
+            
+            // Configurar el botón para añadir DESPUÉS de la canción actual
+            const addButton = trackDiv.querySelector('.add-to-queue-btn');
+            if (addButton) {
+                addButton.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const videoId = addButton.dataset.videoId;
+                    if (!videoId || videoId === 'undefined') return;
+                    
+                    const videoData = {
+                        videoId: videoId,
+                        title: addButton.dataset.title,
+                        thumbnail: addButton.dataset.thumbnail,
+                        duration: parseInt(addButton.dataset.duration) || 0,
+                        uploaderName: addButton.dataset.author,
+                        artist: addButton.dataset.author,
+                        author: addButton.dataset.author
+                    };
+                    
+                    const originalHTML = addButton.innerHTML;
+                    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    addButton.disabled = true;
+                    
+                    try {
+                        // USA addVideoToQueueAfterCurrent EN LUGAR DE addVideoToQueue
+                        if (window.unifiedCore?.addVideoToQueueAfterCurrent) {
+                             await window.unifiedCore.addVideoToQueueAfterCurrent(videoData);
+                        } else if (window.playlistManager?.addVideoToQueueAfterCurrent) {
+                             await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
+                        } else {
+                             // Fallback si la función específica no existe
+                             await this.addVideoToQueue(videoData);
+                        }
+
+                        addButton.innerHTML = '<i class="fas fa-check"></i>';
+                        addButton.style.background = '#4caf50';
+                        setTimeout(() => {
+                            addButton.innerHTML = originalHTML;
+                            addButton.disabled = false;
+                            addButton.style.background = '';
+                        }, 2000);
+                    } catch (error) {
+                        addButton.innerHTML = '<i class="fas fa-times"></i>';
+                        addButton.style.background = '#f44336';
+                        setTimeout(() => {
+                            addButton.innerHTML = originalHTML;
+                            addButton.disabled = false;
+                            addButton.style.background = '';
+                        }, 2000);
+                    }
+                });
+            }
+            
+            // Click en la tarjeta reproduce directamente
+            trackDiv.addEventListener('click', (e) => {
+                if (e.target.closest('.add-to-queue-btn')) return;
+                 if (window.unifiedCore?.addVideoToQueueAfterCurrent) {
+                     // Opcional: reproducir inmediatamente en lugar de añadir a cola
+                     // this.playVideo(videoData); 
+                 }
+            });
+
+            fragment.appendChild(trackDiv);
+        });
+
+        resultsContainer.appendChild(fragment);
+
+        // Configurar Scroll Infinito si hay más páginas
+        if (nextPageContext) {
+             this.setupInfiniteScroll(resultsContainer);
+        }
+    }
+
+    // Nueva función para configurar el observador de scroll infinito
+    setupInfiniteScroll(container) {
+        // Crear un elemento centinela al final
+        const sentinel = document.createElement('div');
+        sentinel.id = 'search-sentinel';
+        sentinel.style.height = '20px';
+        sentinel.style.width = '100%';
+        container.appendChild(sentinel);
+
+        // Desconectar observador previo si existe
+        if (this.searchScrollObserver) {
+            this.searchScrollObserver.disconnect();
+        }
+
+        // Crear nuevo observador
+        this.searchScrollObserver = new IntersectionObserver((entries) => {
+            // Si el centinela es visible, no estamos cargando ya, y hay página siguiente
+            if (entries[0].isIntersecting && !isLoadingMore && nextPageContext) {
+                console.log('📜 Scroll infinito disparado, cargando más resultados...');
+                this.performSearch(currentSearchQuery, nextPageContext);
+            }
+        }, {
+            root: null, // viewport
+            rootMargin: '100px', // Cargar antes de llegar al final exacto
+            threshold: 0.1
+        });
+
+        this.searchScrollObserver.observe(sentinel);
     }
 
     parseDurationToSeconds(durationStr) {
@@ -1582,98 +1776,6 @@ class UnifiedCore {
 
     updateQueuePopup() {
         if (window.playlistManager) window.playlistManager.updateQueuePopup();
-    }
-
-    displaySearchResults(data) {
-        const resultsContainer = document.getElementById('searchResults');
-        if (!resultsContainer) return;
-        
-        resultsContainer.innerHTML = ''; 
-
-        if (!data.items || data.items.length === 0) {
-            resultsContainer.innerHTML = '<div class="search-placeholder"><i class="fas fa-search"></i><p>No se encontraron videos.</p></div>';
-            return;
-        }
-
-        data.items.forEach(video => {
-            const segundos = this.parseDurationToSeconds(video.duration); 
-            const trackDiv = document.createElement('div');
-            trackDiv.className = 'track-item card-track search-result-card'; 
-            trackDiv.dataset.videoId = video.videoId;
-            trackDiv.dataset.durationText = video.duration; 
-            trackDiv.dataset.durationSeconds = segundos;
-
-            trackDiv.innerHTML = `
-                <div class="search-result-thumbnail">
-                    <img src="${video.thumbnail}" alt="${this.escapeHTML(video.title)}" loading="lazy" onerror="this.src='./electronic.ico';">
-                    <span class="search-result-duration">${video.duration || '0:00'}</span>
-                </div>
-                <div class="search-result-info">
-                    <h3 class="search-result-title">${this.escapeHTML(video.title)}</h3>
-                    <p class="search-result-author">${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}</p>
-                </div>
-                <button class="add-to-queue-btn" 
-                        title="Añadir a la cola" 
-                        data-video-id="${video.videoId}"
-                        data-title="${this.escapeHTML(video.title)}"
-                        data-thumbnail="${video.thumbnail}"
-                        data-duration="${segundos}"
-                        data-author="${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}">
-                    <i class="fas fa-plus"></i>
-                </button>
-            `;
-            
-            const addButton = trackDiv.querySelector('.add-to-queue-btn');
-            if (addButton) {
-                addButton.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const videoId = addButton.dataset.videoId;
-                    if (!videoId || videoId === 'undefined') return;
-                    
-                    const videoData = {
-                        videoId: videoId,
-                        title: addButton.dataset.title,
-                        thumbnail: addButton.dataset.thumbnail,
-                        duration: parseInt(addButton.dataset.duration) || 0,
-                        uploaderName: addButton.dataset.author,
-                        artist: addButton.dataset.author,
-                        author: addButton.dataset.author
-                    };
-                    
-                    const originalHTML = addButton.innerHTML;
-                    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                    addButton.disabled = true;
-                    
-                    try {
-                        await this.addVideoToQueue(videoData);
-                        addButton.innerHTML = '<i class="fas fa-check"></i>';
-                        addButton.style.background = '#4caf50';
-                        setTimeout(() => {
-                            addButton.innerHTML = originalHTML;
-                            addButton.disabled = false;
-                            addButton.style.background = '';
-                        }, 2000);
-                    } catch (error) {
-                        addButton.innerHTML = '<i class="fas fa-times"></i>';
-                        addButton.style.background = '#f44336';
-                        setTimeout(() => {
-                            addButton.innerHTML = originalHTML;
-                            addButton.disabled = false;
-                            addButton.style.background = '';
-                        }, 2000);
-                    }
-                });
-            }
-            
-            trackDiv.addEventListener('click', (e) => {
-                if (e.target.closest('.add-to-queue-btn')) return;
-                const videoId = trackDiv.dataset.videoId;
-                // Reproducir directamente si es necesario
-            });
-
-            resultsContainer.appendChild(trackDiv);
-        });
     }
 
     createSearchResultCard(video, videoId) {
@@ -1724,6 +1826,11 @@ class UnifiedCore {
         }
         currentSearchQuery = '';
         nextPageContext = null;
+        // Limpiar observador
+        if (this.searchScrollObserver) {
+            this.searchScrollObserver.disconnect();
+            this.searchScrollObserver = null;
+        }
     }
 
     escapeHTML(text) {
