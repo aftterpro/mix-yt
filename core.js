@@ -557,54 +557,72 @@ class UnifiedCore {
         }
     }
 
-    updatePlayerPosition(targetContainerId) {
-        const playersLayer = document.getElementById('persistent-player-layer');
-        const targetContainer = document.getElementById(targetContainerId);
+updatePlayerPosition(targetContainerId) {
+    const playersLayer = document.getElementById('persistent-player-layer');
+    const targetContainer = document.getElementById(targetContainerId);
+    
+    // Crear la capa persistente si no existe
+    if (!playersLayer) {
+        const layer = document.createElement('div');
+        layer.id = 'persistent-player-layer';
+        layer.style.cssText = `
+            position: fixed;
+            z-index: 1000;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            background: #000;
+            overflow: hidden;
+            pointer-events: none;
+        `;
+        document.body.appendChild(layer);
         
-        if (!playersLayer) {
-            const layer = document.createElement('div');
-            layer.id = 'persistent-player-layer';
-            layer.style.cssText = `
-                position: fixed;
-                z-index: 1000;
-                transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-                background: #000;
-                overflow: hidden;
-                pointer-events: none;
-            `;
-            document.body.appendChild(layer);
-            const p1 = document.getElementById('player1');
-            const p2 = document.getElementById('player2');
-            if (p1) layer.appendChild(p1);
-            if (p2) layer.appendChild(p2);
-            return this.updatePlayerPosition(targetContainerId);
-        }
-
-        if (!targetContainer || targetContainer.classList.contains('hidden')) {
-            playersLayer.style.opacity = '0';
-            playersLayer.style.pointerEvents = 'none';
-            return;
-        }
-
-        const rect = targetContainer.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return;
-
-        playersLayer.style.top = `${rect.top}px`;
-        playersLayer.style.left = `${rect.left}px`;
-        playersLayer.style.width = `${rect.width}px`;
-        playersLayer.style.height = `${rect.height}px`;
-        playersLayer.style.opacity = '1';
+        const p1 = document.getElementById('player1');
+        const p2 = document.getElementById('player2');
+        if (p1) layer.appendChild(p1);
+        if (p2) layer.appendChild(p2);
         
-        if (targetContainerId === 'videoWrapper') {
-             playersLayer.style.pointerEvents = 'auto';
-             playersLayer.style.borderRadius = '0';
-        } else {
-             playersLayer.style.pointerEvents = 'auto';
-             playersLayer.style.borderRadius = '12px';
-             playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+        return this.updatePlayerPosition(targetContainerId);
+    }
+
+    if (!targetContainer || targetContainer.classList.contains('hidden')) {
+        playersLayer.style.opacity = '0';
+        playersLayer.style.pointerEvents = 'none';
+        return;
+    }
+
+    const rect = targetContainer.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    // === CORRECCIÓN DE ALTURA ===
+    let finalHeight = rect.height;
+    
+    // Si es la vista completa y la altura es exagerada (bug de 737px), forzar corrección
+    if (targetContainerId === 'videoWrapper') {
+        // Detectar si la altura es desproporcionada respecto al ancho (más alto que ancho es raro en video)
+        if (finalHeight > 500 || finalHeight > rect.width) {
+            console.log(`🔧 Corrigiendo altura de video: ${finalHeight}px -> 400px`);
+            finalHeight = 400; // Forzar el tamaño solicitado
+            
+            // Opcional: Forzar también el contenedor original para evitar huecos vacíos
+            targetContainer.style.height = '400px';
+            targetContainer.style.minHeight = '400px';
         }
     }
 
+    playersLayer.style.top = `${rect.top}px`;
+    playersLayer.style.left = `${rect.left}px`;
+    playersLayer.style.width = `${rect.width}px`;
+    playersLayer.style.height = `${finalHeight}px`; // Usar altura corregida
+    playersLayer.style.opacity = '1';
+    
+    if (targetContainerId === 'videoWrapper') {
+         playersLayer.style.pointerEvents = 'auto';
+         playersLayer.style.borderRadius = '0';
+    } else {
+         playersLayer.style.pointerEvents = 'auto';
+         playersLayer.style.borderRadius = '12px';
+         playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+    }
+}
     updatePlaylistsUI() {
         if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
             window.playlistManager.updatePlaylistsUI();
@@ -1798,7 +1816,6 @@ getFlattenedPlaylist() {
     
     return validVideos;
 }
-
 updatePersistentQueue() {
     console.log('🔄 Actualizando cola persistente...');
     
@@ -1806,10 +1823,9 @@ updatePersistentQueue() {
     if (!queueContentList) return;
 
     const flatList = this.getFlattenedPlaylist();
-    const count = flatList.length;
-
-    if (count === 0) {
-        queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>';
+    
+    if (flatList.length === 0) {
+        queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía.</p>';
         this.updateQueueCount(0);
         return;
     }
@@ -1818,59 +1834,66 @@ updatePersistentQueue() {
                         window.currentPlayingInfo?.flattenedIndex ?? -1;
 
     const fragment = document.createDocumentFragment();
-    
+    let validCount = 0;
+
     flatList.forEach((video, index) => {
         if (!video || !video.videoId) return;
-        const isPlaying = currentIndex === index;
         
+        const isPlaying = currentIndex === index;
         const queueItem = document.createElement('div');
-        // ... (resto de la creación del elemento queueItem) ...
         queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
         queueItem.dataset.videoId = video.videoId;
         queueItem.dataset.flatIndex = index;
         queueItem.draggable = true;
         queueItem.onclick = () => this.playVideoAtIndex(index);
         
+        // Asignar ID al elemento activo para encontrarlo fácil
+        if (isPlaying) queueItem.id = 'active-queue-item';
+        
         queueItem.innerHTML = `
             <div class="queue-item-number">
                 ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
             </div>
-            <img src="${video.thumbnail || './electronic.ico'}" alt="${this.escapeHTML(video.title || 'Sin título')}" class="queue-item-thumbnail" onerror="this.src='./electronic.ico';">
+            <img src="${video.thumbnail || './electronic.ico'}" class="queue-item-thumbnail" onerror="this.src='./electronic.ico';">
             <div class="queue-item-info">
                 <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
                 <div class="queue-item-meta">
                     <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
-                    ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
+                    <span class="queue-item-author">${this.escapeHTML(video.uploaderName || '')}</span>
                 </div>
             </div>
-            <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola"><i class="fas fa-times"></i></button>
+            <button class="queue-item-remove"><i class="fas fa-times"></i></button>
         `;
         
         const removeBtn = queueItem.querySelector('.queue-item-remove');
         removeBtn.onclick = (e) => {
             e.stopPropagation();
-            if (window.playlistManager) {
-                window.playlistManager.removeVideoFromQueue(video.videoId);
-            }
+            if (window.playlistManager) window.playlistManager.removeVideoFromQueue(video.videoId);
         };
+        
         fragment.appendChild(queueItem);
+        validCount++;
     });
 
     queueContentList.innerHTML = '';
     queueContentList.appendChild(fragment);
+    this.updateQueueCount(validCount);
     
-    // ✅ CRÍTICO: Actualizar el contador con el tamaño real de la lista
-    this.updateQueueCount(count); 
-    
-    setTimeout(() => {
-        if (window.queueDragDrop) window.queueDragDrop.attachDragListeners();
-    }, 100);
-    
+    // === CORRECCIÓN DE SCROLL ===
+    // Asegurar que el scroll baje hasta el video actual
     if (currentIndex >= 0) {
-        requestAnimationFrame(() => {
-            const playingItem = queueContentList.querySelector('.queue-item.playing');
-            if (playingItem) playingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
+        // Usar setTimeout para asegurar que el DOM se ha pintado
+        setTimeout(() => {
+            const playingItem = document.getElementById('active-queue-item');
+            if (playingItem) {
+                console.log('📜 Scrolleando a video actual en cola:', currentIndex);
+                playingItem.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center',  // Centrar el video en la lista
+                    inline: 'nearest' 
+                });
+            }
+        }, 300); // Retardo ligero para garantizar funcionamiento
     }
 }
 
