@@ -2788,6 +2788,8 @@ color: #FFFFFF !important;
     background: #000 !important;
     pointer-events: auto !important;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+     width: 400px; 
+     height: 400px;
 }
 
 /* Mini Player Flotante - Contenedor */
