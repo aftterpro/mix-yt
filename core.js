@@ -823,9 +823,6 @@ setupControlButtons() {
     // =============================================
 // GESTIÓN DE CONTENEDORES DE REPRODUCTOR
 // =============================================
-/**
- * Configurar handlers para cambio de contenedor
- */
 setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de barra inferior');
     
@@ -881,7 +878,288 @@ showFullPlayer() {
     // Actualizar cola persistente
     this.updatePersistentQueue();
 }
+forceMiniPlayerVisibility() {
+console.log('🎬 Forzando visibilidad de mini player...');
+    
+    const miniPlayer = document.getElementById('miniPlayerFloat');
+    
+    if (!miniPlayer) {
+        console.warn('⚠️ Mini player no encontrado en DOM');
+        return false;
+    }
+    
+    // Verificar si hay reproducción activa
+    const hasActiveVideo = window.reproduccionIniciada || 
+                          window.currentPlayingInfo?.flattenedIndex >= 0;
+    
+    if (!hasActiveVideo) {
+        console.log('⏸️ No hay video activo, ocultando mini player');
+        miniPlayer.classList.add('hidden');
+        return false;
+    }
+    
+    // Remover clase hidden
+    miniPlayer.classList.remove('hidden');
+    
+    // Forzar estilos en línea (máxima prioridad)
+    miniPlayer.style.cssText = `
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        bottom: 110px !important;
+        right: 20px !important;
+        width: 320px !important;
+        height: 180px !important;
+        z-index: 999998 !important;
+        background: #000 !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 1px rgba(255,107,53,0.5) !important;
+        pointer-events: auto !important;
+    `;
+    
+    // Asegurar que los contenedores internos sean visibles
+    const containers = [
+        miniPlayer.querySelector('.mini-player-video'),
+        document.getElementById('miniPlayer1Container'),
+        document.getElementById('miniPlayer2Container')
+    ].filter(Boolean);
+    
+    containers.forEach(container => {
+        container.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            background: #000 !important;
+        `;
+    });
+    
+    // Forzar visibilidad del player activo
+    const activePlayerNum = window.currentPlayer || 1;
+    const activePlayerId = `player${activePlayerNum}`;
+    const inactivePlayerId = `player${activePlayerNum === 1 ? 2 : 1}`;
+    
+    const activePlayer = document.getElementById(activePlayerId);
+    const inactivePlayer = document.getElementById(inactivePlayerId);
+    
+    if (activePlayer) {
+        activePlayer.style.cssText = `
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+        `;
+        activePlayer.classList.remove('hidden', 'fade-out');
+    }
+    
+    if (inactivePlayer) {
+        inactivePlayer.style.display = 'none';
+        inactivePlayer.classList.add('hidden');
+    }
+    
+    console.log('✅ Mini player forzado a visible');
+    return true;
+}
+    setupSearchButtonListeners() {
+    console.log('🔘 Configurando listeners de botones de búsqueda...');
+    
+    // Usar delegación de eventos para manejar botones dinámicos
+    const searchResults = document.getElementById('searchResults');
+    
+    if (!searchResults) {
+        console.warn('⚠️ Contenedor searchResults no encontrado');
+        return;
+    }
+    
+    // Event delegation para botón "Añadir Siguiente"
+    searchResults.addEventListener('click', async (e) => {
+        const nextBtn = e.target.closest('.search-result-add-next-btn');
+        
+        if (nextBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('➕ Click en Añadir Siguiente');
+            
+            // Extraer datos del botón
+            const videoId = nextBtn.dataset.videoId;
+            const title = nextBtn.dataset.title;
+            const thumbnail = nextBtn.dataset.thumbnail;
+            const duration = parseInt(nextBtn.dataset.duration) || 0;
+            const author = nextBtn.dataset.author;
+            
+            if (!videoId || videoId === 'undefined') {
+                console.error('❌ videoId inválido en botón');
+                window.unifiedCore?.showMessage('Error: Video inválido', 'error');
+                return;
+            }
+            
+            const videoData = {
+                videoId: videoId,
+                title: title,
+                thumbnail: thumbnail,
+                duration: duration,
+                uploaderName: author,
+                author: author
+            };
+            
+            console.log('📊 Video a añadir:', videoData);
+            
+            // Feedback visual
+            nextBtn.disabled = true;
+            nextBtn.style.opacity = '0.5';
+            
+            try {
+                // Llamar a la función del core
+                if (window.unifiedCore?.addVideoToQueueAfterCurrent) {
+                    await window.unifiedCore.addVideoToQueueAfterCurrent(videoData);
+                } else if (window.playlistManager?.addVideoToQueueAfterCurrent) {
+                    await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
+                } else {
+                    throw new Error('Función addVideoToQueueAfterCurrent no disponible');
+                }
+                
+                // Éxito: cambiar icono temporalmente
+                nextBtn.innerHTML = '<i class="fas fa-check"></i> Añadido';
+                setTimeout(() => {
+                    nextBtn.innerHTML = '<i class="fas fa-forward"></i> Añadir Siguiente';
+                    nextBtn.disabled = false;
+                    nextBtn.style.opacity = '1';
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Error añadiendo video:', error);
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                window.unifiedCore?.showMessage('Error añadiendo video', 'error');
+            }
+        }
+    });
+    
+    console.log('✅ Listeners de búsqueda configurados');
+}
+setupMiniPlayerObserver() {
+    const miniPlayer = document.getElementById('miniPlayerFloat');
+    
+    if (!miniPlayer) {
+        console.warn('⚠️ Mini player no encontrado para observer');
+        return;
+    }
+    
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes') {
+                // Si se añade clase 'hidden', verificar si debería estar visible
+                if (miniPlayer.classList.contains('hidden')) {
+                    const hasActiveVideo = window.reproduccionIniciada && 
+                                         window.unifiedCore?.currentView !== 'fullPlayer';
+                    
+                    if (hasActiveVideo) {
+                        console.log('🔧 Corrigiendo ocultamiento incorrecto del mini player');
+                        forceMiniPlayerVisibility();
+                    }
+                }
+            }
+        });
+    });
+    
+    observer.observe(miniPlayer, {
+        attributes: true,
+        attributeFilter: ['class', 'style']
+    });
+    
+    console.log('👁️ Observer de mini player configurado');
+}
+ checkAndShowMiniPlayer() {
+    // Solo mostrar si:
+    // 1. Hay reproducción activa
+    // 2. No estamos en vista full player
+    
+    const hasActiveVideo = window.reproduccionIniciada;
+    const isInFullPlayer = window.unifiedCore?.currentView === 'fullPlayer';
+    
+    if (hasActiveVideo && !isInFullPlayer) {
+        console.log('✅ Condiciones cumplidas para mostrar mini player');
+        forceMiniPlayerVisibility();
+    } else {
+        console.log('⏸️ Condiciones no cumplidas para mini player:', {
+            hasActiveVideo,
+            isInFullPlayer
+        });
+    }
+}  
+ 
+// =============================================
+// INICIALIZACIÓN AUTOMÁTICA EN CORE
+// =============================================
 
+// Agregar estas llamadas al constructor de UnifiedCore, después de this.init()
+// O llamar directamente después de que el DOM esté listo
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            setupSearchButtonListeners();
+            setupMiniPlayerObserver();
+            checkAndShowMiniPlayer();
+        }, 1500);
+    });
+} else {
+    setTimeout(() => {
+        setupSearchButtonListeners();
+        setupMiniPlayerObserver();
+        checkAndShowMiniPlayer();
+    }, 1500);
+}
+
+// Verificar mini player cada vez que cambie la vista
+document.addEventListener('viewChanged', (e) => {
+    console.log('🔄 Vista cambió:', e.detail);
+    setTimeout(checkAndShowMiniPlayer, 300);
+});
+
+// Verificar cuando empiece a reproducir
+document.addEventListener('playbackStarted', () => {
+    console.log('▶️ Reproducción iniciada');
+    setTimeout(checkAndShowMiniPlayer, 500);
+});
+
+// Re-verificar cada 5 segundos (fallback de seguridad)
+setInterval(() => {
+    const miniPlayer = document.getElementById('miniPlayerFloat');
+    if (miniPlayer && !miniPlayer.classList.contains('hidden')) {
+        const hasActiveVideo = window.reproduccionIniciada;
+        if (hasActiveVideo) {
+            // Verificar que el video sea visible
+            const activePlayerNum = window.currentPlayer || 1;
+            const activePlayer = document.getElementById(`player${activePlayerNum}`);
+            
+            if (activePlayer && activePlayer.style.display === 'none') {
+                console.log('🔧 Corrigiendo player oculto');
+                forceMiniPlayerVisibility();
+            }
+        }
+    }
+}, 5000);
+
+// =============================================
+// EXPORTAR FUNCIONES GLOBALMENTE
+// =============================================
+
+window.forceMiniPlayerVisibility = forceMiniPlayerVisibility;
+window.setupSearchButtonListeners = setupSearchButtonListeners;
+window.checkAndShowMiniPlayer = checkAndShowMiniPlayer;
+   
 /**
  * Mover reproductor entre contenedores
  */
