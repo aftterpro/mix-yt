@@ -2290,18 +2290,16 @@ async performSearchFallback(query, nextPage) {
     window.playlistManager.updateQueuePopup();
 }
 displaySearchResults(data) {
-    console.log('📊 displaySearchResults, log netlify con', data);
+    console.log('📊 displaySearchResults con', data);
     
-    // 🛠️ CORRECCIÓN DE ID: Usar 'searchResults' según el HTML
-    const resultsContainer = document.getElementById('searchResults'); 
+    const resultsContainer = document.getElementById('searchResults');
 
-    // Verificación de seguridad
     if (!resultsContainer) {
         console.error("❌ ERROR: No se encontró el elemento HTML con ID 'searchResults'.");
         return; 
     }
     
-    // Limpiamos y eliminamos el placeholder
+    // Limpiar contenedor
     resultsContainer.innerHTML = ''; 
 
     if (!data.items || data.items.length === 0) {
@@ -2310,92 +2308,144 @@ displaySearchResults(data) {
     }
 
     data.items.forEach(video => {
-        // --- PROCESAMIENTO DE DURACIÓN ---
-        // 🛠️ CORRECCIÓN: Usar 'this.' para llamar al método de la clase
+        // Procesar duración
         const segundos = this.parseDurationToSeconds(video.duration); 
 
-        // CREACIÓN DEL ELEMENTO HTML
+        // Crear elemento HTML
         const trackDiv = document.createElement('div');
-        trackDiv.className = 'track-item card-track'; 
+        trackDiv.className = 'track-item card-track search-result-card'; 
 
-        // ATRIBUTOS DE DATOS
+        // Atributos de datos
         trackDiv.dataset.videoId = video.videoId;
         trackDiv.dataset.durationText = video.duration; 
-        trackDiv.dataset.durationSeconds = segundos;     // <-- Dato numérico para el reproductor
+        trackDiv.dataset.durationSeconds = segundos;
 
-        // ESTRUCTURA INTERNA
+        // Estructura interna CORREGIDA
         trackDiv.innerHTML = `
-            <img src="${video.thumbnail}" alt="${video.title}" class="track-thumbnail">
-            <div class="track-details">
-                <p class="track-title">${video.title}</p>
-                <p class="track-artist">${video.artist}</p>
-                <span class="track-duration">${video.duration}</span>
+            <div class="search-result-thumbnail">
+                <img src="${video.thumbnail}" alt="${this.escapeHTML(video.title)}" loading="lazy" onerror="this.src='./electronic.ico';">
+                <span class="search-result-duration">${video.duration || '0:00'}</span>
             </div>
-            <button class="add-to-queue-btn" title="Añadir a la cola" data-video-id="${video.videoId}">
-              <i class="fas fa-plus"></i>
+            <div class="search-result-info">
+                <h3 class="search-result-title">${this.escapeHTML(video.title)}</h3>
+                <p class="search-result-author">${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}</p>
+            </div>
+            <button class="add-to-queue-btn" 
+                    title="Añadir a la cola" 
+                    data-video-id="${video.videoId}"
+                    data-title="${this.escapeHTML(video.title)}"
+                    data-thumbnail="${video.thumbnail}"
+                    data-duration="${segundos}"
+                    data-author="${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}">
+                <i class="fas fa-plus"></i>
             </button>
         `;
         
-        // --- 🛠️ CORRECCIÓN DE LÓGICA 1: Listener para el Botón de Añadir a Cola ---
+        // =============================================
+        // EVENT LISTENER: Botón Añadir a Cola (fa-plus)
+        // =============================================
         const addButton = trackDiv.querySelector('.add-to-queue-btn');
         if (addButton) {
-            addButton.addEventListener('click', (e) => {
+            addButton.addEventListener('click', async (e) => {
                 e.preventDefault();
-                e.stopPropagation(); // CRÍTICO: Evita que el clic se propague al trackDiv principal
+                e.stopPropagation();
 
                 const videoId = addButton.dataset.videoId;
+                const title = addButton.dataset.title;
+                const thumbnail = addButton.dataset.thumbnail;
+                const duration = parseInt(addButton.dataset.duration) || 0;
+                const author = addButton.dataset.author;
+                
+                if (!videoId || videoId === 'undefined') {
+                    console.error('❌ videoId inválido');
+                    this.showMessage('Error: Video inválido', 'error');
+                    return;
+                }
                 
                 const videoData = {
                     videoId: videoId,
-                    title: video.title,
-                    thumbnail: video.thumbnail,
-                    duration: segundos, // Usamos los segundos calculados
-                    uploaderName: video.uploaderName,
-                    artist: video.artist
+                    title: title,
+                    thumbnail: thumbnail,
+                    duration: duration,
+                    uploaderName: author,
+                    artist: author,
+                    author: author
                 };
                 
-                // Llama a la función de añadir a la cola
-                if (window.unifiedCore && typeof window.unifiedCore.addVideoToQueue === 'function') {
-                     window.unifiedCore.addVideoToQueue(videoData); 
-                } else {
-                     console.error('❌ addVideoToQueue no definido en unifiedCore');
+                console.log('➕ Añadiendo a cola:', videoData);
+                
+                // Feedback visual inmediato
+                const originalHTML = addButton.innerHTML;
+                addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                addButton.disabled = true;
+                addButton.style.opacity = '0.5';
+                
+                try {
+                    // Añadir a cola
+                    if (window.unifiedCore && typeof window.unifiedCore.addVideoToQueue === 'function') {
+                        await window.unifiedCore.addVideoToQueue(videoData);
+                    } else if (window.playlistManager && typeof window.playlistManager.addVideoToQueue === 'function') {
+                        await window.playlistManager.addVideoToQueue(videoData);
+                    } else {
+                        throw new Error('addVideoToQueue no disponible');
+                    }
+                    
+                    // Éxito
+                    addButton.innerHTML = '<i class="fas fa-check"></i>';
+                    addButton.style.background = '#4caf50';
+                    addButton.style.borderColor = '#4caf50';
+                    
+                    setTimeout(() => {
+                        addButton.innerHTML = originalHTML;
+                        addButton.disabled = false;
+                        addButton.style.opacity = '1';
+                        addButton.style.background = '';
+                        addButton.style.borderColor = '';
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('❌ Error añadiendo video:', error);
+                    addButton.innerHTML = '<i class="fas fa-times"></i>';
+                    addButton.style.background = '#f44336';
+                    
+                    setTimeout(() => {
+                        addButton.innerHTML = originalHTML;
+                        addButton.disabled = false;
+                        addButton.style.opacity = '1';
+                        addButton.style.background = '';
+                    }, 2000);
                 }
             });
         }
         
-        // --- 🛠️ CORRECCIÓN DE LÓGICA 2: Listener de Reproducción (Clic en el DIV principal) ---
+        // =============================================
+        // EVENT LISTENER: Click en Card para Reproducir
+        // =============================================
         trackDiv.addEventListener('click', function(e) {
-            // Ya verificamos que no fue un clic en el botón '+'
+            // Ignorar si se hizo click en el botón
             if (e.target.closest('.add-to-queue-btn')) {
                 return;
             }
 
             const videoId = this.dataset.videoId;
-            // Obtenemos el número entero de segundos
             const durationInSeconds = parseInt(this.dataset.durationSeconds); 
 
-            console.log(`▶️ Reproduciendo video ID: ${videoId} con duración: ${durationInSeconds}s`);
+            console.log(`▶️ Reproduciendo video ID: ${videoId}`);
 
-            // LLAMADA A TU FUNCIÓN DE REPRODUCCIÓN
             if (window.unifiedCore && typeof window.unifiedCore.playTrack === 'function') {
-                // Aquí debes pasar la duración para inicializar la barra de progreso
                 window.unifiedCore.playTrack(videoId, durationInSeconds); 
             } else {
-                // Si la función playTrack no existe, usamos playVideoAtIndex
-                if (window.unifiedCore && typeof window.unifiedCore.playVideoAtIndex === 'function') {
-                    // Nota: playVideoAtIndex necesita el índice, lo cual es más complejo aquí.
-                    // Si no usas índices, debes asegurarte de que playTrack maneje la carga.
-                    window.unifiedCore.playTrack(videoId, durationInSeconds); 
-                } else {
-                    console.error('❌ playTrack o playVideoAtIndex no definido en unifiedCore');
-                }
+                console.error('❌ playTrack no disponible');
             }
         });
 
-        // Añadir el elemento al contenedor
+        // Añadir al contenedor
         resultsContainer.appendChild(trackDiv);
     });
+    
+    console.log(`✅ ${data.items.length} resultados renderizados`);
 }
+
 setupImprovedInfiniteScroll(searchResults) {
     if (!nextPageContext) {
         console.log('📜 Sin más páginas disponibles para scroll infinito');
