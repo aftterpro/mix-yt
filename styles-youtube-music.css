@@ -381,16 +381,17 @@ body {
     flex-direction: column;
     background: var(--yt-bg-elevated);
     border-radius: 8px;
-    transition: transform 0.2s ease, background 0.2s ease;
     /* Altura balanceada para que sean "medianas" */
     min-height: 260px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
 }
 
 .search-result-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     border-color: var(--yt-layer-15);
     background: var(--yt-bg-menu);
+   transform: translateY(-6px) !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
 }
 
 .search-result-thumbnail {
@@ -432,21 +433,26 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
+    gap: 4px !important;
 }
 
 .search-result-title {
-    font-size: 14px;
-    font-weight: 400;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
     color: var(--yt-text-primary);
     margin-bottom: 8px;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    line-height: 1.4;
     min-height: 2.8em;
 }
-
+.search-result-author::before {
+    content: '👤 ';
+    opacity: 0.6;
+    margin-right: 4px;
+}
 .search-result-author {
     font-size: 12px;
     color: var(--yt-text-secondary);
@@ -481,23 +487,80 @@ body {
 }
 
 .search-result-add-next-btn {
-    opacity: 0;
-    transform: translateY(10px);
+    flex: 1 !important;
+    background: rgba(255, 107, 53, 0.1) !important;
+    border: 1px solid rgba(255, 107, 53, 0.3) !important;
+    border-radius: 6px !important;
+    color: var(--primary-color) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    transition: all 0.2s ease !important;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
 }
 
+
 .search-result-card:hover .search-result-add-next-btn {
-    opacity: 1;
-    transform: translateY(0);
+    opacity: 1 !important;
+    transform: translateY(0) !important;
 }
 
 .search-result-add-btn:hover,
-.search-result-add-next-btn:hover {
     background: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
     transform: translateY(-2px);
 }
-
+.search-result-add-next-btn i {
+    font-size: 14px !important;
+    }
+.search-result-add-btn:hover {
+    background: #2196F3 !important;
+    color: white !important;
+    border-color: #2196F3 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3) !important;
+}
+/* Contenedor de acciones */
+.search-result-actions {
+    display: flex !important;
+    gap: 8px !important;
+    margin-top: auto !important;
+    width: 100% !important;
+}
+/* Botón "Añadir a Cola" (el de +) */
+.search-result-add-btn {
+    flex: 1 !important;
+    background: rgba(33, 150, 243, 0.1) !important;
+    border: 1px solid rgba(33, 150, 243, 0.3) !important;
+    border-radius: 6px !important;
+    color: #2196F3 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    transition: all 0.2s ease !important;
+}
+.search-result-add-next-btn:active {
+    transform: translateY(0) !important;
+    }
+.search-result-add-next-btn:hover {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border-color: var(--primary-color) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3) !important;
+    }
 .search-placeholder {
     grid-column: 1 / -1;
     text-align: center;
@@ -775,48 +838,6 @@ body {
     height: 200px;
     width: 600px;
 }
-
-.mini-player-float:not(.hidden) {
-    display: block !important;
-}
-
-.mini-player-video {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: #000;
-}
-
-.mini-video-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.mini-player-expand {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 36px;
-    height: 36px;
-    background: rgba(0, 0, 0, 0.8);
-    border: none;
-    border-radius: 50%;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    transition: background var(--transition-fast);
-}
-
-.mini-player-expand:hover {
-    background: rgba(0, 0, 0, 0.9);
-}
-
 /* =============================================
    EFECTOS DE CROSSFADE
    ============================================= */
@@ -1337,6 +1358,114 @@ body {
     }
 }
 
+/* =============================================
+   ANIMACIONES SUAVES
+   ============================================= */
+
+@keyframes miniPlayerSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+#miniPlayerFloat:not(.hidden) {
+    animation: miniPlayerSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Glow sutil en el mini player cuando está activo */
+#miniPlayerFloat::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, 
+        rgba(255, 107, 53, 0.4), 
+        rgba(255, 138, 101, 0.4));
+    border-radius: 14px;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+#miniPlayerFloat:hover::after {
+    opacity: 1;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+/* =============================================
+   ESTADOS DE CARGA
+   ============================================= */
+
+.mini-player-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--primary-color);
+    font-size: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* =============================================
+   CORRECCIONES DE ACCESIBILIDAD
+   ============================================= */
+
+/* Indicador visual cuando está reproduciéndose */
+#miniPlayerFloat.playing {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 
+                0 0 20px rgba(255, 107, 53, 0.4) !important;
+}
+
+/* Focus para teclado */
+.mini-player-expand:focus {
+    outline: 2px solid var(--primary-color) !important;
+    outline-offset: 2px !important;
+}
+
+.search-result-add-next-btn:focus,
+.search-result-add-btn:focus {
+    outline: 2px solid currentColor !important;
+    outline-offset: 2px !important;
+}
+
+/* =============================================
+   CORRECCIÓN DE OVERLAP CON BOTTOM PLAYER
+   ============================================= */
+
+/* Asegurar que el mini player nunca se superponga con la barra inferior */
+#miniPlayerFloat {
+    bottom: clamp(110px, calc(var(--player-height, 90px) + 20px), 150px) !important;
+}
+
+/* Ajuste dinámico si la barra inferior cambia de tamaño */
+@media (max-height: 600px) {
+    #miniPlayerFloat {
+        width: 240px !important;
+        height: 135px !important;
+    }
+}
 /* =============================================
    UTILIDADES ADICIONALES
    ============================================= */
@@ -2373,19 +2502,24 @@ body {
     opacity: 1 !important;
 }
 @media (max-width: 768px) {
-    .mini-player-float {
-        width: 240px !important;
-        height: 135px !important;
-        bottom: calc(var(--player-height) + 10px) !important;
+    #miniPlayerFloat {
+        width: 280px !important;
+        height: 158px !important;
+        bottom: calc(var(--player-height, 90px) + 10px) !important;
         right: 10px !important;
     }
+    
+    .mini-player-expand {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 14px !important;
+    }
 }
-@media (max-width: 768px) {
-    .mini-player-float {
+@media (max-width: 480px) {
+    #miniPlayerFloat {
         width: 240px !important;
         height: 135px !important;
-        bottom: calc(var(--player-height) + 10px) !important;
-        right: 10px !important;
+        bottom: calc(var(--player-height, 72px) + 10px) !important;
     }
 }
 /* =============================================
@@ -2509,6 +2643,15 @@ color: #FFFFFF !important;
 /* =============================================
    MINI PLAYER FLOTANTE - MÁXIMA PRIORIDAD
    ============================================= */
+#persistent-player-layer {
+    position: fixed !important;
+    z-index: 2147483647 !important; /* Máximo z-index posible */
+    background: #000 !important;
+    pointer-events: auto !important;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+/* Mini Player Flotante - Contenedor */
 #miniPlayerFloat {
     position: fixed !important;
     bottom: 110px !important;
@@ -2518,65 +2661,89 @@ color: #FFFFFF !important;
     background: #000 !important;
     border-radius: 12px !important;
     overflow: hidden !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 
+                0 0 1px rgba(255, 107, 53, 0.5) !important;
     z-index: 999998 !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    transition: all 0.3s ease !important;
     pointer-events: auto !important;
+    border: 1px solid rgba(255, 107, 53, 0.2) !important;
 }
 
+/* Cuando está oculto */
 #miniPlayerFloat.hidden {
     display: none !important;
     opacity: 0 !important;
     visibility: hidden !important;
+    pointer-events: none !important;
 }
 
-#miniPlayerFloat .mini-player-video {
+/* Contenedor de video dentro del mini player */
+.mini-player-video {
     position: relative !important;
     width: 100% !important;
     height: 100% !important;
     background: #000 !important;
-}
-
-#miniPlayerFloat .mini-video-container {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* ✅ ASEGURAR QUE LOS PLAYERS DENTRO DEL MINI SEAN VISIBLES */
-#miniPlayerFloat .mini-video-container iframe,
-#miniPlayerFloat .mini-video-container #player1,
-#miniPlayerFloat .mini-video-container #player2 {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
     display: block !important;
     visibility: visible !important;
-    border: none !important;
 }
 
-/* ✅ PLAYER ACTIVO EN MINI */
-#miniPlayerFloat .video-player:not(.hidden) {
+/* Contenedores de players */
+#miniPlayer1Container,
+#miniPlayer2Container,
+.mini-video-container {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #000 !important;
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* CRÍTICO: Players dentro del mini flotante */
+#miniPlayerFloat iframe,
+#miniPlayerFloat .video-player,
+#miniPlayer1Container iframe,
+#miniPlayer2Container iframe {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    background: #000 !important;
 }
 
-#miniPlayerFloat .mini-player-expand {
+/* Anular transiciones que puedan ocultar el video */
+#miniPlayerFloat .video-player.fade-in,
+#miniPlayerFloat .video-player.fade-out {
+    filter: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+}
+
+/* Solo ocultar el player inactivo */
+#miniPlayerFloat .video-player.hidden {
+    display: none !important;
+    opacity: 0 !important;
+}
+
+/* Botón de expandir */
+.mini-player-expand {
     position: absolute !important;
     top: 10px !important;
     right: 10px !important;
     width: 36px !important;
     height: 36px !important;
-    background: rgba(0, 0, 0, 0.8) !important;
-    border: none !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    border: 1px solid rgba(255, 107, 53, 0.3) !important;
     border-radius: 50% !important;
     color: white !important;
     cursor: pointer !important;
@@ -2584,114 +2751,13 @@ color: #FFFFFF !important;
     align-items: center !important;
     justify-content: center !important;
     z-index: 10 !important;
-    transition: background 0.2s !important;
+    font-size: 16px !important;
+    transition: all 0.2s ease !important;
+    backdrop-filter: blur(10px) !important;
 }
 
-#miniPlayerFloat .mini-player-expand:hover {
-    background: rgba(255, 107, 53, 0.9) !important;
-}
-
-/* ✅ REGLA DE MÁXIMA ESPECIFICIDAD */
-body #miniPlayerFloat:not(.hidden) {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-/* Forzar que los contenedores internos del mini player siempre sean visibles */
-#miniPlayer1Container, #miniPlayer2Container {
-    display: block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Solo ocultar el reproductor que NO esté activo, no el contenedor */
-.mini-video-container .video-player.hidden {
-    display: none !important;
-}
-/* =======================================================
-   🔴 PARCHE CRÍTICO: FORZAR VISIBILIDAD MINI PLAYER
-   
-   ======================================================= */
-
-/* 1. Asegurar que el contenedor flotante esté encima de todo y visible */
-#miniPlayerFloat {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    z-index: 2147483647 !important; /* El número más alto posible en CSS */
-    background: #000 !important;
-}
-
-/* Solo ocultar si tiene la clase .hidden explícita */
-#miniPlayerFloat.hidden {
-    display: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-}
-
-/* 2. Forzar que los contenedores internos (donde se mueve el iframe) sean visibles */
-#miniPlayerFloat .mini-player-video,
-#miniPlayer1Container,
-#miniPlayer2Container {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    width: 100% !important;
-    height: 100% !important;
-    background: #000 !important;
-}
-
-/* 3. REGLA DE ORO: Anular las animaciones de efecto.css dentro del mini player */
-/* Esto hace que si el video tiene clase .fade-out, la ignore dentro del mini player */
-#miniPlayerFloat iframe,
-#miniPlayerFloat .video-player,
-#miniPlayerFloat .video-player.fade-out, 
-#miniPlayerFloat .video-player.fade-in {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    display: block !important;
-    filter: none !important; /* Quitar filtros de brillo/blur */
-    transform: none !important; /* Quitar escalas */
-    transition: none !important; /* Quitar transiciones suaves */
-}
-
-/* 4. Ocultar únicamente el reproductor que no está sonando */
-#miniPlayerFloat .video-player.hidden {
-    display: none !important;
-    opacity: 0 !important;
-}
-/* PARCHE FINAL MINI PLAYER */
-#miniPlayerFloat {
-    width: 320px !important;
-    height: 180px !important;
-    background: #000 !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8) !important;
-}
-
-/* Asegurar que el contenido interno ocupe espacio */
-#miniPlayerFloat .mini-player-video {
-    width: 100% !important;
-    height: 100% !important;
-    position: relative !important;
-    display: block !important;
-}
-
-#miniPlayer1Container, 
-#miniPlayer2Container {
-    width: 100% !important;
-    height: 100% !important;
-    position: absolute !important;
-    top: 0; left: 0;
-}
-/* FORZAR VISIBILIDAD DE IFRAME EN MINI PLAYER */
-#miniPlayerFloat iframe {
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
+.mini-player-expand:hover {
+    background: rgba(255, 107, 53, 0.95) !important;
+    border-color: var(--primary-color) !important;
+    transform: scale(1.1) !important;
 }
