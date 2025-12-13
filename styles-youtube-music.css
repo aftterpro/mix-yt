@@ -2948,6 +2948,6 @@ element.style {
     width: 515px;
     opacity: 1;
     border-radius: 0px;
-    /* height: 737px; */
+    height: 400px; 
     box-shadow: rgba(0, 0, 0, 0.5) 0px 8px 32px;
 }
