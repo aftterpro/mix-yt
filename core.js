@@ -1265,17 +1265,19 @@ movePlayersToFullView() {
         }
     }
 async playNextVideo() {
+    // Debounce para evitar doble salto
     const now = Date.now();
-    if (now - lastCrossfadeTime < 1000) return; // Debounce
+    if (now - lastCrossfadeTime < 1000) return; 
     lastCrossfadeTime = now;
     
     if (!playersInitialized) return;
 
     isTransitioning = true;
+    
+    // Obtener datos actuales
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
     const flatList = this.getFlattenedPlaylist();
 
-    // Validaciones de lista vacía o fin de lista
     if (flatList.length === 0) {
         isTransitioning = false;
         this.handleEmptyPlaylist();
@@ -1291,58 +1293,72 @@ async playNextVideo() {
 
     const nextVideo = flatList[nextIndex];
     
-    // Actualizar Info
+    // ============================================================
+    // 1. ACTUALIZACIÓN DE ESTADO GLOBAL (INMEDIATA)
+    // ============================================================
     currentPlayingInfo = {
         flattenedIndex: nextIndex,
         videoId: nextVideo.videoId,
         playlistId: nextVideo.sourcePlaylistId
     };
+    // Sincronizar con variable window para acceso global
+    window.currentPlayingInfo = currentPlayingInfo; 
+    
+    // Actualizar Textos del Reproductor
     this.updateNowPlaying();
 
-    // Identificar reproductores
+    // ============================================================
+    // 2. FORZAR ACTUALIZACIÓN DE COLA Y SCROLL (SOLUCIÓN INDICADOR)
+    // ============================================================
+    if (window.playlistManager) {
+        // Esto mueve la clase 'playing' al nuevo video INMEDIATAMENTE
+        window.playlistManager.syncQueueIndicator(); 
+        
+        // Esto actualiza el scroll en la lista lateral
+        this.updatePersistentQueue(); 
+        
+        // Esto actualiza pestañas de letras/relacionados
+        window.playlistManager.refreshActiveQueueTab(); 
+    }
+
+    // ============================================================
+    // 3. LÓGICA DE REPRODUCTORES (CROSSFADE)
+    // ============================================================
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
     const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
 
     try {
-        // Preparar visualmente el siguiente reproductor (oculto pero activo)
+        // Mostrar visualmente el contenedor del siguiente video (oculto por opacidad)
         if (nextPlayerElement) {
             nextPlayerElement.classList.remove('hidden', 'fade-out');
             nextPlayerElement.style.display = 'block';
-            nextPlayerElement.style.opacity = '0'; // Invisible al inicio
-            nextPlayerElement.style.zIndex = '3';  // Encima del actual
+            nextPlayerElement.style.opacity = '0'; 
+            nextPlayerElement.style.zIndex = '2';
         }
 
-        // Cargar video inmediatamente
-        // NO USAR SETTIMEOUT AQUÍ PARA EVITAR HUECOS DE SILENCIO
+        // Cargar video
         nextPlayerInstance.loadVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
-        
-        // Mute inicial para evitar "golpe" de audio antes del fade
-        nextPlayerInstance.setVolume(0);
+        nextPlayerInstance.setVolume(0); // Empezar en silencio
 
-        // Cambiar puntero de reproductor actual
+        // Cambiar puntero
         currentPlayer = currentPlayer === 1 ? 2 : 1;
-        
-        // Iniciar la mezcla de audio
+        window.currentPlayer = currentPlayer; // Sincronizar global
+
+        // Iniciar transición de audio
         this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
-        
-        // Actualizar UI en segundo plano
-        setTimeout(() => {
-            if (window.playlistManager) {
-                window.playlistManager.updateQueuePopup();
-                window.playlistManager.refreshActiveQueueTab();
-            }
-        }, 200);
 
     } catch (error) {
         console.error("Error en playNextVideo:", error);
+        // Fallback en caso de error
         isTransitioning = false;
         hasOutroCrossfadeStarted = false;
         if (!monitorInterval) this.startMonitoring();
     } finally {
+        // Liberar bloqueo de transición tras un segundo
         setTimeout(() => { isTransitioning = false; }, 1000);
     }
 }
@@ -2266,24 +2282,27 @@ function checkAndSkipSegment(player) {
             }
         }
     } catch (error) {}
-}
-function monitorPlayers() {
+}function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
     try {
         const activePlayer = (currentPlayer === 1) ? player1 : player2;
-        if (!activePlayer?.getPlayerState) return;
+        // Si el reproductor no está listo, salir
+        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') return;
 
         const playerState = activePlayer.getPlayerState();
+        
+        // Solo monitorear si está efectivamente reproduciendo
+        if (playerState !== YT.PlayerState.PLAYING) return;
+
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        // Solo monitorear si está reproduciendo
-        if (playerState !== YT.PlayerState.PLAYING) return;
-        if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
+        if (isNaN(currentTime) || currentTime <= 0 || videoDuration <= 0) return;
 
-        // Calcular duración de segmentos a saltar (SponsorBlock)
+        // --- CÁLCULO DE TIEMPO EFECTIVO ---
+        // 1. Calcular tiempo de SponsorBlock (segmentos a saltar al final)
         let totalSponsorBlockDuration = 0;
         if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
             totalSponsorBlockDuration = segmentosCache[videoId]
@@ -2295,41 +2314,58 @@ function monitorPlayers() {
                 }, 0);
         }
 
-        // CALCULO DEL TRIGGER (Punto de inicio del crossfade)
-        // Eliminamos margenes de seguridad excesivos para que sea más preciso
-        const triggerTime = videoDuration - (CROSSFADE_DURATION + totalSponsorBlockDuration);
+        // 2. Definir cuándo disparar el efecto
+        // Trigger = Duración Total - (Tiempo de Crossfade + SponsorBlock + Buffer mínimo)
+        // El buffer de 0.5s ayuda a que no sea en el último milisegundo
+        const triggerOffset = CROSSFADE_DURATION + totalSponsorBlockDuration + 0.5;
+        const triggerTime = videoDuration - triggerOffset;
+
+        // Log de depuración (puedes comentarlo después)
+        // console.log(`Monitor: Actual: ${currentTime.toFixed(1)} | Trigger: ${triggerTime.toFixed(1)} | Duración: ${videoDuration.toFixed(1)}`);
+
+        // --- ACCIONES ---
         
-        // SponsorBlock: Saltar segmentos
-        if (videoId && currentTime > 0) {
+        // 1. Saltar segmentos (Intro/Outro) si es necesario
+        if (videoId) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // DISPARAR CROSSFADE
-        // Se activa cuando falta exactamente el tiempo de duración del crossfade
+        // 2. DISPARAR CROSSFADE
+        // La condición verifica:
+        // - Que hayamos llegado al tiempo de disparo
+        // - Que no estemos ya en transición
+        // - Que falte poco para acabar (evita disparos al inicio si la duración está mal)
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
-            !crossfadeInProgress &&
-            !nextVideoScheduled) { 
+            !crossfadeInProgress && 
+            !nextVideoScheduled) {
             
-            console.log(`🚀 TRIGGER CROSSFADE: Restan ${(videoDuration - currentTime).toFixed(2)}s`);
+            // Protección para videos muy cortos (menos de 20s)
+            // Si el video es más corto que el crossfade, no hacer crossfade largo
+            if (videoDuration < (CROSSFADE_DURATION * 2)) {
+                if (currentTime < (videoDuration - 2)) return; // Esperar al final real
+            }
+
+            console.log(`🚀 TRIGGER ACTIVADO: Tiempo ${currentTime.toFixed(2)} >= ${triggerTime.toFixed(2)}`);
             
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             
-            // Pausar este monitor para evitar disparos múltiples
+            // Detener este intervalo para evitar dobles llamadas
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
             
-            // Ejecutar inmediatamente
-            if (window.unifiedCore?.playNextVideo) {
+            // Llamar al siguiente video INMEDIATAMENTE
+            if (window.unifiedCore && typeof window.unifiedCore.playNextVideo === 'function') {
                 window.unifiedCore.playNextVideo();
             }
         }
+
     } catch (error) {
-        console.error("Error monitorPlayers:", error);
+        console.error("Error en monitorPlayers:", error);
     }
 }
 function calculateCrossfadeTriggerTime(videoDuration, videoId) {
