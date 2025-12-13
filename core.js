@@ -916,7 +916,7 @@ class UnifiedCore {
                  targetContainer.style.position = 'relative';
             }
             activePlayerElement.style.width = '100%';
-            activePlayerElement.style.height = '100%';
+            activePlayerElement.style.height = '400px';
             activePlayerElement.style.position = 'absolute';
             activePlayerElement.style.top = '0';
             activePlayerElement.style.left = '0';
@@ -2512,3 +2512,4 @@ window.addEventListener('beforeunload', () => {
 });
 
 window.UnifiedCore = UnifiedCore;
+
