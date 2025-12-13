@@ -934,76 +934,6 @@ class UnifiedCore {
         if (miniPlayer) miniPlayer.classList.add('hidden');
     }
 
-    updatePersistentQueue() {
-        console.log('🔄 Actualizando cola persistente...');
-        const queueContentList = document.getElementById('queueContentList');
-        if (!queueContentList) return;
-
-        const flatList = this.getFlattenedPlaylist();
-        if (flatList.length === 0) {
-            queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>';
-            this.updateQueueCount(0);
-            return;
-        }
-
-        const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? 
-                            window.currentPlayingInfo?.flattenedIndex ?? -1;
-
-        const fragment = document.createDocumentFragment();
-        let validCount = 0;
-
-        flatList.forEach((video, index) => {
-            if (!video || !video.videoId) return;
-            const isPlaying = currentIndex === index;
-            const queueItem = document.createElement('div');
-            queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
-            queueItem.dataset.videoId = video.videoId;
-            queueItem.dataset.flatIndex = index;
-            queueItem.draggable = true;
-            queueItem.onclick = () => this.playVideoAtIndex(index);
-            
-            queueItem.innerHTML = `
-                <div class="queue-item-number">
-                    ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
-                </div>
-                <img src="${video.thumbnail || './electronic.ico'}" alt="${this.escapeHTML(video.title || 'Sin título')}" class="queue-item-thumbnail" onerror="this.src='./electronic.ico';">
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
-                    <div class="queue-item-meta">
-                        <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
-                        ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
-                    </div>
-                </div>
-                <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola"><i class="fas fa-times"></i></button>
-            `;
-            
-            const removeBtn = queueItem.querySelector('.queue-item-remove');
-            removeBtn.onclick = (e) => {
-                e.stopPropagation();
-                if (window.playlistManager) {
-                    window.playlistManager.removeVideoFromQueue(video.videoId);
-                }
-            };
-            fragment.appendChild(queueItem);
-            validCount++;
-        });
-
-        queueContentList.innerHTML = '';
-        queueContentList.appendChild(fragment);
-        this.updateQueueCount(validCount);
-        
-        setTimeout(() => {
-            if (window.queueDragDrop) window.queueDragDrop.attachDragListeners();
-        }, 100);
-        
-        if (currentIndex >= 0) {
-            requestAnimationFrame(() => {
-                const playingItem = queueContentList.querySelector('.queue-item.playing');
-                if (playingItem) playingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            });
-        }
-    }
-
     updateQueueCount(count) {
         const queueCountBadge = document.getElementById('queueCount');
         if (queueCountBadge) queueCountBadge.textContent = count;
@@ -1047,57 +977,55 @@ class UnifiedCore {
             }
         }
     }
-
-    // Función corregida para mover reproductores al contenedor full view
-    movePlayersToFullView() {
-        const fullPlayerView = document.getElementById('fullPlayerView');
-        if (!fullPlayerView) return;
-        
-        // Intentar encontrar el wrapper por clase o ID
-        const videoWrapper = fullPlayerView.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
-        if (!videoWrapper) {
-            console.error("No se encontró el contenedor .video-wrapper en fullPlayerView");
-            return;
-        }
-
-        // Asegurar que el contenedor tenga posición relativa
-        if (getComputedStyle(videoWrapper).position === 'static') {
-             videoWrapper.style.position = 'relative';
-        }
-        
-        const player1El = document.getElementById('player1');
-        const player2El = document.getElementById('player2');
-        
-        if (player1El && !videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
-        if (player2El && !videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
-        
-        const activePlayerNum = window.currentPlayer || 1;
-
-        [player1El, player2El].forEach((player, index) => {
-            if (player) {
-                // Aplicar estilos críticos inline para forzar que se quede dentro
-                player.style.position = 'absolute';
-                player.style.top = '0';
-                player.style.left = '0';
-                player.style.width = '100%';
-                player.style.height = '100%';
-                player.style.objectFit = 'cover';
-                
-                const isPlayer1 = index === 0;
-                const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
-
-                if (isActive) {
-                    player.style.display = 'block';
-                    player.style.visibility = 'visible';
-                    player.style.opacity = '1';
-                    player.style.zIndex = '10';
-                } else {
-                     player.style.display = 'none';
-                     player.style.zIndex = '0';
-                }
-            }
-        });
+movePlayersToFullView() {
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    if (!fullPlayerView) return;
+    
+    // Intentar encontrar el wrapper por clase o ID
+    const videoWrapper = fullPlayerView.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
+    if (!videoWrapper) {
+        console.error("No se encontró el contenedor .video-wrapper en fullPlayerView");
+        return;
     }
+
+    // Asegurar que el contenedor tenga posición relativa
+    if (window.getComputedStyle(videoWrapper).position === 'static') {
+         videoWrapper.style.position = 'relative';
+    }
+    
+    const player1El = document.getElementById('player1');
+    const player2El = document.getElementById('player2');
+    
+    if (player1El && !videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
+    if (player2El && !videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
+    
+    const activePlayerNum = window.currentPlayer || 1;
+
+    [player1El, player2El].forEach((player, index) => {
+        if (player) {
+            // Aplicar estilos críticos inline para forzar que se quede dentro
+            player.style.position = 'absolute';
+            player.style.top = '0';
+            player.style.left = '0';
+            player.style.width = '100%';
+            player.style.height = '100%';
+            player.style.objectFit = 'cover';
+            
+            const isPlayer1 = index === 0;
+            const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
+
+            if (isActive) {
+                player.style.display = 'block';
+                player.style.visibility = 'visible';
+                player.style.opacity = '1';
+                player.style.zIndex = '10';
+            } else {
+                 player.style.display = 'none';
+                 player.style.zIndex = '0';
+            }
+        }
+    });
+}
 
     forceBottomPlayerVisible() {
         const bottomPlayer = document.querySelector('.bottom-player');
@@ -1529,61 +1457,100 @@ class UnifiedCore {
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
 
-    async performSearch(query, continuation = null) {
-        const searchResults = document.getElementById('searchResults');
-        if (!searchResults) return;
+async performSearch(query, continuation = null) {
+    const searchResults = document.getElementById('searchResults');
+    if (!searchResults) return;
 
-        // Si es una búsqueda nueva, limpiar y resetear
-        if (!continuation) {
-            currentSearchQuery = query;
-            nextPageContext = null;
-            searchResults.innerHTML = '<div class="search-loading">🔍 Buscando música...</div>';
-            
-            // Desconectar observador anterior si existe
-            if (this.searchScrollObserver) {
-                this.searchScrollObserver.disconnect();
-                this.searchScrollObserver = null;
-            }
-        } else {
-            // Si es paginación, mostrar loading pequeño al final
-            const loadingMore = document.createElement('div');
-            loadingMore.className = 'search-loading-more';
-            loadingMore.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
-            searchResults.appendChild(loadingMore);
+    // Si es una búsqueda nueva, limpiar y resetear
+    if (!continuation) {
+        currentSearchQuery = query;
+        nextPageContext = null;
+        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando música...</div>';
+        
+        // Desconectar observador anterior si existe
+        if (this.searchScrollObserver) {
+            this.searchScrollObserver.disconnect();
+            this.searchScrollObserver = null;
         }
-
-        isLoadingMore = true;
-
-        try {
-            const data = await window.youtubeJSClient.search(query, continuation);
-            
-            // Guardar el token para la siguiente página
-            if (data.continuation) {
-                nextPageContext = data.continuation;
-            } else {
-                nextPageContext = null;
-            }
-
-            this.displaySearchResults(data, !!continuation);
-        } catch (error) {
-            console.error("❌ Error en búsqueda:", error);
-            if (!continuation) {
-                searchResults.innerHTML = `
-                    <div class="search-error">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Error en búsqueda: ${error.message}</p>
-                    </div>
-                `;
-            } else {
-                // Eliminar loading spinner si falla la paginación
-                const loadingMore = searchResults.querySelector('.search-loading-more');
-                if(loadingMore) loadingMore.remove();
-                this.showMessage('Error cargando más resultados', 'error');
-            }
-        } finally {
-            isLoadingMore = false;
-        }
+    } else {
+        // Si es paginación, mostrar loading pequeño al final
+        const loadingMore = document.createElement('div');
+        loadingMore.className = 'search-loading-more';
+        loadingMore.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
+        searchResults.appendChild(loadingMore);
     }
+
+    isLoadingMore = true;
+
+    try {
+        // USAR DIRECTAMENTE EL CLIENTE DE PIPED
+        const data = await window.youtubeJSClient.search(query, continuation);
+        
+        // ✅ CRÍTICO: Guardar el token para la siguiente página (usamos data.nextpage)
+        if (data.nextpage) {
+            nextPageContext = data.nextpage;
+        } else {
+            nextPageContext = null;
+        }
+
+        this.displaySearchResults(data, !!continuation);
+    } catch (error) {
+        console.error("❌ Error en búsqueda:", error);
+        if (!continuation) {
+            searchResults.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error en búsqueda: ${error.message}</p>
+                </div>
+            `;
+        } else {
+            const loadingMore = searchResults.querySelector('.search-loading-more');
+            if(loadingMore) loadingMore.remove();
+            this.showMessage('Error cargando más resultados', 'error');
+        }
+    } finally {
+        isLoadingMore = false;
+    }
+}
+
+// Nueva función para configurar el observador de scroll infinito
+setupInfiniteScroll(container) {
+    const scrollableElement = document.getElementById('searchResults');
+
+    // Crear un elemento centinela al final
+    let sentinel = document.getElementById('search-sentinel');
+    if (!sentinel) {
+        sentinel = document.createElement('div');
+        sentinel.id = 'search-sentinel';
+        sentinel.style.height = '20px';
+        sentinel.style.width = '100%';
+        sentinel.style.marginBottom = '20px';
+        sentinel.innerHTML = '<p style="text-align:center; color:#888;">Cargando más...</p>';
+    }
+
+    // Asegurarse de que el centinela esté al final
+    container.appendChild(sentinel);
+
+    if (this.searchScrollObserver) {
+        this.searchScrollObserver.disconnect();
+    }
+
+    // Crear nuevo observador
+    this.searchScrollObserver = new IntersectionObserver((entries) => {
+        // Si el centinela es visible, no estamos cargando ya, y hay página siguiente
+        if (entries[0].isIntersecting && !isLoadingMore && nextPageContext) {
+            console.log('📜 Scroll infinito disparado, cargando más resultados...');
+            sentinel.remove(); 
+            this.performSearch(currentSearchQuery, nextPageContext);
+        }
+    }, {
+        root: scrollableElement, 
+        rootMargin: '100px', 
+        threshold: 0.1
+    });
+
+    this.searchScrollObserver.observe(sentinel);
+}
 
     displaySearchResults(data, isContinuation) {
         const resultsContainer = document.getElementById('searchResults');
@@ -1840,27 +1807,124 @@ class UnifiedCore {
         return div.innerHTML;
     }
 
-    getFlattenedPlaylist() {
-        const queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
-        if (!queuePlaylist?.videos) return [];
+getFlattenedPlaylist() {
+    let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    
+    if (!queuePlaylist) {
+        // Crear si no existe (solución de emergencia, debería estar en initializeUI)
+        queuePlaylist = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
+        };
+        playlistsData.unshift(queuePlaylist);
+        console.warn('⚠️ Playlist de cola no encontrada, creándola y añadiéndola.');
+    }
+    
+    if (!queuePlaylist.videos || !Array.isArray(queuePlaylist.videos)) {
+        return [];
+    }
+    
+    // Filtrar y mapear (asumiendo que la lógica de mapeo es correcta)
+    const validVideos = queuePlaylist.videos.filter(video => {
+        if (!video.videoId || video.videoId === 'undefined') return false;
+        const title = (video.title || '').toLowerCase();
+        const isDeleted = title.includes('deleted video') || title.includes('private video');
+        if (isDeleted && window.playlistManager) {
+            window.playlistManager.removeVideoFromQueue(video.videoId);
+            return false;
+        }
+        return true;
+    }).map(video => {
+        let duration = 0;
+        if (video.duration) {
+            duration = typeof video.duration === 'number' ? video.duration : this.parseDuration(video.duration);
+        }
+        let artist = video.artist || video.uploaderName || video.author || 'YouTube';
         
-        return queuePlaylist.videos.filter(video => {
-            if (!video.videoId || video.videoId === 'undefined') return false;
-            const title = (video.title || '').toLowerCase();
-            const isDeleted = title.includes('deleted video') || title.includes('private video');
-            if (isDeleted && window.playlistManager) {
+        return { ...video, duration, artist, uploaderName: artist, author: artist };
+    });
+    
+    return validVideos;
+}
+
+updatePersistentQueue() {
+    console.log('🔄 Actualizando cola persistente...');
+    
+    const queueContentList = document.getElementById('queueContentList');
+    if (!queueContentList) return;
+
+    const flatList = this.getFlattenedPlaylist();
+    const count = flatList.length;
+
+    if (count === 0) {
+        queueContentList.innerHTML = '<p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>';
+        this.updateQueueCount(0);
+        return;
+    }
+
+    const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? 
+                        window.currentPlayingInfo?.flattenedIndex ?? -1;
+
+    const fragment = document.createDocumentFragment();
+    
+    flatList.forEach((video, index) => {
+        if (!video || !video.videoId) return;
+        const isPlaying = currentIndex === index;
+        
+        const queueItem = document.createElement('div');
+        // ... (resto de la creación del elemento queueItem) ...
+        queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
+        queueItem.dataset.videoId = video.videoId;
+        queueItem.dataset.flatIndex = index;
+        queueItem.draggable = true;
+        queueItem.onclick = () => this.playVideoAtIndex(index);
+        
+        queueItem.innerHTML = `
+            <div class="queue-item-number">
+                ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
+            </div>
+            <img src="${video.thumbnail || './electronic.ico'}" alt="${this.escapeHTML(video.title || 'Sin título')}" class="queue-item-thumbnail" onerror="this.src='./electronic.ico';">
+            <div class="queue-item-info">
+                <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
+                <div class="queue-item-meta">
+                    <span class="queue-item-duration">${this.formatDuration(video.duration || 0)}</span>
+                    ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
+                </div>
+            </div>
+            <button class="queue-item-remove" data-video-id="${video.videoId}" title="Eliminar de la cola"><i class="fas fa-times"></i></button>
+        `;
+        
+        const removeBtn = queueItem.querySelector('.queue-item-remove');
+        removeBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (window.playlistManager) {
                 window.playlistManager.removeVideoFromQueue(video.videoId);
-                return false;
             }
-            return true;
-        }).map(video => {
-            let duration = 0;
-            if (video.duration) {
-                duration = typeof video.duration === 'number' ? video.duration : this.parseDuration(video.duration);
-            }
-            return { ...video, duration };
+        };
+        fragment.appendChild(queueItem);
+    });
+
+    queueContentList.innerHTML = '';
+    queueContentList.appendChild(fragment);
+    
+    // ✅ CRÍTICO: Actualizar el contador con el tamaño real de la lista
+    this.updateQueueCount(count); 
+    
+    setTimeout(() => {
+        if (window.queueDragDrop) window.queueDragDrop.attachDragListeners();
+    }, 100);
+    
+    if (currentIndex >= 0) {
+        requestAnimationFrame(() => {
+            const playingItem = queueContentList.querySelector('.queue-item.playing');
+            if (playingItem) playingItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
     }
+}
 
     async getBatchVideoDurations(videoIds) {
         if (!videoIds || videoIds.length === 0) return {};
