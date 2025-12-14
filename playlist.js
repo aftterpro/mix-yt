@@ -349,7 +349,7 @@ async loadPlaylistVideos(playlistId) {
             return false;
         }
         
-        this.core?.showMessage('Cargando videos de la playlist...', 'info');
+        this.core?.showMessage('Cargando videos...', 'info');
         
         let allVideos = [];
         let nextPageToken = null;
@@ -363,17 +363,19 @@ async loadPlaylistVideos(playlistId) {
             });
             
             if (response.result.items) {
-                const videos = response.result.items.map(item => ({
-                    videoId: item.contentDetails?.videoId,
-                    title: item.snippet?.title || 'Sin título',
-                    thumbnail: item.snippet?.thumbnails?.high?.url || 
-                              item.snippet?.thumbnails?.default?.url || 
-                              './electronic.ico',
-                    duration: 0, // ⚠️ Temporal, se obtendrá después
-                    uploaderName: item.snippet?.videoOwnerChannelTitle || 'YouTube',
-                    author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
-                    sourcePlaylistId: playlistId
-                })).filter(v => v.videoId);
+                const videos = response.result.items
+                    .map(item => ({
+                        videoId: item.contentDetails?.videoId,
+                        title: item.snippet?.title || 'Sin título',
+                        thumbnail: item.snippet?.thumbnails?.high?.url || 
+                                  item.snippet?.thumbnails?.default?.url || 
+                                  './electronic.ico',
+                        duration: 0, // Se obtendrá después
+                        uploaderName: item.snippet?.videoOwnerChannelTitle || 'YouTube',
+                        author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
+                        sourcePlaylistId: playlistId
+                    }))
+                    .filter(v => v.videoId);
                 
                 allVideos.push(...videos);
             }
@@ -382,29 +384,38 @@ async loadPlaylistVideos(playlistId) {
             
         } while (nextPageToken);
         
-        console.log(`✅ ${allVideos.length} videos cargados de la playlist`);
+        console.log(`✅ ${allVideos.length} videos cargados`);
         
-        // ✅ CORRECCIÓN CRÍTICA: Obtener duraciones ANTES de actualizar la playlist
-        if (allVideos.length > 0 && this.core?.getBatchVideoDurations) {
+        // ✅ OBTENER DURACIONES EN LOTE
+        if (allVideos.length > 0) {
             try {
                 const videoIds = allVideos.map(v => v.videoId);
                 console.log(`⏳ Obteniendo duraciones de ${videoIds.length} videos...`);
-                const durations = await this.core.getBatchVideoDurations(videoIds);
                 
-                // Actualizar duraciones
-                allVideos.forEach(video => {
-                    if (durations[video.videoId]) {
-                        video.duration = durations[video.videoId];
+                // Procesar en lotes de 50
+                for (let i = 0; i < videoIds.length; i += 50) {
+                    const batch = videoIds.slice(i, i + 50);
+                    const response = await gapi.client.youtube.videos.list({
+                        part: ['contentDetails'],
+                        id: batch.join(',')
+                    });
+                    
+                    if (response.result.items) {
+                        response.result.items.forEach(video => {
+                            const matchingVideo = allVideos.find(v => v.videoId === video.id);
+                            if (matchingVideo && video.contentDetails?.duration) {
+                                matchingVideo.duration = this.core.parseDuration(video.contentDetails.duration);
+                            }
+                        });
                     }
-                });
+                }
                 
-                console.log(`✅ Duraciones actualizadas para ${Object.keys(durations).length} videos`);
+                console.log(`✅ Duraciones actualizadas`);
             } catch (durationError) {
-                console.warn('⚠️ No se pudieron obtener duraciones:', durationError);
+                console.warn('⚠️ Error obteniendo duraciones:', durationError);
             }
         }
         
-        // Actualizar playlist
         playlist.videos = allVideos;
         playlist.isLoaded = true;
         
@@ -412,8 +423,8 @@ async loadPlaylistVideos(playlistId) {
         return true;
         
     } catch (error) {
-        console.error('❌ Error cargando videos de playlist:', error);
-        this.core?.showMessage('Error cargando videos de la playlist', 'error');
+        console.error('❌ Error cargando videos:', error);
+        this.core?.showMessage('Error cargando videos', 'error');
         return false;
     }
 }
@@ -421,49 +432,36 @@ async loadPlaylistVideos(playlistId) {
      * Eliminar video de la cola
      */
 removeVideoFromQueue(videoId) {
-    console.log(`🗑️ removeVideoFromQueue INICIADO: ${videoId}`);
+    console.log(`🗑️ removeVideoFromQueue: ${videoId}`);
     
-    if (!videoId || videoId === 'undefined' || videoId === 'null') {
-        console.error('❌ videoId inválido para eliminar:', videoId);
-        this.core?.showMessage('Error: ID de video inválido', 'error');
+    if (!videoId || videoId === 'undefined') {
+        console.error('❌ videoId inválido');
         return false;
     }
     
     const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     if (!queuePlaylist) {
-        console.error('❌ No se encontró playlist de cola');
-        this.core?.showMessage('Error: Cola no encontrada', 'error');
+        console.error('❌ Cola no encontrada');
         return false;
     }
     
     const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
     
     if (videoIndex === -1) {
-        console.error(`❌ Video ${videoId} no encontrado en cola`);
-        this.core?.showMessage('Video no encontrado en la cola', 'error');
+        console.error(`❌ Video ${videoId} no encontrado`);
         return false;
     }
     
     const removedVideo = queuePlaylist.videos[videoIndex];
     const wasCurrentlyPlaying = window.currentPlayingInfo?.videoId === videoId;
     
-    console.log(`📊 Eliminando video en índice ${videoIndex}:`, {
-        title: removedVideo.title.substring(0, 30),
-        wasPlaying: wasCurrentlyPlaying,
-        currentIndex: window.currentPlayingInfo?.flattenedIndex,
-        totalVideos: queuePlaylist.videos.length
-    });
-    
-    // ELIMINAR EL VIDEO
+    // ELIMINAR VIDEO
     queuePlaylist.videos.splice(videoIndex, 1);
     
-    console.log(`✅ Video eliminado físicamente de la cola`);
-    console.log(`📊 Quedan ${queuePlaylist.videos.length} videos en cola`);
+    console.log(`✅ Video eliminado. Quedan ${queuePlaylist.videos.length} videos`);
     
-    // AJUSTAR ÍNDICE DE REPRODUCCIÓN
+    // AJUSTAR ÍNDICE
     if (wasCurrentlyPlaying) {
-        console.log('🎵 El video eliminado estaba reproduciéndose');
-        
         if (queuePlaylist.videos.length > 0) {
             let newIndex = videoIndex;
             if (newIndex >= queuePlaylist.videos.length) {
@@ -474,8 +472,6 @@ removeVideoFromQueue(videoId) {
                 window.currentPlayingInfo.flattenedIndex = newIndex;
             }
             
-            console.log(`▶️ Reproduciendo siguiente video en índice ${newIndex}`);
-            
             setTimeout(() => {
                 const nextVideo = queuePlaylist.videos[newIndex];
                 if (nextVideo && this.core?.playVideoAtIndex) {
@@ -483,53 +479,48 @@ removeVideoFromQueue(videoId) {
                 }
             }, 200);
         } else {
-            console.log('📭 Cola vacía después de eliminar');
             this.core?.handleEmptyPlaylist?.();
         }
     } else if (window.currentPlayingInfo && window.currentPlayingInfo.flattenedIndex > videoIndex) {
         window.currentPlayingInfo.flattenedIndex--;
-        console.log(`🔢 Índice de reproducción ajustado a ${window.currentPlayingInfo.flattenedIndex}`);
     }
     
-    // ✅ ACTUALIZAR UI INMEDIATAMENTE Y FORZAR REDIBUJADO
-    console.log('🔄 Actualizando UI COMPLETA...');
+    // ✅ FORZAR ACTUALIZACIÓN COMPLETA
+    console.log('🔄 Forzando actualización UI...');
     
-    // 1. Actualizar vista de playlists
-    this.updatePlaylistsUI();
-    
-    // 2. Actualizar popup de cola
-    this.updateQueuePopup();
-    
-    // 3. ✅ CORRECCIÓN CRÍTICA: Forzar actualización de cola persistente
-    if (this.core && this.core.updatePersistentQueue) {
-        // Usar setTimeout para asegurar que el DOM se ha actualizado
-        setTimeout(() => {
-            this.core.updatePersistentQueue();
-            console.log('✅ Cola persistente actualizada');
-        }, 100);
-    }
-    
-    // 4. Actualizar info de reproducción
-    this.core?.updateNowPlaying?.();
-    
-    // 5. ✅ FORZAR REDIBUJADO DEL NAVEGADOR
-    requestAnimationFrame(() => {
-        // Forzar reflow
-        document.body.offsetHeight;
-        console.log('🎨 UI forzada a redibujar');
+    // 1. Limpiar elemento del DOM inmediatamente
+    const queueItems = document.querySelectorAll(`.queue-item[data-video-id="${videoId}"]`);
+    queueItems.forEach(item => {
+        item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        item.style.opacity = '0';
+        item.style.transform = 'translateX(-20px)';
+        setTimeout(() => item.remove(), 300);
     });
     
-    // Guardar cambios
+    // 2. Actualizar todas las vistas
     setTimeout(() => {
-        console.log('💾 Guardando cambios...');
+        this.updatePlaylistsUI();
+        this.updateQueuePopup();
+        if (this.core && this.core.updatePersistentQueue) {
+            this.core.updatePersistentQueue();
+        }
+        this.core?.updateNowPlaying?.();
+    }, 350);
+    
+    // 3. Forzar reflow del navegador
+    requestAnimationFrame(() => {
+        document.body.offsetHeight;
+    });
+    
+    // 4. Guardar cambios
+    setTimeout(() => {
         if (typeof window.saveAllData === 'function') {
             window.saveAllData();
         }
-    }, 100);
+    }, 400);
     
     this.core?.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
     
-    console.log('✅ removeVideoFromQueue COMPLETADO');
     return true;
 }
 // =============================================
@@ -676,12 +667,12 @@ renderRelatedVideos(videos, container) {
             
             if (!videoId) return '';
 
+            // ✅ PROCESAR DURACIÓN CORRECTAMENTE
             let durationText = '';
             if (video.duration) {
                 if (typeof video.duration === 'number') {
                     durationText = this.core?.formatDuration(video.duration) || '';
                 } else if (typeof video.duration === 'string') {
-                    // Si es string tipo "3:45", convertir a segundos y formatear
                     const seconds = this.parseDurationToSeconds(video.duration);
                     durationText = this.core?.formatDuration(seconds) || video.duration;
                 }
@@ -695,15 +686,17 @@ renderRelatedVideos(videos, container) {
                 <div class="related-video-item" 
                      data-video-id="${videoId}" 
                      title="${this.escapeHTML(title)}">
-                    <img src="${thumbnail}" 
-                         alt="Thumbnail" 
-                         class="related-video-thumbnail" 
-                         onerror="this.src='./electronic.ico';">
+                    <div class="related-video-thumbnail-container">
+                        <img src="${thumbnail}" 
+                             alt="Thumbnail" 
+                             class="related-video-thumbnail" 
+                             onerror="this.src='./electronic.ico';">
+                        ${durationText ? `<span class="related-video-duration">${durationText}</span>` : ''}
+                    </div>
                     <div class="related-video-info">
                         <div class="related-video-title">${this.escapeHTML(title)}</div>
                         <div class="related-video-meta">
                             <span class="related-video-author">${this.escapeHTML(uploader)}</span>
-                            ${durationText ? `<span class="related-video-duration">${durationText}</span>` : ''}
                         </div>
                     </div>
                     <button class="related-video-add" 
@@ -1070,135 +1063,197 @@ findRelatedVideoData(itemElement) {
     /**
      * Cargar letras con ESTRATEGIA DE REINTENTO OPTIMIZADA
      */
-    async loadLyrics() {
-        // 1. Limpiar sincronización previa
-        if (this.lyricsSyncInterval) {
-            clearInterval(this.lyricsSyncInterval);
-            this.lyricsSyncInterval = null;
-        }
-        this.currentLrc = [];
-        
-        const lyricsContainer = document.getElementById('lyricsContent');
-        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
-                             this.core?.currentPlayingInfo?.flattenedIndex ?? -1;
-        
-        const flatList = this.core?.getFlattenedPlaylist() || [];
-        const currentVideo = flatList[currentIndex];
-        
-        if (!currentVideo || currentIndex < 0) {
-            lyricsContainer.innerHTML = `<div class="lyrics-container"><p class="lyrics-info">Reproduce música...</p></div>`;
-            return;
-        }
-
-        // 2. UI de Carga
-        lyricsContainer.innerHTML = `
-            <div class="lyrics-container">
-                <div class="lyrics-header">
-                    <i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p>
-                    <button id="lyricsProviderToggle" class="lyrics-provider-btn">
-                        <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
-                    </button>
-                </div>
-                <p class="lyrics-info">${this.escapeHTML(currentVideo.title)}</p>
-            </div>`;
-        
-        this.setupLyricsProviderButton();
-
-        try {
-            // ==========================================
-            // PREPARACIÓN DE DATOS
-            // ==========================================
-            let artist = currentVideo.artist || currentVideo.uploaderName || 'Desconocido';
-            let rawTitle = currentVideo.title;
-
-            // Extracción inteligente si el artista es "YouTube" o "Desconocido"
-            if (artist === 'YouTube' || artist === 'Desconocido' || artist === currentVideo.title) {
-                const parts = this.extractArtistFromTitle(currentVideo.title);
-                artist = parts.artist;
-                rawTitle = parts.title;
-            }
-
-            // LIMPIEZA DE ARTISTA (Eliminar @, Emojis, Topic, VEVO)
-            const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
-            artist = artist.replace(emojiRegex, '')
-                           .replace(/^@/, '') // Eliminar @ al inicio (@TOTO -> TOTO)
-                           .replace(/\s*-\s*Topic$/i, '')
-                           .replace(/\s*VEVO$/i, '')
-                           .replace(/\s*Official$/i, '')
-                           .trim();
-
-            // LIMPIEZA DE TÍTULO
-            const cleanTitle = this.cleanTrackTitle(rawTitle);
-            const duration = Math.round(currentVideo.duration || 0);
-
-            console.log(`🎵 Buscando letras: "${artist}" - "${cleanTitle}" (${duration}s)`);
-
-            let match = null;
-
-            if (this.lyricsProvider === 'lrclib') {
-                
-                // --- INTENTO 1: Búsqueda Exacta (/api/get) ---
-                // Idealmente requiere título y artista exactos
-                const url1 = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&duration=${duration}`;
-                
-                let response = await fetch(url1);
-
-                // --- INTENTO 2: Búsqueda Flexible (/api/search) ---
-                // Si falla la exacta, usamos search que perdona errores
-                if (!response.ok) {
-                    console.warn('⚠️ [Lyrics] Exacta falló (404), intentando búsqueda flexible...');
-                    
-                    // Búsqueda combinada: "Artista Titulo"
-                    const query = `${artist} ${cleanTitle}`;
-                    const url2 = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
-                    
-                    const searchResponse = await fetch(url2);
-                    
-                    if (searchResponse.ok) {
-                        const searchData = await searchResponse.json();
-                        // Tomamos el primer resultado si existe
-                        if (Array.isArray(searchData) && searchData.length > 0) {
-                            // Opcional: Podríamos filtrar por duración aquí para ser más precisos
-                            match = searchData[0];
-                            match.source = 'lrclib.net (Search)';
-                        }
-                    }
-                } else {
-                    match = await response.json();
-                    match.source = 'lrclib.net (Exact)';
-                }
-
-                if (!match) throw new Error('No encontradas en LRCLIB');
-
-            } else {
-                // Fallback Provider (Lujjjh)
-                const url = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('No encontradas en Fallback');
-                const text = await res.text();
-                if (!text || text.includes('Error')) throw new Error('No encontradas');
-                
-                match = {
-                    syncedLyrics: text,
-                    plainLyrics: text.replace(/\[.*?\]/g, ''),
-                    trackName: cleanTitle,
-                    artistName: artist,
-                    source: 'lujjjh.com'
-                };
-            }
-
-            // ==========================================
-            // RENDERIZADO
-            // ==========================================
-            this.renderLyricsUI(match, artist, rawTitle);
-
-        } catch (error) {
-            console.warn('❌ Error final letras:', error.message);
-            this.renderErrorUI(currentVideo.title);
-        }
-        
-        this.setupLyricsProviderButton();
+async loadLyrics() {
+    if (this.lyricsSyncInterval) {
+        clearInterval(this.lyricsSyncInterval);
+        this.lyricsSyncInterval = null;
     }
+    this.currentLrc = [];
+    
+    const lyricsContainer = document.getElementById('lyricsContent');
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
+                         this.core?.currentPlayingInfo?.flattenedIndex ?? -1;
+    
+    const flatList = this.core?.getFlattenedPlaylist() || [];
+    const currentVideo = flatList[currentIndex];
+    
+    if (!currentVideo || currentIndex < 0) {
+        lyricsContainer.innerHTML = `<div class="lyrics-container"><p class="lyrics-info">Reproduce música...</p></div>`;
+        return;
+    }
+
+    lyricsContainer.innerHTML = `
+        <div class="lyrics-container">
+            <div class="lyrics-header">
+                <i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p>
+                <button id="lyricsProviderToggle" class="lyrics-provider-btn">
+                    <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
+                </button>
+                <button id="lyricsTranslateToggle" class="lyrics-translate-btn" style="display:none;">
+                    <i class="fas fa-language"></i>
+                </button>
+            </div>
+            <p class="lyrics-info">${this.escapeHTML(currentVideo.title)}</p>
+        </div>`;
+    
+    this.setupLyricsProviderButton();
+
+    try {
+        let artist = currentVideo.artist || currentVideo.uploaderName || 'Desconocido';
+        let rawTitle = currentVideo.title;
+
+        if (artist === 'YouTube' || artist === 'Desconocido' || artist === currentVideo.title) {
+            const parts = this.extractArtistFromTitle(currentVideo.title);
+            artist = parts.artist;
+            rawTitle = parts.title;
+        }
+
+        const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
+        artist = artist.replace(emojiRegex, '')
+                       .replace(/^@/, '')
+                       .replace(/\s*-\s*Topic$/i, '')
+                       .replace(/\s*VEVO$/i, '')
+                       .replace(/\s*Official$/i, '')
+                       .trim();
+
+        const cleanTitle = this.cleanTrackTitle(rawTitle);
+        const duration = Math.round(currentVideo.duration || 0);
+
+        console.log(`🎵 Buscando letras: "${artist}" - "${cleanTitle}" (${duration}s)`);
+
+        let match = null;
+
+        if (this.lyricsProvider === 'lrclib') {
+            const url1 = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&duration=${duration}`;
+            
+            let response = await fetch(url1);
+
+            if (!response.ok) {
+                console.warn('⚠️ [Lyrics] Exacta falló, intentando búsqueda flexible...');
+                
+                const query = `${artist} ${cleanTitle}`;
+                const url2 = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+                
+                const searchResponse = await fetch(url2);
+                
+                if (searchResponse.ok) {
+                    const searchData = await searchResponse.json();
+                    if (Array.isArray(searchData) && searchData.length > 0) {
+                        match = searchData[0];
+                        match.source = 'lrclib.net (Search)';
+                    }
+                }
+            } else {
+                match = await response.json();
+                match.source = 'lrclib.net (Exact)';
+            }
+
+            if (!match) throw new Error('No encontradas en LRCLIB');
+
+        } else {
+            // ✅ USAR PROXY NETLIFY PARA EVITAR CORS
+            // NOTA: La URL debe ir DESPUÉS de /cors-proxy/ sin parámetros query extras
+            const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
+            const proxyUrl = `/.netlify/functions/cors-proxy/${targetUrl}`;
+            
+            console.log('📡 Llamando a proxy para lyrics fallback:', proxyUrl);
+            const res = await fetch(proxyUrl);
+            
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('❌ Error del proxy:', errorText);
+                throw new Error('No encontradas en Fallback');
+            }
+            
+            const text = await res.text();
+            if (!text || text.includes('Error') || text.includes('crashed')) {
+                throw new Error('No encontradas');
+            }
+            
+            match = {
+                syncedLyrics: text,
+                plainLyrics: text.replace(/\[.*?\]/g, ''),
+                trackName: cleanTitle,
+                artistName: artist,
+                source: 'lujjjh.com'
+            };
+        }
+
+        this.renderLyricsUI(match, artist, rawTitle);
+
+    } catch (error) {
+        console.warn('❌ Error letras:', error.message);
+        this.renderErrorUI(currentVideo.title);
+    }
+    
+    this.setupLyricsProviderButton();
+    this.setupTranslateButton();
+}
+    setupTranslateButton() {
+    const translateBtn = document.getElementById('lyricsTranslateToggle');
+    if (!translateBtn) return;
+    
+    // Mostrar botón solo si hay letras cargadas
+    const lyricsText = document.querySelector('.lyrics-text');
+    if (lyricsText && lyricsText.textContent.trim()) {
+        translateBtn.style.display = 'inline-flex';
+        
+        translateBtn.onclick = async () => {
+            if (this.lyricsTranslated) {
+                // Ocultar traducción
+                document.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
+                this.lyricsTranslated = false;
+                translateBtn.innerHTML = '<i class="fas fa-language"></i>';
+            } else {
+                // Mostrar traducción
+                await this.translateLyrics();
+                this.lyricsTranslated = true;
+                translateBtn.innerHTML = '<i class="fas fa-language"></i> ✓';
+            }
+        };
+    }
+}
+
+async translateLyrics() {
+    const lyricsText = document.querySelector('.lyrics-text');
+    if (!lyricsText) return;
+    
+    const lines = lyricsText.querySelectorAll('p');
+    if (lines.length === 0) return;
+    
+    console.log('🌐 Traduciendo letras...');
+    
+    // Usar Google Translate API (gratuita via MyMemory)
+    for (const line of lines) {
+        const originalText = line.textContent.trim();
+        if (!originalText || originalText.startsWith('[')) continue;
+        
+        try {
+            const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText)}&langpair=auto|es`);
+            const data = await response.json();
+            
+            if (data.responseData && data.responseData.translatedText) {
+                const translation = document.createElement('small');
+                translation.className = 'lyrics-translation';
+                translation.textContent = data.responseData.translatedText;
+                translation.style.cssText = `
+                    display: block;
+                    color: rgba(255, 255, 255, 0.5);
+                    font-size: 0.8em;
+                    margin-top: 4px;
+                    font-style: italic;
+                `;
+                line.appendChild(translation);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error traduciendo línea:', error);
+        }
+        
+        // Delay para no saturar la API
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
+}
+    
    /**
      * ✅ NUEVA FUNCIÓN
      * Asigna el evento click al botón de cambio de proveedor
