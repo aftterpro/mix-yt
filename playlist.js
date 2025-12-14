@@ -328,9 +328,6 @@ class PlaylistManager {
         }, 500);
     }
     
-/**
- * Cargar videos de una playlist de YouTube
- */
 async loadPlaylistVideos(playlistId) {
     console.log(`📥 Cargando videos de playlist: ${playlistId}`);
     
@@ -340,14 +337,12 @@ async loadPlaylistVideos(playlistId) {
         return false;
     }
     
-    // Si ya está cargada, no recargar
     if (playlist.isLoaded && playlist.videos.length > 0) {
         console.log(`✅ Playlist ya cargada con ${playlist.videos.length} videos`);
         return true;
     }
     
     try {
-        // Verificar que gapi esté disponible
         if (!window.gapi?.client?.youtube) {
             console.error('❌ Google API no está disponible');
             this.core?.showMessage('Error: API de YouTube no disponible', 'error');
@@ -374,11 +369,11 @@ async loadPlaylistVideos(playlistId) {
                     thumbnail: item.snippet?.thumbnails?.high?.url || 
                               item.snippet?.thumbnails?.default?.url || 
                               './electronic.ico',
-                    duration: 0, // Se puede obtener después con batch
+                    duration: 0, // ⚠️ Temporal, se obtendrá después
                     uploaderName: item.snippet?.videoOwnerChannelTitle || 'YouTube',
                     author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
                     sourcePlaylistId: playlistId
-                })).filter(v => v.videoId); // Filtrar videos sin ID válido
+                })).filter(v => v.videoId);
                 
                 allVideos.push(...videos);
             }
@@ -389,14 +384,11 @@ async loadPlaylistVideos(playlistId) {
         
         console.log(`✅ ${allVideos.length} videos cargados de la playlist`);
         
-        // Actualizar playlist
-        playlist.videos = allVideos;
-        playlist.isLoaded = true;
-        
-        // Obtener duraciones en lote (opcional pero recomendado)
+        // ✅ CORRECCIÓN CRÍTICA: Obtener duraciones ANTES de actualizar la playlist
         if (allVideos.length > 0 && this.core?.getBatchVideoDurations) {
             try {
                 const videoIds = allVideos.map(v => v.videoId);
+                console.log(`⏳ Obteniendo duraciones de ${videoIds.length} videos...`);
                 const durations = await this.core.getBatchVideoDurations(videoIds);
                 
                 // Actualizar duraciones
@@ -412,6 +404,10 @@ async loadPlaylistVideos(playlistId) {
             }
         }
         
+        // Actualizar playlist
+        playlist.videos = allVideos;
+        playlist.isLoaded = true;
+        
         this.core?.showMessage(`${allVideos.length} videos cargados`, 'success');
         return true;
         
@@ -421,21 +417,18 @@ async loadPlaylistVideos(playlistId) {
         return false;
     }
 }
-    
     /**
      * Eliminar video de la cola
      */
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ removeVideoFromQueue INICIADO: ${videoId}`);
     
-    // VALIDACIÓN CRÍTICA
     if (!videoId || videoId === 'undefined' || videoId === 'null') {
         console.error('❌ videoId inválido para eliminar:', videoId);
         this.core?.showMessage('Error: ID de video inválido', 'error');
         return false;
     }
     
-    // Obtener cola
     const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     if (!queuePlaylist) {
         console.error('❌ No se encontró playlist de cola');
@@ -443,7 +436,6 @@ removeVideoFromQueue(videoId) {
         return false;
     }
     
-    // Buscar índice del video
     const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
     
     if (videoIndex === -1) {
@@ -473,7 +465,6 @@ removeVideoFromQueue(videoId) {
         console.log('🎵 El video eliminado estaba reproduciéndose');
         
         if (queuePlaylist.videos.length > 0) {
-            // Si quedan videos, reproducir el siguiente
             let newIndex = videoIndex;
             if (newIndex >= queuePlaylist.videos.length) {
                 newIndex = queuePlaylist.videos.length - 1;
@@ -485,7 +476,6 @@ removeVideoFromQueue(videoId) {
             
             console.log(`▶️ Reproduciendo siguiente video en índice ${newIndex}`);
             
-            // Reproducir el siguiente video
             setTimeout(() => {
                 const nextVideo = queuePlaylist.videos[newIndex];
                 if (nextVideo && this.core?.playVideoAtIndex) {
@@ -497,16 +487,37 @@ removeVideoFromQueue(videoId) {
             this.core?.handleEmptyPlaylist?.();
         }
     } else if (window.currentPlayingInfo && window.currentPlayingInfo.flattenedIndex > videoIndex) {
-        // Ajustar índice si eliminamos un video anterior al actual
         window.currentPlayingInfo.flattenedIndex--;
         console.log(`🔢 Índice de reproducción ajustado a ${window.currentPlayingInfo.flattenedIndex}`);
     }
     
-    // ACTUALIZAR UI INMEDIATAMENTE
-    console.log('🔄 Actualizando UI...');
+    // ✅ ACTUALIZAR UI INMEDIATAMENTE Y FORZAR REDIBUJADO
+    console.log('🔄 Actualizando UI COMPLETA...');
+    
+    // 1. Actualizar vista de playlists
     this.updatePlaylistsUI();
+    
+    // 2. Actualizar popup de cola
     this.updateQueuePopup();
+    
+    // 3. ✅ CORRECCIÓN CRÍTICA: Forzar actualización de cola persistente
+    if (this.core && this.core.updatePersistentQueue) {
+        // Usar setTimeout para asegurar que el DOM se ha actualizado
+        setTimeout(() => {
+            this.core.updatePersistentQueue();
+            console.log('✅ Cola persistente actualizada');
+        }, 100);
+    }
+    
+    // 4. Actualizar info de reproducción
     this.core?.updateNowPlaying?.();
+    
+    // 5. ✅ FORZAR REDIBUJADO DEL NAVEGADOR
+    requestAnimationFrame(() => {
+        // Forzar reflow
+        document.body.offsetHeight;
+        console.log('🎨 UI forzada a redibujar');
+    });
     
     // Guardar cambios
     setTimeout(() => {
@@ -521,12 +532,10 @@ removeVideoFromQueue(videoId) {
     console.log('✅ removeVideoFromQueue COMPLETADO');
     return true;
 }
-    // =============================================
+// =============================================
 // GESTIÓN DE TABS EN LA COLA
 // =============================================
-/**
- * Cambiar entre tabs de la cola
- */
+
 switchQueueTab(tabName) {
     console.log(`🔄 Cambiando a tab: ${tabName}`);
     
@@ -655,10 +664,6 @@ async loadRelatedVideosFallback(currentVideo, relatedList) {
     
     this.renderRelatedVideos(relatedVideos, relatedList);
 }
-
-/**
- * ✅ NUEVO: Renderizar videos relacionados
- */
 renderRelatedVideos(videos, container) {
     const html = videos
         .map(video => {
@@ -671,7 +676,17 @@ renderRelatedVideos(videos, container) {
             
             if (!videoId) return '';
 
-            const duration = this.core?.formatDuration(video.duration) || '';
+            let durationText = '';
+            if (video.duration) {
+                if (typeof video.duration === 'number') {
+                    durationText = this.core?.formatDuration(video.duration) || '';
+                } else if (typeof video.duration === 'string') {
+                    // Si es string tipo "3:45", convertir a segundos y formatear
+                    const seconds = this.parseDurationToSeconds(video.duration);
+                    durationText = this.core?.formatDuration(seconds) || video.duration;
+                }
+            }
+
             const thumbnail = video.thumbnail || './electronic.ico';
             const title = video.title || 'Sin título';
             const uploader = video.uploaderName || 'YouTube';
@@ -688,11 +703,12 @@ renderRelatedVideos(videos, container) {
                         <div class="related-video-title">${this.escapeHTML(title)}</div>
                         <div class="related-video-meta">
                             <span class="related-video-author">${this.escapeHTML(uploader)}</span>
-                            ${duration ? `<span class="related-video-duration">${duration}</span>` : ''}
+                            ${durationText ? `<span class="related-video-duration">${durationText}</span>` : ''}
                         </div>
                     </div>
                     <button class="related-video-add" 
-                            data-video-id="${videoId}" 
+                            data-video-id="${videoId}"
+                            data-duration="${video.duration || 0}" 
                             title="Añadir a cola">
                         <i class="fas fa-plus"></i>
                     </button>
@@ -704,6 +720,17 @@ renderRelatedVideos(videos, container) {
     
     container.innerHTML = html;
     this.setupRelatedVideosListeners();
+}
+
+// Helper para parsear duraciones
+parseDurationToSeconds(durationStr) {
+    if (!durationStr) return 0;
+    if (typeof durationStr === 'number') return durationStr;
+    
+    const parts = durationStr.split(':').map(Number);
+    if (parts.length === 2) return (parts[0] * 60) + parts[1];
+    if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+    return 0;
 }
 /**
  * Actualiza el contenido de la pestaña activa cuando cambia la canción
