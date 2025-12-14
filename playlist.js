@@ -946,16 +946,13 @@ findRelatedVideoData(itemElement) {
         return null;
     }
 }  
-
-      /**
-     * Renderizar UI de Letras
-     */
-    renderLyricsUI(match, originalArtist, originalTitle) {
+renderLyricsUI(match, originalArtist, originalTitle) {
         const lyricsContainer = document.getElementById('lyricsContent');
         const trackName = match.trackName || originalTitle;
         const artistName = match.artistName || originalArtist;
         const albumInfo = match.albumName ? ` • 💿 ${match.albumName}` : '';
 
+        // Header con botón de traducir
         const headerHtml = `
             <div class="lyrics-header">
                 <i class="fas fa-music"></i>
@@ -965,7 +962,7 @@ findRelatedVideoData(itemElement) {
                         ${this.escapeHTML(artistName)}${this.escapeHTML(albumInfo)}
                     </p>
                 </div>
-                <button id="translateLyricsBtn" class="lyrics-provider-btn" title="Traducir en Google">
+                <button id="translateLyricsBtn" class="lyrics-provider-btn" title="Traducir al español">
                     <i class="fas fa-language"></i>
                 </button>
                 <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar proveedor">
@@ -973,44 +970,59 @@ findRelatedVideoData(itemElement) {
                 </button>
             </div>`;
 
+        let contentHtml = '';
+
         if (match.instrumental) {
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    ${headerHtml}
-                    <div class="lyrics-text plain" style="display:flex; justify-content:center; align-items:center; height:300px; flex-direction:column;">
-                        <i class="fas fa-guitar" style="font-size:40px; margin-bottom:15px; opacity:0.5;"></i>
-                        <p>Instrumental</p>
-                    </div>
-                    <p class="lyrics-source">Fuente: ${match.source}</p>
+            contentHtml = `
+                <div class="lyrics-text plain" style="display:flex; justify-content:center; align-items:center; height:300px; flex-direction:column;">
+                    <i class="fas fa-guitar" style="font-size:40px; margin-bottom:15px; opacity:0.5;"></i>
+                    <p>Instrumental</p>
                 </div>`;
         } else if (match.syncedLyrics) {
             this.currentLrc = this.parseLRC(match.syncedLyrics);
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    ${headerHtml}
-                    <div class="lyrics-text synced" id="syncedLyricsContainer">
-                        ${this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('')}
-                    </div>
-                    <p class="lyrics-source">Fuente: ${match.source} (Sincronizada)</p>
+            contentHtml = `
+                <div class="lyrics-text synced" id="syncedLyricsContainer">
+                    ${this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('')}
                 </div>`;
-            this.startLyricsSync();
+            setTimeout(() => this.startLyricsSync(), 100);
         } else if (match.plainLyrics) {
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    ${headerHtml}
-                    <div class="lyrics-text plain">
-                        ${this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>')}
-                    </div>
-                    <p class="lyrics-source">Fuente: ${match.source} (Texto plano)</p>
+            contentHtml = `
+                <div class="lyrics-text plain">
+                    ${this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>')}
                 </div>`;
         } else {
             throw new Error('Sin datos de letra');
         }
 
-        // Configurar los listeners de los botones
-        this.setupLyricsHeaderButtons();
-    }
+        lyricsContainer.innerHTML = `
+            <div class="lyrics-container">
+                ${headerHtml}
+                ${contentHtml}
+                <p class="lyrics-source">Fuente: ${match.source}</p>
+            </div>`;
 
+        // Configurar los botones
+        this.setupLyricsHeaderButtons();
+}
+    setupLyricsHeaderButtons() {
+        // Botón Proveedor
+        const providerBtn = document.getElementById('lyricsProviderToggle');
+        if (providerBtn) {
+            providerBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.toggleLyricsProvider();
+            };
+        }
+
+        // Botón Traducir
+        const translateBtn = document.getElementById('translateLyricsBtn');
+        if (translateBtn) {
+            translateBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.translateLyrics(); // Llamada a la función de traducción
+            };
+        }
+    }
     renderErrorUI(title) {
         const lyricsContainer = document.getElementById('lyricsContent');
         lyricsContainer.innerHTML = `
@@ -1222,47 +1234,102 @@ async loadLyrics() {
         };
     }
 }
-
-async translateLyrics() {
-    const lyricsText = document.querySelector('.lyrics-text');
-    if (!lyricsText) return;
-    
-    const lines = lyricsText.querySelectorAll('p');
-    if (lines.length === 0) return;
-    
-    console.log('🌐 Traduciendo letras...');
-    
-    // Usar Google Translate API (gratuita via MyMemory)
-    for (const line of lines) {
-        const originalText = line.textContent.trim();
-        if (!originalText || originalText.startsWith('[')) continue;
+    async translateLyrics() {
+        const btn = document.getElementById('translateLyricsBtn');
+        const container = document.getElementById('lyricsContent');
         
+        // Si ya está traducido, revertir (toggle)
+        if (btn.classList.contains('translated')) {
+            container.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
+            btn.classList.remove('translated');
+            btn.innerHTML = '<i class="fas fa-language"></i>';
+            btn.style.background = '';
+            return;
+        }
+
+        // Feedback de carga
+        const originalIcon = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+
+        // Detectar si son letras sincronizadas (p) o planas (div)
+        const syncedLines = container.querySelectorAll('.lyrics-text.synced p');
+        const plainContainer = container.querySelector('.lyrics-text.plain');
+        
+        // Preparar texto para enviar
+        let textToTranslate = "";
+        let isSynced = false;
+
+        if (syncedLines.length > 0) {
+            isSynced = true;
+            // Unir con un caracter especial poco común para preservar la estructura
+            textToTranslate = Array.from(syncedLines).map(p => p.textContent).join(' ||| ');
+        } else if (plainContainer) {
+            textToTranslate = plainContainer.innerText;
+        }
+
+        if (!textToTranslate) {
+            this.core?.showMessage('No hay texto para traducir', 'warning');
+            btn.innerHTML = originalIcon;
+            btn.disabled = false;
+            return;
+        }
+
         try {
-            const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(originalText)}&langpair=auto|es`);
+            console.log('🌐 Traduciendo letras...');
+            
+            // Usar Google Translate API (vía tu Proxy para evitar CORS)
+            // 'gtx' es el cliente gratuito de Google
+            const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(textToTranslate)}`;
+            const proxyUrl = `/.netlify/functions/cors-proxy/${googleUrl}`;
+
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error('Error en traducción');
+            
             const data = await response.json();
             
-            if (data.responseData && data.responseData.translatedText) {
-                const translation = document.createElement('small');
-                translation.className = 'lyrics-translation';
-                translation.textContent = data.responseData.translatedText;
-                translation.style.cssText = `
-                    display: block;
-                    color: rgba(255, 255, 255, 0.5);
-                    font-size: 0.8em;
-                    margin-top: 4px;
-                    font-style: italic;
-                `;
-                line.appendChild(translation);
+            // Google devuelve un array de arrays. Necesitamos reconstruir el texto.
+            // data[0] contiene los segmentos traducidos.
+            let fullTranslation = "";
+            if (data && data[0]) {
+                fullTranslation = data[0].map(item => item[0]).join('');
             }
+
+            // Inyectar traducción en el DOM
+            if (isSynced) {
+                const translatedLines = fullTranslation.split(' ||| '); // Separar por nuestro delimitador
+                
+                syncedLines.forEach((line, index) => {
+                    if (translatedLines[index]) {
+                        const transEl = document.createElement('span');
+                        transEl.className = 'lyrics-translation';
+                        transEl.textContent = translatedLines[index].trim();
+                        transEl.style.cssText = "display:block; font-size:0.85em; color:#4caf50; font-style:italic; margin-top:2px; opacity:0.9;";
+                        line.appendChild(transEl);
+                    }
+                });
+            } else if (plainContainer) {
+                // Para texto plano, simplemente añadirlo abajo o reemplazar saltos de línea
+                const transDiv = document.createElement('div');
+                transDiv.className = 'lyrics-translation';
+                transDiv.innerHTML = `<hr style="border-color:#333; margin:20px 0;"><strong>Traducción:</strong><br><br>${fullTranslation.replace(/\n/g, '<br>')}`;
+                transDiv.style.color = "#4caf50";
+                plainContainer.appendChild(transDiv);
+            }
+
+            // Marcar botón como activo
+            btn.classList.add('translated');
+            btn.innerHTML = '<i class="fas fa-check"></i> ES';
+            btn.style.background = 'rgba(76, 175, 80, 0.2)';
+
         } catch (error) {
-            console.warn('⚠️ Error traduciendo línea:', error);
+            console.error('❌ Error traduciendo:', error);
+            this.core?.showMessage('Error al traducir', 'error');
+            btn.innerHTML = originalIcon;
+        } finally {
+            btn.disabled = false;
         }
-        
-        // Delay para no saturar la API
-        await new Promise(resolve => setTimeout(resolve, 200));
     }
-}
-    
    /**
      * ✅ NUEVA FUNCIÓN
      * Asigna el evento click al botón de cambio de proveedor
