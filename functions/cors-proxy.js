@@ -1,28 +1,32 @@
+// USAR REQUIRE (Versión compatible con Netlify Functions standard)
 const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
-    // 1. Extraer la URL destino de la ruta
-    // La ruta viene como /.netlify/functions/cors-proxy/HTTPS://TARGET...
+    // 1. Extraer la URL base del path
     let path = event.path.replace(/^\/\.netlify\/functions\/cors-proxy\//, '');
     
-    // Decodificar si viene con %20, etc.
+    // 2.  CRÍTICO: Recuperar los parámetros de la consulta (query string)
+    // Netlify los separa, así que debemos volver a pegarlos.
+    const queryString = event.rawQuery; 
+    
     let targetUrl = decodeURIComponent(path);
 
-    // Corrección si falta el protocolo por la decodificación o el split
+    // 3. Pegar los parámetros a la URL destino
+    if (queryString) {
+        targetUrl += '?' + queryString;
+    }
+
+    // Corrección de protocolo por si el split falló
     if (!targetUrl.startsWith('http')) {
-        // Fallback: intentar dividir por la ruta de la función
         const splitParts = event.path.split('/cors-proxy/');
         if (splitParts.length > 1) {
             targetUrl = splitParts[1];
+            if (queryString) targetUrl += '?' + queryString;
         }
     }
 
-    // Validación final de URL
     if (!targetUrl || !targetUrl.startsWith('http')) {
-        return { 
-            statusCode: 400, 
-            body: JSON.stringify({ error: "URL destino inválida o no proporcionada" }) 
-        };
+        return { statusCode: 400, body: "URL destino inválida" };
     }
 
     console.log(`Proxying to: ${targetUrl}`);
@@ -35,8 +39,7 @@ exports.handler = async (event, context) => {
             }
         });
 
-        // ✅ CRÍTICO: Usar .text() aquí hace que Node-fetch descomprima el GZIP automáticamente
-        // y nos devuelva el texto limpio, solucionando el problema del archivo "descarga" binario.
+        // ✅ Obtener texto decodificado (evita problemas de binarios/gzip)
         const data = await response.text();
 
         return {
@@ -44,7 +47,7 @@ exports.handler = async (event, context) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type",
-                "Content-Type": "application/json; charset=utf-8" // Forzamos que el navegador sepa que es texto
+                "Content-Type": "text/plain; charset=utf-8" // Cambiado a text/plain para LRC
             },
             body: data
         };
