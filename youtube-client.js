@@ -76,7 +76,7 @@ class YouTubeSimplifiedClient {
         console.log('⚠️ Trending no implementado en función local, usando fallback Piped...');
         // Fallback a una instancia pública de Piped solo para trending
         try {
-            const response = await fetch(`https://pipedapi.kavin.rocks/trending?region=${region}`);
+            const response = await fetch(`https://api.piped.private.coffee/trending?region=${region}`);
             return { items: await response.json(), region };
         } catch (e) {
             return { items: [], error: 'Trending no disponible' };
@@ -91,7 +91,7 @@ class YouTubeSimplifiedClient {
     async getVideoInfo(videoId) {
         try {
             // Usamos una instancia pública rotativa o fija estable
-            const response = await fetch(`https://pipedapi.private.coffee/streams/${videoId}`);
+            const response = await fetch(`https://api.piped.private.coffee/streams/${videoId}`);
             if (!response.ok) throw new Error('Video info error');
             const data = await response.json();
             
