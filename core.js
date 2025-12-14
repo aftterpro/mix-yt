@@ -414,45 +414,56 @@ class UnifiedCore {
             this.enablePlayButton();
         }
     }
-
-    onPlayerStateChange(event) {
-        const player = event.target;
-        const state = event.data;
-        
-        if (state === YT.PlayerState.ENDED) {
-            console.log('📻 Video terminado, reproduciendo siguiente...');
-            this.playNextVideo();
-        } else if (state === YT.PlayerState.PLAYING) {
-            hasOutroCrossfadeStarted = false;
-            
-            const videoData = player.getVideoData();
-            if (videoData?.video_id) {
-                const flatList = this.getFlattenedPlaylist();
-                const index = flatList.findIndex(v => v.videoId === videoData.video_id);
-                
-                if (index !== -1) {
-                    window.currentPlayingInfo.flattenedIndex = index;
-                    window.currentPlayingInfo.videoId = videoData.video_id;
-                    this.state.currentPlayingInfo = window.currentPlayingInfo;
-                    console.log(`✅ Índice sincronizado: ${index} (${videoData.video_id})`);
-                }
-            }
-            
-            this.updateCurrentPlayingIndex();
-            this.updateNowPlaying();
-            
-            if (window.playlistManager) {
-                this.updatePersistentQueue(); 
-                if (window.playlistManager.syncQueueIndicator) {
-                    window.playlistManager.syncQueueIndicator();
-                }
-                if (window.playlistManager.refreshActiveQueueTab) {
-                    window.playlistManager.refreshActiveQueueTab();
-                }
-            }
-            setTimeout(() => saveAllData(), 1000);
+onPlayerStateChange(event) {
+    const player = event.target;
+    const state = event.data;
+    
+    // ✅ CORRECCIÓN: Saltar segmentos INMEDIATAMENTE al cargar
+    if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.CUED) {
+        const videoData = player.getVideoData();
+        if (videoData?.video_id) {
+            // Intentar saltar intro/outro inmediatamente
+            checkAndSkipSegment(player);
         }
     }
+    
+    if (state === YT.PlayerState.ENDED) {
+        console.log('📻 Video terminado, reproduciendo siguiente...');
+        this.playNextVideo();
+    } else if (state === YT.PlayerState.PLAYING) {
+        hasOutroCrossfadeStarted = false;
+        
+        const videoData = player.getVideoData();
+        if (videoData?.video_id) {
+            const flatList = this.getFlattenedPlaylist();
+            const index = flatList.findIndex(v => v.videoId === videoData.video_id);
+            
+            if (index !== -1) {
+                window.currentPlayingInfo.flattenedIndex = index;
+                window.currentPlayingInfo.videoId = videoData.video_id;
+                this.state.currentPlayingInfo = window.currentPlayingInfo;
+                console.log(`✅ Índice sincronizado: ${index} (${videoData.video_id})`);
+            }
+            
+            // ✅ SALTAR INTRO AL INICIO
+            setTimeout(() => checkAndSkipSegment(player), 500);
+        }
+        
+        this.updateCurrentPlayingIndex();
+        this.updateNowPlaying();
+        
+        if (window.playlistManager) {
+            this.updatePersistentQueue(); 
+            if (window.playlistManager.syncQueueIndicator) {
+                window.playlistManager.syncQueueIndicator();
+            }
+            if (window.playlistManager.refreshActiveQueueTab) {
+                window.playlistManager.refreshActiveQueueTab();
+            }
+        }
+        setTimeout(() => saveAllData(), 1000);
+    }
+}
 
     refreshActiveQueueTab() {
         const activeTab = document.querySelector('.queue-tab.active');
@@ -2282,17 +2293,17 @@ function checkAndSkipSegment(player) {
             }
         }
     } catch (error) {}
-}function monitorPlayers() {
+}
+function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
     try {
         const activePlayer = (currentPlayer === 1) ? player1 : player2;
-        // Si el reproductor no está listo, salir
         if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') return;
 
         const playerState = activePlayer.getPlayerState();
         
-        // Solo monitorear si está efectivamente reproduciendo
+        // Solo monitorear si está reproduciendo
         if (playerState !== YT.PlayerState.PLAYING) return;
 
         const currentTime = activePlayer.getCurrentTime();
@@ -2302,7 +2313,6 @@ function checkAndSkipSegment(player) {
         if (isNaN(currentTime) || currentTime <= 0 || videoDuration <= 0) return;
 
         // --- CÁLCULO DE TIEMPO EFECTIVO ---
-        // 1. Calcular tiempo de SponsorBlock (segmentos a saltar al final)
         let totalSponsorBlockDuration = 0;
         if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
             totalSponsorBlockDuration = segmentosCache[videoId]
@@ -2314,37 +2324,25 @@ function checkAndSkipSegment(player) {
                 }, 0);
         }
 
-        // 2. Definir cuándo disparar el efecto
-        // Trigger = Duración Total - (Tiempo de Crossfade + SponsorBlock + Buffer mínimo)
-        // El buffer de 0.5s ayuda a que no sea en el último milisegundo
+        // ✅ CORRECCIÓN: Trigger más preciso
         const triggerOffset = CROSSFADE_DURATION + totalSponsorBlockDuration + 0.5;
         const triggerTime = videoDuration - triggerOffset;
 
-        // Log de depuración (puedes comentarlo después)
-        // console.log(`Monitor: Actual: ${currentTime.toFixed(1)} | Trigger: ${triggerTime.toFixed(1)} | Duración: ${videoDuration.toFixed(1)}`);
-
-        // --- ACCIONES ---
-        
-        // 1. Saltar segmentos (Intro/Outro) si es necesario
+        // --- SALTAR SEGMENTOS ---
         if (videoId) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // 2. DISPARAR CROSSFADE
-        // La condición verifica:
-        // - Que hayamos llegado al tiempo de disparo
-        // - Que no estemos ya en transición
-        // - Que falte poco para acabar (evita disparos al inicio si la duración está mal)
+        // --- DISPARAR CROSSFADE ---
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
             !crossfadeInProgress && 
             !nextVideoScheduled) {
             
-            // Protección para videos muy cortos (menos de 20s)
-            // Si el video es más corto que el crossfade, no hacer crossfade largo
+            // Protección para videos muy cortos
             if (videoDuration < (CROSSFADE_DURATION * 2)) {
-                if (currentTime < (videoDuration - 2)) return; // Esperar al final real
+                if (currentTime < (videoDuration - 2)) return;
             }
 
             console.log(`🚀 TRIGGER ACTIVADO: Tiempo ${currentTime.toFixed(2)} >= ${triggerTime.toFixed(2)}`);
@@ -2352,13 +2350,11 @@ function checkAndSkipSegment(player) {
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             
-            // Detener este intervalo para evitar dobles llamadas
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
             
-            // Llamar al siguiente video INMEDIATAMENTE
             if (window.unifiedCore && typeof window.unifiedCore.playNextVideo === 'function') {
                 window.unifiedCore.playNextVideo();
             }
