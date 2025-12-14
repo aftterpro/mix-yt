@@ -947,8 +947,8 @@ findRelatedVideoData(itemElement) {
     }
 }  
 
-    /**
-     * Renderizar UI de Letras (Helper para limpiar código)
+      /**
+     * Renderizar UI de Letras
      */
     renderLyricsUI(match, originalArtist, originalTitle) {
         const lyricsContainer = document.getElementById('lyricsContent');
@@ -965,7 +965,10 @@ findRelatedVideoData(itemElement) {
                         ${this.escapeHTML(artistName)}${this.escapeHTML(albumInfo)}
                     </p>
                 </div>
-                <button id="lyricsProviderToggle" class="lyrics-provider-btn">
+                <button id="translateLyricsBtn" class="lyrics-provider-btn" title="Traducir en Google">
+                    <i class="fas fa-language"></i>
+                </button>
+                <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar proveedor">
                     <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
                 </button>
             </div>`;
@@ -1003,6 +1006,9 @@ findRelatedVideoData(itemElement) {
         } else {
             throw new Error('Sin datos de letra');
         }
+
+        // Configurar los listeners de los botones
+        this.setupLyricsHeaderButtons();
     }
 
     renderErrorUI(title) {
@@ -1149,53 +1155,38 @@ async loadLyrics() {
             }
 
             if (!match) throw new Error('No encontradas en LRCLIB');
-
-            } else {
+} else {
                 // Fallback Provider (Lujjjh via Proxy)
-                // Usamos encodeURIComponent para asegurar que pase bien por el proxy
+                console.log('🔄 Usando proveedor Lujjjh (Fallback)...');
+                
+                // Construir URL destino
                 const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
                 
-                // Construir la URL del proxy correctamente
+                // Construir URL del proxy
                 const proxyUrl = `/.netlify/functions/cors-proxy/${targetApi}`;
                 
-                console.log('📡 Llamando a proxy Lujjjh:', proxyUrl);
+                console.log('📡 Llamando a proxy:', proxyUrl);
 
                 const res = await fetch(proxyUrl);
                 if (!res.ok) throw new Error('Error en proxy');
                 
-                const data = await res.json(); // Ahora sí recibimos JSON limpio
+                // ✅ CRÍTICO: Esta API devuelve TEXTO PLANO (LRC), no JSON
+                const textData = await res.text();
                 
-                if (!data || data.error) throw new Error('No encontradas');
-
-                // Lujjjh devuelve un array de objetos [{time: 1000, text: "hola"}, ...]
-                // Necesitamos convertirlo a formato LRC o usarlo directamente
-                let convertedLrc = "";
-                
-                if (Array.isArray(data)) {
-                    // Convertir el JSON de Lujjjh a string LRC estándar para que tu parseador funcione
-                    convertedLrc = data.map(line => {
-                        // Lujjjh da tiempo en ms, convertir a mm:ss.xx
-                        const minutes = Math.floor(line.time / 60000);
-                        const seconds = Math.floor((line.time % 60000) / 1000);
-                        const ms = Math.floor((line.time % 1000) / 10);
-                        const timeTag = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms).padStart(2, '0')}]`;
-                        return `${timeTag} ${line.text || line.lyrics}`; // A veces usa 'text' o 'lyrics'
-                    }).join('\n');
-                } else if (typeof data === 'string') {
-                    // Si por casualidad devuelve texto plano
-                    convertedLrc = data;
+                // Validar si devolvió un error o está vacío
+                if (!textData || textData.trim().length === 0 || textData.includes('Not found')) {
+                    throw new Error('No encontradas');
                 }
 
-                if (!convertedLrc) throw new Error('Formato desconocido');
-
+                // Crear objeto match manualmente ya que es texto plano
                 match = {
-                    syncedLyrics: convertedLrc,
-                    plainLyrics: convertedLrc.replace(/\[.*?\]/g, ''),
+                    syncedLyrics: textData,
+                    plainLyrics: textData.replace(/\[.*?\]/g, ''), // Quitar tiempos para texto plano
                     trackName: cleanTitle,
                     artistName: artist,
                     source: 'lujjjh (Proxy)'
                 };
-            }
+        }
 
         this.renderLyricsUI(match, artist, rawTitle);
 
