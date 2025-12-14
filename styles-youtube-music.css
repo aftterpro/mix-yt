@@ -538,8 +538,9 @@ body {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    opacity: 0 !important;
-    transform: scale(0.7) translateY(10px) !important;
+    opacity: 0.7 !important;
+    transform: scale(0.9) !important;
+    
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
     z-index: 10 !important;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
@@ -550,50 +551,32 @@ body {
 /* Aparecer al hacer hover en la card */
 .search-result-card:hover .add-to-queue-btn {
     opacity: 1 !important;
-    transform: scale(1) translateY(0) !important;
+    transform: scale(1) !important;
 }
 
 /* Efecto hover en el botón */
 .add-to-queue-btn:hover {
-    background: rgb(255, 107, 53) !important;
+   background: rgb(255, 107, 53) !important;
     border-color: rgba(255, 255, 255, 0.6) !important;
-    transform: scale(1.15) translateY(-2px) !important;
+    transform: scale(1.15) !important;
     box-shadow: 0 8px 24px rgba(255, 107, 53, 0.6) !important;
 }
-
+/* Touch devices - siempre visible */
+@media (hover: none) {
+    .add-to-queue-btn {
+        opacity: 0.9 !important;
+        transform: scale(1) !important;
+    }
+}
 /* Efecto click */
 .add-to-queue-btn:active {
     transform: scale(0.95) translateY(0) !important;
 }
-
-/* Estado deshabilitado */
-.add-to-queue-btn:disabled {
-    cursor: not-allowed !important;
-    opacity: 0.6 !important;
-    transform: scale(1) !important;
+/* Animación de éxito */
+@keyframes successBounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
 }
-
-/* Icono dentro del botón */
-.add-to-queue-btn i {
-    pointer-events: none !important;
-    font-size: 18px !important;
-}
-
-/* Animación de spinner */
-.add-to-queue-btn .fa-spinner {
-    animation: spin 1s linear infinite !important;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Asegurar que el contenedor sea relativo */
-.search-result-card {
-    position: relative !important;
-}
-
 .search-result-thumbnail {
     position: relative !important;
 }
@@ -615,7 +598,8 @@ body {
 }
 
 .add-to-queue-btn.success {
-    animation: successPulse 0.6s ease-out !important;
+    background: #4caf50 !important;
+    animation: successBounce 0.4s ease-out !important;
 }
 
 /* Efecto de sacudida cuando hay error */
@@ -2902,7 +2886,7 @@ color: #FFFFFF !important;
     transform: scale(1.1) !important;
 }
 
-.search-result-card .add-to-queue-btn:hover {
+.search-result-card {
     transform: scale(1.1);
     background-color: rgba(255, 255, 255, 0.2); /* Ajusta según tu tema */
 }
