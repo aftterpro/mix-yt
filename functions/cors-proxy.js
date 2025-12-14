@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+const fetch = require('node-fetch');
 
 exports.handler = async (event, context) => {
     // 1. Extraer la URL destino de la ruta
@@ -8,14 +8,21 @@ exports.handler = async (event, context) => {
     // Decodificar si viene con %20, etc.
     let targetUrl = decodeURIComponent(path);
 
-    // Corrección si falta el protocolo por la decodificación
+    // Corrección si falta el protocolo por la decodificación o el split
     if (!targetUrl.startsWith('http')) {
-        // A veces el split corta el protocolo
-        targetUrl = event.path.split('/cors-proxy/')[1];
+        // Fallback: intentar dividir por la ruta de la función
+        const splitParts = event.path.split('/cors-proxy/');
+        if (splitParts.length > 1) {
+            targetUrl = splitParts[1];
+        }
     }
 
-    if (!targetUrl) {
-        return { statusCode: 400, body: "URL destino no proporcionada" };
+    // Validación final de URL
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+        return { 
+            statusCode: 400, 
+            body: JSON.stringify({ error: "URL destino inválida o no proporcionada" }) 
+        };
     }
 
     console.log(`Proxying to: ${targetUrl}`);
@@ -28,6 +35,8 @@ exports.handler = async (event, context) => {
             }
         });
 
+        // ✅ CRÍTICO: Usar .text() aquí hace que Node-fetch descomprima el GZIP automáticamente
+        // y nos devuelva el texto limpio, solucionando el problema del archivo "descarga" binario.
         const data = await response.text();
 
         return {
@@ -35,12 +44,13 @@ exports.handler = async (event, context) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type",
-                "Content-Type": "application/json; charset=utf-8" // Forzamos JSON/Texto
+                "Content-Type": "application/json; charset=utf-8" // Forzamos que el navegador sepa que es texto
             },
             body: data
         };
 
     } catch (error) {
+        console.error('Proxy Error:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message })
