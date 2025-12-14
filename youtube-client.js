@@ -91,7 +91,7 @@ class YouTubeSimplifiedClient {
     async getVideoInfo(videoId) {
         try {
             // Usamos una instancia pública rotativa o fija estable
-            const response = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+            const response = await fetch(`https://pipedapi.private.coffee/streams/${videoId}`);
             if (!response.ok) throw new Error('Video info error');
             const data = await response.json();
             
