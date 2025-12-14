@@ -1150,34 +1150,52 @@ async loadLyrics() {
 
             if (!match) throw new Error('No encontradas en LRCLIB');
 
-        } else {
-            // ✅ USAR PROXY NETLIFY PARA EVITAR CORS
-            // NOTA: La URL debe ir DESPUÉS de /cors-proxy/ sin parámetros query extras
-            const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
-            const proxyUrl = `/.netlify/functions/cors-proxy/${targetUrl}`;
-            
-            console.log('📡 Llamando a proxy para lyrics fallback:', proxyUrl);
-            const res = await fetch(proxyUrl);
-            
-            if (!res.ok) {
-                const errorText = await res.text();
-                console.error('❌ Error del proxy:', errorText);
-                throw new Error('No encontradas en Fallback');
+            } else {
+                // Fallback Provider (Lujjjh via Proxy)
+                // Usamos encodeURIComponent para asegurar que pase bien por el proxy
+                const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
+                
+                // Construir la URL del proxy correctamente
+                const proxyUrl = `/.netlify/functions/cors-proxy/${targetApi}`;
+                
+                console.log('📡 Llamando a proxy Lujjjh:', proxyUrl);
+
+                const res = await fetch(proxyUrl);
+                if (!res.ok) throw new Error('Error en proxy');
+                
+                const data = await res.json(); // Ahora sí recibimos JSON limpio
+                
+                if (!data || data.error) throw new Error('No encontradas');
+
+                // Lujjjh devuelve un array de objetos [{time: 1000, text: "hola"}, ...]
+                // Necesitamos convertirlo a formato LRC o usarlo directamente
+                let convertedLrc = "";
+                
+                if (Array.isArray(data)) {
+                    // Convertir el JSON de Lujjjh a string LRC estándar para que tu parseador funcione
+                    convertedLrc = data.map(line => {
+                        // Lujjjh da tiempo en ms, convertir a mm:ss.xx
+                        const minutes = Math.floor(line.time / 60000);
+                        const seconds = Math.floor((line.time % 60000) / 1000);
+                        const ms = Math.floor((line.time % 1000) / 10);
+                        const timeTag = `[${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms).padStart(2, '0')}]`;
+                        return `${timeTag} ${line.text || line.lyrics}`; // A veces usa 'text' o 'lyrics'
+                    }).join('\n');
+                } else if (typeof data === 'string') {
+                    // Si por casualidad devuelve texto plano
+                    convertedLrc = data;
+                }
+
+                if (!convertedLrc) throw new Error('Formato desconocido');
+
+                match = {
+                    syncedLyrics: convertedLrc,
+                    plainLyrics: convertedLrc.replace(/\[.*?\]/g, ''),
+                    trackName: cleanTitle,
+                    artistName: artist,
+                    source: 'lujjjh (Proxy)'
+                };
             }
-            
-            const text = await res.text();
-            if (!text || text.includes('Error') || text.includes('crashed')) {
-                throw new Error('No encontradas');
-            }
-            
-            match = {
-                syncedLyrics: text,
-                plainLyrics: text.replace(/\[.*?\]/g, ''),
-                trackName: cleanTitle,
-                artistName: artist,
-                source: 'lujjjh.com'
-            };
-        }
 
         this.renderLyricsUI(match, artist, rawTitle);
 
