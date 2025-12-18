@@ -589,7 +589,7 @@ updatePlayerPosition(targetContainerId) {
             position: fixed;
             z-index: 1000;
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            background: #000;
+            background: transparent; /* CORRECCIÓN: Fondo transparente en lugar de negro */
             overflow: hidden;
             pointer-events: none;
         `;
@@ -617,7 +617,6 @@ updatePlayerPosition(targetContainerId) {
     
     // Si es la vista completa y la altura es exagerada (bug de 737px), forzar corrección
     if (targetContainerId === 'videoWrapper') {
-        // Detectar si la altura es desproporcionada respecto al ancho (más alto que ancho es raro en video)
         if (finalHeight > 500 || finalHeight > rect.width) {
             console.log(`🔧 Corrigiendo altura de video: ${finalHeight}px -> 400px`);
             finalHeight = 400; // Forzar el tamaño solicitado
@@ -632,15 +631,23 @@ updatePlayerPosition(targetContainerId) {
     playersLayer.style.left = `${rect.left}px`;
     playersLayer.style.width = `${rect.width}px`;
     playersLayer.style.height = `${finalHeight}px`; // Usar altura corregida
-    playersLayer.style.opacity = '1';
     
-    if (targetContainerId === 'videoWrapper') {
-         playersLayer.style.pointerEvents = 'auto';
-         playersLayer.style.borderRadius = '0';
+    // === LÓGICA DE VISIBILIDAD SEGÚN CONTENEDOR ===
+    if (targetContainerId === 'miniPlayerFloat' || targetContainerId === 'miniPlayerContainer') {
+         // En modo mini, ocultar esta capa para que no estorbe (el mini player tiene su propio contenedor)
+         playersLayer.style.opacity = '0';
+         playersLayer.style.pointerEvents = 'none';
     } else {
+         // En modo full, mostrar y permitir interacción
+         playersLayer.style.opacity = '1';
          playersLayer.style.pointerEvents = 'auto';
-         playersLayer.style.borderRadius = '12px';
-         playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+         
+         if (targetContainerId === 'videoWrapper') {
+             playersLayer.style.borderRadius = '0';
+         } else {
+             playersLayer.style.borderRadius = '12px';
+             playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+         }
     }
 }
     updatePlaylistsUI() {
@@ -1019,6 +1026,14 @@ switchView(viewName) {
         }
         document.body.classList.remove('mini-player-active');
 
+        // --- CORRECCIÓN: Reactivar capa persistente ---
+        const persistentLayer = document.getElementById('persistent-player-layer');
+        if (persistentLayer) {
+            persistentLayer.style.display = 'block';
+            persistentLayer.style.opacity = '1';
+        }
+        // ---------------------------------------------
+
         // B. Mover reproductores al contenedor grande (Video Wrapper)
         // Usamos requestAnimationFrame para dar tiempo al navegador a renderizar el div 'videoWrapper'
         requestAnimationFrame(() => {
@@ -1148,6 +1163,14 @@ showMiniPlayerFloat() {
     // 1. Validar reproducción
     if (!window.reproduccionIniciada) return;
 
+    // --- CORRECCIÓN: Ocultar la capa negra persistente ---
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    if (persistentLayer) {
+        persistentLayer.style.display = 'none'; // Ocultar completamente
+        persistentLayer.style.opacity = '0';
+    }
+    // ----------------------------------------------------
+
     const miniPlayer = document.getElementById('miniPlayerFloat');
     const fullContainer = document.getElementById('fullVideoContainer'); // Contenedor grande
     const player1 = document.getElementById('player1');
@@ -1187,7 +1210,6 @@ showMiniPlayerFloat() {
     // 5. Marcar estado
     document.body.classList.add('mini-player-active');
 }
-
 movePlayersToFullView() {
     console.log('🎬 Restaurando reproductores a vista completa...');
     
