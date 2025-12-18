@@ -2294,74 +2294,116 @@ function checkAndSkipSegment(player) {
         }
     } catch (error) {}
 }
+
 function monitorPlayers() {
+    // Validaciones básicas
     if (!playersInitialized || !reproduccionIniciada) return;
 
     try {
         const activePlayer = (currentPlayer === 1) ? player1 : player2;
-        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') return;
+        if (!activePlayer?.getPlayerState) return;
 
         const playerState = activePlayer.getPlayerState();
-        
-        // Solo monitorear si está reproduciendo
-        if (playerState !== YT.PlayerState.PLAYING) return;
-
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        if (isNaN(currentTime) || currentTime <= 0 || videoDuration <= 0) return;
+        // Solo monitorear cuando está reproduciendo
+        if (playerState !== YT.PlayerState.PLAYING) return;
+        if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
+        if (!videoId) return;
 
-        // --- CÁLCULO DE TIEMPO EFECTIVO ---
+        // =============================================
+        // CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
+        // =============================================
         let totalSponsorBlockDuration = 0;
-        if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
+        
+        if (segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
             totalSponsorBlockDuration = segmentosCache[videoId]
                 .filter(s => s.category === 'music_offtopic')
                 .reduce((sum, s) => {
                     const start = s.segment?.[0] ?? s.startTime;
                     const end = s.segment?.[1] ?? s.endTime;
-                    return sum + (end - start);
+                    if (typeof start === 'number' && typeof end === 'number') {
+                        return sum + (end - start);
+                    }
+                    return sum;
                 }, 0);
         }
 
-        // ✅ CORRECCIÓN: Trigger más preciso
-        const triggerOffset = CROSSFADE_DURATION + totalSponsorBlockDuration + 0.5;
-        const triggerTime = videoDuration - triggerOffset;
+        // =============================================
+        // CALCULAR PUNTO DE TRIGGER
+        // =============================================
+        const API_BUFFER = 1;
+        const SAFETY_MARGIN = 0.5;
+        const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
+        const triggerTime = videoDuration - (totalAdjustment + totalSponsorBlockDuration);
+        const timeRemaining = videoDuration - currentTime;
 
-        // --- SALTAR SEGMENTOS ---
-        if (videoId) {
+        // =============================================
+        // SPONSORBLOCK: Saltar segmentos durante reproducción
+        // =============================================
+        if (currentTime > 0) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // --- DISPARAR CROSSFADE ---
+        // =============================================
+        // ⚠️ CRITICAL: DISPARAR CROSSFADE
+        // =============================================
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
-            !crossfadeInProgress && 
-            !nextVideoScheduled) {
+            !crossfadeInProgress &&
+            !nextVideoScheduled) { 
             
-            // Protección para videos muy cortos
-            if (videoDuration < (CROSSFADE_DURATION * 2)) {
-                if (currentTime < (videoDuration - 2)) return;
-            }
-
-            console.log(`🚀 TRIGGER ACTIVADO: Tiempo ${currentTime.toFixed(2)} >= ${triggerTime.toFixed(2)}`);
+            console.log(`🎨 ¡CROSSFADE VISUAL TRIGGER!`, {
+                currentTime: Math.round(currentTime * 10) / 10,
+                triggerTime: Math.round(triggerTime * 10) / 10,
+                timeRemaining: Math.round(timeRemaining * 10) / 10,
+                videoDuration: Math.round(videoDuration)
+            });
             
+            // ✅ MARCAR FLAGS INMEDIATAMENTE
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             
+            // ✅ PAUSAR MONITOREO DURANTE CROSSFADE
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
+        
+            // ✅ APLICAR EFECTOS VISUALES INMEDIATAMENTE
+            const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+            const nextElement = document.getElementById(`player${currentPlayer}`);
             
-            if (window.unifiedCore && typeof window.unifiedCore.playNextVideo === 'function') {
-                window.unifiedCore.playNextVideo();
+            if (prevElement) {
+                prevElement.classList.add('fade-out');
+                prevElement.classList.remove('fade-in');
             }
+            
+            // Disparar evento para mix-effects.js
+            document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
+                detail: {
+                    currentTime,
+                    triggerTime,
+                    timeRemaining,
+                    videoDuration
+                }
+            }));
+            
+            // Ejecutar playNextVideo para cambio de audio
+            if (window.unifiedCore?.playNextVideo) {
+                setTimeout(() => {
+                    window.unifiedCore.playNextVideo();
+                }, 100);
+            }
+            
+            return;
         }
-
+        
     } catch (error) {
-        console.error("Error en monitorPlayers:", error);
+        console.error("❌ Error en monitorPlayers:", error);
     }
 }
 function calculateCrossfadeTriggerTime(videoDuration, videoId) {
