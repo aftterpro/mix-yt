@@ -512,29 +512,38 @@ onPlayerStateChange(event) {
             setTimeout(() => this.updatePlaylistsUI(), 500);
         });
     }
-
-    initializeUI() {
-        if (!playlistsData.some(p => p.id === 'queue')) {
-            playlistsData.push({
-                id: 'queue',
-                name: 'Cola de Reproducción',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true,
-                isQueue: true
-            });
-        }
-        if (!playlistsData.some(p => p.id === 'manual')) {
-            playlistsData.push({
-                id: 'manual',
-                name: 'Mis Vídeos Añadidos',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true
-            });
-        }
-        this.updateOverviewStats();
+initializeUI() {
+    // Asegurar que existe la cola de reproducción VACÍA por defecto
+    if (!playlistsData.some(p => p.id === 'queue')) {
+        playlistsData.unshift({ // Usamos unshift para que sea la primera
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [], // <--- EMPIEZA VACÍA
+            isExpanded: true,
+            isQueue: true
+        });
+    } else {
+        // Si ya existe (por carga de caché), verificar integridad
+        const q = playlistsData.find(p => p.id === 'queue');
+        if (!Array.isArray(q.videos)) q.videos = [];
     }
+
+    // Asegurar playlist manual
+    if (!playlistsData.some(p => p.id === 'manual')) {
+        playlistsData.push({
+            id: 'manual',
+            name: 'Mis Vídeos Añadidos',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true
+        });
+    }
+
+    this.updateOverviewStats();
+    // Forzar actualización visual de la cola a 0
+    this.updateQueueCount(0); 
+}
 
     async initializePlaylistManager() {
         console.log("🔧 Inicializando playlist manager...");
@@ -2224,77 +2233,81 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         return null; 
     }
 }
-
 function checkAndSkipSegment(player) {
     try {
         const currentTime = player.getCurrentTime();
+        const videoDuration = player.getDuration();
         const videoId = player.getVideoData()?.video_id;
 
-        if (!videoId || isNaN(currentTime) || currentTime < 0) return;
+        if (!videoId || isNaN(currentTime) || currentTime <= 0) return;
 
-        const now = Date.now();
-        if (lastSeekVideoId === videoId && lastSeekEndTime > 0 && Math.abs(currentTime - lastSeekEndTime) < 5) return;
+        // Evitar bucles de salto recientes
+        if (lastSeekVideoId === videoId && lastSeekEndTime > 0 && Math.abs(currentTime - lastSeekEndTime) < 2) {
+            return;
+        }
 
+        // Obtener segmentos (cache o fetch)
         if (!segmentosCache[videoId]) {
             obtenerSegmentosSponsorBlock(videoId);
             return;
         }
-
         if (segmentosCache[videoId] === 'fetching') return;
 
         const segments = segmentosCache[videoId];
-        if (!Array.isArray(segments) || segments.length === 0) return;
+        if (!Array.isArray(segments)) return;
 
+        // Buscar segmento activo
         const segmentToSkip = segments.find(segment => {
-            if (!segment || typeof segment !== 'object') return false;
-            let start, end;
+            if (segment.category !== 'music_offtopic') return false; // Solo saltar intros/outros/no-musica
             
-            if (segment.segment && Array.isArray(segment.segment)) {
-                start = segment.segment[0];
-                end = segment.segment[1];
-            } else if (segment.startTime !== undefined && segment.endTime !== undefined) {
-                start = segment.startTime;
-                end = segment.endTime;
-            } else {
-                return false;
-            }
+            let start = segment.startTime ?? segment.segment?.[0];
+            let end = segment.endTime ?? segment.segment?.[1];
+
+            // Validar
+            if (typeof start !== 'number' || typeof end !== 'number') return false;
             
-            if (segment.category === 'music_offtopic') {
-                const duration = end - start;
-                if (duration < 4) return false;
-                return currentTime >= start && currentTime < (end - 0.5);
-            }
-            return false;
+            // Lógica Spotify: Si el segmento es muy corto (< 1s), ignorar para evitar 'glitches'
+            if ((end - start) < 1) return false;
+
+            return currentTime >= start && currentTime < (end - 0.2); // Margen de 0.2s
         });
 
         if (segmentToSkip) {
-            let skipToTime;
-            if (segmentToSkip.segment && Array.isArray(segmentToSkip.segment)) {
-                skipToTime = segmentToSkip.segment[1];
-            } else if (segmentToSkip.endTime !== undefined) {
-                skipToTime = segmentToSkip.endTime;
+            let skipToTime = segmentToSkip.endTime ?? segmentToSkip.segment?.[1];
+            
+            // === LÓGICA TIPO SPOTIFY (Seamless) ===
+            // Si el salto nos lleva casi al final del video (menos de 3s restantes),
+            // en lugar de saltar, forzamos el paso a la siguiente canción.
+            if (videoDuration - skipToTime < 3 && window.unifiedCore) {
+                console.log('⏭️ SponsorBlock: Final detectado (Outro), pasando al siguiente video...');
+                lastSeekVideoId = videoId;
+                lastSeekEndTime = skipToTime; // Evitar re-disparar
+                window.unifiedCore.playNextVideo(); // <--- CROSSFADE INMEDIATO
+                return;
             }
-            
-            if (!skipToTime || typeof skipToTime !== 'number' || isNaN(skipToTime)) return;
-            if (skipToTime <= currentTime) return;
-            
-            const segmentDuration = skipToTime - currentTime;
+            // =======================================
+
+            // Salto normal (Intro o intermedio)
+            console.log(`⏭️ Eliminando silencio/intro: ${currentTime.toFixed(1)}s -> ${skipToTime.toFixed(1)}s`);
             lastSeekVideoId = videoId;
             lastSeekEndTime = skipToTime;
+            player.seekTo(skipToTime, true);
             
-            try {
-                player.seekTo(skipToTime, true);
-                if (window.unifiedCore) {
-                    window.unifiedCore.showMessage(`⏭️ Intro/outro saltado (${segmentDuration.toFixed(0)}s)`, 'info', 2000);
+            if (window.unifiedCore) {
+                // Mostrar un indicador sutil
+                const indicator = document.getElementById('unifiedStatusIndicator');
+                if(indicator) {
+                    indicator.textContent = "Skipped Silence";
+                    indicator.classList.add('show', 'info');
+                    setTimeout(() => indicator.classList.remove('show'), 1500);
                 }
-            } catch (seekError) {
-                lastSeekVideoId = null;
-                lastSeekEndTime = -1;
             }
         }
-    } catch (error) {}
-}
 
+    } catch (error) {
+        // Silencioso para no saturar consola
+    }
+}
 function monitorPlayers() {
     // Validaciones básicas
     if (!playersInitialized || !reproduccionIniciada) return;
