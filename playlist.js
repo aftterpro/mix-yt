@@ -1310,111 +1310,116 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
         };
     }
 }
-    async translateLyrics() {
-        const btn = document.getElementById('translateLyricsBtn');
-        const container = document.getElementById('lyricsContent');
-        
-        // Si ya está traducido, revertir (toggle)
-        if (btn.classList.contains('translated')) {
-            container.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
-            btn.classList.remove('translated');
-            btn.innerHTML = '<i class="fas fa-language"></i>';
-            btn.style.background = '';
-            return;
-        }
-
-        // Feedback de carga
-        const originalIcon = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        btn.disabled = true;
-
-        // Detectar si son letras sincronizadas (p) o planas (div)
-        const syncedLines = container.querySelectorAll('.lyrics-text.synced p');
-        const plainContainer = container.querySelector('.lyrics-text.plain');
-        
-        // Preparar texto para enviar
-        let textToTranslate = "";
-        let isSynced = false;
-
-        if (syncedLines.length > 0) {
-            isSynced = true;
-            // Unir con un caracter especial poco común para preservar la estructura
-            textToTranslate = Array.from(syncedLines).map(p => p.textContent).join(' ||| ');
-        } else if (plainContainer) {
-            textToTranslate = plainContainer.innerText;
-        }
-
-        if (!textToTranslate) {
-            this.core?.showMessage('No hay texto para traducir', 'warning');
-            btn.innerHTML = originalIcon;
-            btn.disabled = false;
-            return;
-        }
-
-        try {
-            console.log('🌐 Traduciendo letras...');
-            
-            // Usar Google Translate API
-            const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(textToTranslate)}`;
-            
-            // CORRECCIÓN 1: Usar sintaxis ?url= para mayor seguridad con el proxy
-            const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(googleUrl)}`;
-
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error('Error en traducción');
-            
-            const data = await response.json();
-            
-            // Google devuelve un array de arrays. Necesitamos reconstruir el texto.
-            // data[0] contiene los segmentos traducidos.
-            let fullTranslation = "";
-            if (data && data[0]) {
-                fullTranslation = data[0].map(item => item[0]).join('');
-            }
-
-            // CORRECCIÓN 2: Decodificar el texto por si llega codificado (%20, %7C...)
-            try {
-                fullTranslation = decodeURIComponent(fullTranslation);
-            } catch (e) {
-                console.warn('No fue necesario decodificar o hubo un error:', e);
-            }
-
-            // Inyectar traducción en el DOM
-            if (isSynced) {
-                // Separar por nuestro delimitador (ahora limpio gracias al decode)
-                const translatedLines = fullTranslation.split(' ||| '); 
-                
-                syncedLines.forEach((line, index) => {
-                    if (translatedLines[index]) {
-                        const transEl = document.createElement('span');
-                        transEl.className = 'lyrics-translation';
-                        transEl.textContent = translatedLines[index].trim();
-                        transEl.style.cssText = "display:block; font-size:0.85em; color:#4caf50; font-style:italic; margin-top:2px; opacity:0.9;";
-                        line.appendChild(transEl);
-                    }
-                });
-            } else if (plainContainer) {
-                // Para texto plano, simplemente añadirlo abajo o reemplazar saltos de línea
-                const transDiv = document.createElement('div');
-                transDiv.className = 'lyrics-translation';
-                transDiv.innerHTML = `<hr style="border-color:#333; margin:20px 0;"><strong>Traducción:</strong><br><br>${fullTranslation.replace(/\n/g, '<br>')}`;
-                transDiv.style.color = "#4caf50";
-                plainContainer.appendChild(transDiv);
-            }
-
-            // Marcar botón como activo
-            btn.classList.add('translated');
-            btn.innerHTML = '<i class="fas fa-check"></i> ES';
-            btn.style.background = 'rgba(76, 175, 80, 0.2)';
-
-        } catch (error) {
-            console.error('❌ Error traduciendo:', error);
-            this.core?.showMessage('Error al traducir', 'error');
-            btn.innerHTML = originalIcon;
-        } finally {
-            btn.disabled = false;
-        }
+async translateLyrics() {
+    const btn = document.getElementById('translateLyricsBtn');
+    const container = document.getElementById('lyricsContent');
+    
+    // --- (Lógica de toggle existente se mantiene igual) ---
+    if (btn.classList.contains('translated')) {
+        container.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
+        btn.classList.remove('translated');
+        btn.innerHTML = '<i class="fas fa-language"></i>';
+        btn.style.background = '';
+        return;
     }
+
+    // Feedback de carga
+    const originalIcon = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    // --- (Obtención del texto se mantiene igual) ---
+    const syncedLines = container.querySelectorAll('.lyrics-text.synced p');
+    const plainContainer = container.querySelector('.lyrics-text.plain');
+    
+    let textToTranslate = "";
+    let isSynced = false;
+
+    if (syncedLines.length > 0) {
+        isSynced = true;
+        textToTranslate = Array.from(syncedLines).map(p => p.textContent).join(' ||| ');
+    } else if (plainContainer) {
+        textToTranslate = plainContainer.innerText;
+    }
+
+    if (!textToTranslate) {
+        // ... manejo de error vacío ...
+        btn.innerHTML = originalIcon;
+        btn.disabled = false;
+        return;
+    }
+
+    try {
+        console.log('🌐 Traduciendo letras (vía POST)...');
+        
+        // 1. URL base de Google (SIN el texto 'q')
+        const googleBaseUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t";
+        
+        // 2. URL del Proxy apuntando a la base de Google
+        const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(googleBaseUrl)}`;
+
+        // 3. Preparar los datos para enviar por POST (Body)
+        // Usamos URLSearchParams para formato 'application/x-www-form-urlencoded' que Google espera
+        const postData = new URLSearchParams();
+        postData.append('q', textToTranslate);
+
+        // 4. Petición Fetch con método POST
+        const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: postData
+        });
+
+        if (!response.ok) throw new Error(`Error en traducción: ${response.status}`);
+        
+        const data = await response.json();
+        
+        // Procesar respuesta de Google
+        let fullTranslation = "";
+        if (data && data[0]) {
+            fullTranslation = data[0].map(item => item[0]).join('');
+        }
+
+        // Limpieza opcional por seguridad
+        try {
+            fullTranslation = decodeURIComponent(fullTranslation);
+        } catch (e) {}
+
+        // --- (Inyección en el DOM - Se mantiene igual) ---
+        if (isSynced) {
+            const translatedLines = fullTranslation.split(' ||| ');
+            syncedLines.forEach((line, index) => {
+                if (translatedLines[index]) {
+                    const transEl = document.createElement('span');
+                    transEl.className = 'lyrics-translation';
+                    transEl.textContent = translatedLines[index].trim();
+                    transEl.style.cssText = "display:block; font-size:0.85em; color:#4caf50; font-style:italic; margin-top:2px; opacity:0.9;";
+                    line.appendChild(transEl);
+                }
+            });
+        } else if (plainContainer) {
+            const transDiv = document.createElement('div');
+            transDiv.className = 'lyrics-translation';
+            transDiv.innerHTML = `<hr style="border-color:#333; margin:20px 0;"><strong>Traducción:</strong><br><br>${fullTranslation.replace(/\n/g, '<br>')}`;
+            transDiv.style.color = "#4caf50";
+            plainContainer.appendChild(transDiv);
+        }
+
+        // Éxito
+        btn.classList.add('translated');
+        btn.innerHTML = '<i class="fas fa-check"></i> ES';
+        btn.style.background = 'rgba(76, 175, 80, 0.2)';
+
+    } catch (error) {
+        console.error('❌ Error traduciendo:', error);
+        this.core?.showMessage('Error al traducir (Intenta de nuevo)', 'error');
+        btn.innerHTML = originalIcon;
+    } finally {
+        btn.disabled = false;
+    }
+}
    /**
      * ✅ NUEVA FUNCIÓN
      * Asigna el evento click al botón de cambio de proveedor
