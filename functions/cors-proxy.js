@@ -3,38 +3,51 @@ const fetch = require('node-fetch');
 exports.handler = async (event, context) => {
     let targetUrl = '';
 
-    // CASO 1: URL pasada como parámetro query (?url=https://...)
+    // 1. INTENTAR SACAR URL DE QUERY PARAM (?url=...)
     if (event.queryStringParameters && event.queryStringParameters.url) {
         targetUrl = event.queryStringParameters.url;
+        
+        // RECONSTRUCCIÓN ROBUSTA (Para el problema de la API de letras):
+        // Si el cliente envió "?url=...&artist=..." sin codificar el "&", Netlify lo separa.
+        // Aquí recuperamos esos parámetros perdidos.
+        const params = event.queryStringParameters;
+        const extras = Object.keys(params)
+            .filter(key => key !== 'url')
+            .map(key => `${key}=${params[key]}`)
+            .join('&');
+
+        if (extras) {
+            // Pegamos lo que se cortó (ej: &artist=Fool's Garden)
+            targetUrl += (targetUrl.includes('?') ? '&' : '?') + extras;
+        }
     } 
-    // CASO 2: URL pasada como parte del path (/cors-proxy/https://...)
+    // 2. INTENTAR SACAR URL DEL PATH (/cors-proxy/https://...)
     else {
-        // Extraer todo lo que viene después de /cors-proxy/
         const pathPrefix = '/.netlify/functions/cors-proxy/';
-        const rawPath = event.path; // ej: /.netlify/functions/cors-proxy/https://api.com...
+        let rawPath = event.path; 
         
         if (rawPath.startsWith(pathPrefix)) {
             targetUrl = rawPath.substring(pathPrefix.length);
-            
-            // Si hay query params adicionales, pegarlos de nuevo
-            // (ej: ?name=Lemon en la url original)
             if (event.rawQuery) {
                 targetUrl += '?' + event.rawQuery;
             }
         }
     }
 
-    // Decodificar por si acaso vino codificada doble
+    // 3. LIMPIEZA
     if (targetUrl.startsWith('http%3A')) {
         targetUrl = decodeURIComponent(targetUrl);
     }
 
-    // Validación final
+    // 4. 🔥 CORRECCIÓN ESPACIOS: Codificar URL para que "Lemon Tree" sea "Lemon%20Tree"
+    // Esto es vital para node-fetch
+    try {
+        targetUrl = encodeURI(targetUrl); 
+    } catch(e) {}
+
+    // Validación básica
     if (!targetUrl || !targetUrl.startsWith('http')) {
-        return { 
-            statusCode: 400, 
-            body: "URL destino inválida. Usa ?url=https://tu-api.com" 
-        };
+        return { statusCode: 400, body: "URL inválida" };
     }
 
     console.log(`Proxying to: ${targetUrl}`);
@@ -47,7 +60,6 @@ exports.handler = async (event, context) => {
             }
         });
 
-        // Obtener texto (soportando tanto JSON como LRC plano)
         const data = await response.text();
 
         return {
@@ -55,8 +67,7 @@ exports.handler = async (event, context) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type",
-                // Devolvemos text/plain porque LRC no es JSON
-                "Content-Type": "text/plain; charset=utf-8" 
+                "Content-Type": "text/plain; charset=utf-8" // LRC es texto plano
             },
             body: data
         };
