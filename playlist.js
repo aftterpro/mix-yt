@@ -1310,7 +1310,6 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
         };
     }
 }
-    
     async translateLyrics() {
         const btn = document.getElementById('translateLyricsBtn');
         const container = document.getElementById('lyricsContent');
@@ -1355,10 +1354,11 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
         try {
             console.log('🌐 Traduciendo letras...');
             
-            // Usar Google Translate API (vía tu Proxy para evitar CORS)
-            // 'gtx' es el cliente gratuito de Google
+            // Usar Google Translate API
             const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(textToTranslate)}`;
-            const proxyUrl = `/.netlify/functions/cors-proxy/${googleUrl}`;
+            
+            // CORRECCIÓN 1: Usar sintaxis ?url= para mayor seguridad con el proxy
+            const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(googleUrl)}`;
 
             const response = await fetch(proxyUrl);
             if (!response.ok) throw new Error('Error en traducción');
@@ -1372,9 +1372,17 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
                 fullTranslation = data[0].map(item => item[0]).join('');
             }
 
+            // CORRECCIÓN 2: Decodificar el texto por si llega codificado (%20, %7C...)
+            try {
+                fullTranslation = decodeURIComponent(fullTranslation);
+            } catch (e) {
+                console.warn('No fue necesario decodificar o hubo un error:', e);
+            }
+
             // Inyectar traducción en el DOM
             if (isSynced) {
-                const translatedLines = fullTranslation.split(' ||| '); // Separar por nuestro delimitador
+                // Separar por nuestro delimitador (ahora limpio gracias al decode)
+                const translatedLines = fullTranslation.split(' ||| '); 
                 
                 syncedLines.forEach((line, index) => {
                     if (translatedLines[index]) {
