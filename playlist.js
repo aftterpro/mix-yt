@@ -139,109 +139,60 @@ class PlaylistManager {
 }
 
     /**
-     * Añadir video a la cola (CORREGIDO)
+     * Añadir video a la cola
      */
-    async addVideoToQueue(videoData) {
-        // 1. VALIDACIÓN CRÍTICA
-        if (!videoData || !videoData.videoId) {
-            console.error('❌ addVideoToQueue: videoData o videoId inválido:', videoData);
-            this.core?.showMessage('Error: Video inválido', 'error');
-            return;
+async addVideoToQueue(videoData, fromPlaylist = false) {
+    // Obtener la cola
+    let queue = this.playlists.find(p => p.id === 'queue');
+    if (!queue) return; // Error de seguridad
+
+    // 1. LÓGICA PARA PLAYLIST COMPLETA (Al final)
+    // Si la llamada viene indicando que es parte de una carga masiva o playlist
+    if (fromPlaylist === true) {
+        // Verificar duplicados simples para no llenar la cola de lo mismo
+        const exists = queue.videos.some(v => v.videoId === videoData.videoId);
+        if (!exists) {
+            queue.videos.push(videoData);
+            this.updateQueueUI(); // Actualizar UI
         }
-
-        // 2. OBTENER O CREAR PLAYLIST DE COLA
-        let queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
-        
-        if (!queuePlaylist) {
-            queuePlaylist = {
-                id: 'queue',
-                name: 'Cola de Reproducción',
-                thumbnailUrl: './electronic.ico',
-                videos: [],
-                isExpanded: true,
-                isQueue: true
-            };
-            this.playlistsData.unshift(queuePlaylist);
-        }
-
-        // 3. VERIFICAR DUPLICADOS
-        const isDuplicate = queuePlaylist.videos.some(v => v.videoId === videoData.videoId);
-        if (isDuplicate) {
-            this.core?.showMessage(`"${videoData.title}" ya está en la cola`, 'warning');
-            return;
-        }
-
-        // 4. PROCESAMIENTO DE ARTISTA Y TÍTULO
-        let artist = 'Desconocido';
-        let cleanTitle = videoData.title || 'Título Desconocido';
-        
-        // Si el backend ya procesó y separó artista y título
-        if (videoData.artist && videoData.artist !== 'Desconocido' && videoData.artist !== 'YouTube') {
-            artist = videoData.artist;
-        } else if (videoData.uploaderName && 
-                   videoData.uploaderName !== 'Desconocido' && 
-                   videoData.uploaderName !== 'YouTube' &&
-                   !videoData.uploaderName.includes('VEVO') &&
-                   !videoData.uploaderName.toLowerCase().includes('official')) {
-            // Si uploaderName parece ser el artista real
-            artist = videoData.uploaderName;
-        } else {
-            // ✅ CORRECCIÓN AQUÍ: Usamos 'this.' para llamar a la función de la clase
-            const extracted = this.extractArtistFromTitle(videoData.title);
-            artist = extracted.artist;
-            cleanTitle = extracted.title;
-        }
-
-        // 5. OBTENER DURACIÓN
-        let duration = videoData.duration || 0;
-        
-        if (!duration && videoData.videoId && window.isAuthorized) {
-            try {
-                // Intentar obtener duración exacta si tenemos API y no vino en los datos
-                const durations = await this.core?.getBatchVideoDurations([videoData.videoId]);
-                duration = durations?.[videoData.videoId] || 0;
-            } catch (error) {
-                console.warn('No se pudo obtener duración para', videoData.videoId);
-            }
-        }
-
-        // 6. CREAR OBJETO DE VIDEO
-        const videoObject = {
-            videoId: videoData.videoId,
-            title: cleanTitle,
-            thumbnail: videoData.thumbnail || './electronic.ico',
-            duration: duration,
-            uploaderName: artist, // Usar artista extraído
-            author: artist,
-            artist: artist,       // Campo explícito
-            sourcePlaylistId: 'queue',
-            addedAt: Date.now()
-        };
-
-        console.log('🎵 Video procesado para cola:', {
-            videoId: videoObject.videoId,
-            title: videoObject.title.substring(0, 50),
-            artist: videoObject.artist
-        });
-
-        // 7. AÑADIR A LA LISTA
-        queuePlaylist.videos.push(videoObject);
-        this.core?.showMessage(`Añadido a cola: ${videoObject.title}`, 'success');
-        
-        // 8. ACTUALIZAR UI
-        this.updatePlaylistsUI();
-        this.updateQueuePopup(); // Actualizar popup si está abierto
-        this.core?.enablePlayButton();
-        
-        console.log(`🎵 Video añadido exitosamente. Total: ${queuePlaylist.videos.length} videos`);
-        
-        // 9. GUARDAR CAMBIOS (Con pequeño delay para no bloquear UI)
-        setTimeout(() => {
-            if (typeof window.saveAllData === 'function') {
-                window.saveAllData();
-            }
-        }, 500);
+        return;
     }
+
+    // 2. LÓGICA PARA VIDEO INDIVIDUAL (Después del actual)
+    // Si el usuario hace clic manualmente en "Añadir a cola"
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+
+    // Si no hay nada reproduciendo, añadir al final (que es el principio)
+    if (currentIndex === -1) {
+        queue.videos.push(videoData);
+        this.core.showMessage(`Añadido a cola: ${videoData.title}`, 'success');
+    } else {
+        // Insertar justo después de la canción actual
+        // +1 porque splice inserta en el índice dado, moviendo el resto
+        queue.videos.splice(currentIndex + 1, 0, videoData);
+        this.core.showMessage(`Siguiente en cola: ${videoData.title}`, 'success');
+    }
+
+    this.savePlaylists();
+    this.updateQueueUI();
+    this.updateQueuePopup(); // Si el popup está abierto
+}
+
+// Asegúrate de tener esta función auxiliar para clicks en la biblioteca
+handleLibraryItemClick(item, isPlaylist) {
+    if (isPlaylist) {
+        // Si es playlist, cargar sus videos y añadir al FINAL
+        console.log('📂 Añadiendo playlist entera al final de la cola...');
+        this.loadPlaylistVideos(item.id).then(videos => {
+            videos.forEach(v => this.addVideoToQueue(v, true)); // true = al final
+            this.core.showMessage(`${videos.length} videos añadidos al final`, 'success');
+        });
+    } else {
+        // Si es video suelto, añadir DESPUÉS DEL ACTUAL
+        console.log('🎵 Añadiendo video siguiente...');
+        this.addVideoToQueue(item, false); // false = lógica inteligente (next)
+    }
+}
 
     /**
      * Añadir video después del video actual
