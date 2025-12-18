@@ -977,44 +977,90 @@ updatePlayerPosition(targetContainerId) {
         if (queueCountBadge) queueCountBadge.textContent = count;
     }
 
-    switchView(viewName) {
-        const validViews = ['home', 'search', 'library', 'fullPlayer'];
-        if (!validViews.includes(viewName)) return;
+switchView(viewName) {
+    const validViews = ['home', 'search', 'library', 'fullPlayer'];
+    if (!validViews.includes(viewName)) return;
 
-        document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.view === viewName) item.classList.add('active');
+    console.log(`🔄 Cambiando a vista: ${viewName}`);
+
+    // 1. Actualizar UI de Navegación (Tabs y Botones inferiores)
+    document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.view === viewName) item.classList.add('active');
+    });
+
+    // 2. Actualizar Contenedores de Vista (Ocultar/Mostrar)
+    document.querySelectorAll('.content-view').forEach(view => {
+        view.classList.remove('active');
+        // Opcional: Resetear scroll al cambiar (excepto si volvemos a full player)
+        if (viewName !== 'fullPlayer' && view.dataset.view !== viewName) {
+            view.scrollTop = 0;
+        }
+    });
+
+    const targetView = document.getElementById(`${viewName}View`);
+    if (targetView) targetView.classList.add('active');
+    
+    // Guardar estado actual
+    this.currentView = viewName;
+
+    // 3. GESTIÓN DE REPRODUCTORES (Full vs Mini)
+    const miniPlayer = document.getElementById('miniPlayerFloat');
+    const hasActiveVideo = window.reproduccionIniciada || 
+                           (this.state.currentPlayingInfo?.flattenedIndex >= 0);
+
+    if (viewName === 'fullPlayer') {
+        // === MODO PANTALLA COMPLETA ===
+        
+        // A. Ocultar Mini Player explícitamente (para que no tape controles)
+        if (miniPlayer) {
+            miniPlayer.style.display = 'none'; // CSS directo
+            miniPlayer.classList.add('hidden');
+        }
+        document.body.classList.remove('mini-player-active');
+
+        // B. Mover reproductores al contenedor grande (Video Wrapper)
+        // Usamos requestAnimationFrame para dar tiempo al navegador a renderizar el div 'videoWrapper'
+        requestAnimationFrame(() => {
+            // Asegurar que el wrapper tenga ID para la capa persistente
+            const wrapper = document.querySelector('.video-wrapper');
+            if (wrapper && !wrapper.id) wrapper.id = 'videoWrapper';
+
+            // Mover iframes
+            this.movePlayersToFullView(); 
+            
+            // Actualizar posición de la capa negra persistente
+            this.updatePlayerPosition('videoWrapper');
         });
 
-        document.querySelectorAll('.content-view').forEach(view => view.classList.remove('active'));
-        const targetView = document.getElementById(`${viewName}View`);
-        if (targetView) targetView.classList.add('active');
-        
-        this.currentView = viewName;
+        // C. Actualizar cola visual si es necesario
+        if (window.playlistManager?.updateQueueUI) {
+            window.playlistManager.updateQueueUI();
+        }
 
-        const hasActiveVideo = window.reproduccionIniciada;
-        const miniPlayerFloat = document.getElementById('miniPlayerFloat');
-        const fullView = document.getElementById('fullPlayerView');
-        let videoWrapper = fullView.querySelector('.video-wrapper');
-        if(videoWrapper && !videoWrapper.id) videoWrapper.id = 'videoWrapper';
-
-        if (viewName === 'fullPlayer') {
-            if (miniPlayerFloat) miniPlayerFloat.classList.add('hidden');
-            requestAnimationFrame(() => this.updatePlayerPosition('videoWrapper'));
+    } else {
+        // A. Si hay música sonando, mostrar Mini Player
+        if (hasActiveVideo) {
+            // Usamos la función "blindada" que hicimos antes
+            this.showMiniPlayerFloat();
         } else {
-            if (hasActiveVideo) {
-                if (miniPlayerFloat) {
-                    miniPlayerFloat.classList.remove('hidden');
-                    miniPlayerFloat.style.display = 'block';
-                }
-                requestAnimationFrame(() => this.updatePlayerPosition('miniPlayerFloat'));
-            } else {
-                if (miniPlayerFloat) miniPlayerFloat.classList.add('hidden');
-                const layer = document.getElementById('persistent-player-layer');
-                if (layer) layer.style.opacity = '0';
+            // Si no hay música, asegurar oculto
+            if (miniPlayer) {
+                miniPlayer.style.display = 'none';
+                miniPlayer.classList.add('hidden');
             }
         }
+        
+        // B. Refrescar vistas específicas si es necesario
+        if (viewName === 'library') {
+            this.refreshLibraryView();
+        } else if (viewName === 'search' && currentSearchQuery) {
+            // Mantener foco si ya había búsqueda
+             const searchInput = document.getElementById('searchInput');
+             if(searchInput) searchInput.focus();
+        }
     }
+}
 movePlayersToFullView() {
     const fullPlayerView = document.getElementById('fullPlayerView');
     if (!fullPlayerView) return;
@@ -1097,36 +1143,37 @@ movePlayersToFullView() {
     }
 
     showMiniPlayerFloat() {
-        const hasActiveVideo = this.state?.currentPlayingInfo?.flattenedIndex >= 0 || 
-                              window.currentPlayingInfo?.flattenedIndex >= 0 ||
-                              window.reproduccionIniciada;
-        
-        if (!hasActiveVideo) return;
-        
-        let miniPlayer = document.getElementById('miniPlayerFloat');
-        if (!miniPlayer) return;
-        
-        miniPlayer.classList.remove('hidden');
-        requestAnimationFrame(() => {
-            miniPlayer.style.cssText = `
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: fixed !important;
-                bottom: 110px !important;
-                right: 20px !important;
-                width: 320px !important;
-                height: 180px !important;
-                z-index: 999998 !important;
-                background: #000 !important;
-                border-radius: 12px !important;
-                overflow: hidden !important;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.8) !important;
-                pointer-events: auto !important;
-            `;
-            requestAnimationFrame(() => this.movePlayersToMini());
-        });
+    console.log('🎬 Activando mini player flotante (FORZADO)...');
+
+    // 1. Validar si hay video
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    if (!window.reproduccionIniciada && currentIndex === -1) {
+        return; // No hay nada sonando
     }
+
+    const miniPlayer = document.getElementById('miniPlayerFloat');
+    if (!miniPlayer) return;
+
+    // 2. Limpiar clases que lo oculten
+    miniPlayer.classList.remove('hidden', 'hide', 'invisible');
+    
+    // 3. Aplicar estilos directamente al hueso (inline styles)
+    Object.assign(miniPlayer.style, {
+        display: 'block',
+        visibility: 'visible',
+        opacity: '1',
+        zIndex: '999999', // ¡Al frente!
+        pointerEvents: 'auto',
+        bottom: '110px', // Ajusta si tu barra inferior lo tapa
+        right: '20px'
+    });
+
+    // 4. Mover los iframes dentro
+    this.movePlayersToMini();
+
+    // 5. Marcar body para ayudar al CSS
+    document.body.classList.add('mini-player-active');
+}
 
     movePlayersToMini() {
         const player1 = document.getElementById('player1');
