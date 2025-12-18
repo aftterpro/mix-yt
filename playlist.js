@@ -47,82 +47,100 @@ class PlaylistManager {
     // PERSISTENCIA DE DATOS
     // =============================================
     
-    async loadPersistentData() {
-        console.log('📂 Cargando datos persistentes...');
-        
-        // Esperar un momento para que las funciones de core.js se carguen
-      //  await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Cargar playlists persistentes
-        if (typeof window.loadPlaylistsDataPersistent === 'function') {
-            const persistentPlaylists = window.loadPlaylistsDataPersistent();
-            if (persistentPlaylists && Array.isArray(persistentPlaylists)) {
-                // Limpiar array existente y agregar datos cargados
-                this.playlistsData.splice(0, this.playlistsData.length);
-                this.playlistsData.push(...persistentPlaylists);
-                
-                // Actualizar también la referencia en core si existe
-                if (this.core && this.core.playlistsData) {
-                    this.core.playlistsData = this.playlistsData;
-                }
-                
-                console.log(`✅ ${persistentPlaylists.length} playlists cargadas desde almacenamiento`);
-            }
-        } else {
-            console.log('⚠️ loadPlaylistsDataPersistent no disponible aún, usando datos vacíos');
-        }
-        
-        // Verificar y cargar playlists de YouTube guardadas en auth.js
-        setTimeout(() => {
-            if (typeof getStoredPlaylists === 'function') {
-                const youtubeLibraryPlaylists = getStoredPlaylists();
-                if (youtubeLibraryPlaylists && youtubeLibraryPlaylists.length > 0) {
-                    console.log('🎵 Restaurando playlists de YouTube Library guardadas');
-                    const event = new CustomEvent('playlistsFetched', {
-                        detail: youtubeLibraryPlaylists
-                    });
-                    document.dispatchEvent(event);
-                }
-            }
-        }, 2000);
+    /**
+     * Cargar playlists desde almacenamiento persistente o inicializar
+     */
+    loadPlaylists() {
+        console.log('📂 Cargando playlists...');
 
-        // Cargar cola persistente
-        if (typeof window.loadQueuePersistent === 'function') {
-            const persistentQueue = window.loadQueuePersistent();
-            if (persistentQueue) {
-                // Asegurar que existe la playlist de cola
-                let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-                if (!queuePlaylist) {
-                    queuePlaylist = {
-                        id: 'queue',
-                        name: 'Cola de Reproducción',
-                        thumbnailUrl: './electronic.ico',
-                        videos: [],
-                        isExpanded: true,
-                        isQueue: true
-                    };
-                    this.playlistsData.unshift(queuePlaylist);
+        // 1. Intentar cargar desde el Core (si ya tiene datos)
+        if (this.core && this.core.playlistsData && this.core.playlistsData.length > 0) {
+            console.log('✅ Usando datos existentes del Core');
+            this.playlistsData = this.core.playlistsData; // Sincronizar referencia
+        } 
+        // 2. Si no, intentar cargar desde localStorage (persistencia propia de playlist.js si existiera)
+        else {
+            // Nota: La persistencia principal la maneja core.js via loadPlaylistsDataPersistent
+            // Aquí podemos intentar recuperar si el core aún no ha cargado
+            const storedData = localStorage.getItem('ytcm_playlists_persistent');
+            if (storedData) {
+                try {
+                    const parsed = JSON.parse(storedData);
+                    this.playlistsData = parsed.data || [];
+                    console.log(`✅ ${this.playlistsData.length} playlists recuperadas de localStorage local`);
+                } catch (e) {
+                    console.warn('⚠️ Error al leer localStorage local, iniciando vacío');
+                    this.playlistsData = [];
                 }
-                
-                // Cargar videos de la cola
-                queuePlaylist.videos = persistentQueue.videos || [];
-                
-                // Restaurar estado de reproducción si el core está disponible
-                if (this.core && persistentQueue.currentPlayingInfo) {
-                    this.core.currentPlayingInfo = persistentQueue.currentPlayingInfo;
-                    // También actualizar la variable global
-                    if (typeof window.currentPlayingInfo !== 'undefined') {
-                        window.currentPlayingInfo = persistentQueue.currentPlayingInfo;
-                    }
-                }
-                
-                console.log(`✅ Cola cargada: ${persistentQueue.videos?.length || 0} videos`);
+            } else {
+                this.playlistsData = [];
             }
-        } else {
-            console.log('⚠️ loadQueuePersistent no disponible aún');
         }
+
+        // 3. Asegurar que existe la Cola de Reproducción
+        let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        if (!queue) {
+            console.log('✨ Creando cola de reproducción inicial');
+            queue = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: './electronic.ico',
+                videos: [],
+                isExpanded: true,
+                isQueue: true
+            };
+            this.playlistsData.unshift(queue); // Añadir al principio
+        }
+
+        // 4. Asegurar que existe la Playlist Manual
+        let manual = this.playlistsData.find(p => p.id === 'manual');
+        if (!manual) {
+            manual = {
+                id: 'manual',
+                name: 'Mis Vídeos Añadidos',
+                thumbnailUrl: './electronic.ico',
+                videos: [],
+                isExpanded: true
+            };
+            this.playlistsData.push(manual);
+        }
+
+        // 5. Sincronizar de vuelta al Core para que ambos compartan la misma referencia
+        if (this.core) {
+            this.core.playlistsData = this.playlistsData;
+        }
+        
+        // Asignar alias para compatibilidad con código que use this.playlists
+        this.playlists = this.playlistsData; 
     }
 
+    /**
+     * Configurar listeners globales (setupEventListeners)
+     */
+    setupEventListeners() {
+        console.log('🎧 Configurando eventos de PlaylistManager...');
+        
+        // Listener para búsqueda de playlists
+        const input = document.getElementById('searchInput2');
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('añadirUrlButton')?.click();
+                }
+            });
+        }
+
+        // Listener para cerrar popups con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const popup = document.querySelector('.playlist-popup-overlay.show');
+                if (popup) {
+                    popup.classList.remove('show');
+                    setTimeout(() => popup.remove(), 300);
+                }
+            }
+        });
+    }
     // =============================================
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
