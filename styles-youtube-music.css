@@ -3266,3 +3266,29 @@ element.style {
         padding: 6px;
     }
 }
+/* Contenedor de resultados de búsqueda */
+#searchResults, .search-results-grid {
+    display: grid;
+    /* Esto crea columnas automáticas pero con un ancho mínimo de 160px */
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+    gap: 20px; /* ESPACIO ENTRE BALDOSAS (Lo que pediste) */
+    padding: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Ajuste de la tarjeta individual */
+.track-item.card-track, .search-result-card {
+    margin: 0; /* Quitamos margin porque usamos gap */
+    width: 100%;
+    background: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.track-item.card-track:hover {
+    transform: translateY(-5px);
+    background: #2a2a2a;
+    z-index: 2;
+}
