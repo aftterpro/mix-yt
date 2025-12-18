@@ -3320,3 +3320,18 @@ element.style {
 #persistent-player-layer {
     z-index: 1000 !important; /* Más alto que el fondo */
 }
+#miniPlayerFloat, #miniPlayerContainer {
+    z-index: 999999 !important; /* Más de 9000 */
+    display: block; /* Asegurar que no esté none */
+}
+
+/* Asegurar que el reproductor dentro del mini se vea */
+#miniPlayerFloat .video-player, 
+#miniPlayerFloat iframe {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+/* Si usas la capa persistente, también subirla cuando está en modo mini */
+body.mini-player-active #persistent-player-layer {
+    z-index: 999999 !important;
+}
