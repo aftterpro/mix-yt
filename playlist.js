@@ -956,6 +956,29 @@ findRelatedVideoData(itemElement) {
         return null;
     }
 }  
+     /**
+     * Renderizar letras (Puente compatible)
+     */
+    renderLyrics(data) {
+        // Obtener metadatos actuales para el header
+        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+        const flatList = this.core?.getFlattenedPlaylist() || [];
+        const currentVideo = flatList[currentIndex];
+        
+        // Llamar a la función UI real pasando los datos
+        // renderLyricsUI espera: (match, originalArtist, originalTitle)
+        
+        // Adaptar el objeto 'data' al formato 'match' que espera renderLyricsUI
+        const match = {
+            syncedLyrics: data.syncedLyrics,
+            plainLyrics: data.plainLyrics,
+            source: data.source || 'Desconocido',
+            trackName: currentVideo?.title,
+            artistName: currentVideo?.artist || currentVideo?.uploaderName
+        };
+
+        this.renderLyricsUI(match, match.artistName, match.trackName);
+    }   
 renderLyricsUI(match, originalArtist, originalTitle) {
         const lyricsContainer = document.getElementById('lyricsContent');
         const trackName = match.trackName || originalTitle;
