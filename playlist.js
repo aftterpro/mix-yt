@@ -4,29 +4,45 @@ console.log('🎵 Cargando gestor de playlists...');
 // CLASE PRINCIPAL PARA GESTIÓN DE PLAYLISTS
 // =============================================
 class PlaylistManager {
-constructor(core) {
-    // 1. Referencia al Núcleo
-    this.core = core;
+    constructor(core) {
+        // 1. Referencia al Núcleo
+        this.core = core;
 
-    // 2. Inicialización de Datos
-    // Intentamos cargar del core si ya tiene datos, si no, array vacío
-    this.playlists = this.core?.playlistsData || []; 
+        // 2. Inicialización de Datos
+        // Intentamos cargar del core si ya tiene datos, si no, array vacío
+        this.playlists = this.core?.playlistsData || []; 
 
-    // 3. Configuración de Letras (Persistencia + Caché)
-    // Carga la preferencia guardada o usa 'lrclib' por defecto
-    this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
-    this.lastLoadedLyricsId = null; // Para evitar recargar la misma letra
-    this.currentLrc = [];           // Array para letras sincronizadas
-    this.lyricsSyncInterval = null; // El timer del scroll automático
-    this.lyricsTranslated = false;  // Estado de la traducción
+        // 3. Configuración de Letras (Persistencia + Caché)
+        this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
+        this.lastLoadedLyricsId = null;
+        this.currentLrc = [];
+        this.lyricsSyncInterval = null;
+        this.lyricsTranslated = false;
 
-    // 4. Configuración de Relacionados (Caché)
-    this.lastLoadedRelatedId = null; // Para evitar recargar sugerencias
+        // 4. Configuración de Relacionados (Caché)
+        this.lastLoadedRelatedId = null;
 
-    // 5. Arranque
-    this.init();
-}
+        // 5. Arranque
+        this.init(); 
+    }
+    init() {
+        console.log('🔧 Inicializando PlaylistManager...');
 
+        // 1. Cargar Playlists persistentes (si existen en localStorage)
+        this.loadPlaylists();
+
+        // 2. Configurar todos los botones y eventos (Drag & drop, clicks, etc.)
+        this.setupEventListeners();
+
+        // 3. Renderizar la vista inicial de playlists
+        this.updatePlaylistsUI();
+        
+        // 4. Si hay una cola guardada, actualizar su UI
+        this.updateQueueUI();
+
+        console.log('✅ PlaylistManager Inicializado correctamente');
+    }
+    
     // =============================================
     // PERSISTENCIA DE DATOS
     // =============================================
