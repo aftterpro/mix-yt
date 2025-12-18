@@ -4,14 +4,28 @@ console.log('🎵 Cargando gestor de playlists...');
 // CLASE PRINCIPAL PARA GESTIÓN DE PLAYLISTS
 // =============================================
 class PlaylistManager {
-    constructor(unifiedCore) {
-        this.core = unifiedCore;
-        this.playlistsData = unifiedCore.playlistsData;
-        this.lyricsSyncInterval = null; // Para el intervalo de sincronización
-        this.currentLrc = [];           // Para guardar las líneas de [tiempo, texto]
-        this.lyricsProvider = 'lrclib'; // Proveedor por defecto
-        this.loadPersistentData();
-    }
+constructor(core) {
+    // 1. Referencia al Núcleo
+    this.core = core;
+
+    // 2. Inicialización de Datos
+    // Intentamos cargar del core si ya tiene datos, si no, array vacío
+    this.playlists = this.core?.playlistsData || []; 
+
+    // 3. Configuración de Letras (Persistencia + Caché)
+    // Carga la preferencia guardada o usa 'lrclib' por defecto
+    this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
+    this.lastLoadedLyricsId = null; // Para evitar recargar la misma letra
+    this.currentLrc = [];           // Array para letras sincronizadas
+    this.lyricsSyncInterval = null; // El timer del scroll automático
+    this.lyricsTranslated = false;  // Estado de la traducción
+
+    // 4. Configuración de Relacionados (Caché)
+    this.lastLoadedRelatedId = null; // Para evitar recargar sugerencias
+
+    // 5. Arranque
+    this.init();
+}
 
     // =============================================
     // PERSISTENCIA DE DATOS
@@ -142,42 +156,53 @@ class PlaylistManager {
      * Añadir video a la cola
      */
 async addVideoToQueue(videoData, fromPlaylist = false) {
-    // Obtener la cola
-    let queue = this.playlists.find(p => p.id === 'queue');
-    if (!queue) return; // Error de seguridad
+    // 1. OBTENCIÓN ROBUSTA DE LA COLA
+    // Intentamos usar this.playlists, si falla, usamos el global del Core
+    const allPlaylists = this.playlists || window.unifiedCore?.playlistsData || [];
+    let queue = allPlaylists.find(p => p.id === 'queue');
 
-    // 1. LÓGICA PARA PLAYLIST COMPLETA (Al final)
-    // Si la llamada viene indicando que es parte de una carga masiva o playlist
-    if (fromPlaylist === true) {
-        // Verificar duplicados simples para no llenar la cola de lo mismo
-        const exists = queue.videos.some(v => v.videoId === videoData.videoId);
-        if (!exists) {
-            queue.videos.push(videoData);
-            this.updateQueueUI(); // Actualizar UI
-        }
+    // Si no existe, intentar crearla o buscarla en el core
+    if (!queue && window.unifiedCore) {
+        // Forzar reinicialización si es necesario
+        queue = window.unifiedCore.playlistsData.find(p => p.id === 'queue');
+    }
+
+    if (!queue) {
+        console.error('❌ Error crítico: No se encuentra la cola de reproducción');
         return;
     }
 
-    // 2. LÓGICA PARA VIDEO INDIVIDUAL (Después del actual)
-    // Si el usuario hace clic manualmente en "Añadir a cola"
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-
-    // Si no hay nada reproduciendo, añadir al final (que es el principio)
-    if (currentIndex === -1) {
-        queue.videos.push(videoData);
-        this.core.showMessage(`Añadido a cola: ${videoData.title}`, 'success');
+    // 2. AÑADIR VIDEO
+    if (fromPlaylist === true) {
+        // Modo Playlist: Añadir al final (evitando duplicados exactos seguidos)
+        const lastVideo = queue.videos[queue.videos.length - 1];
+        if (!lastVideo || lastVideo.videoId !== videoData.videoId) {
+            queue.videos.push(videoData);
+        }
     } else {
-        // Insertar justo después de la canción actual
-        // +1 porque splice inserta en el índice dado, moviendo el resto
-        queue.videos.splice(currentIndex + 1, 0, videoData);
-        this.core.showMessage(`Siguiente en cola: ${videoData.title}`, 'success');
+        // Modo Manual: Añadir después del actual
+        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+        if (currentIndex === -1) {
+            queue.videos.push(videoData);
+            if (this.core) this.core.showMessage(`Añadido a cola: ${videoData.title}`, 'success');
+        } else {
+            queue.videos.splice(currentIndex + 1, 0, videoData);
+            if (this.core) this.core.showMessage(`Siguiente en cola: ${videoData.title}`, 'success');
+        }
     }
 
-    this.savePlaylists();
-    this.updateQueueUI();
-    this.updateQueuePopup(); // Si el popup está abierto
-}
+    // 3. PERSISTENCIA INMEDIATA (Guardar cambios)
+    if (window.saveQueuePersistent) {
+        window.saveQueuePersistent();
+        console.log('💾 Cola guardada tras añadir video');
+    } else if (this.core && this.core.saveAllData) {
+        this.core.saveAllData();
+    }
 
+    // 4. ACTUALIZAR UI
+    this.updateQueueUI();
+    this.updateQueuePopup();
+}
 // Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
     if (isPlaylist) {
@@ -988,189 +1013,222 @@ renderLyricsUI(match, originalArtist, originalTitle) {
                 <p class="lyrics-info" style="font-size:11px; opacity:0.5">Intenta cambiar de proveedor</p>
             </div>`;
     }
-/**
-     * ✅ LIMPIEZA PROFUNDA DE TÍTULOS
-     * Corrige: "Africa s", "Cancion (Official Video)", "@Artista", etc.
-     */
-    cleanTrackTitle(title) {
-        if (!title) return '';
-        
-        let clean = title;
+cleanTrackTitle(title) {
+    if (!title) return '';
+    
+    let clean = title;
 
-        // 1. Eliminar Emojis
-        const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
-        clean = clean.replace(emojiRegex, '');
+    // 1. Eliminar Emojis
+    const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
+    clean = clean.replace(emojiRegex, '');
 
-        // 2. Eliminar colaboraciones y productores (ft., feat., prod.)
-        clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with|prod\.|produced by)\s.*/i, '');
+    // 2. Eliminar colaboraciones y productores (ft., feat., prod.)
+    clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with|prod\.|produced by)\s.*/i, '');
 
-        // 3. Eliminar contenido entre paréntesis/corchetes que sea "ruido"
-        const noiseKeywords = 'official|video|audio|lyrics|visualizer|hd|hq|4k|8k|live|vivo|version|remaster|extended|radio|original|cover|acoustic|instrumental|karaoke|bpm|remix|rmx|mix|edit|mashup|bootleg|dj|set|session|topic';
-        // Regex para eliminar (Official Video), [Lyrics], etc.
-        clean = clean.replace(new RegExp(`\\s*[\\(\\[].*?(${noiseKeywords}).*?[\\)\\]]`, 'gi'), '');
-        
-        // 4. Eliminar palabras clave sueltas al final
-        clean = clean.replace(new RegExp(`\\s*[-:]?\\s*(${noiseKeywords})$`, 'gi'), '');
+    // 3. Eliminar contenido entre paréntesis/corchetes que sea "ruido"
+    const noiseKeywords = 'official|video|audio|lyrics|visualizer|hd|hq|4k|8k|live|vivo|version|remaster|extended|radio|original|cover|acoustic|instrumental|karaoke|bpm|remix|rmx|mix|edit|mashup|bootleg|dj|set|session|topic';
+    
+    clean = clean.replace(new RegExp(`\\s*[\\(\\[].*?(${noiseKeywords}).*?[\\)\\]]`, 'gi'), '');
+    
+    // 4. Eliminar palabras clave sueltas al final
+    clean = clean.replace(new RegExp(`\\s*[-:]?\\s*(${noiseKeywords})$`, 'gi'), '');
 
-        // 5. CORRECCIÓN ESPECÍFICA: Eliminar letra "s" suelta al final (tu error "Africa s")
-        // Solo si está precedida de espacio
-        clean = clean.replace(/\s+s$/i, '');
+    // 5. CORRECCIÓN ESPECÍFICA: Eliminar letra "s" suelta al final
+    clean = clean.replace(/\s+s$/i, '');
 
-        // 6. Limpieza final de caracteres y espacios
-        clean = clean.replace(/["“”]/g, ''); // Comillas
-        clean = clean.split('|')[0]; // Separadores de tubo
-        
-        // Si el título es "Artista - Titulo", quedarse solo con el titulo
-        if (clean.includes(' - ')) {
-            const parts = clean.split(' - ');
-            if (parts.length > 1) clean = parts[1];
-        }
-
-        return clean.replace(/\s+/g, ' ').trim();
+    // 6. Limpieza final de caracteres y espacios
+    clean = clean.replace(/["“”]/g, ''); // Comillas
+    clean = clean.split('|')[0]; // Separadores de tubo
+    
+    // Si el título es "Artista - Titulo", quedarse solo con el titulo
+    if (clean.includes(' - ')) {
+        const parts = clean.split(' - ');
+        if (parts.length > 1) clean = parts[1];
     }
 
+    const finalTitle = clean.replace(/\s+/g, ' ').trim();
+    
+    // Fallback: Si la limpieza borró todo (ej: título era solo emojis), usar original
+    return finalTitle.length > 0 ? finalTitle : title;
+}
 async loadLyrics() {
-    // 1. Limpieza de intervalo previo (siempre, por seguridad)
-    if (this.lyricsSyncInterval) {
-        clearInterval(this.lyricsSyncInterval);
-        this.lyricsSyncInterval = null;
-    }
-
     const lyricsContainer = document.getElementById('lyricsContent');
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
-                         this.core?.currentPlayingInfo?.flattenedIndex ?? -1;
+    const providerBtn = document.getElementById('lyricsProviderToggle'); // El botón de cambiar
     
-    const flatList = this.core?.getFlattenedPlaylist() || [];
-    const currentVideo = flatList[currentIndex];
-    
-    // Si no hay video reproduciéndose
-    if (!currentVideo || currentIndex < 0) {
-        lyricsContainer.innerHTML = `<div class="lyrics-container"><p class="lyrics-info">Reproduce música...</p></div>`;
-        this.lastLoadedLyricsId = null; // Resetear caché
+    // Obtener video actual
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    const allPlaylists = this.playlists || window.unifiedCore?.playlistsData || [];
+    const queue = allPlaylists.find(p => p.id === 'queue');
+    const currentVideo = queue?.videos[currentIndex];
+
+    if (!currentVideo) {
+        lyricsContainer.innerHTML = '<p class="lyrics-info">Reproduce música...</p>';
+        if(providerBtn) providerBtn.style.display = 'none'; // Ocultar si no hay música
         return;
     }
 
-    // === OPTIMIZACIÓN: CACHÉ VISUAL ===
-    // Si la canción es la misma que ya cargamos, NO recargamos el HTML.
-    // Esto evita que se pierda la traducción y el scroll.
+    // Cache visual: Si es la misma canción, no recargar
     if (this.lastLoadedLyricsId === currentVideo.videoId) {
-        console.log('✅ Letras ya cargadas para este video. Manteniendo vista y traducción.');
-        
-        // Si hay letras sincronizadas en memoria, reactivamos el motor de sync
-        if (this.currentLrc && this.currentLrc.length > 0) {
-            this.startLyricsSync();
-        }
-        return; // <--- SALIR AQUÍ PARA NO BORRAR EL HTML
+        if (this.currentLrc && this.currentLrc.length > 0) this.startLyricsSync();
+        return;
     }
-    // ==================================
-
-    // Si es una canción nueva, actualizamos el ID guardado y limpiamos memoria
     this.lastLoadedLyricsId = currentVideo.videoId;
-    this.currentLrc = [];
 
-    // Mostrar estado de carga (Solo si es canción nueva)
+    // UI de Carga
     lyricsContainer.innerHTML = `
-        <div class="lyrics-container">
-            <div class="lyrics-header">
-                <i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p>
-                <button id="lyricsProviderToggle" class="lyrics-provider-btn">
-                    <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
-                </button>
-            </div>
-            <p class="lyrics-info">${this.escapeHTML(currentVideo.title)}</p>
+        <div class="lyrics-loading">
+            <div class="loading-spinner"></div>
+            <p>Buscando letra...</p>
         </div>`;
     
-    this.setupLyricsProviderButton();
+    // Ocultar botón durante la carga para evitar clics
+    if(providerBtn) providerBtn.style.display = 'none';
 
     try {
-        // Preparar metadatos para la búsqueda
-        let artist = currentVideo.artist || currentVideo.uploaderName || 'Desconocido';
-        let rawTitle = currentVideo.title;
+        const artist = currentVideo.artist || currentVideo.uploaderName || '';
+        const title = currentVideo.title || '';
+        const duration = currentVideo.duration || 0;
 
-        // Intentar extraer artista del título si los metadatos son genéricos
-        if (artist === 'YouTube' || artist === 'Desconocido' || artist === currentVideo.title) {
-            const parts = this.extractArtistFromTitle(currentVideo.title);
-            artist = parts.artist;
-            rawTitle = parts.title;
+        console.log(`🔍 Buscando letras para: ${title} (${this.lyricsProvider})`);
+
+        let data = null;
+        let usedProvider = this.lyricsProvider;
+
+        // 1. INTENTO PRINCIPAL
+        try {
+            data = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
+        } catch (e) {
+            console.warn(`⚠️ Falló proveedor principal (${this.lyricsProvider}). Intentando alternativo...`);
         }
 
-        // Limpieza de nombres (Emojis, palabras clave como 'Official', etc.)
-        const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
-        artist = artist.replace(emojiRegex, '')
-                       .replace(/^@/, '')
-                       .replace(/\s*-\s*Topic$/i, '')
-                       .replace(/\s*VEVO$/i, '')
-                       .replace(/\s*Official$/i, '')
-                       .trim();
-
-        const cleanTitle = this.cleanTrackTitle(rawTitle);
-        const duration = Math.round(currentVideo.duration || 0);
-
-        console.log(`🎵 Buscando letras: "${artist}" - "${cleanTitle}" (${duration}s)`);
-
-        let match = null;
-
-        // Lógica de proveedores (Igual a tu código original)
-        if (this.lyricsProvider === 'lrclib') {
-            const url1 = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(cleanTitle)}&duration=${duration}`;
+        // 2. FALLBACK AUTOMÁTICO (Si el principal falló o no trajo nada)
+        if (!data) {
+            // Cambiar temporalmente al otro proveedor
+            const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
+            console.log(`🔄 Cambiando a fallback: ${fallbackProvider}`);
             
-            let response = await fetch(url1);
-
-            if (!response.ok) {
-                console.warn('⚠️ [Lyrics] Exacta falló, intentando búsqueda flexible...');
-                const query = `${artist} ${cleanTitle}`;
-                const url2 = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
-                const searchResponse = await fetch(url2);
-                
-                if (searchResponse.ok) {
-                    const searchData = await searchResponse.json();
-                    if (Array.isArray(searchData) && searchData.length > 0) {
-                        match = searchData[0];
-                        match.source = 'lrclib.net (Search)';
-                    }
+            try {
+                data = await this.fetchLyrics(fallbackProvider, artist, title, duration);
+                if (data) {
+                    usedProvider = fallbackProvider; // Marcamos que usamos el alternativo
                 }
+            } catch (e) {
+                console.warn('❌ Falló también el fallback.');
+            }
+        }
+
+        // 3. RENDERIZADO Y GESTIÓN DEL BOTÓN
+        if (data) {
+            this.renderLyrics(data);
+            
+            // LÓGICA DEL BOTÓN:
+            if (usedProvider !== this.lyricsProvider) {
+                // Si tuvimos que cambiar de proveedor porque el original falló:
+                // BORRAMOS EL BOTÓN (como pediste) para no confundir al usuario
+                if(providerBtn) providerBtn.style.display = 'none';
+                console.log('✅ Letra encontrada con fallback. Botón oculto.');
             } else {
-                match = await response.json();
-                match.source = 'lrclib.net (Exact)';
+                // Si encontramos con el proveedor original, MOSTRAMOS el botón
+                // por si el usuario quiere probar el otro manualmente.
+                if(providerBtn) {
+                    providerBtn.style.display = 'inline-flex';
+                    providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
+                }
             }
-
-            if (!match) throw new Error('No encontradas en LRCLIB');
-
         } else {
-            // Fallback Provider (Lujjjh via Proxy)
-            console.log('🔄 Usando proveedor Lujjjh (Fallback)...');
-            const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(artist)}`;
-            const proxyUrl = `/.netlify/functions/cors-proxy/${targetApi}`;
+            // No se encontró en NINGUNO
+            lyricsContainer.innerHTML = `
+                <div class="lyrics-container">
+                    <p class="lyrics-error">No se encontró la letra.</p>
+                </div>`;
+            // Borrar botón porque no hay opciones
+            if(providerBtn) providerBtn.style.display = 'none';
+        }
+
+    } catch (error) {
+        console.error('Error general letras:', error);
+        lyricsContainer.innerHTML = '<p class="lyrics-error">Error cargando letra.</p>';
+        if(providerBtn) providerBtn.style.display = 'none';
+    }
+}
+
+async fetchLyrics(provider, rawArtist, rawTitle, duration) {
+    // 1. USAR TU FUNCIÓN DE LIMPIEZA
+    const title = this.cleanTrackTitle(rawTitle);
+    
+    // Limpieza básica del artista (quitar " - Topic" que pone YouTube)
+    let artist = rawArtist || 'Desconocido';
+    artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+
+    console.log(`📡 Buscando letras [${provider}]: Título limpio: "${title}" - Artista: "${artist}"`);
+
+    try {
+        if (provider === 'lrclib') {
+            // === LÓGICA LRCLIB ===
+            // Intento 1: Búsqueda exacta con datos limpios
+            const urlExact = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${Math.round(duration)}`;
+            let response = await fetch(urlExact);
             
-            const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error('Error en proxy');
-            
-            const textData = await res.text();
-            if (!textData || textData.trim().length === 0 || textData.includes('Not found')) {
-                throw new Error('No encontradas');
+            // Intento 2: Si falla, búsqueda flexible (Query combinada)
+            if (!response.ok) {
+                console.log('⚠️ LRCLIB Exacto falló, intentando búsqueda flexible...');
+                const query = `${artist} ${title}`;
+                const urlSearch = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+                response = await fetch(urlSearch);
             }
 
-            match = {
-                syncedLyrics: textData,
-                plainLyrics: textData.replace(/\[.*?\]/g, ''),
-                trackName: cleanTitle,
-                artistName: artist,
-                source: 'lujjjh (Proxy)'
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            // Si es búsqueda flexible devuelve array, si es exacta devuelve objeto
+            const track = Array.isArray(data) ? data[0] : data;
+
+            if (!track || (!track.syncedLyrics && !track.plainLyrics)) return null;
+
+            return {
+                syncedLyrics: track.syncedLyrics, 
+                plainLyrics: track.plainLyrics,   
+                source: 'LRCLIB',
+                provider: 'lrclib'
+            };
+
+        } else if (provider === 'lujjjh') {
+            // === LÓGICA LUJJJH ===
+            // Construir URL objetivo
+            const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
+            
+            // Usar Proxy para evitar CORS
+            const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
+
+            const response = await fetch(proxyUrl);
+            if (!response.ok) return null;
+
+            const textData = await response.text();
+            
+            // Validar respuesta (Lujjjh a veces devuelve "Not found" en texto plano)
+            if (!textData || textData.length < 10 || textData.includes('Not found')) {
+                return null;
+            }
+
+            // Crear versión plana quitando los tiempos [00:00.00]
+            const plain = textData.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+
+            return {
+                syncedLyrics: textData, // Lujjjh devuelve formato LRC
+                plainLyrics: plain,
+                source: 'Lujjjh API',
+                provider: 'lujjjh'
             };
         }
 
-        // Renderizar la UI con los resultados
-        this.renderLyricsUI(match, artist, rawTitle);
-
     } catch (error) {
-        console.warn('❌ Error letras:', error.message);
-        this.renderErrorUI(currentVideo.title);
+        console.warn(`❌ Error en fetchLyrics (${provider}):`, error);
+        return null;
     }
-    
-    // Configurar botones (Traducir, Proveedor)
-    this.setupLyricsProviderButton();
-    this.setupTranslateButton();
+
+    return null;
 }
+    
     setupTranslateButton() {
     const translateBtn = document.getElementById('lyricsTranslateToggle');
     if (!translateBtn) return;
@@ -1195,6 +1253,7 @@ async loadLyrics() {
         };
     }
 }
+    
     async translateLyrics() {
         const btn = document.getElementById('translateLyricsBtn');
         const container = document.getElementById('lyricsContent');
@@ -1303,23 +1362,29 @@ async loadLyrics() {
             };
         }
     }
+toggleLyricsProvider() {
+    // Cambiar el estado
+    if (this.lyricsProvider === 'lrclib') {
+        this.lyricsProvider = 'lujjjh';
+    } else {
+        this.lyricsProvider = 'lrclib';
+    }
+    
+    console.log(`🎵 Proveedor de letras cambiado manualmente a: ${this.lyricsProvider}`);
+    
+    // Guardar preferencia en localStorage (opcional pero recomendado)
+    localStorage.setItem('ytcm_lyrics_provider', this.lyricsProvider);
+    
+    // Forzar recarga limpiando el caché del video actual para que loadLyrics no crea que ya terminó
+    this.lastLoadedLyricsId = null; 
 
-    /**
-     * ✅ NUEVA FUNCIÓN
-     * Cambia el proveedor y recarga las letras
-     */
-    toggleLyricsProvider() {
-        if (this.lyricsProvider === 'lrclib') {
-            this.lyricsProvider = 'lujjjh';
-        } else {
-            this.lyricsProvider = 'lrclib';
-        }
-        console.log(`🎵 Proveedor de letras cambiado a: ${this.lyricsProvider}`);
-        this.loadLyrics(); // Recargar letras
-    } 
-/**
- * Actualizar UI de playlists
- */
+    // Recargar letras con el nuevo proveedor
+    this.loadLyrics();
+    
+    // Feedback visual (opcional)
+    if (this.core) this.core.showMessage(`Proveedor cambiado a ${this.lyricsProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`, 'info');
+}
+
 updatePlaylistsUI() {
     console.log('🔄 Actualizando UI de playlists...');
     
