@@ -1142,37 +1142,73 @@ movePlayersToFullView() {
         if (searchInput) setTimeout(() => searchInput.focus(), 100);
     }
 
-    showMiniPlayerFloat() {
-    console.log('🎬 Activando mini player flotante (FORZADO)...');
+showMiniPlayerFloat() {
+    console.log('🎬 Activando mini player flotante (Reducción)...');
 
-    // 1. Validar si hay video
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-    if (!window.reproduccionIniciada && currentIndex === -1) {
-        return; // No hay nada sonando
-    }
+    // 1. Validar reproducción
+    if (!window.reproduccionIniciada) return;
 
     const miniPlayer = document.getElementById('miniPlayerFloat');
+    const fullContainer = document.getElementById('fullVideoContainer'); // Contenedor grande
+    const player1 = document.getElementById('player1');
+    const player2 = document.getElementById('player2');
+
     if (!miniPlayer) return;
 
-    // 2. Limpiar clases que lo oculten
+    // 2. Mostrar contenedor flotante
     miniPlayer.classList.remove('hidden', 'hide', 'invisible');
+    miniPlayer.style.display = 'block';
     
-    // 3. Aplicar estilos directamente al hueso (inline styles)
-    Object.assign(miniPlayer.style, {
-        display: 'block',
-        visibility: 'visible',
-        opacity: '1',
-        zIndex: '999999', // ¡Al frente!
-        pointerEvents: 'auto',
-        bottom: '110px', // Ajusta si tu barra inferior lo tapa
-        right: '20px'
+    // 3. MOVER LOS REPRODUCTORES FÍSICAMENTE AL MINI
+    // (Esto evita recargas o pantallas negras porque es el MISMO iframe)
+    
+    // Contenedores destino dentro del mini (asegúrate de que existan en tu HTML)
+    // O simplemente usa el miniPlayer directo como contenedor
+    let targetContainer = miniPlayer.querySelector('.mini-video-wrapper') || miniPlayer;
+
+    if (player1 && !targetContainer.contains(player1)) {
+        targetContainer.appendChild(player1);
+    }
+    if (player2 && !targetContainer.contains(player2)) {
+        targetContainer.appendChild(player2);
+    }
+
+    // 4. Ajustar estilos para modo mini
+    [player1, player2].forEach(p => {
+        if(p) {
+            p.style.width = '100%';
+            p.style.height = '100%';
+            p.style.position = 'absolute';
+            p.style.top = '0';
+            p.style.left = '0';
+        }
     });
 
-    // 4. Mover los iframes dentro
-    this.movePlayersToMini();
-
-    // 5. Marcar body para ayudar al CSS
+    // 5. Marcar estado
     document.body.classList.add('mini-player-active');
+}
+
+movePlayersToFullView() {
+    console.log('🎬 Restaurando reproductores a vista completa...');
+    
+    const fullWrapper = document.querySelector('.video-wrapper') || document.getElementById('fullVideoContainer');
+    const player1 = document.getElementById('player1');
+    const player2 = document.getElementById('player2');
+
+    if (fullWrapper && player1 && !fullWrapper.contains(player1)) {
+        fullWrapper.appendChild(player1);
+    }
+    if (fullWrapper && player2 && !fullWrapper.contains(player2)) {
+        fullWrapper.appendChild(player2);
+    }
+    
+    // Restaurar estilos Full
+    [player1, player2].forEach(p => {
+        if(p) {
+            p.style.width = '100%';
+            p.style.height = '100%';
+        }
+    });
 }
 
     movePlayersToMini() {
