@@ -1463,6 +1463,52 @@ updatePlaylistsUI() {
     this.core?.updateOverviewStats?.();
 }
     /**
+     * Actualizar la interfaz de la cola de reproducción (Sidebar/Lista)
+     */
+    updateQueueUI() {
+        console.log('🔄 Actualizando interfaz de cola...');
+        
+        // 1. Obtener datos actualizados
+        const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        const videos = queuePlaylist ? queuePlaylist.videos : [];
+        
+        // 2. Actualizar contadores globales
+        if (this.core && this.core.updateQueueCount) {
+            this.core.updateQueueCount(videos.length);
+        }
+        
+        // 3. Si existe un contenedor de lista de cola en el DOM, actualizarlo
+        const queueListContainer = document.getElementById('queueContentList');
+        if (queueListContainer) {
+            // Usamos la misma lógica de renderizado que el popup para consistencia
+            // O una versión simplificada si es una lista lateral
+            if (videos.length === 0) {
+                queueListContainer.innerHTML = `
+                    <div class="empty-queue-placeholder">
+                        <p>La cola está vacía</p>
+                    </div>`;
+            } else {
+                // Renderizar items
+                // Nota: Reutilizamos renderQueueContent si queremos el mismo estilo,
+                // o construimos uno específico si la vista es diferente.
+                // Aquí asumo que quieres actualizar la vista principal de la cola.
+                
+                // Opción A: Delegar al core si tiene la función (para no duplicar lógica visual)
+                if (this.core && this.core.updatePersistentQueue) {
+                    this.core.updatePersistentQueue();
+                } 
+                // Opción B: Renderizar manualmente si el core no lo maneja
+                else {
+                    queueListContainer.innerHTML = this.renderQueueContent(videos);
+                    this.setupQueueItemListeners(); // Reactivar eventos
+                }
+            }
+        }
+
+        // 4. Actualizar estado de "Siguiente" en el reproductor si es necesario
+        // (Opcional, depende de tu diseño)
+    }
+    /**
      * Limpiar toda la cola
      */
     clearQueue() {
