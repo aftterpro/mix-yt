@@ -18,11 +18,9 @@
   height: 100%;
   background: #000;
   z-index: 1;
-  border-radius: 12px;
-  overflow: hidden;
-    transition: none !important;
-  visibility: visible !important;
-  display: block !important;
+  /* IMPORTANTE: Transición suave por defecto */
+  opacity: 0;
+  transition: opacity 1s ease-in-out, transform 1s ease-in-out, filter 1s ease-in-out;
 }
 /* Solo aplicar transición larga de opacidad si NO estamos en medio de un crossfade JS manual */
 /* Esto permite que CSS maneje efectos visuales sutiles pero no bloquee el crossfade */
@@ -33,20 +31,12 @@
    ENTRADA VISUAL IMPACTANTE
    ============================================= */
 .video-player.fade-in {
-  opacity: 1 !important;
-  filter: blur(0px) brightness(1.1) saturate(1.2) contrast(1.1);
-  transform: scale(1);
+opacity: 1 !important;
   z-index: 3;
-  visibility: visible !important;
   display: block !important;
-  
-  box-shadow: 
-    0 16px 64px rgba(255, 107, 53, 0.3),
-    0 8px 32px rgba(255, 107, 53, 0.2),
-    0 0 40px rgba(255, 107, 53, 0.15);
-    
-  border: 2px solid rgba(255, 107, 53, 0.4);
-  animation: subtlePulse var(--pulse-speed) infinite alternate;
+  visibility: visible !important;
+  /* Aquí puedes poner tus filtros de brillo/saturación */
+  filter: blur(0px) brightness(1);
 }
 
 @keyframes subtlePulse {
@@ -70,19 +60,12 @@
    SALIDA VISUAL DRAMÁTICA  
    ============================================= */
 .video-player.fade-out {
-  opacity: 0 !important;
-  filter: blur(4px) brightness(0.85) saturate(0.9) contrast(0.95);
-  transform: scale(0.98);
+opacity: 0 !important;
   z-index: 2;
-  
-  visibility: visible !important;
-  display: block !important;
-  
-  box-shadow: 
-    0 4px 16px rgba(0, 0, 0, 0.6),
-    0 0 20px rgba(255, 107, 53, 0.05);
-    
-  border: 1px solid rgba(255, 107, 53, 0.1);
+  display: block !important; /* Mantener block mientras se desvanece */
+  pointer-events: none;
+  filter: blur(5px) brightness(0.5);
+  transform: scale(0.95);
 }
 
 @keyframes fadeOutEffect {
@@ -112,11 +95,9 @@
    OCULTAMIENTO COMPLETO
    ============================================= */
 .video-player.hidden {
- opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-  z-index: -1 !important;
-  display: none !important;
+display: none !important;
+  opacity: 0 !important;
+  z-index: -1;
 }
 
 /* =============================================
