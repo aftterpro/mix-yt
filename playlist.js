@@ -1891,15 +1891,17 @@ renderQueueContent(flatList) {
                     ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
                 </div>
                 
-                <img src="${video.thumbnail}" 
-                     alt="${this.escapeHTML(video.title)}" 
-                     class="queue-item-thumbnail"
-                     onerror="this.src='./electronic.ico';">
+                <!-- ✅ WRAPPER CON DURACIÓN DENTRO -->
+                <div class="queue-item-thumbnail-wrapper">
+                    <img src="${video.thumbnail}" 
+                         alt="${this.escapeHTML(video.title)}" 
+                         onerror="this.src='./electronic.ico';">
+                    <span class="queue-item-duration">${formattedDuration}</span>
+                </div>
                 
                 <div class="queue-item-info">
                     <div class="queue-item-title">${this.escapeHTML(video.title)}</div>
                     <div class="queue-item-meta">
-                        <span class="queue-item-duration">${formattedDuration}</span>
                         ${video.uploaderName ? `<span class="queue-item-author">${this.escapeHTML(video.uploaderName)}</span>` : ''}
                     </div>
                 </div>
