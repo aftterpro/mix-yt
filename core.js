@@ -981,7 +981,6 @@ switchView(viewName) {
     // 2. Actualizar Contenedores de Vista (Ocultar/Mostrar)
     document.querySelectorAll('.content-view').forEach(view => {
         view.classList.remove('active');
-        // Opcional: Resetear scroll al cambiar (excepto si volvemos a full player)
         if (viewName !== 'fullPlayer' && view.dataset.view !== viewName) {
             view.scrollTop = 0;
         }
@@ -990,46 +989,36 @@ switchView(viewName) {
     const targetView = document.getElementById(`${viewName}View`);
     if (targetView) targetView.classList.add('active');
     
-    // Guardar estado actual
     this.currentView = viewName;
 
-    // 3. GESTIÓN DE REPRODUCTORES (Full vs Mini)
+    // 3. GESTIÓN DE REPRODUCTORES (Full vs Mini vs Oculto)
     const miniPlayer = document.getElementById('miniPlayerFloat');
+    const persistentLayer = document.getElementById('persistent-player-layer'); // <--- IMPORTANTE
     const hasActiveVideo = window.reproduccionIniciada || 
                            (this.state.currentPlayingInfo?.flattenedIndex >= 0);
 
     if (viewName === 'fullPlayer') {
         // === MODO PANTALLA COMPLETA ===
-        
-        // A. Ocultar Mini Player explícitamente
         if (miniPlayer) {
             miniPlayer.style.display = 'none';
             miniPlayer.classList.add('hidden');
         }
         document.body.classList.remove('mini-player-active');
 
-        // B. Reactivar capa persistente
-        const persistentLayer = document.getElementById('persistent-player-layer');
         if (persistentLayer) {
             persistentLayer.style.display = 'block';
             persistentLayer.style.opacity = '1';
+            persistentLayer.style.pointerEvents = 'auto';
         }
 
-        // C. Mover reproductores al contenedor grande (Video Wrapper)
         requestAnimationFrame(() => {
-            const wrapper = document.querySelector('.video-wrapper');
-            if (wrapper && !wrapper.id) wrapper.id = 'videoWrapper';
-
             this.movePlayersToFullView(); 
             this.updatePlayerPosition('videoWrapper');
-            
-            // ✅ CORRECCIÓN CRÍTICA: Segundo ajuste después del renderizado
             setTimeout(() => {
                 this.updatePlayerPosition('videoWrapper');
             }, 100);
         });
 
-        // D. Actualizar cola visual si es necesario
         if (window.playlistManager?.updateQueueUI) {
             window.playlistManager.updateQueueUI();
         }
@@ -1037,17 +1026,21 @@ switchView(viewName) {
     } else {
         // === OTRAS VISTAS (Home, Search, Library) ===
         
-        // A. Si hay música sonando, mostrar Mini Player
         if (hasActiveVideo) {
+            // A. Si hay música, mostramos Mini Player
             this.showMiniPlayerFloat();
         } else {
             if (miniPlayer) {
                 miniPlayer.style.display = 'none';
                 miniPlayer.classList.add('hidden');
             }
+            
+            if (persistentLayer) {
+                persistentLayer.style.opacity = '0';
+                persistentLayer.style.pointerEvents = 'none';
+            }
         }
         
-        // B. Refrescar vistas específicas si es necesario
         if (viewName === 'library') {
             this.refreshLibraryView();
         } else if (viewName === 'search' && currentSearchQuery) {
