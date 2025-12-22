@@ -450,28 +450,33 @@ removeVideoFromQueue(videoId) {
     }
     
     const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-    if (!queuePlaylist) {
+    if (!queuePlaylist || !queuePlaylist.videos) {
         console.error('❌ Cola no encontrada');
         return false;
     }
-    
-    const videoIndex = queuePlaylist.videos.findIndex(v => v.videoId === videoId);
+    const videoIndex = queuePlaylist.videos.findIndex(v => v && v.videoId === videoId);
     
     if (videoIndex === -1) {
-        console.error(`❌ Video ${videoId} no encontrado`);
+        console.error(`❌ Video ${videoId} no encontrado en cola`);
+        console.log('Cola actual:', queuePlaylist.videos.map(v => v.videoId));
         return false;
     }
     
     const removedVideo = queuePlaylist.videos[videoIndex];
-    const wasCurrentlyPlaying = window.currentPlayingInfo?.videoId === videoId;
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    const wasCurrentlyPlaying = (currentIndex === videoIndex);
     
-    // ELIMINAR VIDEO
+    console.log(`🗑️ Eliminando: "${removedVideo.title}" (índice ${videoIndex})`);
+    
+    // ✅ ELIMINAR VIDEO
     queuePlaylist.videos.splice(videoIndex, 1);
     
-    console.log(`✅ Video eliminado. Quedan ${queuePlaylist.videos.length} videos`);
+    console.log(`✅ Eliminado. Quedan ${queuePlaylist.videos.length} videos`);
     
-    // AJUSTAR ÍNDICE
+    // ✅ AJUSTAR ÍNDICE DE REPRODUCCIÓN
     if (wasCurrentlyPlaying) {
+        console.log('⚠️ Video eliminado era el que estaba sonando');
+        
         if (queuePlaylist.videos.length > 0) {
             let newIndex = videoIndex;
             if (newIndex >= queuePlaylist.videos.length) {
@@ -492,13 +497,12 @@ removeVideoFromQueue(videoId) {
             this.core?.handleEmptyPlaylist?.();
         }
     } else if (window.currentPlayingInfo && window.currentPlayingInfo.flattenedIndex > videoIndex) {
+        // Si eliminamos un video ANTES del actual, ajustar índice
         window.currentPlayingInfo.flattenedIndex--;
+        console.log(`📊 Índice ajustado a: ${window.currentPlayingInfo.flattenedIndex}`);
     }
     
-    // ✅ FORZAR ACTUALIZACIÓN COMPLETA
-    console.log('🔄 Forzando actualización UI...');
-    
-    // 1. Limpiar elemento del DOM inmediatamente
+    // ✅ ELIMINAR ELEMENTO DEL DOM INMEDIATAMENTE
     const queueItems = document.querySelectorAll(`.queue-item[data-video-id="${videoId}"]`);
     queueItems.forEach(item => {
         item.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
@@ -507,22 +511,26 @@ removeVideoFromQueue(videoId) {
         setTimeout(() => item.remove(), 300);
     });
     
-    // 2. Actualizar todas las vistas
+    // ✅ ACTUALIZAR UI (después de 350ms para que termine la animación)
     setTimeout(() => {
         this.updatePlaylistsUI();
         this.updateQueuePopup();
+        
         if (this.core && this.core.updatePersistentQueue) {
             this.core.updatePersistentQueue();
         }
+        
         this.core?.updateNowPlaying?.();
+        
+        // ✅ Re-activar drag & drop
+        if (window.queueDragDrop) {
+            setTimeout(() => {
+                window.queueDragDrop.attachDragListeners();
+            }, 100);
+        }
     }, 350);
     
-    // 3. Forzar reflow del navegador
-    requestAnimationFrame(() => {
-        document.body.offsetHeight;
-    });
-    
-    // 4. Guardar cambios
+    // ✅ GUARDAR CAMBIOS
     setTimeout(() => {
         if (typeof window.saveAllData === 'function') {
             window.saveAllData();
@@ -1749,7 +1757,6 @@ showQueuePopup() {
      * Actualizar contenido del popup de cola
      */
 updateQueuePopup() {
-    // Actualizar popup (código existente)
     const popupContent = document.getElementById('queuePopupContent');
     if (popupContent) {
         const flatList = this.core?.getFlattenedPlaylist() || [];
@@ -1765,10 +1772,8 @@ updateQueuePopup() {
         }, 50);
     }
     
-    // NUEVO: Actualizar cola persistente
-    if (this.core && this.core.updatePersistentQueue) {
-        this.core.updatePersistentQueue();
-    }
+    // Actualizar cola persistente
+    
 }
 /**
  * Sincronizar cola después de cambio de video
@@ -2711,31 +2716,32 @@ class QueueDragDrop {
         
         observer.observe(document.body, { childList: true, subtree: true });
     }
-    
     attachDragListeners() {
-        const queueItems = document.querySelectorAll('.queue-item');
+    const queueItems = document.querySelectorAll('.queue-item');
+    
+    console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
+    
+    queueItems.forEach((item, index) => {
+        item.setAttribute('draggable', 'true');
+        item.style.cursor = 'move';
         
-        console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
+        // ✅ Remover listeners anteriores
+        item.ondragstart = null;
+        item.ondragover = null;
+        item.ondrop = null;
+        item.ondragend = null;
+        item.ondragenter = null;
+        item.ondragleave = null;
         
-        queueItems.forEach((item, index) => {
-            item.setAttribute('draggable', 'true');
-            item.style.cursor = 'move';
-            
-            item.removeEventListener('dragstart', this.handleDragStart);
-            item.removeEventListener('dragover', this.handleDragOver);
-            item.removeEventListener('drop', this.handleDrop);
-            item.removeEventListener('dragend', this.handleDragEnd);
-            item.removeEventListener('dragenter', this.handleDragEnter);
-            item.removeEventListener('dragleave', this.handleDragLeave);
-            
-            item.addEventListener('dragstart', (e) => this.handleDragStart(e, item, index));
-            item.addEventListener('dragover', (e) => this.handleDragOver(e));
-            item.addEventListener('drop', (e) => this.handleDrop(e, item, index));
-            item.addEventListener('dragend', (e) => this.handleDragEnd(e));
-            item.addEventListener('dragenter', (e) => this.handleDragEnter(e, item));
-            item.addEventListener('dragleave', (e) => this.handleDragLeave(e, item));
-        });
-    }
+        // ✅ Configurar nuevos listeners
+        item.addEventListener('dragstart', (e) => this.handleDragStart(e, item, index));
+        item.addEventListener('dragover', (e) => this.handleDragOver(e));
+        item.addEventListener('drop', (e) => this.handleDrop(e, item, index));
+        item.addEventListener('dragend', (e) => this.handleDragEnd(e));
+        item.addEventListener('dragenter', (e) => this.handleDragEnter(e, item));
+        item.addEventListener('dragleave', (e) => this.handleDragLeave(e, item));
+    });
+}
     
     handleDragStart(e, item, index) {
         console.log(`🎯 Drag start: item ${index}`);
