@@ -169,65 +169,76 @@ class UnifiedCore {
         console.log('💾 Guardado automático configurado (cada 60s)');
     }
 
-    async init() {
-        console.log('🔧 Inicializando Sistema Unificado...');
+async init() {
+    console.log('🚀 Inicializando Sistema Unificado (Modo Rápido)...');
+    
+    // 1. INMEDIATO: Habilitar elementos visuales y eventos
+    this.enableUnifiedElements(); 
+    this.setupEventListeners();
+    
+    // 2. CARGA DE DATOS: Recuperar playlists y cola del almacenamiento
+    this.loadInitialData();
+    
+    // 3. INICIALIZAR UI VISUALMENTE (¡Antes de conectar APIs!)
+    // Esto hace que el usuario vea sus playlists y cola al instante
+    this.initializeUI(); 
+    
+    // Intentar inicializar gestor de playlists (sin await bloqueante si es posible)
+    this.initializePlaylistManager();
+    
+    // 4. SEGUNDO PLANO: Conectar con YouTube y APIs
+    // Quitamos el 'await' para que no bloquee el hilo principal si tarda
+    this.updateStatusIndicator('Conectando servicios...', 'loading');
+    
+    this.initializeComponents().then(() => {
+        console.log('✅ APIs conectadas en segundo plano');
+        this.updateStatusIndicator('Sistema Listo', 'success');
+        this.state.initialized = true;
         
-        this.enableUnifiedElements(); 
-        this.updateStatusIndicator('Cargando motor de audio...', 'loading');
-            
-        if (this.debugMode) {
-            this.enableDebugMode();
+        // Procesar cosas pendientes una vez que las APIs responden
+        if (window.pendingYouTubePlaylists) {
+            this.processYouTubePlaylists(window.pendingYouTubePlaylists);
+            window.pendingYouTubePlaylists = null;
         }
-        
-        this.setupEventListeners();
-        this.loadInitialData();
-        this.initializePlaylistManager();
+    });
 
-        await this.initializeComponents();
-        
-        // ✅ Inicialización diferida de UI
+    // 5. OPTIMIZACIÓN: Reducir el retraso artificial de 1500ms a 100ms
+    // Usamos requestAnimationFrame para asegurar que el DOM ya pintó
+    requestAnimationFrame(() => {
         setTimeout(() => {
             this.setupSearchButtonListeners();
             this.setupMiniPlayerObserver();
             this.checkAndShowMiniPlayer();
-        }, 1500);
+            // Refrescar UI una vez más por si acaso
+            this.updatePlaylistsUI();
+        }, 100);
+    });
 
-        this.state.initialized = true;
-        this.updateStatusIndicator('Sistema Listo', 'success');
-        
-        if (window.pendingYouTubePlaylists) {
-            console.log("🔄 Procesando playlists de YouTube pendientes");
-            this.processYouTubePlaylists(window.pendingYouTubePlaylists);
-            window.pendingYouTubePlaylists = null;
+    // Listeners de redimensionamiento
+    window.addEventListener('resize', () => {
+        if (window.unifiedCore) {
+            if (window.unifiedCore.currentView === 'fullPlayer') {
+                window.unifiedCore.updatePlayerPosition('videoWrapper');
+            } else if (window.reproduccionIniciada) {
+                window.unifiedCore.updatePlayerPosition('miniPlayerFloat');
+            }
         }
+    });
 
-        window.addEventListener('resize', () => {
-            if (window.unifiedCore) {
-                if (window.unifiedCore.currentView === 'fullPlayer') {
-                    window.unifiedCore.updatePlayerPosition('videoWrapper');
-                } else if (window.reproduccionIniciada) {
-                    window.unifiedCore.updatePlayerPosition('miniPlayerFloat');
-                }
-            }
-        });
+    // Listeners adicionales
+    document.addEventListener('viewChanged', (e) => {
+        setTimeout(() => this.checkAndShowMiniPlayer(), 300);
+        if (e.detail === 'fullPlayer') {
+             requestAnimationFrame(() => this.movePlayerToFullView());
+        }
+    });
 
-        // Listeners adicionales
-        document.addEventListener('viewChanged', (e) => {
-            console.log('🔄 Vista cambió:', e.detail);
-            setTimeout(() => this.checkAndShowMiniPlayer(), 300);
-            // Asegurar posición correcta al entrar a fullPlayer
-            if (e.detail === 'fullPlayer') {
-                 requestAnimationFrame(() => this.movePlayerToFullView());
-            }
-        });
+    document.addEventListener('playbackStarted', () => {
+        setTimeout(() => this.checkAndShowMiniPlayer(), 500);
+    });
 
-        document.addEventListener('playbackStarted', () => {
-            console.log('▶️ Reproducción iniciada');
-            setTimeout(() => this.checkAndShowMiniPlayer(), 500);
-        });
-
-        console.log('✅ Sistema Unificado Inicializado');
-    }
+    console.log('⚡ UI Inicializada (Esperando APIs en background)');
+}
 
     processYouTubePlaylists(playlists) {
         console.log(`📁 processYouTubePlaylists llamada con ${playlists?.length || 0} playlists`);
@@ -301,6 +312,7 @@ class UnifiedCore {
     }
 
     async initializeComponents() {
+        // 1. Esperar a que las APIs de Google/YouTube estén listas (si no lo están ya)
         if (!window.ytCrossMixAPIs?.ready) {
             console.log('⏳ Esperando a que las APIs estén listas...');
             await new Promise((resolve) => {
@@ -312,13 +324,22 @@ class UnifiedCore {
                     }
                 };
                 checkAPIs();
+                // Timeout de seguridad de 10 segundos
                 setTimeout(resolve, 10000);
             });
         }
         
+        // 2. Inicializar los reproductores de YouTube (Iframe API)
         await this.initializeYouTubeAPI();
+        
+        // 3. Configurar autenticación
         this.initializeAuth();
-        this.initializeUI();
+        
+        // ❌ BORRADO: this.initializeUI(); 
+        // Ya no lo llamamos aquí porque lo movimos al inicio de init() 
+        // para que la carga visual sea instantánea.
+        
+        return true;
     }
 
     async initializeYouTubeAPI() {
