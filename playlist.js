@@ -539,16 +539,15 @@ removeVideoFromQueue(videoId) {
 switchQueueTab(tabName) {
     console.log(`🔄 Cambiando a tab: ${tabName}`);
     
-    // 1. Gestión de intervalos (Detener sincronización si salimos de letras)
+    // 1. Detener sincronización de letras si salimos
     if (tabName !== 'lyrics') {
         if (this.lyricsSyncInterval) {
             clearInterval(this.lyricsSyncInterval);
             this.lyricsSyncInterval = null;
-            // No reseteamos currentLrc para no perder la posición si volvemos
         }
     }
     
-    // 2. Actualizar UI de botones y contenido
+    // 2. Actualizar UI
     document.querySelectorAll('.queue-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
@@ -557,31 +556,40 @@ switchQueueTab(tabName) {
         content.classList.toggle('active', content.dataset.tabContent === tabName);
     });
     
-    // 3. Obtener el ID del video actual para verificar caché
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    // 3. ✅ OBTENER VIDEO REAL DEL REPRODUCTOR
+    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
+    
+    if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
+        console.warn('⚠️ No hay reproductor activo');
+        return;
+    }
+    
+    const videoData = activePlayer.getVideoData();
+    const currentVideoId = videoData?.video_id;
+    
+    if (!currentVideoId) {
+        console.warn('⚠️ No hay video reproduciéndose');
+        return;
+    }
+    
+    // 4. ✅ Buscar video en cola
     const flatList = this.core?.getFlattenedPlaylist() || [];
-    const currentVideo = flatList[currentIndex];
-    const currentVideoId = currentVideo?.videoId;
-
-    if (!currentVideoId) return;
-
-    // 4. Lógica Inteligente de Carga (Solo recarga si cambió el video)
-    if (tabName === 'related') {
-        // Solo cargar si es un video diferente al último cargado en esta pestaña
-        if (this.lastLoadedRelatedId !== currentVideoId) {
-            this.loadRelatedVideos();
-        } else {
-            console.log('✅ Relacionados ya cargados para este video. Manteniendo vista.');
-        }
-    } else if (tabName === 'lyrics') {
-        // Solo cargar si es un video diferente
-        if (this.lastLoadedLyricsId !== currentVideoId) {
-            this.loadLyrics();
-        } else {
-            console.log('✅ Letras ya cargadas (y traducidas). Reanudando sincronización.');
-            // Importante: Reiniciar solo el "motor" de sincronización, no el HTML
-            this.startLyricsSync();
-        }
+    const currentVideo = flatList.find(v => v.videoId === currentVideoId);
+    
+    if (!currentVideo) {
+        console.warn(`⚠️ Video ${currentVideoId} no encontrado`);
+        return;
+    }
+    
+    // 5. ✅ Cargar contenido correcto
+    if (tabName === 'lyrics') {
+        setTimeout(() => {
+            this.loadLyricsForVideo(currentVideo);
+        }, 100);
+    } else if (tabName === 'related') {
+        setTimeout(() => {
+            this.loadRelatedForVideo(currentVideo);
+        }, 100);
     }
 }
 async loadRelatedVideos() {
@@ -642,7 +650,62 @@ async loadRelatedVideos() {
         `;
     }
 }
+ /**
+ * ✅ NUEVA FUNCIÓN: Cargar relacionados para un video específico
+ */
+async loadRelatedForVideo(video) {
+    const relatedList = document.getElementById('relatedVideosList');
     
+    if (!video || !video.videoId) {
+        relatedList.innerHTML = `<p class="related-placeholder">Video no válido</p>`;
+        this.lastLoadedRelatedId = null;
+        return;
+    }
+    
+    console.log(`🎵 Cargando relacionados EXPLÍCITOS para: ${video.title} (${video.videoId})`);
+    
+    // ✅ CACHÉ: Si ya están cargados para ESTE video
+    if (this.lastLoadedRelatedId === video.videoId) {
+        const existingItems = relatedList.querySelectorAll('.related-video-item');
+        if (existingItems.length > 0) {
+            console.log('✅ Relacionados ya cargados para este video');
+            return;
+        }
+    }
+    
+    this.lastLoadedRelatedId = video.videoId;
+    
+    relatedList.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">Cargando...</p>`;
+    
+    try {
+        const { artist, title } = this.extractArtistFromTitle(video.title);
+        const searchQuery = artist !== 'Desconocido' ? artist : title;
+        
+        console.log(`🔍 Buscando relacionados: "${searchQuery}"`);
+        
+        const searchResults = await window.youtubeJSClient.search(searchQuery);
+        
+        if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
+            throw new Error('Sin resultados');
+        }
+        
+        // Filtrar el video actual
+        const relatedVideos = searchResults.items
+            .filter(v => v.videoId !== video.videoId)
+            .slice(0, 15);
+        
+        this.renderRelatedVideos(relatedVideos, relatedList);
+        
+    } catch (error) {
+        console.error('❌ Error cargando relacionados:', error);
+        relatedList.innerHTML = `
+            <div class="related-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>No se pudieron cargar sugerencias</p>
+            </div>
+        `;
+    }
+}   
 /**
  * Fallback usando búsqueda
  */
@@ -747,30 +810,45 @@ refreshActiveQueueTab() {
 
     const tabName = activeTab.dataset.tab;
     
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
-                        this.core?.currentPlayingInfo?.flattenedIndex ?? -1;
+    // ✅ CORRECCIÓN CRÍTICA: Obtener el video DIRECTAMENTE del player en ejecución
+    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
+    if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
+        console.warn('⚠️ Player no disponible para obtener video actual');
+        return;
+    }
+    
+    // ✅ Obtener videoId REAL del reproductor
+    const videoData = activePlayer.getVideoData();
+    const currentVideoId = videoData?.video_id;
+    
+    if (!currentVideoId) {
+        console.warn('⚠️ No hay video reproduciéndose');
+        return;
+    }
+    
+    // ✅ Buscar el video en la cola por videoId (no por índice)
     const flatList = this.core?.getFlattenedPlaylist() || [];
-    const currentVideo = flatList[currentIndex];
+    const currentVideo = flatList.find(v => v.videoId === currentVideoId);
     
-    if (!currentVideo || currentIndex < 0) return;
-
-    // Dependiendo del tab activo, solicitamos la carga.
-    // Como hemos optimizado loadLyrics y loadRelatedVideos, ellas mismas 
-    // decidirán si recargar (si la canción cambió) o no hacer nada (si es la misma).
+    if (!currentVideo) {
+        console.warn(`⚠️ Video ${currentVideoId} no encontrado en la cola`);
+        return;
+    }
     
+    console.log(`🎵 Refrescando tab "${tabName}" para:`, currentVideo.title);
+    
+    // Cargar contenido según el tab activo
     if (tabName === 'lyrics') {
-        // Usamos setTimeout para no bloquear el hilo principal durante cambios de canción rápidos
+        // ✅ Pasar el video correcto explícitamente
         setTimeout(() => {
-            this.loadLyrics();
+            this.loadLyricsForVideo(currentVideo);
         }, 100);
     } else if (tabName === 'related') {
         setTimeout(() => {
-            this.loadRelatedVideos();
+            this.loadRelatedForVideo(currentVideo);
         }, 100);
-    } 
-    // El tab 'next' (cola) se actualiza por separado vía updatePersistentQueue, 
-    // así que no necesitamos forzar nada aquí.
+    }
 }
     /**
      * Parsea un string de formato LRC [00:00.00]texto a un array de objetos
@@ -1199,6 +1277,102 @@ async loadLyrics() {
         if(providerBtn) providerBtn.style.display = 'none';
     }
 }
+ /**
+ * ✅ NUEVA FUNCIÓN: Cargar letras para un video específico
+ */
+async loadLyricsForVideo(video) {
+    const lyricsContainer = document.getElementById('lyricsContent');
+    const providerBtn = document.getElementById('lyricsProviderToggle');
+    
+    if (!video || !video.videoId) {
+        lyricsContainer.innerHTML = '<p class="lyrics-info">Video no válido</p>';
+        if (providerBtn) providerBtn.style.display = 'none';
+        return;
+    }
+    
+    console.log(`🎵 Cargando letras EXPLÍCITAS para: ${video.title} (${video.videoId})`);
+    
+    // ✅ CACHÉ: Si ya están cargadas para ESTE video específico
+    if (this.lastLoadedLyricsId === video.videoId) {
+        const existingLyrics = lyricsContainer.querySelector('.lyrics-text');
+        if (existingLyrics && existingLyrics.textContent.trim().length > 0) {
+            console.log('✅ Letras ya cargadas para este video');
+            if (this.currentLrc && this.currentLrc.length > 0) {
+                this.startLyricsSync();
+            }
+            if (providerBtn) providerBtn.style.display = 'inline-flex';
+            return;
+        }
+    }
+    
+    // ✅ Marcar este video como el último procesado
+    this.lastLoadedLyricsId = video.videoId;
+    
+    // Loading
+    lyricsContainer.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Cargando letras...</p>`;
+    if (providerBtn) providerBtn.style.display = 'none';
+    
+    try {
+        const artist = video.artist || video.uploaderName || '';
+        const title = video.title || '';
+        const duration = video.duration || 0;
+        
+        console.log(`🔍 Búsqueda: "${title}" por "${artist}" (${duration}s)`);
+        
+        let data = null;
+        let usedProvider = this.lyricsProvider;
+        
+        // Intento principal
+        try {
+            data = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
+        } catch (e) {
+            console.warn(`⚠️ Falló ${this.lyricsProvider}, probando alternativa...`);
+        }
+        
+        // Fallback
+        if (!data) {
+            const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
+            console.log(`🔄 Usando ${fallbackProvider}...`);
+            
+            try {
+                data = await this.fetchLyrics(fallbackProvider, artist, title, duration);
+                if (data) usedProvider = fallbackProvider;
+            } catch (e) {
+                console.warn('❌ Fallback también falló');
+            }
+        }
+        
+        // Renderizar
+        if (data) {
+            this.renderLyrics(data);
+            
+            if (usedProvider !== this.lyricsProvider) {
+                if (providerBtn) providerBtn.style.display = 'none';
+                console.log('✅ Letras con fallback, botón oculto');
+            } else {
+                if (providerBtn) {
+                    providerBtn.style.display = 'inline-flex';
+                    providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
+                }
+            }
+        } else {
+            lyricsContainer.innerHTML = `
+                <div class="lyrics-container">
+                    <div class="lyrics-header">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>No encontradas</p>
+                    </div>
+                    <p class="lyrics-info">"${this.escapeHTML(title)}"</p>
+                </div>`;
+            if (providerBtn) providerBtn.style.display = 'none';
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando letras:', error);
+        lyricsContainer.innerHTML = '<p class="lyrics-error">Error cargando letra.</p>';
+        if (providerBtn) providerBtn.style.display = 'none';
+    }
+}   
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
     // 1. USAR TU FUNCIÓN DE LIMPIEZA
     const title = this.cleanTrackTitle(rawTitle);
