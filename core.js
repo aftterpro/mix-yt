@@ -2553,7 +2553,7 @@ window.reloadSponsorBlockSegments = function(videoId) {
 
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
-window.loadQueuePersistent = loadQueuePersistent;
+
 window.saveQueuePersistent = saveQueuePersistent;
 
 window.debugUnified = function() {
