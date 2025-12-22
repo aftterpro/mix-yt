@@ -1415,120 +1415,56 @@ async playNextVideo() {
         // Liberar bloqueo de transición tras un segundo
         setTimeout(() => { isTransitioning = false; }, 1000);
     }
-}startCrossfade(prevPlayer, nextPlayer) {
-    if (crossfadeInProgress) {
-        console.warn('⚠️ Crossfade ya en progreso, ignorando...');
-        return;
-    }
-
-    const CROSSFADE_DURATION_MS = CROSSFADE_DURATION * 1000;
+}
+    
+startCrossfade(prevPlayer, nextPlayer) {
+    if (crossfadeInProgress) return;
+    
+    console.log('🔊 Iniciando Crossfade de AUDIO...');
     crossfadeInProgress = true;
 
-    const prevPlayerNum = currentPlayer === 1 ? 2 : 1;
-    const nextPlayerNum = currentPlayer;
-    
-    const prevElement = document.getElementById(`player${prevPlayerNum}`);
-    const nextElement = document.getElementById(`player${nextPlayerNum}`);
-
-    console.log(`🎨 Iniciando crossfade: player${prevPlayerNum} → player${nextPlayerNum}`);
-
-    // ✅ CONFIGURAR TRANSICIONES CSS
-    if (nextElement) {
-        nextElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
-        nextElement.style.display = 'block';
-        nextElement.style.zIndex = '3';
-        
-        // Fade-in gradual
-        setTimeout(() => {
-            nextElement.style.opacity = '1';
-            nextElement.classList.add('fade-in');
-        }, 50);
-    }
-    
-    if (prevElement) {
-        prevElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
-        prevElement.style.zIndex = '2';
-        
-        // Fade-out gradual
-        setTimeout(() => {
-            prevElement.style.opacity = '0';
-            prevElement.classList.add('fade-out');
-        }, 50);
-    }
-
-    const steps = 50;
-    const stepTime = CROSSFADE_DURATION_MS / steps;
-    let step = 0;
-
-    // Asegurar que el siguiente video corre
     try {
         nextPlayer.playVideo();
-        console.log(`▶️ Reproduciendo player${nextPlayerNum}`);
-    } catch (e) {
-        console.error('❌ Error iniciando nextPlayer:', e);
-    }
+    } catch (e) {}
 
-    // ✅ CROSSFADE DE AUDIO (Equal Power)
+    const steps = 40; // Menos pasos para mejor rendimiento
+    const stepTime = (CROSSFADE_DURATION * 1000) / steps;
+    let step = 0;
+
     crossfadeInterval = setInterval(() => {
         step++;
-        
         const progress = step / steps;
+        
+        // Curva logarítmica para audio más suave (Equal Power Crossfade)
         const gainNext = Math.sin(progress * (Math.PI / 2));
         const gainPrev = Math.cos(progress * (Math.PI / 2));
 
-        const prevVolume = Math.round(100 * gainPrev);
-        const nextVolume = Math.round(100 * gainNext);
-
         try {
-            prevPlayer.setVolume(prevVolume);
-            nextPlayer.setVolume(nextVolume);
+            prevPlayer.setVolume(Math.round(100 * gainPrev));
+            nextPlayer.setVolume(Math.round(100 * gainNext));
         } catch (e) {}
 
-        // Finalizar transición
         if (step >= steps) {
             clearInterval(crossfadeInterval);
             crossfadeInterval = null;
             crossfadeInProgress = false;
-
-            console.log('✅ Crossfade completado');
-
-            // ✅ DISPARAR EVENTO DE COMPLETADO
-            document.dispatchEvent(new CustomEvent('crossfadeCompleted', {
-                detail: {
-                    prevPlayer: prevPlayerNum,
-                    nextPlayer: nextPlayerNum
-                }
-            }));
-
+            
             // Limpieza final
-            setTimeout(() => {
-                try {
-                    prevPlayer.stopVideo();
-                    if (prevElement) {
-                        prevElement.classList.add('hidden');
-                        prevElement.classList.remove('fade-out');
-                        prevElement.style.display = 'none';
-                        prevElement.style.opacity = '0';
-                    }
-                    
-                    if (nextElement) {
-                        nextElement.classList.remove('fade-in');
-                        nextElement.style.opacity = '1';
-                    }
-                    
-                    // Reiniciar banderas
-                    hasOutroCrossfadeStarted = false;
-                    nextVideoScheduled = false;
-                    isTransitioning = false;
-                    
-                    // Reactivar monitoreo
-                    if (!monitorInterval && window.unifiedCore) {
-                        window.unifiedCore.startMonitoring();
-                    }
-                } catch (e) {
-                    console.error('❌ Error en limpieza:', e);
-                }
-            }, 500);
+            try {
+                prevPlayer.stopVideo();
+                // Restaurar volumen para la próxima vez que se use este player
+                prevPlayer.setVolume(100); 
+            } catch (e) {}
+
+            // Reiniciar banderas
+            hasOutroCrossfadeStarted = false;
+            nextVideoScheduled = false;
+            isTransitioning = false;
+            
+            // Reactivar monitor
+            if (!monitorInterval && window.unifiedCore) {
+                window.unifiedCore.startMonitoring();
+            }
         }
     }, stepTime);
 }
@@ -2335,78 +2271,57 @@ async function obtenerSegmentosSponsorBlock(videoId) {
         return [];
     }
 }
-
 function checkAndSkipSegment(player) {
     try {
         const currentTime = player.getCurrentTime();
-        const videoDuration = player.getDuration();
         const videoId = player.getVideoData()?.video_id;
 
         if (!videoId || isNaN(currentTime) || currentTime <= 0) return;
 
-        // ✅ Evitar bucles de salto
+        // Evitar bucle infinito si ya saltamos hace poco (1 segundo de espera)
         if (lastSeekVideoId === videoId && 
             lastSeekEndTime > 0 && 
             Math.abs(currentTime - lastSeekEndTime) < 1) {
             return;
         }
 
-        // ✅ Obtener segmentos (si no existen, cargarlos)
         if (!segmentosCache[videoId]) {
             obtenerSegmentosSponsorBlock(videoId);
             return;
         }
-        
-        if (segmentosCache[videoId] === 'fetching') return;
 
         const segments = segmentosCache[videoId];
-        if (!Array.isArray(segments) || segments.length === 0) return;
+        if (!Array.isArray(segments)) return;
 
-        // ✅ Buscar segmento activo
+        // Buscar segmento activo con un margen de seguridad
         const segmentToSkip = segments.find(segment => {
-            // ✅ CAMBIO: Aceptar cualquier categoría molesta
-            const skipCategories = ['sponsor', 'intro', 'outro', 'selfpromo', 'music_offtopic'];
+            const skipCategories = ['sponsor', 'intro', 'outro', 'selfpromo', 'music_offtopic', 'interaction'];
             if (!skipCategories.includes(segment.category)) return false;
             
             let start = segment.startTime ?? segment.segment?.[0];
             let end = segment.endTime ?? segment.segment?.[1];
 
-            if (typeof start !== 'number' || typeof end !== 'number') return false;
-            if ((end - start) < 0.5) return false; // Ignorar segmentos muy cortos
-
-            return currentTime >= start && currentTime < (end - 0.2);
+            // Margen de tolerancia de 0.5s para asegurar que entramos al segmento
+            return currentTime >= (start - 0.5) && currentTime < (end - 1);
         });
 
         if (segmentToSkip) {
             let skipToTime = segmentToSkip.endTime ?? segmentToSkip.segment?.[1];
             
-            // ✅ Si el salto nos lleva casi al final (menos de 3s), pasar al siguiente
-            if (videoDuration - skipToTime < 3 && window.unifiedCore) {
-                console.log('⏭️ Final detectado (Outro), pasando al siguiente...');
-                lastSeekVideoId = videoId;
-                lastSeekEndTime = skipToTime;
-                
-                // ✅ Forzar siguiente inmediatamente
-                hasOutroCrossfadeStarted = true;
-                nextVideoScheduled = true;
+            // Si el salto es al final del video, forzar siguiente canción
+            const videoDuration = player.getDuration();
+            if (videoDuration - skipToTime < 2 && window.unifiedCore) {
+                console.log('⏭️ SponsorBlock: El salto lleva al final, pasando video...');
                 window.unifiedCore.playNextVideo();
                 return;
             }
 
-            // ✅ Salto normal
-            console.log(`⏭️ SponsorBlock: Saltando ${segmentToSkip.category} (${currentTime.toFixed(1)}s → ${skipToTime.toFixed(1)}s)`);
+            console.log(`⏭️ Saltando ${segmentToSkip.category}`);
             lastSeekVideoId = videoId;
             lastSeekEndTime = skipToTime;
             player.seekTo(skipToTime, true);
-            
-            if (window.unifiedCore) {
-                window.unifiedCore.showMessage(`⏭️ ${segmentToSkip.category}`, 'info');
-            }
         }
-
-    } catch (error) {
-        // Silencioso para no saturar
-    }
+    } catch (error) { /* Ignorar errores leves */ }
 }
 
 function monitorPlayers() {
@@ -2417,93 +2332,46 @@ function monitorPlayers() {
         if (!activePlayer?.getPlayerState) return;
 
         const playerState = activePlayer.getPlayerState();
+        if (playerState !== YT.PlayerState.PLAYING) return;
+
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
-        const videoId = activePlayer.getVideoData()?.video_id;
+        
+        // Ejecutar SponsorBlock
+        checkAndSkipSegment(activePlayer);
 
-        if (playerState !== YT.PlayerState.PLAYING) return;
-        if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
-        if (!videoId) return;
-
-        // ✅ CORRECCIÓN: Cálculo simplificado y preciso
-        const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; // 10s + 2s de margen
+        // LÓGICA DE CROSSFADE
+        // Usamos una ventana de 2 segundos en lugar de 0.5 para asegurar que se detecte
+        const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; 
         const timeRemaining = videoDuration - currentTime;
 
-        // SponsorBlock
-        if (currentTime > 0.5) {
-            checkAndSkipSegment(activePlayer);
-        }
-
-        // ✅ DISPARAR CROSSFADE cuando queden exactamente X segundos
         if (timeRemaining <= TRIGGER_OFFSET && 
-            timeRemaining > (TRIGGER_OFFSET - 0.5) && // Ventana de 0.5s para evitar múltiples llamadas
+            timeRemaining > (TRIGGER_OFFSET - 2.0) && // VENTANA AMPLIADA A 2s
             !hasOutroCrossfadeStarted && 
-            !isTransitioning && 
-            !crossfadeInProgress &&
-            !nextVideoScheduled) { 
+            !isTransitioning) {
             
-            console.log(`🎨 ¡CROSSFADE INICIADO!`, {
-                currentTime: currentTime.toFixed(2),
-                videoDuration: videoDuration.toFixed(2),
-                timeRemaining: timeRemaining.toFixed(2),
-                triggerOffset: TRIGGER_OFFSET
-            });
+            console.log(`🎨 Trigger Crossfade Detectado (Restante: ${timeRemaining.toFixed(2)}s)`);
             
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             
+            // Pausar monitor brevemente para evitar doble disparo
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
-        
-            const prevPlayerNum = currentPlayer;
-            const nextPlayerNum = currentPlayer === 1 ? 2 : 1;
-            
-            const prevElement = document.getElementById(`player${prevPlayerNum}`);
-            const nextElement = document.getElementById(`player${nextPlayerNum}`);
-            
-            if (prevElement) {
-                console.log(`🎨 Fade-out: player${prevPlayerNum}`);
-                prevElement.classList.remove('fade-in', 'hidden');
-                prevElement.classList.add('fade-out');
-                prevElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
-                prevElement.style.opacity = '0';
-                prevElement.style.zIndex = '1';
-            }
-            
-            if (nextElement) {
-                console.log(`🎨 Preparando: player${nextPlayerNum}`);
-                nextElement.classList.remove('hidden', 'fade-out');
-                nextElement.classList.add('fade-in');
-                nextElement.style.display = 'block';
-                nextElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
-                nextElement.style.opacity = '0';
-                nextElement.style.zIndex = '2';
-            }
-            
+
+            // Disparar evento para mix-effects.js (Visuales)
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
-                detail: {
-                    currentTime,
-                    timeRemaining,
-                    videoDuration,
-                    prevPlayer: prevPlayerNum,
-                    nextPlayer: nextPlayerNum
-                }
+                detail: { prevPlayer: currentPlayer, nextPlayer: currentPlayer === 1 ? 2 : 1 }
             }));
             
-            setTimeout(() => {
-                if (window.unifiedCore?.playNextVideo) {
-                    window.unifiedCore.playNextVideo();
-                }
-            }, 100);
-            
-            return;
+            // Ejecutar lógica de cambio (Audio/Carga)
+            if (window.unifiedCore?.playNextVideo) {
+                window.unifiedCore.playNextVideo();
+            }
         }
-        
-    } catch (error) {
-        console.error("❌ Error en monitorPlayers:", error);
-    }
+    } catch (error) { console.error(error); }
 }
 function calculateCrossfadeTriggerTime(videoDuration, videoId) {
     const API_BUFFER = 1;
