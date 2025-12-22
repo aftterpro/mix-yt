@@ -390,31 +390,38 @@ document.addEventListener('playerStateChanged', (e) => {
 // =============================================
 // ESCUCHAR EVENTOS DE CORE.JS
 // =============================================
+
 document.addEventListener('crossfadeTriggered', (event) => {
-    console.log('🎨 [MIX-EFFECTS] Crossfade visual iniciado', event.detail);
+    console.log('🎨 [MIX-EFFECTS] Aplicando clases visuales');
     
     const { prevPlayer, nextPlayer } = event.detail;
     
     const prevElement = document.getElementById(`player${prevPlayer}`);
     const nextElement = document.getElementById(`player${nextPlayer}`);
     
+    // Solo manipulamos CLASES, no estilos inline (style.opacity)
     if (nextElement) {
-        // ✅ Fade-in del siguiente video (gradual)
-        setTimeout(() => {
-            nextElement.style.opacity = '1';
-            console.log(`🎨 Fade-in aplicado a player${nextPlayer}`);
-        }, 100);
+        nextElement.classList.remove('hidden', 'fade-out');
+        // Forzamos un reflow para que el navegador procese el cambio de clase
+        void nextElement.offsetWidth; 
+        nextElement.classList.add('fade-in');
     }
     
     if (prevElement) {
-        // ✅ Asegurar fade-out completo
-        console.log(`🎨 Fade-out confirmado en player${prevPlayer}`);
+        prevElement.classList.remove('fade-in');
+        prevElement.classList.add('fade-out');
+        
+        // Esperar a que termine la animación CSS para ocultar completamente (display:none)
+        setTimeout(() => {
+            if (prevElement.classList.contains('fade-out')) {
+                prevElement.classList.add('hidden');
+                prevElement.classList.remove('fade-out');
+            }
+        }, (window.effectsState?.crossfadeDuration || 10) * 1000);
     }
     
-    // ✅ Aplicar efecto visual completo
     applyCrossfadeVisualEffect();
 });
-
 document.addEventListener('crossfadeCompleted', () => {
     console.log('✅ Crossfade completado');
 });
