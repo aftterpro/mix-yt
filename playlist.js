@@ -584,77 +584,67 @@ switchQueueTab(tabName) {
         }
     }
 }
-
-/**
- * Cargar videos relacionados
- */
 async loadRelatedVideos() {
     const relatedList = document.getElementById('relatedVideosList');
     
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? 
-                        this.core?.currentPlayingInfo?.flattenedIndex ?? -1;
-    
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
     const flatList = this.core?.getFlattenedPlaylist() || [];
     const currentVideo = flatList[currentIndex];
 
-    // Validación básica
     if (!currentVideo || !currentVideo.videoId || currentIndex < 0) {
-        relatedList.innerHTML = `<p class="related-placeholder">Reproduce una canción para ver videos relacionados</p>`;
+        relatedList.innerHTML = `<p class="related-placeholder">Reproduce una canción</p>`;
         this.lastLoadedRelatedId = null;
         return;
     }
 
-    // === OPTIMIZACIÓN: CACHÉ VISUAL ===
+    // ✅ CACHÉ: Si ya están cargados, no recargar
     if (this.lastLoadedRelatedId === currentVideo.videoId) {
-        console.log('✅ Relacionados ya cargados. Manteniendo vista.');
-        return; // <--- SALIR AQUÍ
+        const existingItems = relatedList.querySelectorAll('.related-video-item');
+        if (existingItems.length > 0) {
+            console.log('✅ Relacionados ya cargados');
+            return; // ← SALIR AQUÍ
+        }
     }
-    // ==================================
 
     this.lastLoadedRelatedId = currentVideo.videoId;
 
-    relatedList.innerHTML = `
-        <div class="related-loading">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Cargando videos relacionados...</p>
-        </div>
-    `;
+    // ✅ LOADING LIGERO
+    relatedList.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">Cargando...</p>`;
 
     try {
-        // Intentar cargar desde Piped/YouTube Client
-        if (!window.youtubeJSClient || typeof window.youtubeJSClient.getVideoInfo !== 'function') {
-            throw new Error('YouTube client no está disponible.');
+        // ✅ USAR NUESTRA API EN LUGAR DE PIPED
+        console.log(`📡 Buscando relacionados con nuestra API...`);
+        
+        const { artist, title } = this.extractArtistFromTitle(currentVideo.title);
+        const searchQuery = artist !== 'Desconocido' ? artist : title;
+        
+        // Usar youtube-client.js que ya apunta a tu Netlify Function
+        const searchResults = await window.youtubeJSClient.search(searchQuery);
+        
+        if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
+            throw new Error('Sin resultados');
         }
         
-        console.log(`📡 Obteniendo info de video: ${currentVideo.videoId}`);
-        const videoInfo = await window.youtubeJSClient.getVideoInfo(currentVideo.videoId);
-
-        if (!videoInfo || !videoInfo.relatedStreams || videoInfo.relatedStreams.length === 0) {
-            throw new Error('No se encontraron videos relacionados.');
-        }
-
-        this.renderRelatedVideos(videoInfo.relatedStreams, relatedList);
+        // Filtrar el video actual
+        const relatedVideos = searchResults.items
+            .filter(video => video.videoId !== currentVideo.videoId)
+            .slice(0, 15);
+        
+        this.renderRelatedVideos(relatedVideos, relatedList);
 
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
-        
-        // Fallback: Usar búsqueda
-        try {
-            await this.loadRelatedVideosFallback(currentVideo, relatedList);
-        } catch (fallbackError) {
-            console.error('❌ Error en fallback:', fallbackError);
-            relatedList.innerHTML = `
-                <div class="related-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>No se pudieron cargar sugerencias</p>
-                </div>
-            `;
-        }
+        relatedList.innerHTML = `
+            <div class="related-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>No se pudieron cargar sugerencias</p>
+            </div>
+        `;
     }
 }
     
 /**
- * ✅ NUEVO: Fallback usando búsqueda
+ * Fallback usando búsqueda
  */
 async loadRelatedVideosFallback(currentVideo, relatedList) {
     console.log('🔄 Usando fallback para videos relacionados...');
@@ -1110,7 +1100,7 @@ cleanTrackTitle(title) {
 }
 async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
-    const providerBtn = document.getElementById('lyricsProviderToggle'); // El botón de cambiar
+    const providerBtn = document.getElementById('lyricsProviderToggle');
     
     // Obtener video actual
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
@@ -1120,25 +1110,29 @@ async loadLyrics() {
 
     if (!currentVideo) {
         lyricsContainer.innerHTML = '<p class="lyrics-info">Reproduce música...</p>';
-        if(providerBtn) providerBtn.style.display = 'none'; // Ocultar si no hay música
+        if(providerBtn) providerBtn.style.display = 'none';
         return;
     }
 
-    // Cache visual: Si es la misma canción, no recargar
+    // ✅ CACHÉ OPTIMIZADO: Si ya están cargadas Y visibles, no hacer nada
     if (this.lastLoadedLyricsId === currentVideo.videoId) {
-        if (this.currentLrc && this.currentLrc.length > 0) this.startLyricsSync();
-        return;
+        const existingLyrics = lyricsContainer.querySelector('.lyrics-text');
+        if (existingLyrics && existingLyrics.textContent.trim().length > 0) {
+            console.log('✅ Letras ya cargadas y visibles, omitiendo recarga');
+            if (this.currentLrc && this.currentLrc.length > 0) {
+                this.startLyricsSync(); // Solo reiniciar sync
+            }
+            if (providerBtn) providerBtn.style.display = 'inline-flex';
+            return; // ← SALIR AQUÍ
+        }
     }
+    
     this.lastLoadedLyricsId = currentVideo.videoId;
 
-    // UI de Carga
-    lyricsContainer.innerHTML = `
-        <div class="lyrics-loading">
-            <div class="loading-spinner"></div>
-            <p>Buscando letra...</p>
-        </div>`;
+    // ✅ LOADING LIGERO (sin spinner pesado)
+    lyricsContainer.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Cargando...</p>`;
     
-    // Ocultar botón durante la carga para evitar clics
+    // Ocultar botón durante la carga
     if(providerBtn) providerBtn.style.display = 'none';
 
     try {
@@ -1160,14 +1154,13 @@ async loadLyrics() {
 
         // 2. FALLBACK AUTOMÁTICO (Si el principal falló o no trajo nada)
         if (!data) {
-            // Cambiar temporalmente al otro proveedor
             const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
             console.log(`🔄 Cambiando a fallback: ${fallbackProvider}`);
             
             try {
                 data = await this.fetchLyrics(fallbackProvider, artist, title, duration);
                 if (data) {
-                    usedProvider = fallbackProvider; // Marcamos que usamos el alternativo
+                    usedProvider = fallbackProvider;
                 }
             } catch (e) {
                 console.warn('❌ Falló también el fallback.');
@@ -1181,12 +1174,11 @@ async loadLyrics() {
             // LÓGICA DEL BOTÓN:
             if (usedProvider !== this.lyricsProvider) {
                 // Si tuvimos que cambiar de proveedor porque el original falló:
-                // BORRAMOS EL BOTÓN (como pediste) para no confundir al usuario
+                // BORRAMOS EL BOTÓN para no confundir al usuario
                 if(providerBtn) providerBtn.style.display = 'none';
                 console.log('✅ Letra encontrada con fallback. Botón oculto.');
             } else {
                 // Si encontramos con el proveedor original, MOSTRAMOS el botón
-                // por si el usuario quiere probar el otro manualmente.
                 if(providerBtn) {
                     providerBtn.style.display = 'inline-flex';
                     providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
@@ -1198,7 +1190,6 @@ async loadLyrics() {
                 <div class="lyrics-container">
                     <p class="lyrics-error">No se encontró la letra.</p>
                 </div>`;
-            // Borrar botón porque no hay opciones
             if(providerBtn) providerBtn.style.display = 'none';
         }
 
@@ -1208,7 +1199,6 @@ async loadLyrics() {
         if(providerBtn) providerBtn.style.display = 'none';
     }
 }
-
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
     // 1. USAR TU FUNCIÓN DE LIMPIEZA
     const title = this.cleanTrackTitle(rawTitle);
