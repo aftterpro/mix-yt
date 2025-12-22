@@ -464,6 +464,7 @@ onPlayerStateChange(event) {
             setTimeout(() => this.updatePlaylistsUI(), 500);
         });
     }
+
 initializeUI() {
     // Asegurar que existe la cola de reproducción VACÍA por defecto
     if (!playlistsData.some(p => p.id === 'queue')) {
@@ -476,9 +477,12 @@ initializeUI() {
             isQueue: true
         });
     } else {
-        // Si ya existe (por carga de caché), verificar integridad
+        // 🛠️ CORRECCIÓN: Si ya existe (por caché/localStorage), LA VACIAMOS
         const q = playlistsData.find(p => p.id === 'queue');
-        if (!Array.isArray(q.videos)) q.videos = [];
+        if (q) {
+            console.log('🧹 Limpiando cola de reproducción al iniciar...');
+            q.videos = []; // <--- ESTO ASEGURA QUE EMPIECE EN 0
+        }
     }
 
     // Asegurar playlist manual
@@ -495,6 +499,11 @@ initializeUI() {
     this.updateOverviewStats();
     // Forzar actualización visual de la cola a 0
     this.updateQueueCount(0); 
+    
+    // Forzar actualización de la UI de la cola para que se vea vacía
+    if (this.updatePersistentQueue) {
+        this.updatePersistentQueue();
+    }
 }
 
     async initializePlaylistManager() {
