@@ -2553,9 +2553,6 @@ window.reloadSponsorBlockSegments = function(videoId) {
 
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
-
-window.saveQueuePersistent = saveQueuePersistent;
-
 window.debugUnified = function() {
     console.log('🐛 Estado del Sistema Unificado:', {
         unifiedState,
