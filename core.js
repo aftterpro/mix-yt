@@ -1349,94 +1349,69 @@ async playNextVideo() {
     
     if (!playersInitialized) return;
 
-    isTransitioning = true;
-    
     // Obtener datos actuales
     const currentFlatIndex = currentPlayingInfo.flattenedIndex;
     const flatList = this.getFlattenedPlaylist();
 
-    if (flatList.length === 0) {
-        isTransitioning = false;
-        this.handleEmptyPlaylist();
-        return;
-    }
+    if (flatList.length === 0) return this.handleEmptyPlaylist();
 
     let nextIndex = currentFlatIndex + 1;
-    if (nextIndex >= flatList.length) {
-        isTransitioning = false;
-        this.handleEndOfPlaylist();
-        return;
-    }
+    if (nextIndex >= flatList.length) return this.handleEndOfPlaylist();
 
     const nextVideo = flatList[nextIndex];
     
-    // ============================================================
-    // 1. ACTUALIZACIÓN DE ESTADO GLOBAL (INMEDIATA)
-    // ============================================================
+    // 1. ACTUALIZACIÓN DE ESTADO
     currentPlayingInfo = {
         flattenedIndex: nextIndex,
         videoId: nextVideo.videoId,
         playlistId: nextVideo.sourcePlaylistId
     };
-    // Sincronizar con variable window para acceso global
     window.currentPlayingInfo = currentPlayingInfo; 
     
-    // Actualizar Textos del Reproductor
     this.updateNowPlaying();
 
-    // ============================================================
-    // 2. FORZAR ACTUALIZACIÓN DE COLA Y SCROLL (SOLUCIÓN INDICADOR)
-    // ============================================================
     if (window.playlistManager) {
-        // Esto mueve la clase 'playing' al nuevo video INMEDIATAMENTE
         window.playlistManager.syncQueueIndicator(); 
-        
-        // Esto actualiza el scroll en la lista lateral
         this.updatePersistentQueue(); 
-        
-        // Esto actualiza pestañas de letras/relacionados
         window.playlistManager.refreshActiveQueueTab(); 
     }
 
-    // ============================================================
-    // 3. LÓGICA DE REPRODUCTORES (CROSSFADE)
-    // ============================================================
-    const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
+    // 2. PREPARAR REPRODUCTORES
+    const prevPlayerInstance = currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
-    const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    
+    // Cambiar puntero global INMEDIATAMENTE
+    const prevPlayerNum = currentPlayer;
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    window.currentPlayer = currentPlayer;
 
     try {
-        // Mostrar visualmente el contenedor del siguiente video (oculto por opacidad)
-        if (nextPlayerElement) {
-            nextPlayerElement.classList.remove('hidden', 'fade-out');
-            nextPlayerElement.style.display = 'block';
-            nextPlayerElement.style.opacity = '0'; 
-            nextPlayerElement.style.zIndex = '2';
-        }
+        console.log(`⌛ Cargando siguiente video (${nextVideo.videoId})... esperando buffer.`);
 
-        // Cargar video
+        // Cargar video y asegurar que empiece MUTEADO
         nextPlayerInstance.loadVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
-        nextPlayerInstance.setVolume(0); // Empezar en silencio
+        nextPlayerInstance.setVolume(0); 
 
-        // Cambiar puntero
-        currentPlayer = currentPlayer === 1 ? 2 : 1;
-        window.currentPlayer = currentPlayer; // Sincronizar global
+        // NO iniciamos el crossfade todavía.
+        // Guardamos la intención y esperamos a que el evento onStateChange nos diga "YA ESTOY SONANDO"
+        this.pendingCrossfade = {
+            active: true,
+            prev: prevPlayerInstance,
+            next: nextPlayerInstance,
+            prevNum: prevPlayerNum,
+            nextNum: currentPlayer
+        };
 
-        // Iniciar transición de audio
-        this.startCrossfade(currentPlayerInstance, nextPlayerInstance);
+        // Disparar evento visual (para que la UI sepa que algo viene, aunque no suene aún)
+        document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
+            detail: { prevPlayer: prevPlayerNum, nextPlayer: currentPlayer }
+        }));
 
     } catch (error) {
         console.error("Error en playNextVideo:", error);
-        // Fallback en caso de error
-        isTransitioning = false;
-        hasOutroCrossfadeStarted = false;
-        if (!monitorInterval) this.startMonitoring();
-    } finally {
-        // Liberar bloqueo de transición tras un segundo
-        setTimeout(() => { isTransitioning = false; }, 1000);
     }
 }
     
