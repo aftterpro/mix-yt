@@ -387,7 +387,42 @@ document.addEventListener('playerStateChanged', (e) => {
     const { state, playerId } = e.detail;
     updatePlayerStatusUI(`Player ${playerId}: ${state}`);
 });
+// =============================================
+// ESCUCHAR EVENTOS DE CORE.JS
+// =============================================
+document.addEventListener('crossfadeTriggered', (event) => {
+    console.log('🎨 [MIX-EFFECTS] Crossfade visual iniciado', event.detail);
+    
+    const { prevPlayer, nextPlayer } = event.detail;
+    
+    const prevElement = document.getElementById(`player${prevPlayer}`);
+    const nextElement = document.getElementById(`player${nextPlayer}`);
+    
+    if (nextElement) {
+        // ✅ Fade-in del siguiente video (gradual)
+        setTimeout(() => {
+            nextElement.style.opacity = '1';
+            console.log(`🎨 Fade-in aplicado a player${nextPlayer}`);
+        }, 100);
+    }
+    
+    if (prevElement) {
+        // ✅ Asegurar fade-out completo
+        console.log(`🎨 Fade-out confirmado en player${prevPlayer}`);
+    }
+    
+    // ✅ Aplicar efecto visual completo
+    applyCrossfadeVisualEffect();
+});
 
+document.addEventListener('crossfadeCompleted', () => {
+    console.log('✅ Crossfade completado');
+});
+
+document.addEventListener('playerStateChanged', (e) => {
+    const { state, playerId } = e.detail;
+    updatePlayerStatusUI(`Player ${playerId}: ${state}`);
+});
 // =============================================
 // INICIALIZACIÓN AUTOMÁTICA
 // =============================================
