@@ -1019,47 +1019,46 @@ switchView(viewName) {
     if (viewName === 'fullPlayer') {
         // === MODO PANTALLA COMPLETA ===
         
-        // A. Ocultar Mini Player explícitamente (para que no tape controles)
+        // A. Ocultar Mini Player explícitamente
         if (miniPlayer) {
-            miniPlayer.style.display = 'none'; // CSS directo
+            miniPlayer.style.display = 'none';
             miniPlayer.classList.add('hidden');
         }
         document.body.classList.remove('mini-player-active');
 
-        // --- CORRECCIÓN: Reactivar capa persistente ---
+        // B. Reactivar capa persistente
         const persistentLayer = document.getElementById('persistent-player-layer');
         if (persistentLayer) {
             persistentLayer.style.display = 'block';
             persistentLayer.style.opacity = '1';
         }
-        // ---------------------------------------------
 
-        // B. Mover reproductores al contenedor grande (Video Wrapper)
-        // Usamos requestAnimationFrame para dar tiempo al navegador a renderizar el div 'videoWrapper'
+        // C. Mover reproductores al contenedor grande (Video Wrapper)
         requestAnimationFrame(() => {
-            // Asegurar que el wrapper tenga ID para la capa persistente
             const wrapper = document.querySelector('.video-wrapper');
             if (wrapper && !wrapper.id) wrapper.id = 'videoWrapper';
 
-            // Mover iframes
             this.movePlayersToFullView(); 
-            
-            // Actualizar posición de la capa negra persistente
             this.updatePlayerPosition('videoWrapper');
+            
+            // ✅ CORRECCIÓN CRÍTICA: Segundo ajuste después del renderizado
+            setTimeout(() => {
+                this.updatePlayerPosition('videoWrapper');
+            }, 100);
         });
 
-        // C. Actualizar cola visual si es necesario
+        // D. Actualizar cola visual si es necesario
         if (window.playlistManager?.updateQueueUI) {
             window.playlistManager.updateQueueUI();
         }
 
     } else {
+        // === OTRAS VISTAS (Home, Search, Library) ===
+        
         // A. Si hay música sonando, mostrar Mini Player
         if (hasActiveVideo) {
-            // Usamos la función "blindada" que hicimos antes
             this.showMiniPlayerFloat();
         } else {
-            // Si no hay música, asegurar oculto
             if (miniPlayer) {
                 miniPlayer.style.display = 'none';
                 miniPlayer.classList.add('hidden');
@@ -1070,9 +1069,8 @@ switchView(viewName) {
         if (viewName === 'library') {
             this.refreshLibraryView();
         } else if (viewName === 'search' && currentSearchQuery) {
-            // Mantener foco si ya había búsqueda
-             const searchInput = document.getElementById('searchInput');
-             if(searchInput) searchInput.focus();
+            const searchInput = document.getElementById('searchInput');
+            if(searchInput) searchInput.focus();
         }
     }
 }
@@ -1158,81 +1156,60 @@ movePlayersToFullView() {
     }
 
 showMiniPlayerFloat() {
-    console.log('🎬 Activando mini player flotante (Reducción)...');
-
-    // 1. Validar reproducción
+    console.log('🎬 Reduciendo a mini player...');
+    
     if (!window.reproduccionIniciada) return;
 
-    // --- CORRECCIÓN: Ocultar la capa negra persistente ---
-    const persistentLayer = document.getElementById('persistent-player-layer');
-    if (persistentLayer) {
-        persistentLayer.style.display = 'none'; // Ocultar completamente
-        persistentLayer.style.opacity = '0';
-    }
-    // ----------------------------------------------------
-
     const miniPlayer = document.getElementById('miniPlayerFloat');
-    const fullContainer = document.getElementById('fullVideoContainer'); // Contenedor grande
-    const player1 = document.getElementById('player1');
-    const player2 = document.getElementById('player2');
-
     if (!miniPlayer) return;
 
-    // 2. Mostrar contenedor flotante
-    miniPlayer.classList.remove('hidden', 'hide', 'invisible');
+    // ✅ NO MOVER IFRAMES - Solo cambiar posición de la capa persistente
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    if (!persistentLayer) return;
+
+    // Mostrar mini player
+    miniPlayer.classList.remove('hidden');
     miniPlayer.style.display = 'block';
     
-    // 3. MOVER LOS REPRODUCTORES FÍSICAMENTE AL MINI
-    // (Esto evita recargas o pantallas negras porque es el MISMO iframe)
+    // ✅ ANIMAR LA CAPA PERSISTENTE hacia el mini player
+    const miniRect = miniPlayer.getBoundingClientRect();
     
-    // Contenedores destino dentro del mini (asegúrate de que existan en tu HTML)
-    // O simplemente usa el miniPlayer directo como contenedor
-    let targetContainer = miniPlayer.querySelector('.mini-video-wrapper') || miniPlayer;
-
-    if (player1 && !targetContainer.contains(player1)) {
-        targetContainer.appendChild(player1);
-    }
-    if (player2 && !targetContainer.contains(player2)) {
-        targetContainer.appendChild(player2);
-    }
-
-    // 4. Ajustar estilos para modo mini
-    [player1, player2].forEach(p => {
-        if(p) {
-            p.style.width = '100%';
-            p.style.height = '100%';
-            p.style.position = 'absolute';
-            p.style.top = '0';
-            p.style.left = '0';
-        }
-    });
-
-    // 5. Marcar estado
+    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    persistentLayer.style.top = `${miniRect.top}px`;
+    persistentLayer.style.left = `${miniRect.left}px`;
+    persistentLayer.style.width = `${miniRect.width}px`;
+    persistentLayer.style.height = `${miniRect.height}px`;
+    persistentLayer.style.borderRadius = '12px';
+    persistentLayer.style.opacity = '1';
+    persistentLayer.style.pointerEvents = 'auto';
+    
     document.body.classList.add('mini-player-active');
 }
 movePlayersToFullView() {
-    console.log('🎬 Restaurando reproductores a vista completa...');
+    console.log('🎬 Expandiendo a vista completa...');
     
-    const fullWrapper = document.querySelector('.video-wrapper') || document.getElementById('fullVideoContainer');
-    const player1 = document.getElementById('player1');
-    const player2 = document.getElementById('player2');
-
-    if (fullWrapper && player1 && !fullWrapper.contains(player1)) {
-        fullWrapper.appendChild(player1);
-    }
-    if (fullWrapper && player2 && !fullWrapper.contains(player2)) {
-        fullWrapper.appendChild(player2);
-    }
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    if (!persistentLayer) return;
     
-    // Restaurar estilos Full
-    [player1, player2].forEach(p => {
-        if(p) {
-            p.style.width = '100%';
-            p.style.height = '100%';
-        }
-    });
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
+    
+    if (!videoWrapper) return;
+    
+    // ✅ ANIMAR LA CAPA PERSISTENTE hacia el contenedor grande
+    const wrapperRect = videoWrapper.getBoundingClientRect();
+    
+    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    persistentLayer.style.top = `${wrapperRect.top}px`;
+    persistentLayer.style.left = `${wrapperRect.left}px`;
+    persistentLayer.style.width = `${wrapperRect.width}px`;
+    persistentLayer.style.height = `${wrapperRect.height}px`;
+    persistentLayer.style.borderRadius = '0px';
+    persistentLayer.style.opacity = '1';
+    persistentLayer.style.pointerEvents = 'auto';
+    
+    document.body.classList.remove('mini-player-active');
 }
-
     movePlayersToMini() {
         const player1 = document.getElementById('player1');
         const player2 = document.getElementById('player2');
