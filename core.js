@@ -2288,35 +2288,54 @@ updatePersistentQueue() {
 // =============================================
 
 async function obtenerSegmentosSponsorBlock(videoId) {
-    if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) return null;
+    if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) {
+        return null;
+    }
 
     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
-    const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`; 
+    
+    // ✅ USAR TU FUNCIÓN NETLIFY
+    const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
     
     segmentosCache[videoId] = 'fetching';
 
     try {
-        const response = await fetch(apiUrl, { headers: { 'X-UserID': userId } });
-        if (!response.ok) throw new Error(`API SB Error: ${response.status}`);
+        const response = await fetch(apiUrl, { 
+            headers: { 'X-UserID': userId }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API SB Error: ${response.status}`);
+        }
 
         const data = await response.json();
-        if (!Array.isArray(data)) return [];
+        
+        if (!Array.isArray(data)) {
+            segmentosCache[videoId] = [];
+            return [];
+        }
 
         const validSegments = data.filter(segment => {
-            if (!segment || typeof segment.startTime === 'undefined' || typeof segment.endTime === 'undefined') return false;
+            if (!segment || typeof segment.startTime === 'undefined' || typeof segment.endTime === 'undefined') {
+                return false;
+            }
             const start = parseFloat(segment.startTime);
             const end = parseFloat(segment.endTime);
             if (isNaN(start) || isNaN(end) || end < start) return false;
             return true;
         });
 
-        segmentosCache[videoId] = validSegments; 
-        return validSegments; 
+        segmentosCache[videoId] = validSegments;
+        console.log(`✅ SponsorBlock: ${validSegments.length} segmentos para ${videoId}`);
+        return validSegments;
+
     } catch (error) {
-        segmentosCache[videoId] = null;
-        return null; 
+        console.warn(`⚠️ SponsorBlock falló para ${videoId}:`, error.message);
+        segmentosCache[videoId] = [];
+        return [];
     }
 }
+
 function checkAndSkipSegment(player) {
     try {
         const currentTime = player.getCurrentTime();
@@ -2325,74 +2344,72 @@ function checkAndSkipSegment(player) {
 
         if (!videoId || isNaN(currentTime) || currentTime <= 0) return;
 
-        // Evitar bucles de salto recientes
-        if (lastSeekVideoId === videoId && lastSeekEndTime > 0 && Math.abs(currentTime - lastSeekEndTime) < 2) {
+        // ✅ Evitar bucles de salto
+        if (lastSeekVideoId === videoId && 
+            lastSeekEndTime > 0 && 
+            Math.abs(currentTime - lastSeekEndTime) < 1) {
             return;
         }
 
-        // Obtener segmentos (cache o fetch)
+        // ✅ Obtener segmentos (si no existen, cargarlos)
         if (!segmentosCache[videoId]) {
             obtenerSegmentosSponsorBlock(videoId);
             return;
         }
+        
         if (segmentosCache[videoId] === 'fetching') return;
 
         const segments = segmentosCache[videoId];
-        if (!Array.isArray(segments)) return;
+        if (!Array.isArray(segments) || segments.length === 0) return;
 
-        // Buscar segmento activo
+        // ✅ Buscar segmento activo
         const segmentToSkip = segments.find(segment => {
-            if (segment.category !== 'music_offtopic') return false; // Solo saltar intros/outros/no-musica
+            // ✅ CAMBIO: Aceptar cualquier categoría molesta
+            const skipCategories = ['sponsor', 'intro', 'outro', 'selfpromo', 'music_offtopic'];
+            if (!skipCategories.includes(segment.category)) return false;
             
             let start = segment.startTime ?? segment.segment?.[0];
             let end = segment.endTime ?? segment.segment?.[1];
 
-            // Validar
             if (typeof start !== 'number' || typeof end !== 'number') return false;
-            
-            // Lógica Spotify: Si el segmento es muy corto (< 1s), ignorar para evitar 'glitches'
-            if ((end - start) < 1) return false;
+            if ((end - start) < 0.5) return false; // Ignorar segmentos muy cortos
 
-            return currentTime >= start && currentTime < (end - 0.2); // Margen de 0.2s
+            return currentTime >= start && currentTime < (end - 0.2);
         });
 
         if (segmentToSkip) {
             let skipToTime = segmentToSkip.endTime ?? segmentToSkip.segment?.[1];
             
-            // === LÓGICA TIPO SPOTIFY (Seamless) ===
-            // Si el salto nos lleva casi al final del video (menos de 3s restantes),
-            // en lugar de saltar, forzamos el paso a la siguiente canción.
+            // ✅ Si el salto nos lleva casi al final (menos de 3s), pasar al siguiente
             if (videoDuration - skipToTime < 3 && window.unifiedCore) {
-                console.log('⏭️ SponsorBlock: Final detectado (Outro), pasando al siguiente video...');
+                console.log('⏭️ Final detectado (Outro), pasando al siguiente...');
                 lastSeekVideoId = videoId;
-                lastSeekEndTime = skipToTime; // Evitar re-disparar
-                window.unifiedCore.playNextVideo(); // <--- CROSSFADE INMEDIATO
+                lastSeekEndTime = skipToTime;
+                
+                // ✅ Forzar siguiente inmediatamente
+                hasOutroCrossfadeStarted = true;
+                nextVideoScheduled = true;
+                window.unifiedCore.playNextVideo();
                 return;
             }
-            // =======================================
 
-            // Salto normal (Intro o intermedio)
-            console.log(`⏭️ Eliminando silencio/intro: ${currentTime.toFixed(1)}s -> ${skipToTime.toFixed(1)}s`);
+            // ✅ Salto normal
+            console.log(`⏭️ SponsorBlock: Saltando ${segmentToSkip.category} (${currentTime.toFixed(1)}s → ${skipToTime.toFixed(1)}s)`);
             lastSeekVideoId = videoId;
             lastSeekEndTime = skipToTime;
             player.seekTo(skipToTime, true);
             
             if (window.unifiedCore) {
-                // Mostrar un indicador sutil
-                const indicator = document.getElementById('unifiedStatusIndicator');
-                if(indicator) {
-                    indicator.textContent = "Skipped Silence";
-                    indicator.classList.add('show', 'info');
-                    setTimeout(() => indicator.classList.remove('show'), 1500);
-                }
+                window.unifiedCore.showMessage(`⏭️ ${segmentToSkip.category}`, 'info');
             }
         }
 
     } catch (error) {
-        // Silencioso para no saturar consola
+        // Silencioso para no saturar
     }
-}function monitorPlayers() {
-    // Validaciones básicas
+}
+
+function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
     try {
@@ -2404,81 +2421,50 @@ function checkAndSkipSegment(player) {
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        // Solo monitorear cuando está reproduciendo
         if (playerState !== YT.PlayerState.PLAYING) return;
         if (isNaN(currentTime) || currentTime < 0 || videoDuration <= 0) return;
         if (!videoId) return;
 
-        // =============================================
-        // CALCULAR DURACIÓN TOTAL DE SPONSORBLOCK
-        // =============================================
-        let totalSponsorBlockDuration = 0;
-        
-        if (segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
-            totalSponsorBlockDuration = segmentosCache[videoId]
-                .filter(s => s.category === 'music_offtopic')
-                .reduce((sum, s) => {
-                    const start = s.segment?.[0] ?? s.startTime;
-                    const end = s.segment?.[1] ?? s.endTime;
-                    if (typeof start === 'number' && typeof end === 'number') {
-                        return sum + (end - start);
-                    }
-                    return sum;
-                }, 0);
-        }
-
-        // =============================================
-        // CALCULAR PUNTO DE TRIGGER
-        // =============================================
-        const API_BUFFER = 1;
-        const SAFETY_MARGIN = 0.5;
-        const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
-        const triggerTime = videoDuration - (totalAdjustment + totalSponsorBlockDuration);
+        // ✅ CORRECCIÓN: Cálculo simplificado y preciso
+        const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; // 10s + 2s de margen
         const timeRemaining = videoDuration - currentTime;
 
-        // =============================================
-        // SPONSORBLOCK: Saltar segmentos durante reproducción
-        // =============================================
-        if (currentTime > 0) {
+        // SponsorBlock
+        if (currentTime > 0.5) {
             checkAndSkipSegment(activePlayer);
         }
 
-        // =============================================
-        // ⚠️ CRITICAL: DISPARAR CROSSFADE
-        // =============================================
-        if (currentTime >= triggerTime && 
+        // ✅ DISPARAR CROSSFADE cuando queden exactamente X segundos
+        if (timeRemaining <= TRIGGER_OFFSET && 
+            timeRemaining > (TRIGGER_OFFSET - 0.5) && // Ventana de 0.5s para evitar múltiples llamadas
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
             !crossfadeInProgress &&
             !nextVideoScheduled) { 
             
-            console.log(`🎨 ¡CROSSFADE TRIGGER!`, {
-                currentTime: Math.round(currentTime * 10) / 10,
-                triggerTime: Math.round(triggerTime * 10) / 10,
-                timeRemaining: Math.round(timeRemaining * 10) / 10,
-                videoDuration: Math.round(videoDuration)
+            console.log(`🎨 ¡CROSSFADE INICIADO!`, {
+                currentTime: currentTime.toFixed(2),
+                videoDuration: videoDuration.toFixed(2),
+                timeRemaining: timeRemaining.toFixed(2),
+                triggerOffset: TRIGGER_OFFSET
             });
             
-            // ✅ MARCAR FLAGS INMEDIATAMENTE
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             
-            // ✅ PAUSAR MONITOREO DURANTE CROSSFADE
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
         
-            // ✅ OBTENER ELEMENTOS DEL DOM
             const prevPlayerNum = currentPlayer;
             const nextPlayerNum = currentPlayer === 1 ? 2 : 1;
             
             const prevElement = document.getElementById(`player${prevPlayerNum}`);
             const nextElement = document.getElementById(`player${nextPlayerNum}`);
             
-            // ✅ APLICAR EFECTOS VISUALES INMEDIATAMENTE
             if (prevElement) {
-                console.log(`🎨 Aplicando fade-out a player${prevPlayerNum}`);
+                console.log(`🎨 Fade-out: player${prevPlayerNum}`);
                 prevElement.classList.remove('fade-in', 'hidden');
                 prevElement.classList.add('fade-out');
                 prevElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
@@ -2487,20 +2473,18 @@ function checkAndSkipSegment(player) {
             }
             
             if (nextElement) {
-                console.log(`🎨 Preparando fade-in para player${nextPlayerNum}`);
+                console.log(`🎨 Preparando: player${nextPlayerNum}`);
                 nextElement.classList.remove('hidden', 'fade-out');
                 nextElement.classList.add('fade-in');
                 nextElement.style.display = 'block';
                 nextElement.style.transition = `opacity ${CROSSFADE_DURATION}s ease-in-out`;
-                nextElement.style.opacity = '0'; // Empieza invisible
+                nextElement.style.opacity = '0';
                 nextElement.style.zIndex = '2';
             }
             
-            // ✅ DISPARAR EVENTO PARA MIX-EFFECTS.JS
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
                 detail: {
                     currentTime,
-                    triggerTime,
                     timeRemaining,
                     videoDuration,
                     prevPlayer: prevPlayerNum,
@@ -2508,7 +2492,6 @@ function checkAndSkipSegment(player) {
                 }
             }));
             
-            // ✅ EJECUTAR CAMBIO DE AUDIO (playNextVideo)
             setTimeout(() => {
                 if (window.unifiedCore?.playNextVideo) {
                     window.unifiedCore.playNextVideo();
