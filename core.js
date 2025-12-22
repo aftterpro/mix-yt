@@ -391,23 +391,42 @@ onPlayerStateChange(event) {
     const player = event.target;
     const state = event.data;
     
-    // ✅ CORRECCIÓN: Saltar segmentos INMEDIATAMENTE al cargar
+    // 1. GESTIÓN DE SPONSORBLOCK (Intros/Segmentos)
+    // Intentar saltar inmediatamente si está cargando o listo
     if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.CUED) {
         const videoData = player.getVideoData();
         if (videoData?.video_id) {
-            // Intentar saltar intro/outro inmediatamente
             checkAndSkipSegment(player);
         }
     }
     
-    if (state === YT.PlayerState.ENDED) {
-        console.log('📻 Video terminado, reproduciendo siguiente...');
-        this.playNextVideo();
-    } else if (state === YT.PlayerState.PLAYING) {
-        hasOutroCrossfadeStarted = false;
+    // 2. LOGICA DE REPRODUCCIÓN (PLAYING)
+    if (state === YT.PlayerState.PLAYING) {
+        
+        // === A. SINCRONIZACIÓN GAPLESS (La magia del crossfade) ===
+        // Si había una transición pendiente esperando a que este player cargara...
+        if (this.pendingCrossfade && this.pendingCrossfade.active) {
+            
+            // Verificamos si este es el reproductor que estábamos esperando
+            const isNextPlayer = (player === this.pendingCrossfade.next);
+
+            if (isNextPlayer) {
+                console.log('🚀 Buffer terminado: INICIANDO CROSSFADE DE AUDIO AHORA');
+                
+                // Iniciamos la mezcla de volumen solo ahora que hay audio real
+                this.startCrossfade(this.pendingCrossfade.prev, this.pendingCrossfade.next);
+                
+                // Limpiamos la bandera para no repetir
+                this.pendingCrossfade.active = false;
+            }
+        }
+
+        // === B. ACTUALIZACIÓN DE ESTADO ===
+        hasOutroCrossfadeStarted = false; // Resetear bandera de salida
         
         const videoData = player.getVideoData();
         if (videoData?.video_id) {
+            // Sincronizar índice en la lista plana
             const flatList = this.getFlattenedPlaylist();
             const index = flatList.findIndex(v => v.videoId === videoData.video_id);
             
@@ -415,18 +434,19 @@ onPlayerStateChange(event) {
                 window.currentPlayingInfo.flattenedIndex = index;
                 window.currentPlayingInfo.videoId = videoData.video_id;
                 this.state.currentPlayingInfo = window.currentPlayingInfo;
-                console.log(`✅ Índice sincronizado: ${index} (${videoData.video_id})`);
+                // console.log(`✅ Índice sincronizado: ${index} (${videoData.video_id})`);
             }
             
-            // ✅ SALTAR INTRO AL INICIO
+            // Re-verificar SponsorBlock por si acaso (ej. intros muy cortas)
             setTimeout(() => checkAndSkipSegment(player), 500);
         }
         
-        this.updateCurrentPlayingIndex();
-        this.updateNowPlaying();
+        this.updateCurrentPlayingIndex(); // Marcar canción actual
+        this.updateNowPlaying();        // Actualizar textos/títulos
         
         if (window.playlistManager) {
-            this.updatePersistentQueue(); 
+            this.updatePersistentQueue(); // Actualizar scroll de la cola
+            
             if (window.playlistManager.syncQueueIndicator) {
                 window.playlistManager.syncQueueIndicator();
             }
@@ -434,7 +454,14 @@ onPlayerStateChange(event) {
                 window.playlistManager.refreshActiveQueueTab();
             }
         }
+        
+        // Guardar estado
         setTimeout(() => saveAllData(), 1000);
+    }
+    
+    if (state === YT.PlayerState.ENDED) {
+        console.log('📻 Video terminado, solicitando siguiente...');
+        this.playNextVideo();
     }
 }
 
@@ -1417,52 +1444,54 @@ async playNextVideo() {
     
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) return;
-    
-    console.log('🔊 Iniciando Crossfade de AUDIO...');
     crossfadeInProgress = true;
 
-    try {
-        nextPlayer.playVideo();
-    } catch (e) {}
+    // Asegurar que ambos están corriendo
+    try { nextPlayer.playVideo(); } catch(e){}
 
-    const steps = 40; // Menos pasos para mejor rendimiento
-    const stepTime = (CROSSFADE_DURATION * 1000) / steps;
+    const steps = 50;
+    // Duración del crossfade (asegúrate de que CROSSFADE_DURATION sea al menos 5 o 10 en config)
+    const stepTime = (CROSSFADE_DURATION * 1000) / steps; 
     let step = 0;
+
+    console.log(`🎚️ Mezclando audio... (${CROSSFADE_DURATION}s)`);
 
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
         
-        // Curva logarítmica para audio más suave (Equal Power Crossfade)
-        const gainNext = Math.sin(progress * (Math.PI / 2));
-        const gainPrev = Math.cos(progress * (Math.PI / 2));
+        // Curva suave (Equal Power) para que no suene bajo en el medio
+        const gainNext = Math.sin(progress * (Math.PI / 2)); // Sube rápido al final
+        const gainPrev = Math.cos(progress * (Math.PI / 2)); // Baja lento al principio
 
         try {
-            prevPlayer.setVolume(Math.round(100 * gainPrev));
-            nextPlayer.setVolume(Math.round(100 * gainNext));
+            if(prevPlayer && typeof prevPlayer.setVolume === 'function') 
+                prevPlayer.setVolume(Math.round(100 * gainPrev));
+            
+            if(nextPlayer && typeof nextPlayer.setVolume === 'function') 
+                nextPlayer.setVolume(Math.round(100 * gainNext));
         } catch (e) {}
 
         if (step >= steps) {
             clearInterval(crossfadeInterval);
             crossfadeInterval = null;
             crossfadeInProgress = false;
-            
+
             // Limpieza final
             try {
-                prevPlayer.stopVideo();
-                // Restaurar volumen para la próxima vez que se use este player
-                prevPlayer.setVolume(100); 
+                if(prevPlayer) {
+                    prevPlayer.stopVideo(); // Detener el anterior para ahorrar recursos
+                    prevPlayer.setVolume(100); // Resetear volumen para la próxima
+                }
             } catch (e) {}
 
-            // Reiniciar banderas
+            document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
+            
+            // Reiniciar banderas de monitoreo
             hasOutroCrossfadeStarted = false;
             nextVideoScheduled = false;
             isTransitioning = false;
-            
-            // Reactivar monitor
-            if (!monitorInterval && window.unifiedCore) {
-                window.unifiedCore.startMonitoring();
-            }
+            if (!monitorInterval) this.startMonitoring();
         }
     }, stepTime);
 }
