@@ -953,13 +953,12 @@ body {
 }
 
 .video-wrapper {
-    flex: 1;
+    flex: 1; /* Cambiar de height: 200px a flex: 1 */
     position: relative;
     background: #000;
     border-radius: 12px;
     overflow: hidden;
-    height: 200px;
-    width: 600px;
+    /* QUITAR: height: 200px; width: 600px; */
 }
 /* =============================================
    EFECTOS DE CROSSFADE
@@ -2982,8 +2981,7 @@ color: #FFFFFF !important;
     transform: scale(1.1);
     background-color: rgba(255, 255, 255, 0.2); /* Ajusta según tu tema */
 }
-#videoWrapper,
-.video-wrapper {
+#videoWrapper{
     position: relative !important; /* Crucial para contener los iframes absolutos */
     width: 100% !important;
     height: 100% !important;
