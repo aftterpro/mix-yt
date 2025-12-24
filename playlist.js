@@ -1711,40 +1711,37 @@ updatePlaylistsUI() {
     this.core?.updateOverviewStats?.();
 }
     
-   updateQueueUI() {
-        console.log('🔄 Actualizando interfaz de cola...');
-        
-        // 1. Obtener datos actualizados
-        const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-        const videos = queuePlaylist ? queuePlaylist.videos : [];
-        
-        // 2. Actualizar contadores globales
-        if (this.core && this.core.updateQueueCount) {
-            this.core.updateQueueCount(videos.length);
-        }
+updateQueueUI() {
+    console.log('🔄 Actualizando interfaz de cola...');
+    
+    // 1. Obtener datos actualizados
+    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    const videos = queuePlaylist ? queuePlaylist.videos : [];
+    
+    // 2. Actualizar contadores globales
+    if (this.core && this.core.updateQueueCount) {
+        this.core.updateQueueCount(videos.length);
+    }
 
-        // Aseguramos que si existía, se borre siempre
-        const existingBtn = document.querySelector('.play-queue-btn');
-        if (existingBtn) existingBtn.remove();
-        
-        // 4. Si existe un contenedor de lista de cola en el DOM, actualizarlo
-        const queueListContainer = document.getElementById('queueContentList');
-        if (queueListContainer) {
-            if (videos.length === 0) {
-                queueListContainer.innerHTML = `
-                    <div class="empty-queue-placeholder">
-                        <p>La cola está vacía</p>
-                    </div>`;
-            } else {
-                if (this.core && this.core.updatePersistentQueue) {
-                    this.core.updatePersistentQueue();
-                } else {
-                    queueListContainer.innerHTML = this.renderQueueContent(videos);
-                    this.setupQueueItemListeners();
-                }
-            }
+    // Aseguramos que si existía, se borre siempre
+    const existingBtn = document.querySelector('.play-queue-btn');
+    if (existingBtn) existingBtn.remove();
+    
+    // 4. Si existe un contenedor de lista de cola en el DOM, actualizarlo
+    const queueListContainer = document.getElementById('queueContentList');
+    if (queueListContainer) {
+        if (videos.length === 0) {
+            queueListContainer.innerHTML = `
+                <div class="empty-queue-placeholder">
+                    <p>La cola está vacía</p>
+                </div>`;
+        } else {
+            // ✅ CORRECCIÓN: Renderizar directamente sin llamar a core
+            queueListContainer.innerHTML = this.renderQueueContent(videos);
+            this.setupQueueItemListeners();
         }
     }
+}
     /**
      * Limpiar toda la cola
      */
