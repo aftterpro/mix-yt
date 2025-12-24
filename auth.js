@@ -446,102 +446,78 @@ function showError(message) {
 // =============================================
 // ACCESO A DATOS DE YOUTUBE
 // =============================================
-
 async function getYouTubeLibraryPlaylistItems(playlistId) {
-    if (!isAuthorized) {
-        console.error('❌ Debe iniciar sesión para cargar la biblioteca.');
-        return [];
-    }
+    if (!isAuthorized) return [];
 
-    const videos = [];
+    let videos = [];
     let nextPageToken = null;
-    let pageCount = 0;
-
-    console.log(`📡 Iniciando carga de playlist: ${playlistId}`);
 
     try {
-do {
+        do {
+            // 1. Obtener lista básica (1 unidad)
             const response = await gapi.client.youtube.playlistItems.list({
                 playlistId: playlistId,
-                part: 'snippet,contentDetails',
+                part: 'snippet,contentDetails', // contentDetails aquí solo da el ID, no la duración
                 maxResults: 50,
                 pageToken: nextPageToken
             });
 
             const items = response.result.items;
+            const videoIds = [];
+            
+            // Recolectar IDs válidos
             items.forEach(item => {
-                //  VALIDACIÓN ROBUSTA
-                const videoId = item.snippet?.resourceId?.videoId;
-                const title = item.snippet?.title || 'Título Desconocido';
+                const vidId = item.snippet?.resourceId?.videoId;
+                if (vidId) videoIds.push(vidId);
+            });
+
+            // 2. Obtener duraciones reales (1 unidad extra por cada 50 videos - ¡Muy barato!)
+            let durationsMap = {};
+            if (videoIds.length > 0) {
+                const videosResponse = await gapi.client.youtube.videos.list({
+                    part: 'contentDetails',
+                    id: videoIds.join(',')
+                });
                 
-                // Validar que el video no esté eliminado o privado
-                const isDeleted = title.toLowerCase().includes('deleted video') || 
-                                 title.toLowerCase().includes('[deleted video]') ||
-                                 title === 'Deleted video' ||
-                                 title === 'Private video';
-                
-                if (videoId && !isDeleted) {
-                    //  OBTENER THUMBNAIL CON FALLBACKS
-                    let thumbnail = './electronic.ico'; // Fallback por defecto
-                    
-                    if (item.snippet?.thumbnails) {
-                        const thumbs = item.snippet.thumbnails;
-                        thumbnail = thumbs.high?.url || 
-                                   thumbs.medium?.url || 
-                                   thumbs.default?.url || 
-                                   thumbs.standard?.url || 
-                                   thumbs.maxres?.url || 
-                                   './electronic.ico';
-                    }
-                    
-                   // ✅ EXTRAER ARTISTA DEL TÍTULO
-let artist = 'YouTube';
-let cleanTitle = title;
+                videosResponse.result.items.forEach(v => {
+                    durationsMap[v.id] = parseDuration(v.contentDetails.duration);
+                });
+            }
 
-// Intentar separar "Artista - Título"
-const separatorMatch = title.match(/^(.+?)\s*[-–—:]\s*(.+?)$/);
-if (separatorMatch && separatorMatch[1] && separatorMatch[2]) {
-    artist = separatorMatch[1].trim();
-    cleanTitle = separatorMatch[2].trim();
-} else if (item.snippet?.videoOwnerChannelTitle) {
-    artist = item.snippet.videoOwnerChannelTitle;
-}
-
-// Limpiar patrones comunes del título
-cleanTitle = cleanTitle
-    .replace(/\(official.*?video\)/gi, '')
-    .replace(/\(lyric.*?video\)/gi, '')
-    .replace(/\(audio\)/gi, '')
-    .replace(/\[.*?\]/g, '')
-    .trim();
-
-videos.push({
-    videoId: videoId,
-    title: cleanTitle,
-    artist: artist,
-    uploaderName: artist,
-    author: artist,
-    thumbnail: thumbnail,
-    source: 'youtube_library',
-    playlistId: playlistId,
-    dateAdded: Date.now()
-});
-                } else if (videoId) {
-                    console.warn(`⚠️ Video eliminado detectado: "${title}" (${videoId})`);
+            // 3. Unir datos
+            items.forEach(item => {
+                const vidId = item.snippet?.resourceId?.videoId;
+                if (vidId && durationsMap[vidId]) {
+                    videos.push({
+                        videoId: vidId,
+                        title: item.snippet.title,
+                        thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
+                        duration: durationsMap[vidId], // ¡Aquí tendrás la duración real!
+                        artist: item.snippet.videoOwnerChannelTitle,
+                        source: 'youtube_library',
+                        playlistId: playlistId
+                    });
                 }
             });
 
             nextPageToken = response.result.nextPageToken;
-            pageCount++;
-        } while (nextPageToken && pageCount < 5);
+        } while (nextPageToken);
 
-        console.log(`✅ Carga de playlist ${playlistId} completa. Total videos: ${videos.length}`);
         return videos;
-
     } catch (error) {
-        console.error(`❌ Error al cargar la playlist ${playlistId}:`, error);
+        console.error("Error cargando playlist:", error);
         return [];
     }
+}
+
+// Función auxiliar para convertir ISO 8601 (PT3M20S) a segundos
+function parseDuration(duration) {
+    const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+    if (!match) return 0;
+    const hours = (parseInt(match[1]) || 0);
+    const minutes = (parseInt(match[2]) || 0);
+    const seconds = (parseInt(match[3]) || 0);
+    return (hours * 3600) + (minutes * 60) + seconds;
 }
 
 window.loadUserPlaylists = async function() {
