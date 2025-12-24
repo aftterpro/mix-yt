@@ -1324,130 +1324,90 @@ async performSearch(query, continuation = null) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
-    // Si es una búsqueda nueva, limpiar y resetear
+    // Si es búsqueda nueva
     if (!continuation) {
         currentSearchQuery = query;
         nextPageContext = null;
-        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando música...</div>';
+        searchResults.innerHTML = '<div class="search-loading">🔍 Buscando...</div>';
         
-        // Desconectar observador anterior si existe
+        // Desconectar observador anterior
         if (this.searchScrollObserver) {
             this.searchScrollObserver.disconnect();
             this.searchScrollObserver = null;
         }
-    } else {
-        // Si es paginación, mostrar loading pequeño al final
-        const loadingMore = document.createElement('div');
-        loadingMore.className = 'search-loading-more';
-        loadingMore.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
-        searchResults.appendChild(loadingMore);
     }
 
     isLoadingMore = true;
 
     try {
-        // USAR DIRECTAMENTE EL CLIENTE DE PIPED
         const data = await window.youtubeJSClient.search(query, continuation);
         
-        // ✅ CRÍTICO: Guardar el token para la siguiente página (usamos data.nextpage)
-        if (data.nextpage) {
-            nextPageContext = data.nextpage;
-        } else {
-            nextPageContext = null;
-        }
+        // ✅ GUARDAR TOKEN PARA SIGUIENTE PÁGINA
+        nextPageContext = data.nextpage || null;
+        console.log('📄 Próxima página:', nextPageContext ? 'Disponible' : 'No hay más');
 
         this.displaySearchResults(data, !!continuation);
+        
+        // ✅ CONFIGURAR SCROLL INFINITO SOLO SI HAY MÁS PÁGINAS
+        if (nextPageContext) {
+            requestAnimationFrame(() => {
+                this.setupInfiniteScroll(searchResults);
+            });
+        }
+        
     } catch (error) {
         console.error("❌ Error en búsqueda:", error);
-        if (!continuation) {
-            searchResults.innerHTML = `
-                <div class="search-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error en búsqueda: ${error.message}</p>
-                </div>
-            `;
-        } else {
-            const loadingMore = searchResults.querySelector('.search-loading-more');
-            if(loadingMore) loadingMore.remove();
-            this.showMessage('Error cargando más resultados', 'error');
-        }
+        searchResults.innerHTML = `
+            <div class="search-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Error: ${error.message}</p>
+            </div>
+        `;
     } finally {
         isLoadingMore = false;
     }
 }
-
-// Nueva función para configurar el observador de scroll infinito
 setupInfiniteScroll(container) {
-    const scrollableElement = document.getElementById('searchResults');
-
-    // Crear un elemento centinela al final
-    let sentinel = document.getElementById('search-sentinel');
-    if (!sentinel) {
-        sentinel = document.createElement('div');
-        sentinel.id = 'search-sentinel';
-        sentinel.style.height = '20px';
-        sentinel.style.width = '100%';
-        sentinel.style.marginBottom = '20px';
-        sentinel.innerHTML = '<p style="text-align:center; color:#888;">Cargando más...</p>';
-    }
-
-    // Asegurarse de que el centinela esté al final
+    console.log('📜 Configurando scroll infinito...');
+    
+    // Limpiar sentinel anterior
+    const oldSentinel = document.getElementById('search-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+    
+    // Crear sentinel
+    const sentinel = document.createElement('div');
+    sentinel.id = 'search-sentinel';
+    sentinel.style.cssText = 'height: 50px; width: 100%; pointer-events: none;';
     container.appendChild(sentinel);
 
+    // Desconectar observador anterior
     if (this.searchScrollObserver) {
         this.searchScrollObserver.disconnect();
     }
 
     // Crear nuevo observador
     this.searchScrollObserver = new IntersectionObserver((entries) => {
-        // Si el centinela es visible, no estamos cargando ya, y hay página siguiente
-        if (entries[0].isIntersecting && !isLoadingMore && nextPageContext) {
-            console.log('📜 Scroll infinito disparado, cargando más resultados...');
-            sentinel.remove(); 
+        const entry = entries[0];
+        
+        if (entry.isIntersecting && !isLoadingMore && nextPageContext) {
+            console.log('📜 Sentinel visible, cargando más...');
             this.performSearch(currentSearchQuery, nextPageContext);
         }
     }, {
-        root: scrollableElement, 
-        rootMargin: '100px', 
+        root: null, // viewport
+        rootMargin: '200px', // Cargar antes de llegar al final
         threshold: 0.1
     });
 
     this.searchScrollObserver.observe(sentinel);
+    console.log('✅ Observador configurado');
 }
 // Renderizar resultados de búsqueda
 displaySearchResults(videos, isContinuation = false) {
     this.ui.renderSearchResults(videos, isContinuation);
 }
 
-    // Nueva función para configurar el observador de scroll infinito
-    setupInfiniteScroll(container) {
-        // Crear un elemento centinela al final
-        const sentinel = document.createElement('div');
-        sentinel.id = 'search-sentinel';
-        sentinel.style.height = '20px';
-        sentinel.style.width = '100%';
-        container.appendChild(sentinel);
-
-        // Desconectar observador previo si existe
-        if (this.searchScrollObserver) {
-            this.searchScrollObserver.disconnect();
-        }
-
-        // Crear nuevo observador
-        this.searchScrollObserver = new IntersectionObserver((entries) => {
-            // Si el centinela es visible, no estamos cargando ya, y hay página siguiente
-            if (entries[0].isIntersecting && !isLoadingMore && nextPageContext) {
-                console.log('📜 Scroll infinito disparado, cargando más resultados...');
-                this.performSearch(currentSearchQuery, nextPageContext);
-            }
-        }, {
-            root: null, // viewport
-            rootMargin: '100px', // Cargar antes de llegar al final exacto
-            threshold: 0.1
-        });
-
-        this.searchScrollObserver.observe(sentinel);
-    }
+    
 
     parseDurationToSeconds(durationStr) {
         if (!durationStr) return 0;
