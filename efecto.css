@@ -21,7 +21,22 @@
   /* IMPORTANTE: Transición suave por defecto */
   opacity: 0;
   transition: opacity 1s ease-in-out, transform 1s ease-in-out, filter 1s ease-in-out;
+  will-change: opacity, transform; /* Ayuda al navegador a preparar la GPU */
+  backface-visibility: hidden; /* Evita parpadeos en algunas GPUs */
 }
+/* Optimizar el pulse */
+@keyframes subtlePulse {
+  0% {
+    /* En lugar de animar box-shadow (pesado), usa transform: scale sutilmente o solo opacity */
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(1.005); /* Muy sutil */
+    filter: brightness(1.1);
+  }
+}
+
 /* Solo aplicar transición larga de opacidad si NO estamos en medio de un crossfade JS manual */
 /* Esto permite que CSS maneje efectos visuales sutiles pero no bloquee el crossfade */
 .video-player:not([style*="transition: none"]) {
@@ -37,23 +52,6 @@ opacity: 1 !important;
   visibility: visible !important;
   /* Aquí puedes poner tus filtros de brillo/saturación */
   filter: blur(0px) brightness(1);
-}
-
-@keyframes subtlePulse {
-  0% {
-    box-shadow: 
-      0 16px 64px rgba(255, 107, 53, 0.3),
-      0 8px 32px rgba(255, 107, 53, 0.2),
-      0 0 40px rgba(255, 107, 53, 0.15);
-    filter: blur(0px) brightness(1.1) saturate(1.2);
-  }
-  100% {
-    box-shadow: 
-      0 20px 80px rgba(255, 107, 53, 0.4),
-      0 12px 48px rgba(255, 107, 53, 0.3),
-      0 0 60px rgba(255, 107, 53, 0.2);
-    filter: blur(0px) brightness(1.15) saturate(1.25);
-  }
 }
 
 /* =============================================
