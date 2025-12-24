@@ -1083,54 +1083,46 @@ switchView(viewName) {
         }
     }
 }
+
 movePlayersToFullView() {
+    console.log('🎬 Expandiendo a vista completa (Efecto Visual)...');
+    
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    if (!persistentLayer) return;
+    
+    // 1. Asegurar que la capa persistente sea visible
+    persistentLayer.style.display = 'block';
+    persistentLayer.style.opacity = '1';
+    persistentLayer.style.zIndex = '50'; // Z-Index alto
+
+    // 2. Obtener dimensiones destino
     const fullPlayerView = document.getElementById('fullPlayerView');
-    if (!fullPlayerView) return;
+    const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
     
-    // Intentar encontrar el wrapper por clase o ID
-    const videoWrapper = fullPlayerView.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
-    if (!videoWrapper) {
-        console.error("No se encontró el contenedor .video-wrapper en fullPlayerView");
-        return;
-    }
-
-    // Asegurar que el contenedor tenga posición relativa
-    if (window.getComputedStyle(videoWrapper).position === 'static') {
-         videoWrapper.style.position = 'relative';
-    }
+    if (!videoWrapper) return;
     
-    const player1El = document.getElementById('player1');
-    const player2El = document.getElementById('player2');
+    const wrapperRect = videoWrapper.getBoundingClientRect();
     
-    if (player1El && !videoWrapper.contains(player1El)) videoWrapper.appendChild(player1El);
-    if (player2El && !videoWrapper.contains(player2El)) videoWrapper.appendChild(player2El);
+    // 3. Aplicar efecto de transición (mover capa visualmente)
+    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    persistentLayer.style.top = `${wrapperRect.top}px`;
+    persistentLayer.style.left = `${wrapperRect.left}px`;
+    persistentLayer.style.width = `${wrapperRect.width}px`;
+    persistentLayer.style.height = `${wrapperRect.height}px`;
+    persistentLayer.style.borderRadius = '0px'; // En full screen sin bordes
     
+    // 4. FIX PANTALLA NEGRA: Forzar opacidad del reproductor interno
     const activePlayerNum = window.currentPlayer || 1;
+    const activePlayerId = `player${activePlayerNum}`;
+    const activePlayer = document.getElementById(activePlayerId);
+    
+    if (activePlayer) {
+        activePlayer.style.opacity = '1';
+        activePlayer.style.display = 'block';
+        activePlayer.style.visibility = 'visible';
+    }
 
-    [player1El, player2El].forEach((player, index) => {
-        if (player) {
-            // Aplicar estilos críticos inline para forzar que se quede dentro
-            player.style.position = 'absolute';
-            player.style.top = '0';
-            player.style.left = '0';
-            player.style.width = '100%';
-            player.style.height = '100%';
-            player.style.objectFit = 'cover';
-            
-            const isPlayer1 = index === 0;
-            const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
-
-            if (isActive) {
-                player.style.display = 'block';
-                player.style.visibility = 'visible';
-                player.style.opacity = '1';
-                player.style.zIndex = '10';
-            } else {
-                 player.style.display = 'none';
-                 player.style.zIndex = '0';
-            }
-        }
-    });
+    document.body.classList.remove('mini-player-active');
 }
 
     forceBottomPlayerVisible() {
