@@ -188,15 +188,25 @@ class PlaylistManager {
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue llamado:', videoData);
     
-    // 1. VALIDACIÓN
-    if (!videoData || !videoData.videoId) {
+    // ✅ VALIDACIÓN MEJORADA
+    if (!videoData || 
+        !videoData.videoId || 
+        videoData.videoId === 'undefined' || 
+        videoData.videoId === undefined ||
+        typeof videoData.videoId !== 'string' ||
+        videoData.videoId.trim() === '') {
         console.error('❌ videoData inválido:', videoData);
         if (this.core) this.core.showMessage('Error: Video inválido', 'error');
         return;
     }
 
+    // ✅ VALIDACIÓN ADICIONAL: Título debe existir
+    if (!videoData.title || videoData.title.trim() === '') {
+        console.warn('⚠️ Video sin título, usando fallback');
+        videoData.title = 'Video sin título';
+    }
+
     // 2. SINCRONIZACIÓN CRÍTICA CON CORE
-    // Aseguramos que estamos editando la misma memoria que usa el reproductor
     if (this.core && this.core.playlistsData) {
         this.playlistsData = this.core.playlistsData;
     }
@@ -215,16 +225,15 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
             isQueue: true
         };
         this.playlistsData.unshift(queue);
-        // Sincronizar de vuelta al core por si acaso
         if (this.core) this.core.playlistsData = this.playlistsData;
     }
 
     // 4. NORMALIZAR DATOS
     const videoToAdd = {
-        videoId: videoData.videoId,
-        title: videoData.title || 'Sin título',
+        videoId: videoData.videoId.trim(),
+        title: videoData.title.trim(),
         thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
-        duration: videoData.duration || 0,
+        duration: parseInt(videoData.duration) || 0,
         uploaderName: videoData.uploaderName || videoData.artist || 'Desconocido',
         artist: videoData.artist || videoData.uploaderName || 'Desconocido',
         sourcePlaylistId: 'queue'
@@ -241,7 +250,6 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     if (fromPlaylist) {
         queue.videos.push(videoToAdd);
     } else {
-        // Lógica "Play Next" inteligente
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
@@ -256,12 +264,6 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     if (this.core) {
         this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
         
-        // IMPORTANTE: Actualizar la cola persistente visual en Core
-        if (typeof this.core.updatePersistentQueue === 'function') {
-            this.core.updatePersistentQueue();
-        }
-        
-        // IMPORTANTE: Habilitar los botones de play (esto arregla que se queden grises)
         if (typeof this.core.enablePlayButton === 'function') {
             this.core.enablePlayButton(); 
         }
@@ -858,15 +860,31 @@ refreshActiveQueueTab() {
 
     const tabName = activeTab.dataset.tab;
     
-    // ✅ CORRECCIÓN CRÍTICA: Obtener el video DIRECTAMENTE del player en ejecución
+    // 1. Detener sincronización de letras si salimos
+    if (tabName !== 'lyrics') {
+        if (this.lyricsSyncInterval) {
+            clearInterval(this.lyricsSyncInterval);
+            this.lyricsSyncInterval = null;
+        }
+    }
+    
+    // 2. Actualizar UI de tabs
+    document.querySelectorAll('.queue-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    
+    document.querySelectorAll('.queue-list-content').forEach(content => {
+        content.classList.toggle('active', content.dataset.tabContent === tabName);
+    });
+    
+    // ✅ CORRECCIÓN: Obtener video del PLAYER directamente (sin find recursivo)
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
-        console.warn('⚠️ Player no disponible para obtener video actual');
+        console.warn('⚠️ No hay reproductor activo');
         return;
     }
     
-    // ✅ Obtener videoId REAL del reproductor
     const videoData = activePlayer.getVideoData();
     const currentVideoId = videoData?.video_id;
     
@@ -875,12 +893,25 @@ refreshActiveQueueTab() {
         return;
     }
     
-    // ✅ Buscar el video en la cola por videoId (no por índice)
-    const flatList = this.core?.getFlattenedPlaylist() || [];
-    const currentVideo = flatList.find(v => v.videoId === currentVideoId);
+    // ✅ BÚSQUEDA DIRECTA Y SEGURA (sin llamar a getFlattenedPlaylist)
+    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+    
+    if (!queuePlaylist || !queuePlaylist.videos) {
+        console.warn('⚠️ Cola no encontrada');
+        return;
+    }
+    
+    // Búsqueda simple sin recursión
+    let currentVideo = null;
+    for (let i = 0; i < queuePlaylist.videos.length; i++) {
+        if (queuePlaylist.videos[i].videoId === currentVideoId) {
+            currentVideo = queuePlaylist.videos[i];
+            break;
+        }
+    }
     
     if (!currentVideo) {
-        console.warn(`⚠️ Video ${currentVideoId} no encontrado en la cola`);
+        console.warn(`⚠️ Video ${currentVideoId} no encontrado en cola`);
         return;
     }
     
@@ -888,7 +919,6 @@ refreshActiveQueueTab() {
     
     // Cargar contenido según el tab activo
     if (tabName === 'lyrics') {
-        // ✅ Pasar el video correcto explícitamente
         setTimeout(() => {
             this.loadLyricsForVideo(currentVideo);
         }, 100);
@@ -1737,7 +1767,46 @@ updateQueueUI() {
                 </div>`;
         } else {
             // ✅ CORRECCIÓN: Renderizar directamente sin llamar a core
-            queueListContainer.innerHTML = this.renderQueueContent(videos);
+            const fragment = document.createDocumentFragment();
+            
+            videos.forEach((video, index) => {
+                if (!video || !video.videoId) return;
+                
+                const duration = video.duration && video.duration > 0 
+                    ? this.formatDuration(video.duration) 
+                    : '--:--';
+                
+                const queueItem = document.createElement('div');
+                queueItem.className = 'queue-item';
+                queueItem.dataset.videoId = video.videoId;
+                queueItem.dataset.flatIndex = index;
+                
+                queueItem.innerHTML = `
+                    <div class="queue-item-number">${index + 1}</div>
+                    <div class="queue-item-thumbnail-wrapper">
+                        <img src="${video.thumbnail || './electronic.ico'}" 
+                             alt="${this.escapeHTML(video.title)}" 
+                             onerror="this.src='./electronic.ico';">
+                        <span class="queue-item-duration">${duration}</span>
+                    </div>
+                    <div class="queue-item-info">
+                        <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
+                        <div class="queue-item-meta">
+                            <span class="queue-item-author">${this.escapeHTML(video.uploaderName || 'Desconocido')}</span>
+                        </div>
+                    </div>
+                    <button class="queue-item-remove" 
+                            data-video-id="${video.videoId}" 
+                            title="Eliminar de la cola">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                fragment.appendChild(queueItem);
+            });
+            
+            queueListContainer.innerHTML = '';
+            queueListContainer.appendChild(fragment);
             this.setupQueueItemListeners();
         }
     }
@@ -2144,32 +2213,37 @@ setupQueueItemListeners() {
     
     console.log(`🎵 Configurando listeners para ${queueItems.length} items de cola`);
     
-    queueItems.forEach((item, index) => {
+    // ✅ CORRECCIÓN: LIMPIAR LISTENERS PREVIOS clonando nodos
+    queueItems.forEach((item) => {
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
+    });
+    
+    // Ahora configurar listeners en los nodos limpios
+    const freshItems = document.querySelectorAll('.queue-item');
+    
+    freshItems.forEach((item) => {
+        const itemIndex = parseInt(item.dataset.flatIndex);
+        const videoId = item.dataset.videoId;
+        
         // Click en el item para reproducir
         item.addEventListener('click', (e) => {
-            if (!e.target.closest('.queue-item-remove') && 
-                !e.target.closest('.queue-item-drag-handle')) {
-                
-                const itemIndex = parseInt(item.dataset.flatIndex);
-                const videoId = item.dataset.videoId;
-                
-                console.log(`🎵 Click en queue item: ${videoId} (índice ${itemIndex})`);
-                
-                if (!isNaN(itemIndex)) {
-                    // Validar que el índice sea correcto
-                    const flatList = this.core?.getFlattenedPlaylist() || [];
-                    if (itemIndex >= 0 && itemIndex < flatList.length) {
-                        console.log(`▶️ Saltando a: ${flatList[itemIndex].title}`);
-                        this.core?.playVideoAtIndex(itemIndex);
-                    } else {
-                        console.error(`❌ Índice fuera de rango: ${itemIndex}`);
-                    }
+            // Ignorar click en botón de eliminar
+            if (e.target.closest('.queue-item-remove')) {
+                return;
+            }
+            
+            if (!isNaN(itemIndex)) {
+                const flatList = this.core?.getFlattenedPlaylist() || [];
+                if (itemIndex >= 0 && itemIndex < flatList.length) {
+                    console.log(`▶️ Reproduciendo: ${flatList[itemIndex].title}`);
+                    this.core?.playVideoAtIndex(itemIndex);
                 }
             }
         });
     });
     
-    // Listeners para botones de eliminar
+    // Configurar botones de eliminar (también limpiados)
     const removeButtons = document.querySelectorAll('.queue-item-remove');
     removeButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
