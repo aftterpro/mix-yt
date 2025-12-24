@@ -140,12 +140,12 @@ function loadYouTubeAPI() {
     
     console.log('📺 Cargando YouTube IFrame API...');
     const script = document.createElement('script');
+
     script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    
-    // ✅ CORRECCIÓN: Agregar atributos para evitar error de postMessage
     script.setAttribute('data-origin', window.location.origin);
-    
+
+    script.async = true;
+        
     script.onerror = () => {
         console.error('❌ Error cargando YouTube IFrame API');
         showInitError('Error cargando YouTube API');
