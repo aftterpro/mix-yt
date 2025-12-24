@@ -188,76 +188,89 @@ class PlaylistManager {
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue llamado:', videoData);
     
-    // 1. VALIDACIÓN DE DATOS
+    // 1. VALIDACIÓN
     if (!videoData || !videoData.videoId) {
         console.error('❌ videoData inválido:', videoData);
         if (this.core) this.core.showMessage('Error: Video inválido', 'error');
         return;
     }
 
-    // 2. OBTENCIÓN DE LA COLA
-    const allPlaylists = this.playlistsData || window.unifiedCore?.playlistsData || [];
-    let queue = allPlaylists.find(p => p.id === 'queue' || p.isQueue);
-
-    if (!queue) {
-        console.error('❌ No se encuentra la cola');
-        if (this.core) this.core.showMessage('Error: Cola no disponible', 'error');
-        return;
+    // 2. SINCRONIZACIÓN CRÍTICA CON CORE
+    // Aseguramos que estamos editando la misma memoria que usa el reproductor
+    if (this.core && this.core.playlistsData) {
+        this.playlistsData = this.core.playlistsData;
     }
 
-    // 3. NORMALIZAR DATOS DEL VIDEO
+    // 3. OBTENCIÓN DE LA COLA
+    let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+
+    if (!queue) {
+        console.log('✨ Creando cola nueva...');
+        queue = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
+        };
+        this.playlistsData.unshift(queue);
+        // Sincronizar de vuelta al core por si acaso
+        if (this.core) this.core.playlistsData = this.playlistsData;
+    }
+
+    // 4. NORMALIZAR DATOS
     const videoToAdd = {
         videoId: videoData.videoId,
         title: videoData.title || 'Sin título',
         thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
         duration: videoData.duration || 0,
-        uploaderName: videoData.uploaderName || videoData.artist || videoData.author || 'YouTube',
-        artist: videoData.artist || videoData.uploaderName || videoData.author || 'YouTube',
-        author: videoData.author || videoData.uploaderName || 'YouTube',
+        uploaderName: videoData.uploaderName || videoData.artist || 'Desconocido',
+        artist: videoData.artist || videoData.uploaderName || 'Desconocido',
         sourcePlaylistId: 'queue'
     };
 
-    console.log('📦 Video normalizado:', videoToAdd);
-
-    // 4. VERIFICAR DUPLICADOS
+    // 5. VERIFICAR DUPLICADOS
     const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
     if (isDuplicate) {
         if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en la cola`, 'warning');
         return;
     }
 
-    // 5. AÑADIR A LA COLA
+    // 6. AÑADIR A LA COLA
     if (fromPlaylist) {
-        // Modo Playlist: Al final
         queue.videos.push(videoToAdd);
-        console.log('✅ Video añadido al final (playlist mode)');
     } else {
-        // Modo Manual: Después del actual
+        // Lógica "Play Next" inteligente
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-        if (currentIndex === -1 || currentIndex >= queue.videos.length) {
+        if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
-            console.log('✅ Video añadido al final (no hay reproducción)');
         } else {
             queue.videos.splice(currentIndex + 1, 0, videoToAdd);
-            console.log(`✅ Video insertado en posición ${currentIndex + 1}`);
         }
     }
 
-    // 6. ACTUALIZAR UI
+    // 7. ACTUALIZACIÓN VISUAL Y DE ESTADO
     this.updateQueueUI();
+    
     if (this.core) {
         this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
-        this.core.updatePersistentQueue();
+        
+        // IMPORTANTE: Actualizar la cola persistente visual en Core
+        if (typeof this.core.updatePersistentQueue === 'function') {
+            this.core.updatePersistentQueue();
+        }
+        
+        // IMPORTANTE: Habilitar los botones de play (esto arregla que se queden grises)
+        if (typeof this.core.enablePlayButton === 'function') {
+            this.core.enablePlayButton(); 
+        }
     }
 
-    // 7. GUARDAR
+    // 8. GUARDAR
     setTimeout(() => {
-        if (typeof window.saveAllData === 'function') {
-            window.saveAllData();
-        }
+        if (typeof window.saveAllData === 'function') window.saveAllData();
     }, 100);
-
-    console.log(`🎵 Cola actualizada: ${queue.videos.length} videos`);
 }
 // Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
