@@ -1450,52 +1450,79 @@ async playNextVideo() {
 }
     
 startCrossfade(prevPlayer, nextPlayer) {
-    if (crossfadeInProgress) return;
+    if (crossfadeInProgress) {
+        console.warn('⚠️ Crossfade ya en progreso, ignorando');
+        return;
+    }
+    
     crossfadeInProgress = true;
-
-    // Asegurar que ambos están corriendo
-    try { nextPlayer.playVideo(); } catch(e){}
+    try { 
+        if (nextPlayer && typeof nextPlayer.playVideo === 'function') {
+            nextPlayer.playVideo(); 
+        }
+    } catch(e) {
+        console.warn('⚠️ Error iniciando nextPlayer:', e);
+    }
 
     const steps = 50;
-    // Duración del crossfade (asegúrate de que CROSSFADE_DURATION sea al menos 5 o 10 en config)
     const stepTime = (CROSSFADE_DURATION * 1000) / steps; 
     let step = 0;
 
-    console.log(`🎚️ Mezclando audio... (${CROSSFADE_DURATION}s)`);
+    console.log(`🎚️ Mezclando audio... (${CROSSFADE_DURATION}s, ${steps} pasos)`);
 
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
         
-        // Curva suave (Equal Power) para que no suene bajo en el medio
-        const gainNext = Math.sin(progress * (Math.PI / 2)); // Sube rápido al final
-        const gainPrev = Math.cos(progress * (Math.PI / 2)); // Baja lento al principio
+        // Curva Equal Power para transición suave
+        const gainNext = Math.sin(progress * (Math.PI / 2));
+        const gainPrev = Math.cos(progress * (Math.PI / 2));
 
         try {
-            if(prevPlayer && typeof prevPlayer.setVolume === 'function') 
+            if (prevPlayer && typeof prevPlayer.setVolume === 'function') {
                 prevPlayer.setVolume(Math.round(100 * gainPrev));
+            }
             
-            if(nextPlayer && typeof nextPlayer.setVolume === 'function') 
+            if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
                 nextPlayer.setVolume(Math.round(100 * gainNext));
-        } catch (e) {}
-
-          if (step >= steps) {
-        clearInterval(crossfadeInterval);
-        crossfadeInterval = null;
-        crossfadeInProgress = false;
-
-        // ✅ ASEGURAR RESET DE BANDERAS
-        hasOutroCrossfadeStarted = false;
-        nextVideoScheduled = false;
-        isTransitioning = false;
-        
-        // ✅ REINICIAR MONITOR
-        if (!monitorInterval) {
-            window.unifiedCore?.startMonitoring();
+            }
+        } catch (e) {
+            console.warn('⚠️ Error ajustando volumen:', e);
         }
-        
-        document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
-    }
+
+        if (step >= steps) {
+            clearInterval(crossfadeInterval);
+            crossfadeInterval = null;
+            crossfadeInProgress = false;
+
+            // ✅ Limpieza final
+            try {
+                if (prevPlayer && typeof prevPlayer.stopVideo === 'function') {
+                    prevPlayer.stopVideo();
+                    prevPlayer.setVolume(100);
+                }
+                if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
+                    nextPlayer.setVolume(100);
+                }
+            } catch (e) {
+                console.warn('⚠️ Error en limpieza:', e);
+            }
+
+            // ✅ RESETEAR BANDERAS CRÍTICAS
+            hasOutroCrossfadeStarted = false;
+            nextVideoScheduled = false;
+            isTransitioning = false;
+            
+            console.log('✅ Crossfade completado, banderas reseteadas');
+            
+            document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
+            
+            // ✅ Reiniciar monitor si no está activo
+            if (!monitorInterval && window.unifiedCore) {
+                window.unifiedCore.startMonitoring();
+            }
+        }
+    }, stepTime);
 }
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
