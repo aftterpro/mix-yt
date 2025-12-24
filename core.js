@@ -598,7 +598,7 @@ updatePlayerPosition(targetContainerId) {
             position: fixed;
             z-index: 1000;
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            background: transparent; /* CORRECCIÓN: Fondo transparente en lugar de negro */
+            background: transparent;
             overflow: hidden;
             pointer-events: none;
         `;
@@ -624,39 +624,46 @@ updatePlayerPosition(targetContainerId) {
     // === CORRECCIÓN DE ALTURA ===
     let finalHeight = rect.height;
     
-    // Si es la vista completa y la altura es exagerada (bug de 737px), forzar corrección
+    // ✅ NUEVA LÓGICA: Si es full player y altura es sospechosa, usar altura calculada correcta
     if (targetContainerId === 'videoWrapper') {
+        // Para full player, usar aspect ratio 16:9 basado en el ancho
+        const calculatedHeight = rect.width * (9 / 16);
+        
+        // Si la altura detectada es exagerada (>500px o mayor al ancho), usar calculada
         if (finalHeight > 500 || finalHeight > rect.width) {
-            console.log(`🔧 Corrigiendo altura de video: ${finalHeight}px -> 400px`);
-            finalHeight = 400; // Forzar el tamaño solicitado
+            console.log(`🔧 Corrigiendo altura de video: ${finalHeight}px → ${calculatedHeight.toFixed(0)}px`);
+            finalHeight = calculatedHeight;
             
-            // Opcional: Forzar también el contenedor original para evitar huecos vacíos
-            targetContainer.style.height = '400px';
-            targetContainer.style.minHeight = '400px';
+            // ✅ FORZAR ALTURA EN EL CONTENEDOR ORIGINAL
+            targetContainer.style.height = `${calculatedHeight}px`;
+            targetContainer.style.minHeight = `${calculatedHeight}px`;
+            targetContainer.style.maxHeight = `${calculatedHeight}px`;
         }
     }
 
     playersLayer.style.top = `${rect.top}px`;
     playersLayer.style.left = `${rect.left}px`;
     playersLayer.style.width = `${rect.width}px`;
-    playersLayer.style.height = `${finalHeight}px`; // Usar altura corregida
+    playersLayer.style.height = `${finalHeight}px`;
     
     // === LÓGICA DE VISIBILIDAD SEGÚN CONTENEDOR ===
     if (targetContainerId === 'miniPlayerFloat' || targetContainerId === 'miniPlayerContainer') {
-         // En modo mini, ocultar esta capa para que no estorbe (el mini player tiene su propio contenedor)
-         playersLayer.style.opacity = '0';
-         playersLayer.style.pointerEvents = 'none';
+        // En modo mini, ocultar esta capa (el mini player tiene su propio contenedor)
+        playersLayer.style.opacity = '0';
+        playersLayer.style.pointerEvents = 'none';
     } else {
-         // En modo full, mostrar y permitir interacción
-         playersLayer.style.opacity = '1';
-         playersLayer.style.pointerEvents = 'auto';
-         
-         if (targetContainerId === 'videoWrapper') {
-             playersLayer.style.borderRadius = '0';
-         } else {
-             playersLayer.style.borderRadius = '12px';
-             playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
-         }
+        // En modo full, mostrar y permitir interacción
+        playersLayer.style.opacity = '1';
+        playersLayer.style.pointerEvents = 'auto';
+        playersLayer.style.background = 'transparent'; // ✅ TRANSPARENTE, no negro
+        
+        if (targetContainerId === 'videoWrapper') {
+            playersLayer.style.borderRadius = '12px'; // ✅ Bordes redondeados en full player
+            playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+        } else {
+            playersLayer.style.borderRadius = '12px';
+            playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+        }
     }
 }
     updatePlaylistsUI() {
@@ -2368,14 +2375,13 @@ function monitorPlayers() {
         checkAndSkipSegment(activePlayer);
 
         // LÓGICA DE CROSSFADE
-        // Usamos una ventana de 2 segundos en lugar de 0.5 para asegurar que se detecte
-        const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; 
-        const timeRemaining = videoDuration - currentTime;
+       const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; 
+    const timeRemaining = videoDuration - currentTime;
 
-        if (timeRemaining <= TRIGGER_OFFSET && 
-            timeRemaining > (TRIGGER_OFFSET - 2.0) && // VENTANA AMPLIADA A 2s
-            !hasOutroCrossfadeStarted && 
-            !isTransitioning) {
+    if (timeRemaining <= TRIGGER_OFFSET && 
+    timeRemaining > (TRIGGER_OFFSET - 3.0) && // Ampliar de 2.0 a 3.0
+    !hasOutroCrossfadeStarted && 
+    !isTransitioning) {
             
             console.log(`🎨 Trigger Crossfade Detectado (Restante: ${timeRemaining.toFixed(2)}s)`);
             
