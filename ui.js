@@ -336,7 +336,6 @@ movePlayersToFullView() {
 
         container.appendChild(fragment);
     }
-       
 createSearchResultCard(video) {
     const videoId = video.videoId || video.id;
     if (!videoId) {
@@ -348,11 +347,17 @@ createSearchResultCard(video) {
     const artist = video.uploaderName || video.artist || 'Artista desconocido';
     const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
     
+    // ✅ CORRECCIÓN: Procesar duración correctamente
+    let durationInSeconds = 0;
     let durationDisplay = '';
+    
     if (typeof video.duration === 'number') {
+        durationInSeconds = video.duration;
         durationDisplay = this.formatDuration(video.duration);
-    } else {
-        durationDisplay = video.duration || '';
+    } else if (typeof video.duration === 'string') {
+        // Si es string tipo "3:45", convertir a segundos
+        durationInSeconds = window.youtubeClientUtils?.parseDurationString(video.duration) || 0;
+        durationDisplay = video.duration;
     }
 
     const div = document.createElement('div');
@@ -377,7 +382,7 @@ createSearchResultCard(video) {
                 data-video-id="${videoId}"
                 data-title="${this.escapeHTML(title)}"
                 data-thumbnail="${thumbnail}"
-                data-duration="${video.duration || 0}"
+                data-duration="${durationInSeconds}"
                 data-artist="${this.escapeHTML(artist)}"
                 title="Añadir a la cola">
             <i class="fas fa-plus"></i>
@@ -390,13 +395,13 @@ createSearchResultCard(video) {
         e.stopPropagation();
         e.preventDefault();
         
-        console.log('🎵 Click en añadir:', videoId);
+        console.log('🎵 Click en añadir:', videoId, 'Duración:', durationInSeconds, 's');
         
         const videoData = {
             videoId: videoId,
             title: addBtn.dataset.title,
             thumbnail: addBtn.dataset.thumbnail,
-            duration: parseInt(addBtn.dataset.duration) || 0,
+            duration: durationInSeconds, // ✅ Enviar en segundos
             uploaderName: addBtn.dataset.artist,
             artist: addBtn.dataset.artist
         };
