@@ -636,10 +636,9 @@ switchQueueTab(tabName) {
         setTimeout(() => {
             this.loadLyricsForVideo(currentVideo);
         }, 100);
-    } else if (tabName === 'related') {
-        setTimeout(() => {
-            this.loadRelatedForVideo(currentVideo);
-        }, 100);
+    } else if (if (tabName === 'related' && !this.relatedLoaded) {
+        setTimeout(() => this.loadRelatedVideos(), 100);
+        this.relatedLoaded = true;
     }
 }
 async loadRelatedVideos() {
