@@ -242,30 +242,7 @@ class UIManager {
         }
     }
 
-    renderSearchResults(items, isContinuation = false) {
-        const container = this.elements.searchResults;
-        if (!container) return;
-
-        if (!isContinuation) container.innerHTML = '';
-        else {
-             const loader = container.querySelector('.search-loading-more');
-             if (loader) loader.remove();
-        }
-
-        if (!items || items.length === 0) {
-            if (!isContinuation) container.innerHTML = '<div class="search-placeholder"><p>No se encontraron videos.</p></div>';
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        items.forEach(video => {
-            const card = this.createSearchResultCard(video);
-            fragment.appendChild(card);
-        });
-
-        container.appendChild(fragment);
-    }
-
+   renderSearchResults(items, isContinuation = false) {
     createSearchResultCard(video) {
         const div = document.createElement('div');
         div.className = 'track-item card-track search-result-card';
