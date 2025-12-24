@@ -5,7 +5,6 @@ class YouTubeSimplifiedClient {
         this.initialized = false;
         
         // 🛠️ CORRECCIÓN CLAVE: Usar la URL absoluta de Netlify.
-        // Esto asegura que mix-yt.pages.dev llame correctamente a mix-yt.netlify.app.
         this.searchApiUrl = 'https://mix-yt.netlify.app/.netlify/functions/search'; 
     }
 
@@ -118,7 +117,6 @@ class YouTubeSimplifiedClient {
 
 window.youtubeJSClient = new YouTubeSimplifiedClient();
 
-// Utilidades de formato (mantenidas para compatibilidad con core.js)
 window.youtubeClientUtils = {
     formatDuration: (seconds) => {
         if (!seconds) return '0:00';
@@ -126,5 +124,21 @@ window.youtubeClientUtils = {
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
         return h > 0 ? `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}` : `${m}:${s.toString().padStart(2,'0')}`;
+    },
+    
+    parseDurationString: (durationStr) => {
+        if (!durationStr || typeof durationStr !== 'string') return 0;
+        
+        const parts = durationStr.split(':').map(Number);
+        
+        if (parts.length === 2) {
+            // Formato MM:SS
+            return (parts[0] * 60) + parts[1];
+        } else if (parts.length === 3) {
+            // Formato HH:MM:SS
+            return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+        }
+        
+        return 0;
     }
 };
