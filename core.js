@@ -1479,28 +1479,23 @@ startCrossfade(prevPlayer, nextPlayer) {
                 nextPlayer.setVolume(Math.round(100 * gainNext));
         } catch (e) {}
 
-        if (step >= steps) {
-            clearInterval(crossfadeInterval);
-            crossfadeInterval = null;
-            crossfadeInProgress = false;
+          if (step >= steps) {
+        clearInterval(crossfadeInterval);
+        crossfadeInterval = null;
+        crossfadeInProgress = false;
 
-            // Limpieza final
-            try {
-                if(prevPlayer) {
-                    prevPlayer.stopVideo(); // Detener el anterior para ahorrar recursos
-                    prevPlayer.setVolume(100); // Resetear volumen para la próxima
-                }
-            } catch (e) {}
-
-            document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
-            
-            // Reiniciar banderas de monitoreo
-            hasOutroCrossfadeStarted = false;
-            nextVideoScheduled = false;
-            isTransitioning = false;
-            if (!monitorInterval) this.startMonitoring();
+        // ✅ ASEGURAR RESET DE BANDERAS
+        hasOutroCrossfadeStarted = false;
+        nextVideoScheduled = false;
+        isTransitioning = false;
+        
+        // ✅ REINICIAR MONITOR
+        if (!monitorInterval) {
+            window.unifiedCore?.startMonitoring();
         }
-    }, stepTime);
+        
+        document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
+    }
 }
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
@@ -2374,37 +2369,57 @@ function monitorPlayers() {
         // Ejecutar SponsorBlock
         checkAndSkipSegment(activePlayer);
 
-        // LÓGICA DE CROSSFADE
-       const TRIGGER_OFFSET = CROSSFADE_DURATION + 2; 
-    const timeRemaining = videoDuration - currentTime;
-
-    if (timeRemaining <= TRIGGER_OFFSET && 
-    timeRemaining > (TRIGGER_OFFSET - 3.0) && // Ampliar de 2.0 a 3.0
-    !hasOutroCrossfadeStarted && 
-    !isTransitioning) {
+        // ✅ CORRECCIÓN: Simplificar lógica de crossfade
+        const timeRemaining = videoDuration - currentTime;
+        
+        // ✅ SI quedan menos de 15 segundos Y no hemos iniciado crossfade
+        if (timeRemaining <= 15 && 
+            !hasOutroCrossfadeStarted && 
+            !isTransitioning && 
+            !nextVideoScheduled) {
             
-            console.log(`🎨 Trigger Crossfade Detectado (Restante: ${timeRemaining.toFixed(2)}s)`);
+            console.log(`🎨 CROSSFADE ACTIVADO - Quedan ${timeRemaining.toFixed(2)}s`);
             
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
+            isTransitioning = true;
             
-            // Pausar monitor brevemente para evitar doble disparo
+            // Pausar monitor brevemente
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
 
-            // Disparar evento para mix-effects.js (Visuales)
+            // ✅ Disparar evento para efectos visuales
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
-                detail: { prevPlayer: currentPlayer, nextPlayer: currentPlayer === 1 ? 2 : 1 }
+                detail: { 
+                    prevPlayer: currentPlayer, 
+                    nextPlayer: currentPlayer === 1 ? 2 : 1,
+                    timeRemaining: timeRemaining
+                }
             }));
             
-            // Ejecutar lógica de cambio (Audio/Carga)
+            // ✅ Ejecutar cambio de video
+            if (window.unifiedCore?.playNextVideo) {
+                console.log('🎵 Llamando a playNextVideo()...');
+                window.unifiedCore.playNextVideo();
+            } else {
+                console.error('❌ unifiedCore.playNextVideo no disponible');
+            }
+        }
+        
+        // ✅ FALLBACK: Si llega a los últimos 2 segundos sin crossfade
+        if (timeRemaining <= 2 && !nextVideoScheduled) {
+            console.warn('⚠️ FALLBACK: Forzando siguiente video');
+            nextVideoScheduled = true;
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
             }
         }
-    } catch (error) { console.error(error); }
+        
+    } catch (error) { 
+        console.error('❌ Error en monitorPlayers:', error); 
+    }
 }
 function calculateCrossfadeTriggerTime(videoDuration, videoId) {
     const API_BUFFER = 1;
