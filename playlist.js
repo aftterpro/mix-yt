@@ -185,57 +185,79 @@ class PlaylistManager {
     // Si no hay separador, retornar el título completo y artista desconocido
     return { artist: 'Desconocido', title: cleanTitle };
 }
-
-    /**
-     * Añadir video a la cola
-     */
 async addVideoToQueue(videoData, fromPlaylist = false) {
-    // 1. OBTENCIÓN ROBUSTA DE LA COLA
-    // Intentamos usar this.playlists, si falla, usamos el global del Core
-    const allPlaylists = this.playlists || window.unifiedCore?.playlistsData || [];
-    let queue = allPlaylists.find(p => p.id === 'queue');
-
-    // Si no existe, intentar crearla o buscarla en el core
-    if (!queue && window.unifiedCore) {
-        // Forzar reinicialización si es necesario
-        queue = window.unifiedCore.playlistsData.find(p => p.id === 'queue');
-    }
-
-    if (!queue) {
-        console.error('❌ Error crítico: No se encuentra la cola de reproducción');
+    console.log('🎵 addVideoToQueue llamado:', videoData);
+    
+    // 1. VALIDACIÓN DE DATOS
+    if (!videoData || !videoData.videoId) {
+        console.error('❌ videoData inválido:', videoData);
+        if (this.core) this.core.showMessage('Error: Video inválido', 'error');
         return;
     }
 
-    // 2. AÑADIR VIDEO
-    if (fromPlaylist === true) {
-        // Modo Playlist: Añadir al final (evitando duplicados exactos seguidos)
-        const lastVideo = queue.videos[queue.videos.length - 1];
-        if (!lastVideo || lastVideo.videoId !== videoData.videoId) {
-            queue.videos.push(videoData);
-        }
+    // 2. OBTENCIÓN DE LA COLA
+    const allPlaylists = this.playlistsData || window.unifiedCore?.playlistsData || [];
+    let queue = allPlaylists.find(p => p.id === 'queue' || p.isQueue);
+
+    if (!queue) {
+        console.error('❌ No se encuentra la cola');
+        if (this.core) this.core.showMessage('Error: Cola no disponible', 'error');
+        return;
+    }
+
+    // 3. NORMALIZAR DATOS DEL VIDEO
+    const videoToAdd = {
+        videoId: videoData.videoId,
+        title: videoData.title || 'Sin título',
+        thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
+        duration: videoData.duration || 0,
+        uploaderName: videoData.uploaderName || videoData.artist || videoData.author || 'YouTube',
+        artist: videoData.artist || videoData.uploaderName || videoData.author || 'YouTube',
+        author: videoData.author || videoData.uploaderName || 'YouTube',
+        sourcePlaylistId: 'queue'
+    };
+
+    console.log('📦 Video normalizado:', videoToAdd);
+
+    // 4. VERIFICAR DUPLICADOS
+    const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
+    if (isDuplicate) {
+        if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en la cola`, 'warning');
+        return;
+    }
+
+    // 5. AÑADIR A LA COLA
+    if (fromPlaylist) {
+        // Modo Playlist: Al final
+        queue.videos.push(videoToAdd);
+        console.log('✅ Video añadido al final (playlist mode)');
     } else {
-        // Modo Manual: Añadir después del actual
+        // Modo Manual: Después del actual
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-        if (currentIndex === -1) {
-            queue.videos.push(videoData);
-            if (this.core) this.core.showMessage(`Añadido a cola: ${videoData.title}`, 'success');
+        if (currentIndex === -1 || currentIndex >= queue.videos.length) {
+            queue.videos.push(videoToAdd);
+            console.log('✅ Video añadido al final (no hay reproducción)');
         } else {
-            queue.videos.splice(currentIndex + 1, 0, videoData);
-            if (this.core) this.core.showMessage(`Siguiente en cola: ${videoData.title}`, 'success');
+            queue.videos.splice(currentIndex + 1, 0, videoToAdd);
+            console.log(`✅ Video insertado en posición ${currentIndex + 1}`);
         }
     }
 
-    // 3. PERSISTENCIA INMEDIATA (Guardar cambios)
-    if (window.saveQueuePersistent) {
-        window.saveQueuePersistent();
-        console.log('💾 Cola guardada tras añadir video');
-    } else if (this.core && this.core.saveAllData) {
-        this.core.saveAllData();
+    // 6. ACTUALIZAR UI
+    this.updateQueueUI();
+    if (this.core) {
+        this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
+        this.core.updatePersistentQueue();
     }
 
-    // 4. ACTUALIZAR UI
-    this.updateQueueUI();
-    this.updateQueuePopup();
+    // 7. GUARDAR
+    setTimeout(() => {
+        if (typeof window.saveAllData === 'function') {
+            window.saveAllData();
+        }
+    }, 100);
+
+    console.log(`🎵 Cola actualizada: ${queue.videos.length} videos`);
 }
 // Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
