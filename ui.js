@@ -271,7 +271,7 @@ movePlayersToFullView() {
         }
     }
 
-   renderSearchResults(items, isContinuation = false) {renderSearchResults(items, isContinuation = false) {
+   renderSearchResults(items, isContinuation = false) {
         const container = this.elements.searchResults;
         if (!container) return;
 
