@@ -26,40 +26,55 @@
   <script src="https://accounts.google.com/gsi/client" async defer onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
 
   <style>
-  #miniPlayerFloat,
-  .mini-player-video,
-  .mini-video-container {
-    background-color: transparent !important;
-    border: none !important; /* Asegúrate de que no haya bordes negros */
-    }
-    .bottom-player {
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      height: 90px !important;
-      display: flex !important;
-      flex-direction: row !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      background: #181818 !important;
-      color: white !important;
-      z-index: 999999 !important;
-      border-top: 1px solid #333 !important;
-      padding: 0 15px !important;
-      box-sizing: border-box !important;
-    }
-    .bottom-player * { flex-shrink: 0 !important; }
-    .player-info, .player-controls, .player-extras {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
+    /* ===== CORRECCIÓN CRÍTICA - VISIBILIDAD DE VIDEOS ===== */
+    #videoWrapper, .video-wrapper {
       position: relative !important;
-      min-height: 50px !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 400px !important;
+      background: #000 !important;
+      overflow: hidden !important;
+      display: block !important;
+      visibility: visible !important;
+    }
+    
+    #videoWrapper .video-player:not(.hidden),
+    .video-wrapper .video-player:not(.hidden) {
+      display: block !important;
       visibility: visible !important;
       opacity: 1 !important;
+      z-index: 10 !important;
+      pointer-events: auto !important;
+    }
+    
+    #videoWrapper .video-player.hidden {
+      display: none !important;
+    }
+    
+    #videoWrapper iframe, .video-wrapper iframe {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      border: none !important;
+      display: block !important;
+    }
+    
+    #persistent-player-layer {
+      z-index: 60 !important;
+      pointer-events: auto !important;
+    }
+    
+    .persistent-queue-sidebar {
+      z-index: 50 !important;
+    }
+    
+    .video-container-full {
+      z-index: 55 !important;
     }
   </style>
+  
 </head>
 
 <body>
