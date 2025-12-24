@@ -205,16 +205,10 @@ class UnifiedCore {
             }
         }, 60000);
         
-        window.addEventListener('beforeunload', () => {
-            if (this.saveInterval) clearInterval(this.saveInterval);
-            saveAllData();
-        });
-        
         console.log('💾 Guardado automático configurado (cada 60s)');
     }
-
 async init() {
-    console.log('🚀 Inicializando Sistema Unificado (Modo Rápido)...');
+    console.log('🚀 Inicializando Sistema Unificado (Modo Optimizado)...');
     
     // 1. INMEDIATO: Habilitar elementos visuales y eventos
     this.enableUnifiedElements(); 
@@ -224,36 +218,39 @@ async init() {
     this.loadInitialData();
     
     // 3. INICIALIZAR UI VISUALMENTE (¡Antes de conectar APIs!)
-    // Esto hace que el usuario vea sus playlists y cola al instante
     this.initializeUI(); 
     
-    // Intentar inicializar gestor de playlists (sin await bloqueante si es posible)
-    this.initializePlaylistManager();
+    // 4. Intentar inicializar gestor de playlists
+    await this.initializePlaylistManager();
     
-    // 4. SEGUNDO PLANO: Conectar con YouTube y APIs
-    // Quitamos el 'await' para que no bloquee el hilo principal si tarda
+    // 5. SEGUNDO PLANO: Conectar con YouTube y APIs
     this.updateStatusIndicator('Conectando servicios...', 'loading');
     
-    this.initializeComponents().then(() => {
-        console.log('✅ APIs conectadas en segundo plano');
+    try {
+        // ✅ CORRECCIÓN: ESPERAR a que las APIs se inicialicen
+        await this.initializeComponents();
+        
+        console.log('✅ APIs conectadas correctamente');
         this.updateStatusIndicator('Sistema Listo', 'success');
         this.state.initialized = true;
         
-        // Procesar cosas pendientes una vez que las APIs responden
+        // Procesar cosas pendientes
         if (window.pendingYouTubePlaylists) {
             this.processYouTubePlaylists(window.pendingYouTubePlaylists);
             window.pendingYouTubePlaylists = null;
         }
-    });
+        
+    } catch (error) {
+        console.error('❌ Error inicializando componentes:', error);
+        this.updateStatusIndicator('Error en sistema', 'error');
+    }
 
-    // 5. OPTIMIZACIÓN: Reducir el retraso artificial de 1500ms a 100ms
-    // Usamos requestAnimationFrame para asegurar que el DOM ya pintó
+    // 6. CONFIGURACIÓN FINAL (después de todo lo demás)
     requestAnimationFrame(() => {
         setTimeout(() => {
             this.setupSearchButtonListeners();
             this.setupMiniPlayerObserver();
             this.checkAndShowMiniPlayer();
-            // Refrescar UI una vez más por si acaso
             this.updatePlaylistsUI();
         }, 100);
     });
@@ -281,9 +278,76 @@ async init() {
         setTimeout(() => this.checkAndShowMiniPlayer(), 500);
     });
 
-    console.log('⚡ UI Inicializada (Esperando APIs en background)');
+    console.log('⚡ Sistema inicializado correctamente');
+}
+/**
+ * Resetear todas las banderas de crossfade
+ */
+resetCrossfadeFlags() {
+    console.log('🔄 Reseteando banderas de crossfade...');
+    
+    hasOutroCrossfadeStarted = false;
+    nextVideoScheduled = false;
+    isTransitioning = false;
+    crossfadeInProgress = false;
+    isNextVideoPreloaded = false;
+    
+    if (this.pendingCrossfade) {
+        this.pendingCrossfade.active = false;
+        this.pendingCrossfade = null;
+    }
+    
+    if (crossfadeInterval) {
+        clearInterval(crossfadeInterval);
+        crossfadeInterval = null;
+    }
+    
+    console.log('✅ Banderas reseteadas');
 }
 
+/**
+ * Manejar error de reproducción con recuperación
+ */
+handlePlaybackError(error, context = 'unknown') {
+    console.error(`❌ Error de reproducción (${context}):`, error);
+    
+    // Resetear banderas
+    this.resetCrossfadeFlags();
+    
+    // Reiniciar monitor si estaba activo
+    if (reproduccionIniciada && !monitorInterval) {
+        this.startMonitoring();
+    }
+    
+    // Mostrar error
+    this.showMessage(`Error de reproducción: ${error.message || 'desconocido'}`, 'error');
+    
+    return false;
+}  
+/**
+ * Limpiar recursos al cambiar de vista
+ */
+cleanupView(viewName) {
+    console.log(`🧹 Limpiando recursos de vista: ${viewName}`);
+    
+    // Desconectar scroll observer si salimos de búsqueda
+    if (viewName !== 'search' && this.searchScrollObserver) {
+        try {
+            this.searchScrollObserver.disconnect();
+            this.searchScrollObserver = null;
+            console.log('✅ Observer de scroll desconectado');
+        } catch (e) {
+            console.warn('⚠️ Error limpiando observer:', e);
+        }
+    }
+    
+    // Detener sincronización de letras si salimos de fullPlayer
+    if (viewName !== 'fullPlayer' && window.playlistManager?.lyricsSyncInterval) {
+        clearInterval(window.playlistManager.lyricsSyncInterval);
+        window.playlistManager.lyricsSyncInterval = null;
+        console.log('✅ Sincronización de letras detenida');
+    }
+}
     processYouTubePlaylists(playlists) {
         console.log(`📁 processYouTubePlaylists llamada con ${playlists?.length || 0} playlists`);
         
@@ -642,37 +706,52 @@ initializeUI() {
     }
 }
 
-    async initializePlaylistManager() {
-        console.log("🔧 Inicializando playlist manager...");
-        const waitForPlaylistManager = new Promise((resolve, reject) => {
-            if (typeof initializePlaylistManager === 'function') {
-                resolve();
-                return;
-            }
-            const timeout = setTimeout(() => reject(new Error('Timeout esperando initializePlaylistManager')), 5000);
-            const interval = setInterval(() => {
-                if (typeof initializePlaylistManager === 'function') {
-                    clearInterval(interval);
-                    clearTimeout(timeout);
-                    resolve();
-                }
-            }, 100);
-        });
-        
-        try {
-            await waitForPlaylistManager;
-            initializePlaylistManager(this);
-            if (window.playlistManager) {
-                console.log("✅ Playlist manager inicializado correctamente");
-                return true;
-            }
-            throw new Error('PlaylistManager no se creó correctamente');
-        } catch (error) {
-            console.error("❌ No se pudo inicializar playlist manager:", error);
-            this.showMessage("Funcionalidad de playlists limitada", 'warning');
-            return false;
+ async initializePlaylistManager() {
+    console.log("🔧 Inicializando playlist manager...");
+    
+    // ✅ CORRECCIÓN: Esperar activamente en lugar de timeout
+    const waitForPlaylistManager = new Promise((resolve, reject) => {
+        // Si ya existe, resolver inmediatamente
+        if (typeof initializePlaylistManager === 'function') {
+            resolve();
+            return;
         }
+        
+        // Si no, esperar hasta 5 segundos
+        const timeout = setTimeout(() => {
+            reject(new Error('Timeout esperando initializePlaylistManager'));
+        }, 5000);
+        
+        const interval = setInterval(() => {
+            if (typeof initializePlaylistManager === 'function') {
+                clearInterval(interval);
+                clearTimeout(timeout);
+                resolve();
+            }
+        }, 100);
+    });
+    
+    try {
+        // ✅ ESPERAR a que la función esté disponible
+        await waitForPlaylistManager;
+        
+        // Inicializar
+        initializePlaylistManager(this);
+        
+        // Verificar que se creó correctamente
+        if (window.playlistManager) {
+            console.log("✅ Playlist manager inicializado correctamente");
+            return true;
+        } else {
+            throw new Error('PlaylistManager no se creó correctamente');
+        }
+        
+    } catch (error) {
+        console.error("❌ No se pudo inicializar playlist manager:", error);
+        this.showMessage("Funcionalidad de playlists limitada", 'warning');
+        return false;
     }
+}
 updatePlayerPosition(targetContainerId) {
     // Delegamos la tarea visual al UI Manager
     this.ui.updatePlayerPosition(targetContainerId);
@@ -960,8 +1039,13 @@ forceMiniPlayerVisibility() {
         if (queueCountBadge) queueCountBadge.textContent = count;
     }
 
-// Cambia entre vistas (Home, Library, Player, etc.)
 switchView(viewName) {
+    // ✅ CORRECCIÓN: Limpiar vista anterior antes de cambiar
+    const previousView = this.currentView;
+    if (previousView && previousView !== viewName) {
+        this.cleanupView(previousView);
+    }
+    
     // 1. Guardar el estado lógico en Core
     this.currentView = viewName;
     
@@ -1230,7 +1314,6 @@ async playNextVideo() {
     const prevPlayerInstance = currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = currentPlayer === 1 ? player2 : player1;
     
-    // Cambiar puntero global INMEDIATAMENTE
     const prevPlayerNum = currentPlayer;
     currentPlayer = currentPlayer === 1 ? 2 : 1;
     window.currentPlayer = currentPlayer;
@@ -1238,15 +1321,12 @@ async playNextVideo() {
     try {
         console.log(`⌛ Cargando siguiente video (${nextVideo.videoId})... esperando buffer.`);
 
-        // Cargar video y asegurar que empiece MUTEADO
         nextPlayerInstance.loadVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
         nextPlayerInstance.setVolume(0); 
 
-        // NO iniciamos el crossfade todavía.
-        // Guardamos la intención y esperamos a que el evento onStateChange nos diga "YA ESTOY SONANDO"
         this.pendingCrossfade = {
             active: true,
             prev: prevPlayerInstance,
@@ -1255,16 +1335,41 @@ async playNextVideo() {
             nextNum: currentPlayer
         };
 
-        // Disparar evento visual (para que la UI sepa que algo viene, aunque no suene aún)
         document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
             detail: { prevPlayer: prevPlayerNum, nextPlayer: currentPlayer }
         }));
 
     } catch (error) {
-        console.error("Error en playNextVideo:", error);
+        console.error("❌ Error en playNextVideo:", error);
+        
+        // ✅ CORRECCIÓN: RESETEAR TODAS LAS BANDERAS EN CASO DE ERROR
+        hasOutroCrossfadeStarted = false;
+        nextVideoScheduled = false;
+        isTransitioning = false;
+        crossfadeInProgress = false;
+        isNextVideoPreloaded = false;
+        
+        // Limpiar pending crossfade
+        if (this.pendingCrossfade) {
+            this.pendingCrossfade.active = false;
+        }
+        
+        // Restaurar estado del player
+        currentPlayer = prevPlayerNum;
+        window.currentPlayer = currentPlayer;
+        
+        // Mostrar error al usuario
+        this.showMessage('Error cambiando de video', 'error');
+        
+        // Reintentar en 2 segundos si es posible
+        setTimeout(() => {
+            if (flatList.length > nextIndex) {
+                console.log('🔄 Reintentando reproducción...');
+                this.playNextVideo();
+            }
+        }, 2000);
     }
 }
-    
 startCrossfade(prevPlayer, nextPlayer) {
     if (crossfadeInProgress) {
         console.warn('⚠️ Crossfade ya en progreso, ignorando');
@@ -1355,9 +1460,14 @@ async performSearch(query, continuation = null) {
         nextPageContext = null;
         searchResults.innerHTML = '<div class="search-loading">🔍 Buscando...</div>';
         
-        // Desconectar observador anterior
-        if (this.searchScrollObserver) {
-            this.searchScrollObserver.disconnect();
+        // ✅ CORRECCIÓN: Desconectar observador anterior de forma segura
+        try {
+            if (this.searchScrollObserver) {
+                this.searchScrollObserver.disconnect();
+                this.searchScrollObserver = null;
+            }
+        } catch (e) {
+            console.warn('⚠️ Error desconectando observer:', e);
             this.searchScrollObserver = null;
         }
     }
@@ -1367,13 +1477,13 @@ async performSearch(query, continuation = null) {
     try {
         const data = await window.youtubeJSClient.search(query, continuation);
         
-        // ✅ GUARDAR TOKEN PARA SIGUIENTE PÁGINA
+        // Guardar token para siguiente página
         nextPageContext = data.nextpage || null;
         console.log('📄 Próxima página:', nextPageContext ? 'Disponible' : 'No hay más');
 
         this.displaySearchResults(data, !!continuation);
         
-        // ✅ CONFIGURAR SCROLL INFINITO SOLO SI HAY MÁS PÁGINAS
+        // Configurar scroll infinito solo si hay más páginas
         if (nextPageContext) {
             requestAnimationFrame(() => {
                 this.setupInfiniteScroll(searchResults);
@@ -1382,10 +1492,25 @@ async performSearch(query, continuation = null) {
         
     } catch (error) {
         console.error("❌ Error en búsqueda:", error);
+        
+        // ✅ CORRECCIÓN: Desconectar observer en caso de error
+        try {
+            if (this.searchScrollObserver) {
+                this.searchScrollObserver.disconnect();
+                this.searchScrollObserver = null;
+            }
+        } catch (e) {
+            console.warn('⚠️ Error desconectando observer tras error:', e);
+            this.searchScrollObserver = null;
+        }
+        
         searchResults.innerHTML = `
             <div class="search-error">
                 <i class="fas fa-exclamation-triangle"></i>
                 <p>Error: ${error.message}</p>
+                <button onclick="window.unifiedCore.performSearch('${query.replace(/'/g, "\\'")}')">
+                    Reintentar
+                </button>
             </div>
         `;
     } finally {
@@ -1914,7 +2039,13 @@ function preloadNextVideo() {
 }
 async function cargarSponsorBlock(videoId) {
     // Si ya tenemos datos o estamos buscando, no hacemos nada
-    if (segmentosCache[videoId]) return;
+    if (segmentosCache[videoId]) {
+        // ✅ CORRECCIÓN: Verificar si es viejo y recargar
+        const cacheAge = Date.now() - (segmentosCache[videoId].timestamp || 0);
+        if (cacheAge < 10 * 60 * 1000) { // Menos de 10 minutos
+            return;
+        }
+    }
 
     const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
     const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
@@ -1927,15 +2058,18 @@ async function cargarSponsorBlock(videoId) {
         
         const data = await response.json();
         if (Array.isArray(data)) {
-            // Guardamos solo segmentos válidos
-            segmentosCache[videoId] = data.filter(s => s.startTime < s.endTime);
-            console.log(`✅ SB: ${segmentosCache[videoId].length} segmentos para ${videoId}`);
+            // ✅ CORRECCIÓN: Añadir timestamp
+            segmentosCache[videoId] = {
+                segments: data.filter(s => s.startTime < s.endTime),
+                timestamp: Date.now() // Guardar cuándo se obtuvo
+            };
+            console.log(`✅ SB: ${segmentosCache[videoId].segments.length} segmentos para ${videoId}`);
         } else {
-            segmentosCache[videoId] = [];
+            segmentosCache[videoId] = { segments: [], timestamp: Date.now() };
         }
     } catch (e) {
         console.warn(`⚠️ SB Error ${videoId}:`, e.message);
-        segmentosCache[videoId] = []; // Evitar reintentos fallidos
+        segmentosCache[videoId] = { segments: [], timestamp: Date.now() };
     }
 }
 
@@ -1949,7 +2083,9 @@ function checkAndSkipSegment(player) {
     // Evitar rebotes (si acabamos de saltar hace menos de 1s)
     if (Math.abs(currentTime - lastSkipTime) < 1.5) return;
 
-    const segmentos = segmentosCache[videoId];
+    // ✅ CORRECCIÓN: Acceder a la estructura correcta
+    const cacheData = segmentosCache[videoId];
+    const segmentos = cacheData.segments || cacheData; // Compatibilidad con formato viejo
 
     for (const seg of segmentos) {
         if (currentTime >= seg.startTime && currentTime < seg.endTime) {
@@ -1957,29 +2093,23 @@ function checkAndSkipSegment(player) {
             const nombreCat = nombresCategorias[seg.category] || seg.category;
 
             // CASO 1: DETECCIÓN DE OUTRO
-            // Si el segmento termina muy cerca del final (margen de 2s)
             if (seg.endTime >= (duration - 2)) {
                 console.log("🎬 SponsorBlock: Outro detectado. Forzando final.");
                 mostrarAvisoSB(`🎬 Final saltado`, player.getIframe().parentElement);
-                
-                // Saltamos DIRECTAMENTE al final. 
-                // Tu 'monitorPlayers' detectará (timeRemaining <= 1) y activará el siguiente video.
                 player.seekTo(duration, true);
             } 
             // CASO 2: SALTO NORMAL (Intros, etc)
             else {
                 console.log(`⏩ SponsorBlock: Saltando ${nombreCat}`);
                 mostrarAvisoSB(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
-                
                 player.seekTo(seg.endTime, true);
             }
 
             lastSkipTime = seg.endTime;
-            break; // Solo un salto por ciclo
+            break;
         }
     }
 }
-
 // Función visual simple (asegúrate de tener el CSS .sb-toast que te pasé antes)
 function mostrarAvisoSB(mensaje, container) {
     let toast = document.querySelector('.sb-toast');
@@ -2130,6 +2260,59 @@ window.reloadSponsorBlockSegments = function(videoId) {
     delete segmentosCache[videoId];
     obtenerSegmentosSponsorBlock(videoId);
 };
+// =============================================
+// LIMPIEZA AUTOMÁTICA DE CACHÉ SPONSORBLOCK
+// =============================================
+
+/**
+ * Limpiar segmentos de SponsorBlock antiguos para evitar memory leak
+ */
+function cleanupSponsorBlockCache() {
+    const MAX_AGE = 10 * 60 * 1000; // 10 minutos
+    const MAX_ENTRIES = 100; // Máximo 100 videos en caché
+    const now = Date.now();
+    
+    // Convertir a array para poder ordenar por timestamp
+    const entries = Object.entries(segmentosCache);
+    
+    // Filtrar entradas antiguas
+    const validEntries = entries.filter(([videoId, data]) => {
+        // Si no tiene timestamp, es viejo (formato antiguo)
+        if (!data.timestamp) return false;
+        
+        // Eliminar si es muy viejo
+        return (now - data.timestamp) < MAX_AGE;
+    });
+    
+    // Si aún hay demasiadas entradas, mantener solo las más recientes
+    if (validEntries.length > MAX_ENTRIES) {
+        validEntries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+        validEntries.splice(MAX_ENTRIES);
+    }
+    
+    // Reconstruir caché
+    const newCache = {};
+    validEntries.forEach(([videoId, data]) => {
+        newCache[videoId] = data;
+    });
+    
+    const removed = entries.length - validEntries.length;
+    if (removed > 0) {
+        console.log(`🧹 Cache SponsorBlock limpiado: ${removed} entradas eliminadas`);
+    }
+    
+    segmentosCache = newCache;
+    
+    // Guardar en sessionStorage (opcional)
+    try {
+        sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(segmentosCache));
+    } catch (e) {
+        console.warn('⚠️ No se pudo guardar cache en sessionStorage');
+    }
+}
+
+// Ejecutar limpieza cada 5 minutos
+setInterval(cleanupSponsorBlockCache, 5 * 60 * 1000);
 
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
@@ -2244,12 +2427,91 @@ window.addEventListener('resize', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+    console.log('🚪 Cerrando aplicación, limpiando recursos...');
+    
+    // ✅ CORRECCIÓN: LIMPIEZA COMPLETA DE RECURSOS
+    
+    // 1. Guardar datos y detener monitoring
     if (window.unifiedCore?.state?.initialized) {
-        window.unifiedCore.saveData();
-        window.unifiedCore.stopMonitoring();
+        try {
+            window.unifiedCore.saveData();
+            window.unifiedCore.stopMonitoring();
+        } catch (e) {
+            console.warn('⚠️ Error en saveData:', e);
+        }
     }
-    if (crossfadeInterval) clearInterval(crossfadeInterval);
-    if (monitorInterval) clearInterval(monitorInterval);
+    
+    // 2. Desconectar observers
+    if (window.unifiedCore) {
+        // Search scroll observer
+        if (window.unifiedCore.searchScrollObserver) {
+            try {
+                window.unifiedCore.searchScrollObserver.disconnect();
+                window.unifiedCore.searchScrollObserver = null;
+            } catch (e) {
+                console.warn('⚠️ Error desconectando search observer:', e);
+            }
+        }
+        
+        // Mini player observer (si existe)
+        if (window.unifiedCore.miniPlayerObserver) {
+            try {
+                window.unifiedCore.miniPlayerObserver.disconnect();
+                window.unifiedCore.miniPlayerObserver = null;
+            } catch (e) {
+                console.warn('⚠️ Error desconectando mini player observer:', e);
+            }
+        }
+        
+        // Limpiar interval de guardado automático
+        if (window.unifiedCore.saveInterval) {
+            clearInterval(window.unifiedCore.saveInterval);
+            window.unifiedCore.saveInterval = null;
+        }
+    }
+    
+    // 3. Limpiar intervals de crossfade
+    if (crossfadeInterval) {
+        clearInterval(crossfadeInterval);
+        crossfadeInterval = null;
+    }
+    
+    if (monitorInterval) {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+    }
+    
+    // 4. Limpiar interval de letras
+    if (window.playlistManager?.lyricsSyncInterval) {
+        clearInterval(window.playlistManager.lyricsSyncInterval);
+        window.playlistManager.lyricsSyncInterval = null;
+    }
+    
+    // 5. Detener reproductores
+    try {
+        if (player1 && typeof player1.stopVideo === 'function') {
+            player1.stopVideo();
+        }
+        if (player2 && typeof player2.stopVideo === 'function') {
+            player2.stopVideo();
+        }
+    } catch (e) {
+        console.warn('⚠️ Error deteniendo players:', e);
+    }
+    
+    // 6. Limpiar cache de SponsorBlock
+    if (typeof cleanupSponsorBlockCache === 'function') {
+        try {
+            cleanupSponsorBlockCache();
+        } catch (e) {
+            console.warn('⚠️ Error limpiando cache SB:', e);
+        }
+    }
+    
+    // 7. Remover event listeners de resize
+    window.removeEventListener('resize', window.resizeTimeout);
+    
+    console.log('✅ Recursos limpiados correctamente');
 });
 
 window.UnifiedCore = UnifiedCore;
