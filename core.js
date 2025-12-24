@@ -15,7 +15,14 @@ const nombresCategorias = {
     'selfpromo': 'Autopromo',
     'music_offtopic': 'Intro no musical'
 };
-
+const playerConfig = {
+    playerVars: { 
+        'playsinline': 1,
+        'origin': window.location.origin, 
+        'enablejsapi': 1 
+    },
+    host: 'https://www.youtube.com'
+};
 const CROSSFADE_DURATION = 10;
 window.player1 = null;
 window.player2 = null;
@@ -284,8 +291,7 @@ async init() {
  * Resetear todas las banderas de crossfade
  */
 resetCrossfadeFlags() {
-    console.log('🔄 Reseteando banderas de crossfade...');
-    
+    console.log('🔄 Reseteando banderas...');
     hasOutroCrossfadeStarted = false;
     nextVideoScheduled = false;
     isTransitioning = false;
@@ -294,17 +300,14 @@ resetCrossfadeFlags() {
     
     if (this.pendingCrossfade) {
         this.pendingCrossfade.active = false;
-        this.pendingCrossfade = null;
     }
-    
-    if (crossfadeInterval) {
-        clearInterval(crossfadeInterval);
-        crossfadeInterval = null;
-    }
-    
-    console.log('✅ Banderas reseteadas');
 }
 
+// Llamar en caso de error:
+handlePlaybackError(error) {
+    this.resetCrossfadeFlags();
+    this.startMonitoring();
+}
 /**
  * Manejar error de reproducción con recuperación
  */
@@ -328,24 +331,16 @@ handlePlaybackError(error, context = 'unknown') {
  * Limpiar recursos al cambiar de vista
  */
 cleanupView(viewName) {
-    console.log(`🧹 Limpiando recursos de vista: ${viewName}`);
+    console.log(`🧹 Limpiando recursos: ${viewName}`);
     
-    // Desconectar scroll observer si salimos de búsqueda
     if (viewName !== 'search' && this.searchScrollObserver) {
         try {
             this.searchScrollObserver.disconnect();
             this.searchScrollObserver = null;
-            console.log('✅ Observer de scroll desconectado');
         } catch (e) {
-            console.warn('⚠️ Error limpiando observer:', e);
+            console.warn('⚠️ Error:', e);
+            this.searchScrollObserver = null;
         }
-    }
-    
-    // Detener sincronización de letras si salimos de fullPlayer
-    if (viewName !== 'fullPlayer' && window.playlistManager?.lyricsSyncInterval) {
-        clearInterval(window.playlistManager.lyricsSyncInterval);
-        window.playlistManager.lyricsSyncInterval = null;
-        console.log('✅ Sincronización de letras detenida');
     }
 }
     processYouTubePlaylists(playlists) {
@@ -782,52 +777,23 @@ updatePlayerPosition(targetContainerId) {
             }
         }, true);
     }
-
- setupControlButtons() {
-    // Array de IDs de botones de Play/Pause (Principal y Mini Player)
+setupControlButtons() {
     const playButtons = ['botonPlay', 'miniPlayBtn'];
     
     playButtons.forEach(btnId => {
         const btn = document.getElementById(btnId);
         if (btn) {
-            // Clonar nodo para limpiar listeners viejos
+            // ✅ Clonar nodo para limpiar listeners
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
             newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.handlePlayPause(); // Llamar a la función central de Play/Pause
+                this.handlePlayPause();
             });
         }
     });
-
-    // Configurar Siguiente
-    const nextIds = ['botonNext', 'miniNextBtn'];
-    nextIds.forEach(btnId => {
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handleNext();
-            });
-        }
-    });
-
-    // Configurar Anterior
-    const prevBtn = document.getElementById('prevButton');
-    if (prevBtn) {
-        const newPrevBtn = prevBtn.cloneNode(true);
-        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
-        newPrevBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.handlePrevious();
-        });
-    }
 }
 
     setupSearch() {
@@ -1038,18 +1004,12 @@ forceMiniPlayerVisibility() {
         const queueCountBadge = document.getElementById('queueCount');
         if (queueCountBadge) queueCountBadge.textContent = count;
     }
-
 switchView(viewName) {
-    // ✅ CORRECCIÓN: Limpiar vista anterior antes de cambiar
     const previousView = this.currentView;
     if (previousView && previousView !== viewName) {
         this.cleanupView(previousView);
     }
-    
-    // 1. Guardar el estado lógico en Core
     this.currentView = viewName;
-    
-    // 2. Decirle a la UI que cambie las clases y oculte divs
     this.ui.switchView(viewName);
 }
 
@@ -2269,49 +2229,31 @@ window.reloadSponsorBlockSegments = function(videoId) {
  */
 function cleanupSponsorBlockCache() {
     const MAX_AGE = 10 * 60 * 1000; // 10 minutos
-    const MAX_ENTRIES = 100; // Máximo 100 videos en caché
+    const MAX_ENTRIES = 100;
     const now = Date.now();
     
-    // Convertir a array para poder ordenar por timestamp
     const entries = Object.entries(segmentosCache);
-    
-    // Filtrar entradas antiguas
     const validEntries = entries.filter(([videoId, data]) => {
-        // Si no tiene timestamp, es viejo (formato antiguo)
         if (!data.timestamp) return false;
-        
-        // Eliminar si es muy viejo
         return (now - data.timestamp) < MAX_AGE;
     });
     
-    // Si aún hay demasiadas entradas, mantener solo las más recientes
     if (validEntries.length > MAX_ENTRIES) {
         validEntries.sort((a, b) => b[1].timestamp - a[1].timestamp);
         validEntries.splice(MAX_ENTRIES);
     }
     
-    // Reconstruir caché
-    const newCache = {};
-    validEntries.forEach(([videoId, data]) => {
-        newCache[videoId] = data;
-    });
+    segmentosCache = Object.fromEntries(validEntries);
     
-    const removed = entries.length - validEntries.length;
-    if (removed > 0) {
-        console.log(`🧹 Cache SponsorBlock limpiado: ${removed} entradas eliminadas`);
-    }
-    
-    segmentosCache = newCache;
-    
-    // Guardar en sessionStorage (opcional)
     try {
         sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(segmentosCache));
     } catch (e) {
-        console.warn('⚠️ No se pudo guardar cache en sessionStorage');
+        console.warn('⚠️ Cache muy grande, limpiando...');
+        segmentosCache = {};
     }
 }
 
-// Ejecutar limpieza cada 5 minutos
+// Ejecutar cada 5 minutos
 setInterval(cleanupSponsorBlockCache, 5 * 60 * 1000);
 
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
