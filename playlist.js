@@ -2313,7 +2313,7 @@ setupPlaylistPopupEvents(popup, playlist) {
             if (action === 'queue') {
                 await this.addVideoToQueue(videoData);
             } else if (action === 'play') {
-                await this.addVideoToQueue(videoData);
+                await this.addVideoToQueue(videoData, true); // true = desde playlist
                 setTimeout(() => {
                     const flatList = this.core?.getFlattenedPlaylist();
                     const index = flatList?.findIndex(v => v.videoId === video.videoId);
