@@ -46,7 +46,24 @@ let searchScrollObserver = null; // Nuevo observador para scroll
 let segmentosCache = {};
 let lastSeekEndTime = -1;
 let lastSeekVideoId = null;
+// ==========================================
+// VARIABLES GLOBALES Y CACHÉ OPTIMIZADA
+// ==========================================
 
+// Variable de estado para el preload
+let isNextVideoPreloaded = false;
+
+// Inicialización de Cache SponsorBlock con persistencia
+let segmentosCache = {};
+try {
+    const saved = sessionStorage.getItem('ytcm_sponsor_cache');
+    if (saved) {
+        segmentosCache = JSON.parse(saved);
+        console.log('📦 Cache de SponsorBlock restaurada de sesión.');
+    }
+} catch (e) { 
+    console.warn('⚠️ No se pudo acceder a sessionStorage para SponsorBlock'); 
+}
 const PIPED_SPONSOR_BLOCK_URL = 'https://api.piped.private.coffee/sponsors/';
 
 const unifiedState = {
@@ -422,6 +439,7 @@ onPlayerStateChange(event) {
         }
 
         // === B. ACTUALIZACIÓN DE ESTADO ===
+        isNextVideoPreloaded = false; // <--- AGREGAR ESTO PARA RESETEAR EL CICLO
         hasOutroCrossfadeStarted = false; // Resetear bandera de salida
         
         const videoData = player.getVideoData();
@@ -464,7 +482,42 @@ onPlayerStateChange(event) {
         this.playNextVideo();
     }
 }
+addToQueue(videoObject) {
+        // Asegurar estructura del objeto
+        const queueItem = {
+            videoId: videoObject.videoId || videoObject.id, // Compatibilidad
+            title: videoObject.title,
+            artist: videoObject.artist || videoObject.uploaderName || 'Desconocido',
+            thumbnail: videoObject.thumbnail || videoObject.thumbnailUrl,
+            duration: videoObject.duration,
+            source: 'queue' // Marcamos que viene manual
+        };
 
+        // Buscar la playlist 'queue'
+        const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+        
+        if (queuePlaylist) {
+            queuePlaylist.videos.push(queueItem);
+            
+            // Actualizar UI
+            this.ui.showMessage(`Añadido a cola: ${queueItem.title}`, 'success');
+            this.ui.updateQueueCount(queuePlaylist.videos.length);
+            
+            // Si tienes el PlaylistManager, decirle que actualice su vista también
+            if (window.playlistManager) {
+                window.playlistManager.updateQueueUI(); 
+            }
+        } else {
+            console.error('❌ No se encontró la playlist de cola (queue)');
+            // Crear si no existe (fallback)
+            this.playlistsData.push({
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                videos: [queueItem]
+            });
+            this.ui.showMessage(`Cola creada y video añadido`, 'success');
+        }
+    }
     refreshActiveQueueTab() {
         const activeTab = document.querySelector('.queue-tab.active');
         if (!activeTab) return;
@@ -1232,6 +1285,37 @@ startCrossfade(prevPlayer, nextPlayer) {
         }
     }, stepTime);
 }
+
+function preloadNextVideo() {
+    // Si no hay core o playlist, abortar
+    if (!window.unifiedCore) return;
+
+    const flatList = window.unifiedCore.getFlattenedPlaylist();
+    // Validar que info actual existe
+    if (!window.currentPlayingInfo || window.currentPlayingInfo.flattenedIndex === -1) return;
+
+    const nextIndex = window.currentPlayingInfo.flattenedIndex + 1;
+
+    // Solo precargar si existe un siguiente video en la lista
+    if (nextIndex < flatList.length) {
+        const nextVideo = flatList[nextIndex];
+        // Seleccionar el reproductor que NO está sonando actualmente
+        const nextPlayer = (window.currentPlayer === 1) ? window.player2 : window.player1;
+        
+        if (nextPlayer && typeof nextPlayer.cueVideoById === 'function') {
+            console.log(`📥 Precargando siguiente pista: "${nextVideo.title}"`);
+            
+            // cueVideoById descarga metadatos y buffer inicial sin reproducir
+            nextPlayer.cueVideoById({
+                videoId: nextVideo.videoId,
+                startSeconds: 0
+            });
+            
+            // Opcional: Cargar también sus segmentos SponsorBlock ahora
+            obtenerSegmentosSponsorBlock(nextVideo.videoId);
+        }
+    }
+}
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
@@ -1825,52 +1909,67 @@ showMessage(message, type = 'info') {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
-
 async function obtenerSegmentosSponsorBlock(videoId) {
-    if (segmentosCache[videoId] === 'fetching' || Array.isArray(segmentosCache[videoId])) {
-        return null;
+    if (!videoId) return [];
+
+    // 1. Revisar caché en memoria primero (Velocidad instantánea)
+    if (segmentosCache[videoId]) {
+        return segmentosCache[videoId];
     }
 
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
-    
-    // ✅ USAR TU FUNCIÓN NETLIFY
-    const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-    
-    segmentosCache[videoId] = 'fetching';
-
     try {
-        const response = await fetch(apiUrl, { 
-            headers: { 'X-UserID': userId }
-        });
+        const url = `${PIPED_SPONSOR_BLOCK_URL}${videoId}?categories=["music_offtopic","intro","outro","selfpromo","interaction","preview","non_music"]`;
         
+        const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`API SB Error: ${response.status}`);
+            if (response.status === 404) {
+                segmentosCache[videoId] = []; // Guardar que no tiene segmentos para no volver a preguntar
+                return [];
+            }
+            throw new Error('Error API');
         }
 
         const data = await response.json();
-        
-        if (!Array.isArray(data)) {
-            segmentosCache[videoId] = [];
-            return [];
-        }
 
-        const validSegments = data.filter(segment => {
-            if (!segment || typeof segment.startTime === 'undefined' || typeof segment.endTime === 'undefined') {
-                return false;
+        // Filtrar y mapear segmentos válidos
+        const validSegments = data.map(segment => ({
+            category: segment.category,
+            startTime: segment.segment[0],
+            endTime: segment.segment[1],
+            uuid: segment.uuid
+        })).sort((a, b) => a.startTime - b.startTime);
+
+        // 2. Guardar en memoria
+        segmentosCache[videoId] = validSegments;
+
+        // 3. Guardar en Storage (Sin bloquear UI)
+        // Usamos requestIdleCallback con fallback a setTimeout para compatibilidad Safari
+        const idleCallback = window.requestIdleCallback || (cb => setTimeout(cb, 1000));
+        
+        idleCallback(() => {
+            try {
+                // Verificar límite de cuota antes de guardar
+                sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(segmentosCache));
+            } catch (e) {
+                // Si el storage está lleno, limpiamos la mitad antigua para hacer espacio (Estrategia FIFO simple)
+                console.warn('⚠️ Storage lleno, limpiando cache antigua...');
+                const keys = Object.keys(segmentosCache);
+                if (keys.length > 20) {
+                    const newCache = {};
+                    // Mantener solo los últimos 20
+                    keys.slice(-20).forEach(k => newCache[k] = segmentosCache[k]);
+                    segmentosCache = newCache;
+                    try {
+                        sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(segmentosCache));
+                    } catch(err) { console.error('No se pudo limpiar cache', err); }
+                }
             }
-            const start = parseFloat(segment.startTime);
-            const end = parseFloat(segment.endTime);
-            if (isNaN(start) || isNaN(end) || end < start) return false;
-            return true;
         });
 
-        segmentosCache[videoId] = validSegments;
-        console.log(`✅ SponsorBlock: ${validSegments.length} segmentos para ${videoId}`);
         return validSegments;
 
     } catch (error) {
-        console.warn(`⚠️ SponsorBlock falló para ${videoId}:`, error.message);
-        segmentosCache[videoId] = [];
+        console.warn(`SponsorBlock error para ${videoId}:`, error);
         return [];
     }
 }
@@ -1939,35 +2038,44 @@ function monitorPlayers() {
 
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
-        const videoId = activePlayer.getVideoData()?.video_id; // Necesitamos el ID
-        
-        // Ejecutar SponsorBlock (Saltos normales)
+        const videoId = activePlayer.getVideoData()?.video_id;
+
+        // 1. Lógica SponsorBlock (Saltar segmentos malos)
         checkAndSkipSegment(activePlayer);
 
-        // ✅ CÁLCULO DINÁMICO DEL CROSSFADE
-        // Calculamos el momento exacto donde debe iniciar, considerando SponsorBlock
+        const timeRemaining = videoDuration - currentTime;
+
+        // ==========================================
+        // NUEVO: PRELOAD A LOS 25 SEGUNDOS
+        // ==========================================
+        // Si falta poco, no hemos precargado aún, y no estamos ya cambiando de canción
+        if (timeRemaining < 25 && !isNextVideoPreloaded && !nextVideoScheduled) {
+            preloadNextVideo();
+            isNextVideoPreloaded = true; // Marcar para no hacerlo 60 veces por segundo
+        }
+
+        // ==========================================
+        // LÓGICA CROSSFADE INTELIGENTE
+        // ==========================================
         const triggerTime = calculateCrossfadeTriggerTime(videoDuration, videoId);
-        
-        // Si ya pasamos el tiempo de disparo Y no hemos iniciado la transición...
+
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
             !nextVideoScheduled) {
             
-            const timeRemaining = videoDuration - currentTime;
-            console.log(`🎨 CROSSFADE ACTIVADO - Trigger: ${triggerTime.toFixed(2)}s | Actual: ${currentTime.toFixed(2)}s`);
+            console.log(`🎨 CROSSFADE ACTIVADO - Trigger: ${triggerTime.toFixed(2)}s`);
             
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             isTransitioning = true;
             
-            // Pausar monitor brevemente para evitar disparos dobles
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
 
-            // ✅ Disparar evento para efectos visuales
+            // Disparar evento para efectos
             document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
                 detail: { 
                     prevPlayer: currentPlayer, 
@@ -1976,27 +2084,19 @@ function monitorPlayers() {
                 }
             }));
             
-            // ✅ Ejecutar cambio de video
             if (window.unifiedCore?.playNextVideo) {
-                console.log('🎵 Llamando a playNextVideo()...');
                 window.unifiedCore.playNextVideo();
-            } else {
-                console.error('❌ unifiedCore.playNextVideo no disponible');
             }
         }
         
-        // ✅ FALLBACK DE EMERGENCIA
-        // Si por alguna razón matemática falló el cálculo y estamos a 1s del final real
-        if ((videoDuration - currentTime) <= 1 && !nextVideoScheduled) {
-            console.warn('⚠️ FALLBACK: Forzando siguiente video por fin de pista');
+        // Fallback de emergencia por si falla el cálculo
+        if (timeRemaining <= 1 && !nextVideoScheduled) {
             nextVideoScheduled = true;
-            if (window.unifiedCore?.playNextVideo) {
-                window.unifiedCore.playNextVideo();
-            }
+            if (window.unifiedCore?.playNextVideo) window.unifiedCore.playNextVideo();
         }
         
     } catch (error) { 
-        console.error('❌ Error en monitorPlayers:', error); 
+        console.error('Error en monitorPlayers:', error); 
     }
 }
 
