@@ -2658,13 +2658,17 @@ font-size: 1.5rem; /* Tamaño base */
 
 /* La línea que está sonando ahora */
 .lyrics-text.synced p.active {
-color: #FFFFFF !important;
+   color: #FFFFFF !important;
     font-size: 2.2rem !important; /* Mucho más grande */
     font-weight: 700 !important;
     filter: blur(0);
     opacity: 1;
     transform: scale(1) translateX(10px); /* Un poco a la derecha */
     text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+   text-shadow: 0 0 15px rgba(255, 107, 53, 0.6); /* Brillo naranja para destacar */
+    background: linear-gradient(90deg, rgba(255,255,255,0.1), transparent); /* Fondo sutil */
+    padding-left: 10px;
+    border-left: 4px solid var(--primary-color);
 }
 /* Líneas Pasadas */
 .lyrics-text.synced p.past {
@@ -3292,9 +3296,9 @@ iframe[style*="opacity: 1"],
 }
 /* Forzar que la capa del video esté encima */
 #persistent-player-layer {
-    background: transparent !important; /* Crucial: Quitar fondo negro */
-    pointer-events: none; /* Dejar pasar clicks */
-    z-index: 40; /* Por debajo del video activo (50) */
+    background: transparent !important;
+    pointer-events: auto !important; /* Importante para poder dar click en pausar/play */
+    z-index: 60 !important; /* Debe ser mayor que el full-player-view (50) */
 }
 #miniPlayerFloat, #miniPlayerContainer {
     z-index: 999999 !important; /* Más de 9000 */
