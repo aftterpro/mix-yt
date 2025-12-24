@@ -668,39 +668,52 @@ updatePlayerPosition(targetContainerId) {
         }, true);
     }
 
-    setupControlButtons() {
-        const playBtn = document.getElementById('botonPlay');
-        const nextBtn = document.getElementById('botonNext');
-        const prevBtn = document.getElementById('prevButton');
-
-        if (playBtn) {
-            const newPlayBtn = playBtn.cloneNode(true);
-            playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
-            newPlayBtn.addEventListener('click', (e) => {
+ setupControlButtons() {
+    // Array de IDs de botones de Play/Pause (Principal y Mini Player)
+    const playButtons = ['botonPlay', 'miniPlayBtn'];
+    
+    playButtons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            // Clonar nodo para limpiar listeners viejos
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.handlePlayPause();
+                this.handlePlayPause(); // Llamar a la función central de Play/Pause
             });
         }
-        if (nextBtn) {
-            const newNextBtn = nextBtn.cloneNode(true);
-            nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
-            newNextBtn.addEventListener('click', (e) => {
+    });
+
+    // Configurar Siguiente
+    const nextIds = ['botonNext', 'miniNextBtn'];
+    nextIds.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 this.handleNext();
             });
         }
-        if (prevBtn) {
-            const newPrevBtn = prevBtn.cloneNode(true);
-            prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
-            newPrevBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handlePrevious();
-            });
-        }
+    });
+
+    // Configurar Anterior
+    const prevBtn = document.getElementById('prevButton');
+    if (prevBtn) {
+        const newPrevBtn = prevBtn.cloneNode(true);
+        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+        newPrevBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handlePrevious();
+        });
     }
+}
 
     setupSearch() {
         const searchInputs = [
