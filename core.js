@@ -753,31 +753,38 @@ updatePlayerPosition(targetContainerId) {
         }
     }
 
-    setupPlayerContainerHandlers() {
-        console.log('🎬 Configurando handlers de barra inferior');
-        const bottomPlayer = document.querySelector('.bottom-player');
-        if (bottomPlayer) {
-            const newBottomPlayer = bottomPlayer.cloneNode(true);
-            bottomPlayer.parentNode.replaceChild(newBottomPlayer, bottomPlayer);
-            newBottomPlayer.style.cursor = 'pointer';
+ setupPlayerContainerHandlers() {
+    console.log('🎬 Configurando handlers de barra inferior');
+    const bottomPlayer = document.querySelector('.bottom-player');
+    
+    if (bottomPlayer) {
+    
+        if (bottomPlayer.dataset.clickListenerAttached) return;
+        
+        bottomPlayer.addEventListener('click', (e) => {
+            // Ignorar clicks en controles interactivos
+            if (e.target.closest('button') || 
+                e.target.closest('.volume-slider') || 
+                e.target.closest('.player-controls') ||
+                e.target.closest('.control-button') ||
+                e.target.closest('.progress-container')) { // Agregado progress-container
+                return;
+            }
             
-            newBottomPlayer.addEventListener('click', (e) => {
-                if (e.target.closest('button') || 
-                    e.target.closest('.volume-slider') || 
-                    e.target.closest('.player-controls') ||
-                    e.target.closest('.control-button')) {
-                    return;
-                }
-                const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
-                if (hasVideo) {
-                    console.log('🎬 Click en barra -> Full Player');
-                    this.switchView('fullPlayer');
-                }
-            });
-            this.setupControlButtons();
-            this.forceBottomPlayerVisible();
-        }
+            const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
+            if (hasVideo) {
+                console.log('🎬 Click en barra -> Full Player');
+                this.switchView('fullPlayer');
+            }
+        });
+        
+        bottomPlayer.dataset.clickListenerAttached = "true";
+        
+        // Setup de botones individuales (esto ya clona los botones internamente, está bien)
+        this.setupControlButtons();
+        this.forceBottomPlayerVisible();
     }
+}
 
     showFullPlayer() {
         console.log('🎬 Mostrando reproductor completo');
@@ -1518,11 +1525,22 @@ getFlattenedPlaylist() {
     return validVideos;
 }
 updatePersistentQueue() {
-    console.log('🔄 Actualizando cola persistente...');
+    // 1. DELEGACIÓN INTELIGENTE (OPTIMIZACIÓN PRINCIPAL)
+    // Si el gestor de playlists está activo, dejemos que él maneje la UI.
+    // Esto evita doble renderizado, parpadeos y conflictos de eventos.
+    if (window.playlistManager && typeof window.playlistManager.updateQueueUI === 'function') {
+        window.playlistManager.updateQueueUI();
+        return; 
+    }
+
+    // 2. FALLBACK (CÓDIGO DE RESPALDO)
+    // Solo se ejecuta si playlist.js no ha cargado aún.
+    console.log('🔄 Actualizando cola persistente (Modo Fallback Core)...');
     
     const queueContentList = document.getElementById('queueContentList');
     if (!queueContentList) return;
 
+    // Usamos this.playlistsData en lugar de la variable global para asegurar datos frescos
     const flatList = this.getFlattenedPlaylist();
     
     if (flatList.length === 0) {
@@ -1531,11 +1549,8 @@ updatePersistentQueue() {
         return;
     }
 
-    const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? 
-                        window.currentPlayingInfo?.flattenedIndex ?? -1;
-
+    const currentIndex = this.state?.currentPlayingInfo?.flattenedIndex ?? -1;
     const fragment = document.createDocumentFragment();
-    let validCount = 0;
 
     flatList.forEach((video, index) => {
         if (!video || !video.videoId) return;
@@ -1543,67 +1558,30 @@ updatePersistentQueue() {
         const isPlaying = currentIndex === index;
         const queueItem = document.createElement('div');
         queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
-        queueItem.dataset.videoId = video.videoId;
-        queueItem.dataset.flatIndex = index;
-        queueItem.draggable = true;
-        queueItem.onclick = () => this.playVideoAtIndex(index);
         
-        if (isPlaying) queueItem.id = 'active-queue-item';
-        
-        const formattedDuration = video.duration && video.duration > 0 
-            ? this.formatDuration(video.duration) 
-            : '--:--';
-        
+        // Datos mínimos necesarios para que funcione el click básico
         queueItem.innerHTML = `
             <div class="queue-item-number">
-                ${isPlaying ? '<i class="fas fa-play-circle queue-item-playing"></i>' : (index + 1)}
+                ${isPlaying ? '<i class="fas fa-play-circle"></i>' : (index + 1)}
             </div>
-            
-            <!-- ✅ WRAPPER CON DURACIÓN DENTRO -->
-            <div class="queue-item-thumbnail-wrapper">
-                <img src="${video.thumbnail || './electronic.ico'}" 
-                     alt="${this.escapeHTML(video.title || 'Sin título')}"
-                     onerror="this.src='./electronic.ico';">
-                <span class="queue-item-duration">${formattedDuration}</span>
-            </div>
-            
             <div class="queue-item-info">
                 <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
-                <div class="queue-item-meta">
-                    <span class="queue-item-author">${this.escapeHTML(video.uploaderName || '')}</span>
-                </div>
             </div>
-            <button class="queue-item-remove"><i class="fas fa-times"></i></button>
         `;
         
-        const removeBtn = queueItem.querySelector('.queue-item-remove');
-        removeBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (window.playlistManager) window.playlistManager.removeVideoFromQueue(video.videoId);
-        };
+        // Evento simple de reproducción
+        queueItem.onclick = () => this.playVideoAtIndex(index);
+        
+        if (isPlaying) {
+            setTimeout(() => queueItem.scrollIntoView({ block: 'center', behavior: 'smooth' }), 100);
+        }
         
         fragment.appendChild(queueItem);
-        validCount++;
     });
 
     queueContentList.innerHTML = '';
     queueContentList.appendChild(fragment);
-    this.updateQueueCount(validCount);
-    
-    // Scroll al item activo
-    if (currentIndex >= 0) {
-        setTimeout(() => {
-            const playingItem = document.getElementById('active-queue-item');
-            if (playingItem) {
-                console.log('📜 Scrolleando a video actual en cola:', currentIndex);
-                playingItem.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center',
-                    inline: 'nearest' 
-                });
-            }
-        }, 300);
-    }
+    this.updateQueueCount(flatList.length);
 }
     async getBatchVideoDurations(videoIds) {
         if (!videoIds || videoIds.length === 0) return {};
@@ -1828,22 +1806,24 @@ showMessage(message, type = 'info') {
     }
 
     loadInitialData() {
-        if (playlistsData.length === 0) {
+        const persistentData = loadPlaylistsDataPersistent();
+        if (persistentData) {
+            this.playlistsData = persistentData;
+            return;
+        }
+
+        if (this.playlistsData.length === 0) {
             try {
-                const savedPlaylists = localStorage.getItem('ytcm_playlists');
+                const savedPlaylists = localStorage.getItem('ytcm_playlists'); // Key antigua
                 if (savedPlaylists) {
                     const parsed = JSON.parse(savedPlaylists);
-                    if (Array.isArray(parsed)) playlistsData = parsed;
+                    if (Array.isArray(parsed)) this.playlistsData = parsed;
                 }
             } catch (e) {}
         }
     }
-
     saveData() {
-        try {
-            const playlistsToSave = playlistsData.filter(p => p.source !== 'youtube_library');
-            localStorage.setItem('ytcm_playlists', JSON.stringify(playlistsToSave));
-        } catch (e) {}
+        saveAllData();
     }
 }
 
