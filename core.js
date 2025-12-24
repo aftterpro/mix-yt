@@ -803,9 +803,9 @@ setupControlButtons() {
             document.getElementById('mobileSearchInput')
         ].filter(Boolean);
 
-        const debouncedSearch = this.debounce((query) => {
-            this.performSearch(query);
-        }, 500);
+       const debouncedSearch = this.debounce((query) => {
+    this.performSearch(query);
+    }, 800); 
 
         searchInputs.forEach(input => {
             input.addEventListener('input', (event) => {
