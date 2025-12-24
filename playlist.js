@@ -396,25 +396,27 @@ async loadPlaylistVideos(playlistId) {
         
         console.log(`✅ ${allVideos.length} videos cargados`);
         
-        // ✅ OBTENER DURACIONES EN LOTE
+        // ✅ OBTENER DURACIONES EN LOTE (CORRECCIÓN)
         if (allVideos.length > 0) {
             try {
-                const videoIds = allVideos.map(v => v.videoId);
-                console.log(`⏳ Obteniendo duraciones de ${videoIds.length} videos...`);
+                console.log(`⏳ Obteniendo duraciones de ${allVideos.length} videos...`);
                 
                 // Procesar en lotes de 50
-                for (let i = 0; i < videoIds.length; i += 50) {
-                    const batch = videoIds.slice(i, i + 50);
+                for (let i = 0; i < allVideos.length; i += 50) {
+                    const batch = allVideos.slice(i, i + 50);
+                    const videoIds = batch.map(v => v.videoId);
+                    
                     const response = await gapi.client.youtube.videos.list({
                         part: ['contentDetails'],
-                        id: batch.join(',')
+                        id: videoIds.join(',')
                     });
                     
                     if (response.result.items) {
                         response.result.items.forEach(video => {
                             const matchingVideo = allVideos.find(v => v.videoId === video.id);
                             if (matchingVideo && video.contentDetails?.duration) {
-                                matchingVideo.duration = this.core.parseDuration(video.contentDetails.duration);
+                                // Usar la función del core para parsear duración ISO 8601
+                                matchingVideo.duration = this.core?.parseDuration(video.contentDetails.duration) || 0;
                             }
                         });
                     }
@@ -423,9 +425,11 @@ async loadPlaylistVideos(playlistId) {
                 console.log(`✅ Duraciones actualizadas`);
             } catch (durationError) {
                 console.warn('⚠️ Error obteniendo duraciones:', durationError);
+                // Continuar sin duraciones si falla
             }
         }
         
+        // Guardar videos en la playlist
         playlist.videos = allVideos;
         playlist.isLoaded = true;
         
