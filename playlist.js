@@ -1697,9 +1697,7 @@ updatePlaylistsUI() {
     // Actualizar stats en core
     this.core?.updateOverviewStats?.();
 }
-    /**
-     * Actualizar la interfaz de la cola de reproducción (Sidebar/Lista)
-     */
+    
     updateQueueUI() {
         console.log('🔄 Actualizando interfaz de cola...');
         
@@ -1712,36 +1710,61 @@ updatePlaylistsUI() {
             this.core.updateQueueCount(videos.length);
         }
         
-        // 3. Si existe un contenedor de lista de cola en el DOM, actualizarlo
+        // ✅ 3. AÑADIR BOTÓN DE PLAY SI HAY VIDEOS Y NO HAY REPRODUCCIÓN
+        const hasVideos = videos.length > 0;
+        const isPlaying = window.reproduccionIniciada;
+        
+        if (hasVideos && !isPlaying) {
+            // Mostrar botón de play en el header de la cola
+            const queueHeader = document.querySelector('.queue-header');
+            if (queueHeader && !queueHeader.querySelector('.play-queue-btn')) {
+                const playBtn = document.createElement('button');
+                playBtn.className = 'play-queue-btn';
+                playBtn.innerHTML = '<i class="fas fa-play"></i> Reproducir';
+                playBtn.style.cssText = `
+                    background: var(--primary-color);
+                    color: white;
+                    border: none;
+                    border-radius: 20px;
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s ease;
+                `;
+                playBtn.onclick = () => {
+                    if (this.core) {
+                        this.core.playVideoAtIndex(0);
+                    }
+                };
+                queueHeader.insertBefore(playBtn, queueHeader.querySelector('.clear-queue-btn'));
+            }
+        } else {
+            // Remover botón si ya está reproduciendo
+            const existingBtn = document.querySelector('.play-queue-btn');
+            if (existingBtn) existingBtn.remove();
+        }
+        
+        // 4. Si existe un contenedor de lista de cola en el DOM, actualizarlo
         const queueListContainer = document.getElementById('queueContentList');
         if (queueListContainer) {
-            // Usamos la misma lógica de renderizado que el popup para consistencia
-            // O una versión simplificada si es una lista lateral
             if (videos.length === 0) {
                 queueListContainer.innerHTML = `
                     <div class="empty-queue-placeholder">
                         <p>La cola está vacía</p>
                     </div>`;
             } else {
-                // Renderizar items
-                // Nota: Reutilizamos renderQueueContent si queremos el mismo estilo,
-                // o construimos uno específico si la vista es diferente.
-                // Aquí asumo que quieres actualizar la vista principal de la cola.
-                
-                // Opción A: Delegar al core si tiene la función (para no duplicar lógica visual)
                 if (this.core && this.core.updatePersistentQueue) {
                     this.core.updatePersistentQueue();
-                } 
-                // Opción B: Renderizar manualmente si el core no lo maneja
-                else {
+                } else {
                     queueListContainer.innerHTML = this.renderQueueContent(videos);
-                    this.setupQueueItemListeners(); // Reactivar eventos
+                    this.setupQueueItemListeners();
                 }
             }
         }
-
-        // 4. Actualizar estado de "Siguiente" en el reproductor si es necesario
-        // (Opcional, depende de tu diseño)
     }
     /**
      * Limpiar toda la cola
