@@ -41,11 +41,11 @@ let currentPlayingInfo = {
 let isLoadingMore = false;
 let nextPageContext = null;
 let currentSearchQuery = '';
-let searchScrollObserver = null; // Nuevo observador para scroll
+let searchScrollObserver = null;
 
-let segmentosCache = {};
 let lastSeekEndTime = -1;
 let lastSeekVideoId = null;
+
 // ==========================================
 // VARIABLES GLOBALES Y CACHÉ OPTIMIZADA
 // ==========================================
@@ -53,7 +53,6 @@ let lastSeekVideoId = null;
 // Variable de estado para el preload
 let isNextVideoPreloaded = false;
 
-// Inicialización de Cache SponsorBlock con persistencia
 let segmentosCache = {};
 try {
     const saved = sessionStorage.getItem('ytcm_sponsor_cache');
