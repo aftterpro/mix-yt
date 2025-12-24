@@ -364,6 +364,7 @@ async loadPlaylistVideos(playlistId) {
         let allVideos = [];
         let nextPageToken = null;
         
+        // ✅ PASO 1: Cargar metadata de la playlist
         do {
             const response = await gapi.client.youtube.playlistItems.list({
                 part: ['snippet', 'contentDetails'],
@@ -385,7 +386,7 @@ async loadPlaylistVideos(playlistId) {
                         author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
                         sourcePlaylistId: playlistId
                     }))
-                    .filter(v => v.videoId);
+                    .filter(v => v.videoId && !v.title.toLowerCase().includes('deleted'));
                 
                 allVideos.push(...videos);
             }
@@ -394,51 +395,51 @@ async loadPlaylistVideos(playlistId) {
             
         } while (nextPageToken);
         
-        console.log(`✅ ${allVideos.length} videos cargados`);
+        console.log(`📦 ${allVideos.length} videos obtenidos, cargando duraciones...`);
         
-        // ✅ OBTENER DURACIONES EN LOTE (CORRECCIÓN)
-        if (allVideos.length > 0) {
+        // ✅ PASO 2: Obtener duraciones en lotes
+        if (allVideos.length > 0 && this.core) {
             try {
-                console.log(`⏳ Obteniendo duraciones de ${allVideos.length} videos...`);
+                const videoIds = allVideos.map(v => v.videoId);
                 
                 // Procesar en lotes de 50
-                for (let i = 0; i < allVideos.length; i += 50) {
-                    const batch = allVideos.slice(i, i + 50);
-                    const videoIds = batch.map(v => v.videoId);
+                for (let i = 0; i < videoIds.length; i += 50) {
+                    const batch = videoIds.slice(i, i + 50);
+                    
+                    console.log(`⏱️ Cargando duraciones del lote ${Math.floor(i/50) + 1}...`);
                     
                     const response = await gapi.client.youtube.videos.list({
                         part: ['contentDetails'],
-                        id: videoIds.join(',')
+                        id: batch.join(',')
                     });
                     
                     if (response.result.items) {
-                        response.result.items.forEach(video => {
-                            const matchingVideo = allVideos.find(v => v.videoId === video.id);
-                            if (matchingVideo && video.contentDetails?.duration) {
-                                // Usar la función del core para parsear duración ISO 8601
-                                matchingVideo.duration = this.core?.parseDuration(video.contentDetails.duration) || 0;
+                        response.result.items.forEach(videoData => {
+                            const video = allVideos.find(v => v.videoId === videoData.id);
+                            if (video && videoData.contentDetails?.duration) {
+                                // ✅ Usar parseDuration del core
+                                video.duration = this.core.parseDuration(videoData.contentDetails.duration);
+                                console.log(`✅ ${video.videoId}: ${video.duration}s`);
                             }
                         });
                     }
                 }
                 
-                console.log(`✅ Duraciones actualizadas`);
+                console.log(`✅ Duraciones cargadas para ${allVideos.length} videos`);
             } catch (durationError) {
                 console.warn('⚠️ Error obteniendo duraciones:', durationError);
-                // Continuar sin duraciones si falla
             }
         }
         
-        // Guardar videos en la playlist
         playlist.videos = allVideos;
         playlist.isLoaded = true;
         
-        this.core?.showMessage(`${allVideos.length} videos cargados`, 'success');
+        this.core?.showMessage(`${allVideos.length} videos cargados con duraciones`, 'success');
         return true;
         
     } catch (error) {
         console.error('❌ Error cargando videos:', error);
-        this.core?.showMessage('Error cargando videos', 'error');
+        this.core?.showMessage('Error cargando videos: ' + error.message, 'error');
         return false;
     }
 }
@@ -1959,60 +1960,71 @@ createPlaylistCard(playlist) {
             </button>
         </div>
     `;
-
-    // ✅ Event listener para reproducir playlist
     const playBtn = card.querySelector('.play-playlist-btn');
     playBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const playlistId = playBtn.dataset.playlistId;
-        
-        console.log(`🎵 Reproducir playlist: ${playlistId}`);
-        
-        if (isYouTubeLibrary && !playlist.isLoaded) {
-            console.log('📥 Cargando videos de YouTube Library...');
-            await this.loadPlaylistVideos(playlistId);
+    e.stopPropagation();
+    const playlistId = playBtn.dataset.playlistId;
+    
+    console.log(`🎵 Reproducir playlist: ${playlistId}`);
+    
+    // ✅ Si es de YouTube Library, cargar videos primero
+    if (isYouTubeLibrary && !playlist.isLoaded) {
+        console.log('📥 Cargando videos de YouTube Library...');
+        const success = await this.loadPlaylistVideos(playlistId);
+        if (!success) {
+            this.core?.showMessage('Error cargando videos', 'error');
+            return;
         }
+    }
+    
+    // ✅ Obtener playlist actualizada
+    const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
+    
+    if (!updatedPlaylist?.videos?.length) {
+        this.core?.showMessage('La playlist está vacía', 'error');
+        return;
+    }
+    
+    console.log(`📋 Añadiendo ${updatedPlaylist.videos.length} videos a cola...`);
+    
+    let addedCount = 0;
+    
+    // ✅ Añadir cada video a la cola
+    for (const video of updatedPlaylist.videos) {
+        const videoData = {
+            videoId: video.videoId,
+            title: video.title,
+            thumbnail: video.thumbnail,
+            duration: video.duration || 0, // ✅ Incluir duración
+            uploaderName: video.uploaderName || video.author || 'YouTube',
+            author: video.author || video.uploaderName || 'YouTube',
+            sourcePlaylistId: playlistId
+        };
         
-        const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
+        // ✅ Verificar duplicados
+        const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+        const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
         
-        if (updatedPlaylist?.videos?.length > 0) {
-            let addedCount = 0;
-            
-            for (const video of updatedPlaylist.videos) {
-                const videoData = {
-                    videoId: video.videoId,
-                    title: video.title,
-                    thumbnail: video.thumbnail,
-                    duration: video.duration,
-                    uploaderName: video.uploaderName || video.author || 'YouTube',
-                    author: video.author || video.uploaderName || 'YouTube'
-                };
-                
-                const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
-                const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
-                
-                if (!isDuplicate) {
-                    await this.addVideoToQueue(videoData);
-                    addedCount++;
-                }
-            }
-            
-            if (addedCount > 0) {
-                this.core?.showMessage(`${addedCount} videos de "${updatedPlaylist.name}" añadidos a cola`, 'success');
-                
-                const flatList = this.core?.getFlattenedPlaylist();
-                if (flatList?.length > 0 && !window.reproduccionIniciada) {
-                    this.core?.playVideoAtIndex(0);
-                    this.core?.switchView('playing');
-                }
-            } else {
-                this.core?.showMessage(`Todos los videos de "${updatedPlaylist.name}" ya están en la cola`, 'info');
-            }
-        } else {
-            console.error('❌ La playlist no tiene videos o no se cargaron correctamente');
-            this.core?.showMessage('No se pudieron cargar los videos de la playlist', 'error');
+        if (!isDuplicate) {
+            await this.addVideoToQueue(videoData, true); // ✅ true = al final
+            addedCount++;
         }
-    });
+    }
+    
+    if (addedCount > 0) {
+        this.core?.showMessage(`${addedCount} videos añadidos a cola`, 'success');
+        
+        // ✅ Si no hay reproducción, iniciar
+        const flatList = this.core?.getFlattenedPlaylist();
+        if (flatList?.length > 0 && !window.reproduccionIniciada) {
+            setTimeout(() => {
+                this.core?.playVideoAtIndex(0);
+            }, 300);
+        }
+    } else {
+        this.core?.showMessage('Todos los videos ya están en la cola', 'info');
+    }
+});
 
     // ✅ Event listener para eliminar playlist
     const deleteBtn = card.querySelector('.delete-playlist-btn');
