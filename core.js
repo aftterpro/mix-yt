@@ -1085,44 +1085,40 @@ switchView(viewName) {
 }
 
 movePlayersToFullView() {
-    console.log('🎬 Expandiendo a vista completa (Efecto Visual)...');
+    console.log('🎬 Expandiendo a vista completa...');
     
     const persistentLayer = document.getElementById('persistent-player-layer');
     if (!persistentLayer) return;
     
-    // 1. Asegurar que la capa persistente sea visible
-    persistentLayer.style.display = 'block';
-    persistentLayer.style.opacity = '1';
-    persistentLayer.style.zIndex = '50'; // Z-Index alto
-
-    // 2. Obtener dimensiones destino
     const fullPlayerView = document.getElementById('fullPlayerView');
     const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
     
     if (!videoWrapper) return;
     
+    // Forzar recalculo de dimensiones
     const wrapperRect = videoWrapper.getBoundingClientRect();
     
-    // 3. Aplicar efecto de transición (mover capa visualmente)
+    // Aplicar estilos
     persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
     persistentLayer.style.top = `${wrapperRect.top}px`;
     persistentLayer.style.left = `${wrapperRect.left}px`;
     persistentLayer.style.width = `${wrapperRect.width}px`;
     persistentLayer.style.height = `${wrapperRect.height}px`;
-    persistentLayer.style.borderRadius = '0px'; // En full screen sin bordes
+    persistentLayer.style.borderRadius = '12px'; // Un poco de borde se ve mejor
+    persistentLayer.style.opacity = '1';
+    persistentLayer.style.pointerEvents = 'auto';
     
-    // 4. FIX PANTALLA NEGRA: Forzar opacidad del reproductor interno
-    const activePlayerNum = window.currentPlayer || 1;
-    const activePlayerId = `player${activePlayerNum}`;
-    const activePlayer = document.getElementById(activePlayerId);
+    // CORRECCIÓN: Z-Index alto para ganar al fondo negro
+    persistentLayer.style.zIndex = '100'; 
     
-    if (activePlayer) {
-        activePlayer.style.opacity = '1';
-        activePlayer.style.display = 'block';
-        activePlayer.style.visibility = 'visible';
-    }
-
     document.body.classList.remove('mini-player-active');
+    
+    // Asegurar que el player interno sea visible
+    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
+    if (activePlayer && activePlayer.getIframe()) {
+        activePlayer.getIframe().style.opacity = '1';
+        activePlayer.getIframe().style.visibility = 'visible';
+    }
 }
 
     forceBottomPlayerVisible() {
@@ -2384,26 +2380,29 @@ function monitorPlayers() {
 
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
+        const videoId = activePlayer.getVideoData()?.video_id; // Necesitamos el ID
         
-        // Ejecutar SponsorBlock
+        // Ejecutar SponsorBlock (Saltos normales)
         checkAndSkipSegment(activePlayer);
 
-        // ✅ CORRECCIÓN: Simplificar lógica de crossfade
-        const timeRemaining = videoDuration - currentTime;
+        // ✅ CÁLCULO DINÁMICO DEL CROSSFADE
+        // Calculamos el momento exacto donde debe iniciar, considerando SponsorBlock
+        const triggerTime = calculateCrossfadeTriggerTime(videoDuration, videoId);
         
-        // ✅ SI quedan menos de 15 segundos Y no hemos iniciado crossfade
-        if (timeRemaining <= 15 && 
+        // Si ya pasamos el tiempo de disparo Y no hemos iniciado la transición...
+        if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
             !nextVideoScheduled) {
             
-            console.log(`🎨 CROSSFADE ACTIVADO - Quedan ${timeRemaining.toFixed(2)}s`);
+            const timeRemaining = videoDuration - currentTime;
+            console.log(`🎨 CROSSFADE ACTIVADO - Trigger: ${triggerTime.toFixed(2)}s | Actual: ${currentTime.toFixed(2)}s`);
             
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             isTransitioning = true;
             
-            // Pausar monitor brevemente
+            // Pausar monitor brevemente para evitar disparos dobles
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
@@ -2427,9 +2426,10 @@ function monitorPlayers() {
             }
         }
         
-        // ✅ FALLBACK: Si llega a los últimos 2 segundos sin crossfade
-        if (timeRemaining <= 2 && !nextVideoScheduled) {
-            console.warn('⚠️ FALLBACK: Forzando siguiente video');
+        // ✅ FALLBACK DE EMERGENCIA
+        // Si por alguna razón matemática falló el cálculo y estamos a 1s del final real
+        if ((videoDuration - currentTime) <= 1 && !nextVideoScheduled) {
+            console.warn('⚠️ FALLBACK: Forzando siguiente video por fin de pista');
             nextVideoScheduled = true;
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
@@ -2440,23 +2440,41 @@ function monitorPlayers() {
         console.error('❌ Error en monitorPlayers:', error); 
     }
 }
+
 function calculateCrossfadeTriggerTime(videoDuration, videoId) {
-    const API_BUFFER = 1;
-    const SAFETY_MARGIN = 0.5;
-    let totalSponsorBlockDuration = 0;
+    // Margen de seguridad para que no corte antes de tiempo
+    const SAFETY_MARGIN = 0.5; 
     
-    if (videoId && segmentosCache[videoId] && Array.isArray(segmentosCache[videoId])) {
-        totalSponsorBlockDuration = segmentosCache[videoId]
-            .filter(s => s.category === 'music_offtopic')
-            .reduce((sum, s) => {
-                const start = s.segment?.[0] ?? s.startTime;
-                const end = s.segment?.[1] ?? s.endTime;
-                return sum + (end - start);
-            }, 0);
+    // Si no hay datos, usar el final normal menos la duración del efecto
+    if (!videoId || !segmentosCache[videoId] || !Array.isArray(segmentosCache[videoId])) {
+        return videoDuration - CROSSFADE_DURATION - SAFETY_MARGIN;
     }
-    const effectiveVideoDuration = videoDuration - totalSponsorBlockDuration;
-    const totalAdjustment = CROSSFADE_DURATION + API_BUFFER + SAFETY_MARGIN;
-    return effectiveVideoDuration - totalAdjustment;
+
+    // 1. Encontrar el "Final Efectivo" (Donde termina la música realmente)
+    // Buscamos segmentos tipo 'outro', 'selfpromo', etc. que estén cerca del final
+    let effectiveEndTime = videoDuration;
+    
+    const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
+    
+    segmentosCache[videoId].forEach(segment => {
+        if (endCategories.includes(segment.category)) {
+            const start = segment.segment?.[0] ?? segment.startTime;
+            const end = segment.segment?.[1] ?? segment.endTime;
+            
+            // Si este segmento termina cerca del final del video (margen de 2s)
+            // entonces el video "musicalmente" termina donde empieza este segmento.
+            if (Math.abs(videoDuration - end) < 5) {
+                if (start < effectiveEndTime) {
+                    effectiveEndTime = start;
+                }
+            }
+        }
+    });
+
+    console.log(`⏱️ Video: ${videoDuration}s | Final Efectivo: ${effectiveEndTime}s | Trigger: ${effectiveEndTime - CROSSFADE_DURATION}s`);
+
+    // 2. El trigger es: Final Efectivo - Duración del Crossfade - Margen
+    return effectiveEndTime - CROSSFADE_DURATION - SAFETY_MARGIN;
 }
 
 window.reloadSponsorBlockSegments = function(videoId) {
