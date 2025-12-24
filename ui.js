@@ -170,15 +170,35 @@ class UIManager {
         }
     }
 
-    movePlayersToFullView() {
+movePlayersToFullView() {
         const persistentLayer = document.getElementById('persistent-player-layer');
         const videoWrapper = document.getElementById('videoWrapper');
         
-        if (!persistentLayer || !videoWrapper) return;
+        if (!persistentLayer || !videoWrapper) {
+            console.warn('⚠️ No se encontró persistent layer o videoWrapper');
+            return;
+        }
 
+        // Asegurar que videoWrapper sea visible y tenga dimensiones
         const rect = videoWrapper.getBoundingClientRect();
         
+        if (rect.width === 0 || rect.height === 0) {
+            console.warn('⚠️ videoWrapper no tiene dimensiones');
+            // Forzar dimensiones
+            videoWrapper.style.width = '100%';
+            videoWrapper.style.height = '100%';
+            videoWrapper.style.minHeight = '400px';
+            
+            // Reintentar después del reflow
+            requestAnimationFrame(() => this.movePlayersToFullView());
+            return;
+        }
+
+        console.log('🎬 Moviendo a Full View:', rect);
+        
         persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+        persistentLayer.style.display = 'block';
+        persistentLayer.style.position = 'fixed';
         persistentLayer.style.top = `${rect.top}px`;
         persistentLayer.style.left = `${rect.left}px`;
         persistentLayer.style.width = `${rect.width}px`;
@@ -186,8 +206,17 @@ class UIManager {
         persistentLayer.style.zIndex = '60';
         persistentLayer.style.borderRadius = '12px';
         persistentLayer.style.opacity = '1';
+        persistentLayer.style.pointerEvents = 'auto';
+        persistentLayer.style.backgroundColor = '#000';
         
         document.body.classList.remove('mini-player-active');
+        const players = persistentLayer.querySelectorAll('.video-player');
+        players.forEach(player => {
+            if (!player.classList.contains('hidden')) {
+                player.style.display = 'block';
+                player.style.visibility = 'visible';
+            }
+        });
     }
 
     showMiniPlayerFloat() {
@@ -242,27 +271,99 @@ class UIManager {
         }
     }
 
-   renderSearchResults(items, isContinuation = false) {
-    createSearchResultCard(video) {
+   renderSearchResults(items, isContinuation = false) {renderSearchResults(items, isContinuation = false) {
+        const container = this.elements.searchResults;
+        if (!container) return;
+
+        // --- CORRECCIÓN 1: Asegurar que 'items' sea un array ---
+        let videosToRender = [];
+        
+        if (Array.isArray(items)) {
+            videosToRender = items;
+        } else if (items && Array.isArray(items.items)) {
+            // Si la API devuelve { items: [...], nextPageToken: ... }
+            videosToRender = items.items;
+        } else if (items && typeof items === 'object') {
+             // Caso raro: objeto único
+             console.warn('UI: Recibido objeto no array, intentando convertir', items);
+             videosToRender = [items];
+        }
+
+        if (!isContinuation) container.innerHTML = '';
+        else {
+             const loader = container.querySelector('.search-loading-more');
+             if (loader) loader.remove();
+        }
+
+        // Si después de limpiar sigue vacío o nulo
+        if (!videosToRender || videosToRender.length === 0) {
+            if (!isContinuation) container.innerHTML = '<div class="search-placeholder"><p>No se encontraron videos.</p></div>';
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        
+        // Usamos videosToRender en lugar de items
+        videosToRender.forEach(video => {
+            // Validación extra para evitar errores si llega un item vacío
+            if (!video) return; 
+            const card = this.createSearchResultCard(video);
+            fragment.appendChild(card);
+        });
+
+        container.appendChild(fragment);
+    }
+       
+createSearchResultCard(video) {
+        // 1. Validación temprana: Si no hay ID, no renderizamos nada (evita errores)
+        const videoId = video.videoId || video.id;
+        if (!videoId) return document.createDocumentFragment();
+
+        // 2. Normalización de datos (Fallbacks)
+        const title = video.title || 'Título desconocido';
+        const artist = video.uploaderName || video.artist || 'Artista desconocido';
+        const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
+        
+        // Formatear duración solo si es necesario
+        let durationDisplay = '';
+        if (typeof video.duration === 'number') {
+            durationDisplay = this.formatDuration(video.duration);
+        } else {
+            durationDisplay = video.duration || '';
+        }
+
+        // 3. Creación del Elemento
         const div = document.createElement('div');
+        // Combinamos clases: 
+        // 'track-item' y 'card-track': Para que herede estilos de lista/grid de tu CSS.
+        // 'search-result-card': Por si tienes estilos específicos de búsqueda.
         div.className = 'track-item card-track search-result-card';
-        // ... (Tu lógica de HTML del card, copiada de core.js) ...
-        // Simplificado para el ejemplo:
+        div.dataset.videoId = videoId; // Útil para debug o clicks generales
+
+        // 4. HTML Optimizado
+        // Nota: Agregamos 'play-video-card-btn' al contenedor de la imagen para permitir play directo
         div.innerHTML = `
-            <div class="search-result-thumbnail">
-                <img src="${video.thumbnail}" loading="lazy">
-                <span class="search-result-duration">${video.duration}</span>
+            <div class="search-result-thumbnail play-video-card-btn" data-video-id="${videoId}" role="button">
+                <img src="${thumbnail}" 
+                     alt="${this.escapeHTML(title)}" 
+                     loading="lazy" 
+                     onerror="this.src='./electronic.ico';">
+                ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
+                <div class="play-overlay"><i class="fas fa-play"></i></div>
             </div>
+            
             <div class="search-result-info">
-                <h3>${this.escapeHTML(video.title)}</h3>
-                <p>${this.escapeHTML(video.uploaderName || video.artist)}</p>
+                <h3 title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
+                <p>${this.escapeHTML(artist)}</p>
             </div>
-            <button class="add-to-queue-btn" data-video-id="${video.videoId}">
+            
+            <button class="add-to-queue-btn" 
+                    data-video-id="${videoId}"
+                    title="Añadir a la cola">
                 <i class="fas fa-plus"></i>
             </button>
         `;
-        
-        // Agregar listeners aquí o delegar en el controlador
+
         return div;
     }
 
