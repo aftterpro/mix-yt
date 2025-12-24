@@ -1285,36 +1285,6 @@ startCrossfade(prevPlayer, nextPlayer) {
     }, stepTime);
 }
 
-function preloadNextVideo() {
-    // Si no hay core o playlist, abortar
-    if (!window.unifiedCore) return;
-
-    const flatList = window.unifiedCore.getFlattenedPlaylist();
-    // Validar que info actual existe
-    if (!window.currentPlayingInfo || window.currentPlayingInfo.flattenedIndex === -1) return;
-
-    const nextIndex = window.currentPlayingInfo.flattenedIndex + 1;
-
-    // Solo precargar si existe un siguiente video en la lista
-    if (nextIndex < flatList.length) {
-        const nextVideo = flatList[nextIndex];
-        // Seleccionar el reproductor que NO está sonando actualmente
-        const nextPlayer = (window.currentPlayer === 1) ? window.player2 : window.player1;
-        
-        if (nextPlayer && typeof nextPlayer.cueVideoById === 'function') {
-            console.log(`📥 Precargando siguiente pista: "${nextVideo.title}"`);
-            
-            // cueVideoById descarga metadatos y buffer inicial sin reproducir
-            nextPlayer.cueVideoById({
-                videoId: nextVideo.videoId,
-                startSeconds: 0
-            });
-            
-            // Opcional: Cargar también sus segmentos SponsorBlock ahora
-            obtenerSegmentosSponsorBlock(nextVideo.videoId);
-        }
-    }
-}
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
@@ -1868,6 +1838,38 @@ showMessage(message, type = 'info') {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
+
+function preloadNextVideo() {
+    // Si no hay core o playlist, abortar
+    if (!window.unifiedCore) return;
+
+    const flatList = window.unifiedCore.getFlattenedPlaylist();
+    // Validar que info actual existe
+    if (!window.currentPlayingInfo || window.currentPlayingInfo.flattenedIndex === -1) return;
+
+    const nextIndex = window.currentPlayingInfo.flattenedIndex + 1;
+
+    // Solo precargar si existe un siguiente video en la lista
+    if (nextIndex < flatList.length) {
+        const nextVideo = flatList[nextIndex];
+        // Seleccionar el reproductor que NO está sonando actualmente
+        const nextPlayer = (window.currentPlayer === 1) ? window.player2 : window.player1;
+        
+        if (nextPlayer && typeof nextPlayer.cueVideoById === 'function') {
+            console.log(`📥 Precargando siguiente pista: "${nextVideo.title}"`);
+            
+            // cueVideoById descarga metadatos y buffer inicial sin reproducir
+            nextPlayer.cueVideoById({
+                videoId: nextVideo.videoId,
+                startSeconds: 0
+            });
+            
+            // Opcional: Cargar también sus segmentos SponsorBlock ahora
+            obtenerSegmentosSponsorBlock(nextVideo.videoId);
+        }
+    }
+}
+
 async function obtenerSegmentosSponsorBlock(videoId) {
     if (!videoId) return [];
 
