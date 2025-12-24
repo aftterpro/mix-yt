@@ -142,7 +142,7 @@ class UnifiedCore {
         this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
         this.playlistsData = playlistsData;
         this.scrollObserver = null; // Inicializar observador de scroll
-        
+        this.ui = window.uiManager; // Referencia corta
         // Inicializar
         this.init();
         this.setupAutomaticSaving();
@@ -585,86 +585,9 @@ initializeUI() {
             return false;
         }
     }
-
 updatePlayerPosition(targetContainerId) {
-    const playersLayer = document.getElementById('persistent-player-layer');
-    const targetContainer = document.getElementById(targetContainerId);
-    
-    // Crear la capa persistente si no existe
-    if (!playersLayer) {
-        const layer = document.createElement('div');
-        layer.id = 'persistent-player-layer';
-        layer.style.cssText = `
-            position: fixed;
-            z-index: 1000;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            background: transparent;
-            overflow: hidden;
-            pointer-events: none;
-        `;
-        document.body.appendChild(layer);
-        
-        const p1 = document.getElementById('player1');
-        const p2 = document.getElementById('player2');
-        if (p1) layer.appendChild(p1);
-        if (p2) layer.appendChild(p2);
-        
-        return this.updatePlayerPosition(targetContainerId);
-    }
-
-    if (!targetContainer || targetContainer.classList.contains('hidden')) {
-        playersLayer.style.opacity = '0';
-        playersLayer.style.pointerEvents = 'none';
-        return;
-    }
-
-    const rect = targetContainer.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return;
-
-    // === CORRECCIÓN DE ALTURA ===
-    let finalHeight = rect.height;
-    
-    // ✅ NUEVA LÓGICA: Si es full player y altura es sospechosa, usar altura calculada correcta
-    if (targetContainerId === 'videoWrapper') {
-        // Para full player, usar aspect ratio 16:9 basado en el ancho
-        const calculatedHeight = rect.width * (9 / 16);
-        
-        // Si la altura detectada es exagerada (>500px o mayor al ancho), usar calculada
-        if (finalHeight > 500 || finalHeight > rect.width) {
-            console.log(`🔧 Corrigiendo altura de video: ${finalHeight}px → ${calculatedHeight.toFixed(0)}px`);
-            finalHeight = calculatedHeight;
-            
-            // ✅ FORZAR ALTURA EN EL CONTENEDOR ORIGINAL
-            targetContainer.style.height = `${calculatedHeight}px`;
-            targetContainer.style.minHeight = `${calculatedHeight}px`;
-            targetContainer.style.maxHeight = `${calculatedHeight}px`;
-        }
-    }
-
-    playersLayer.style.top = `${rect.top}px`;
-    playersLayer.style.left = `${rect.left}px`;
-    playersLayer.style.width = `${rect.width}px`;
-    playersLayer.style.height = `${finalHeight}px`;
-    
-    // === LÓGICA DE VISIBILIDAD SEGÚN CONTENEDOR ===
-    if (targetContainerId === 'miniPlayerFloat' || targetContainerId === 'miniPlayerContainer') {
-        // En modo mini, ocultar esta capa (el mini player tiene su propio contenedor)
-        playersLayer.style.opacity = '0';
-        playersLayer.style.pointerEvents = 'none';
-    } else {
-        // En modo full, mostrar y permitir interacción
-        playersLayer.style.opacity = '1';
-        playersLayer.style.pointerEvents = 'auto';
-        playersLayer.style.background = 'transparent'; // ✅ TRANSPARENTE, no negro
-        
-        if (targetContainerId === 'videoWrapper') {
-            playersLayer.style.borderRadius = '12px'; // ✅ Bordes redondeados en full player
-            playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
-        } else {
-            playersLayer.style.borderRadius = '12px';
-            playersLayer.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
-        }
-    }
+    // Delegamos la tarea visual al UI Manager
+    this.ui.updatePlayerPosition(targetContainerId);
 }
     updatePlaylistsUI() {
         if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
@@ -797,81 +720,10 @@ updatePlayerPosition(targetContainerId) {
         this.updatePersistentQueue();
     }
 
-    forceMiniPlayerVisibility() {
-        console.log('🎬 Forzando visibilidad de mini player...');
-        const miniPlayer = document.getElementById('miniPlayerFloat');
-        if (!miniPlayer) return false;
-        
-        const hasActiveVideo = window.reproduccionIniciada || 
-                              window.currentPlayingInfo?.flattenedIndex >= 0;
-        
-        if (!hasActiveVideo) {
-            miniPlayer.classList.add('hidden');
-            return false;
-        }
-        
-        miniPlayer.classList.remove('hidden');
-        miniPlayer.style.cssText = `
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            position: fixed !important;
-            bottom: 110px !important;
-            right: 20px !important;
-            width: 320px !important;
-            height: 180px !important;
-            z-index: 999998 !important;
-            background: #000 !important;
-            border-radius: 12px !important;
-            overflow: hidden !important;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 1px rgba(255,107,53,0.5) !important;
-            pointer-events: auto !important;
-        `;
-        
-        const containers = [
-            miniPlayer.querySelector('.mini-player-video'),
-            document.getElementById('miniPlayer1Container'),
-            document.getElementById('miniPlayer2Container')
-        ].filter(Boolean);
-        
-        containers.forEach(container => {
-            container.style.cssText = `
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                width: 100% !important;
-                height: 100% !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                background: #000 !important;
-            `;
-        });
-        
-        const activePlayerNum = window.currentPlayer || 1;
-        const activePlayer = document.getElementById(`player${activePlayerNum}`);
-        const inactivePlayer = document.getElementById(`player${activePlayerNum === 1 ? 2 : 1}`);
-        
-        if (activePlayer) {
-            activePlayer.style.cssText = `
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-            `;
-            activePlayer.classList.remove('hidden', 'fade-out');
-        }
-        if (inactivePlayer) {
-            inactivePlayer.style.display = 'none';
-            inactivePlayer.classList.add('hidden');
-        }
-        console.log('✅ Mini player forzado a visible');
-        return true;
-    }
+  // Fuerza la visibilidad si algo falla
+forceMiniPlayerVisibility() {
+    this.ui.forceMiniPlayerVisibility();
+}
 
     setupSearchButtonListeners() {
         console.log('🔘 Configurando listeners de botones de búsqueda...');
@@ -1000,125 +852,19 @@ updatePlayerPosition(targetContainerId) {
         if (queueCountBadge) queueCountBadge.textContent = count;
     }
 
+// Cambia entre vistas (Home, Library, Player, etc.)
 switchView(viewName) {
-    const validViews = ['home', 'search', 'library', 'fullPlayer'];
-    if (!validViews.includes(viewName)) return;
-
-    console.log(`🔄 Cambiando a vista: ${viewName}`);
-
-    // 1. Actualizar UI de Navegación (Tabs y Botones inferiores)
-    document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
-        item.classList.remove('active');
-        if (item.dataset.view === viewName) item.classList.add('active');
-    });
-
-    // 2. Actualizar Contenedores de Vista (Ocultar/Mostrar)
-    document.querySelectorAll('.content-view').forEach(view => {
-        view.classList.remove('active');
-        if (viewName !== 'fullPlayer' && view.dataset.view !== viewName) {
-            view.scrollTop = 0;
-        }
-    });
-
-    const targetView = document.getElementById(`${viewName}View`);
-    if (targetView) targetView.classList.add('active');
-    
+    // 1. Guardar el estado lógico en Core
     this.currentView = viewName;
-
-    // 3. GESTIÓN DE REPRODUCTORES (Full vs Mini vs Oculto)
-    const miniPlayer = document.getElementById('miniPlayerFloat');
-    const persistentLayer = document.getElementById('persistent-player-layer'); // <--- IMPORTANTE
-    const hasActiveVideo = window.reproduccionIniciada || 
-                           (this.state.currentPlayingInfo?.flattenedIndex >= 0);
-
-    if (viewName === 'fullPlayer') {
-        // === MODO PANTALLA COMPLETA ===
-        if (miniPlayer) {
-            miniPlayer.style.display = 'none';
-            miniPlayer.classList.add('hidden');
-        }
-        document.body.classList.remove('mini-player-active');
-
-        if (persistentLayer) {
-            persistentLayer.style.display = 'block';
-            persistentLayer.style.opacity = '1';
-            persistentLayer.style.pointerEvents = 'auto';
-        }
-
-        requestAnimationFrame(() => {
-            this.movePlayersToFullView(); 
-            this.updatePlayerPosition('videoWrapper');
-            setTimeout(() => {
-                this.updatePlayerPosition('videoWrapper');
-            }, 100);
-        });
-
-        if (window.playlistManager?.updateQueueUI) {
-            window.playlistManager.updateQueueUI();
-        }
-
-    } else {
-        // === OTRAS VISTAS (Home, Search, Library) ===
-        
-        if (hasActiveVideo) {
-            // A. Si hay música, mostramos Mini Player
-            this.showMiniPlayerFloat();
-        } else {
-            if (miniPlayer) {
-                miniPlayer.style.display = 'none';
-                miniPlayer.classList.add('hidden');
-            }
-            
-            if (persistentLayer) {
-                persistentLayer.style.opacity = '0';
-                persistentLayer.style.pointerEvents = 'none';
-            }
-        }
-        
-        if (viewName === 'library') {
-            this.refreshLibraryView();
-        } else if (viewName === 'search' && currentSearchQuery) {
-            const searchInput = document.getElementById('searchInput');
-            if(searchInput) searchInput.focus();
-        }
-    }
+    
+    // 2. Decirle a la UI que cambie las clases y oculte divs
+    this.ui.switchView(viewName);
 }
 
+// Expande el reproductor a pantalla completa
 movePlayersToFullView() {
-    console.log('🎬 Expandiendo a vista completa...');
-    
-    const persistentLayer = document.getElementById('persistent-player-layer');
-    if (!persistentLayer) return;
-    
-    const fullPlayerView = document.getElementById('fullPlayerView');
-    const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
-    
-    if (!videoWrapper) return;
-    
-    // Forzar recalculo de dimensiones
-    const wrapperRect = videoWrapper.getBoundingClientRect();
-    
-    // Aplicar estilos
-    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-    persistentLayer.style.top = `${wrapperRect.top}px`;
-    persistentLayer.style.left = `${wrapperRect.left}px`;
-    persistentLayer.style.width = `${wrapperRect.width}px`;
-    persistentLayer.style.height = `${wrapperRect.height}px`;
-    persistentLayer.style.borderRadius = '12px'; // Un poco de borde se ve mejor
-    persistentLayer.style.opacity = '1';
-    persistentLayer.style.pointerEvents = 'auto';
-    
-    // CORRECCIÓN: Z-Index alto para ganar al fondo negro
-    persistentLayer.style.zIndex = '100'; 
-    
-    document.body.classList.remove('mini-player-active');
-    
-    // Asegurar que el player interno sea visible
-    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
-    if (activePlayer && activePlayer.getIframe()) {
-        activePlayer.getIframe().style.opacity = '1';
-        activePlayer.getIframe().style.visibility = 'visible';
-    }
+    this.currentView = 'fullPlayer'; // Mantenemos el estado en Core
+    this.ui.movePlayersToFullView();
 }
 
     forceBottomPlayerVisible() {
@@ -1152,35 +898,9 @@ movePlayersToFullView() {
         if (searchInput) setTimeout(() => searchInput.focus(), 100);
     }
 
+// Muestra el mini reproductor flotante
 showMiniPlayerFloat() {
-    console.log('🎬 Reduciendo a mini player...');
-    
-    if (!window.reproduccionIniciada) return;
-
-    const miniPlayer = document.getElementById('miniPlayerFloat');
-    if (!miniPlayer) return;
-
-    // ✅ NO MOVER IFRAMES - Solo cambiar posición de la capa persistente
-    const persistentLayer = document.getElementById('persistent-player-layer');
-    if (!persistentLayer) return;
-
-    // Mostrar mini player
-    miniPlayer.classList.remove('hidden');
-    miniPlayer.style.display = 'block';
-    
-    // ✅ ANIMAR LA CAPA PERSISTENTE hacia el mini player
-    const miniRect = miniPlayer.getBoundingClientRect();
-    
-    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-    persistentLayer.style.top = `${miniRect.top}px`;
-    persistentLayer.style.left = `${miniRect.left}px`;
-    persistentLayer.style.width = `${miniRect.width}px`;
-    persistentLayer.style.height = `${miniRect.height}px`;
-    persistentLayer.style.borderRadius = '12px';
-    persistentLayer.style.opacity = '1';
-    persistentLayer.style.pointerEvents = 'auto';
-    
-    document.body.classList.add('mini-player-active');
+    this.ui.showMiniPlayerFloat();
 }
 movePlayersToFullView() {
     console.log('🎬 Expandiendo a vista completa...');
@@ -1610,132 +1330,10 @@ setupInfiniteScroll(container) {
 
     this.searchScrollObserver.observe(sentinel);
 }
-
-    displaySearchResults(data, isContinuation) {
-        const resultsContainer = document.getElementById('searchResults');
-        if (!resultsContainer) return;
-        
-        // Si no es continuación, limpiar el contenedor primero
-        if (!isContinuation) {
-             resultsContainer.innerHTML = '';
-        } else {
-             // Si es continuación, eliminar el spinner de carga y el centinela anterior
-             const loadingMore = resultsContainer.querySelector('.search-loading-more');
-             if(loadingMore) loadingMore.remove();
-             const existingSentinel = document.getElementById('search-sentinel');
-             if(existingSentinel) existingSentinel.remove();
-        }
-
-        if (!data.items || data.items.length === 0) {
-            if (!isContinuation) {
-                 resultsContainer.innerHTML = '<div class="search-placeholder"><i class="fas fa-search"></i><p>No se encontraron videos.</p></div>';
-            }
-            return;
-        }
-
-        // Crear fragmento para mejor rendimiento
-        const fragment = document.createDocumentFragment();
-
-        data.items.forEach(video => {
-            const segundos = this.parseDurationToSeconds(video.duration); 
-            const trackDiv = document.createElement('div');
-            trackDiv.className = 'track-item card-track search-result-card'; 
-            trackDiv.dataset.videoId = video.videoId;
-            trackDiv.dataset.durationText = video.duration; 
-            trackDiv.dataset.durationSeconds = segundos;
-
-            trackDiv.innerHTML = `
-                <div class="search-result-thumbnail">
-                    <img src="${video.thumbnail}" alt="${this.escapeHTML(video.title)}" loading="lazy" onerror="this.src='./electronic.ico';">
-                    <span class="search-result-duration">${video.duration || '0:00'}</span>
-                </div>
-                <div class="search-result-info">
-                    <h3 class="search-result-title">${this.escapeHTML(video.title)}</h3>
-                    <p class="search-result-author">${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}</p>
-                </div>
-                <button class="add-to-queue-btn" 
-                        title="Añadir a continuación" 
-                        data-video-id="${video.videoId}"
-                        data-title="${this.escapeHTML(video.title)}"
-                        data-thumbnail="${video.thumbnail}"
-                        data-duration="${segundos}"
-                        data-author="${this.escapeHTML(video.artist || video.uploaderName || 'Desconocido')}">
-                    <i class="fas fa-plus"></i>
-                </button>
-            `;
-            
-            // Configurar el botón para añadir DESPUÉS de la canción actual
-            const addButton = trackDiv.querySelector('.add-to-queue-btn');
-            if (addButton) {
-                addButton.addEventListener('click', async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const videoId = addButton.dataset.videoId;
-                    if (!videoId || videoId === 'undefined') return;
-                    
-                    const videoData = {
-                        videoId: videoId,
-                        title: addButton.dataset.title,
-                        thumbnail: addButton.dataset.thumbnail,
-                        duration: parseInt(addButton.dataset.duration) || 0,
-                        uploaderName: addButton.dataset.author,
-                        artist: addButton.dataset.author,
-                        author: addButton.dataset.author
-                    };
-                    
-                    const originalHTML = addButton.innerHTML;
-                    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                    addButton.disabled = true;
-                    
-                    try {
-                        // USA addVideoToQueueAfterCurrent EN LUGAR DE addVideoToQueue
-                        if (window.unifiedCore?.addVideoToQueueAfterCurrent) {
-                             await window.unifiedCore.addVideoToQueueAfterCurrent(videoData);
-                        } else if (window.playlistManager?.addVideoToQueueAfterCurrent) {
-                             await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
-                        } else {
-                             // Fallback si la función específica no existe
-                             await this.addVideoToQueue(videoData);
-                        }
-
-                        addButton.innerHTML = '<i class="fas fa-check"></i>';
-                        addButton.style.background = '#4caf50';
-                        setTimeout(() => {
-                            addButton.innerHTML = originalHTML;
-                            addButton.disabled = false;
-                            addButton.style.background = '';
-                        }, 2000);
-                    } catch (error) {
-                        addButton.innerHTML = '<i class="fas fa-times"></i>';
-                        addButton.style.background = '#f44336';
-                        setTimeout(() => {
-                            addButton.innerHTML = originalHTML;
-                            addButton.disabled = false;
-                            addButton.style.background = '';
-                        }, 2000);
-                    }
-                });
-            }
-            
-            // Click en la tarjeta reproduce directamente
-            trackDiv.addEventListener('click', (e) => {
-                if (e.target.closest('.add-to-queue-btn')) return;
-                 if (window.unifiedCore?.addVideoToQueueAfterCurrent) {
-                     // Opcional: reproducir inmediatamente en lugar de añadir a cola
-                     // this.playVideo(videoData); 
-                 }
-            });
-
-            fragment.appendChild(trackDiv);
-        });
-
-        resultsContainer.appendChild(fragment);
-
-        // Configurar Scroll Infinito si hay más páginas
-        if (nextPageContext) {
-             this.setupInfiniteScroll(resultsContainer);
-        }
-    }
+// Renderizar resultados de búsqueda
+displaySearchResults(videos, isContinuation = false) {
+    this.ui.renderSearchResults(videos, isContinuation);
+}
 
     // Nueva función para configurar el observador de scroll infinito
     setupInfiniteScroll(container) {
@@ -1839,25 +1437,10 @@ setupInfiniteScroll(container) {
         return card;
     }
 
-    clearSearchResults() {
-        const searchResults = document.getElementById('searchResults');
-        if (searchResults) {
-            searchResults.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>Busca música, artistas o playlists</p>
-                    <p><small>Sistema Unificado Activo</small></p>
-                </div>
-            `;
-        }
-        currentSearchQuery = '';
-        nextPageContext = null;
-        // Limpiar observador
-        if (this.searchScrollObserver) {
-            this.searchScrollObserver.disconnect();
-            this.searchScrollObserver = null;
-        }
-    }
+ // Limpiar resultados
+clearSearchResults() {
+    this.ui.clearSearchResults();
+}
 
     escapeHTML(text) {
         if (!text) return '';
@@ -2082,59 +1665,46 @@ updatePersistentQueue() {
         } catch (e) {}
     }
 
-    updateNowPlaying() {
-        const flatList = this.getFlattenedPlaylist();
-        const currentVideo = flatList[currentPlayingInfo.flattenedIndex];
+// Actualiza Título, Artista y Carátula
+updateNowPlaying() {
+    // 1. Obtener la info actual (Lógica de negocio se queda en Core)
+    const info = window.currentPlayingInfo;
+    if (!info || info.flattenedIndex === -1) return;
+
+    const flatList = this.getFlattenedPlaylist();
+    const videoData = flatList[info.flattenedIndex];
+
+    if (videoData) {
+        // 2. Pasar los datos limpios a la UI para que los pinte
+        this.ui.updateNowPlaying({
+            title: videoData.title,
+            artist: videoData.uploaderName || videoData.artist,
+            thumbnail: videoData.thumbnail
+        });
         
-        if (currentVideo) {
-            let artistInfo = currentVideo.artist || currentVideo.uploaderName || currentVideo.author || 'YouTube';
-            const elements = {
-                nowPlayingTitle: document.getElementById('nowPlayingTitle'),
-                nowPlayingArtist: document.getElementById('nowPlayingArtist'),
-                playerTitle: document.getElementById('playerTitle'),
-                playerArtist: document.getElementById('playerArtist'),
-                playerThumbnail: document.getElementById('playerThumbnail')
-            };
-
-            if (elements.nowPlayingTitle) elements.nowPlayingTitle.textContent = currentVideo.title;
-            if (elements.nowPlayingArtist) elements.nowPlayingArtist.textContent = artistInfo;
-            if (elements.playerTitle) elements.playerTitle.textContent = currentVideo.title;
-            if (elements.playerArtist) elements.playerArtist.textContent = artistInfo;
-            if (elements.playerThumbnail) elements.playerThumbnail.src = currentVideo.thumbnail;
-            
-            if (window.playlistManager && typeof window.playlistManager.refreshActiveQueueTab === 'function') {
-                window.playlistManager.refreshActiveQueueTab();
-            }
-        }
+        // Actualizar título de la pestaña del navegador
+        document.title = `▶ ${videoData.title} - YT CrossMix`;
     }
+}
 
-    updatePlayButton(state) {
-        const icon = state === 'play' ? 'fa-play' : 'fa-pause';
-        [document.getElementById('botonPlay'), document.getElementById('miniPlayBtn')].filter(Boolean).forEach(btn => {
-            const iconElement = btn.querySelector('i');
-            if (iconElement) iconElement.className = `fas ${icon}`;
-        });
-    }
+   // Cambia el icono de Play/Pause
+updatePlayButton(state) {
+    this.ui.updatePlayButton(state);
+}
+// Habilita los botones (cuando carga la playlist)
+enablePlayButton() {
+    this.ui.enablePlayButton(true);
+}
 
-    enablePlayButton() {
-        const shouldEnable = this.getFlattenedPlaylist().length > 0 && playersInitialized;
-        ['botonPlay', 'botonNext', 'prevButton', 'miniPlayBtn', 'miniNextBtn'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) btn.disabled = !shouldEnable;
-        });
-    }
-
-    updateOverviewStats() {
-        const totalPlaylists = playlistsData.length;
-        const totalVideos = playlistsData.reduce((sum, p) => sum + p.videos.length, 0);
-        const overviewGrid = document.getElementById('overviewGrid');
-        if (overviewGrid) {
-            const playlistStat = overviewGrid.querySelector('.overview-stat');
-            if (playlistStat) playlistStat.textContent = `${totalPlaylists} playlists cargadas`;
-            const videoStat = overviewGrid.querySelector('.overview-stat:nth-child(2)');
-            if (videoStat) videoStat.textContent = `${totalVideos} videos en total`;
-        }
-    }
+  // Actualizar contadores de estadísticas en Home
+updateOverviewStats() {
+    // Calcular datos (Core)
+    const playlistsCount = this.playlistsData.length;
+    const videosCount = this.playlistsData.reduce((acc, p) => acc + (p.videos ? p.videos.length : 0), 0);
+    
+    // Pintar datos (UI)
+    this.ui.updateOverviewStats(playlistsCount, videosCount);
+}
 
     updateStatusIndicator(message, type = 'info') {
         const indicator = document.getElementById('unifiedStatusIndicator');
@@ -2210,21 +1780,10 @@ updatePersistentQueue() {
         }
     }
 
-    showMessage(message, type = 'info', duration = 4000) {
-        console.log(`💬 ${type.toUpperCase()}: ${message}`);
-        const container = document.getElementById('floatingMessageContainer') || document.querySelector('.floating-messages');
-        if (!container) return;
-
-        const messageEl = document.createElement('div');
-        messageEl.className = `floating-message ${type}`;
-        messageEl.textContent = message;
-        container.appendChild(messageEl);
-
-        setTimeout(() => {
-            messageEl.classList.add('fade-out');
-            setTimeout(() => messageEl.remove(), 500);
-        }, duration);
-    }
+// Mostrar mensajes flotantes (Toast)
+showMessage(message, type = 'info') {
+    this.ui.showMessage(message, type);
+}
 
     closeAllContextMenus() {
         document.querySelectorAll('.delete-menu-content, .playlist-selection-popup-menu').forEach(menu => {
