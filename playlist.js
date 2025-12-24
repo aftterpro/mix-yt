@@ -2720,30 +2720,58 @@ class QueueDragDrop {
         
         observer.observe(document.body, { childList: true, subtree: true });
     }
-    attachDragListeners() {
+ attachDragListeners() {
     const queueItems = document.querySelectorAll('.queue-item');
     
     console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
     
     queueItems.forEach((item, index) => {
+        // ✅ CRÍTICO: Asegurar que el atributo draggable esté activo
         item.setAttribute('draggable', 'true');
         item.style.cursor = 'move';
         
-        // ✅ Remover listeners anteriores
-        item.ondragstart = null;
-        item.ondragover = null;
-        item.ondrop = null;
-        item.ondragend = null;
-        item.ondragenter = null;
-        item.ondragleave = null;
+        // ✅ Limpiar listeners anteriores clonando el nodo
+        const newItem = item.cloneNode(true);
+        item.parentNode.replaceChild(newItem, item);
         
-        // ✅ Configurar nuevos listeners
-        item.addEventListener('dragstart', (e) => this.handleDragStart(e, item, index));
-        item.addEventListener('dragover', (e) => this.handleDragOver(e));
-        item.addEventListener('drop', (e) => this.handleDrop(e, item, index));
-        item.addEventListener('dragend', (e) => this.handleDragEnd(e));
-        item.addEventListener('dragenter', (e) => this.handleDragEnter(e, item));
-        item.addEventListener('dragleave', (e) => this.handleDragLeave(e, item));
+        // ✅ Configurar eventos en el nodo limpio
+        newItem.addEventListener('dragstart', (e) => {
+            this.draggedItem = newItem;
+            this.draggedIndex = parseInt(newItem.dataset.flatIndex);
+            
+            newItem.style.opacity = '0.5';
+            newItem.classList.add('dragging');
+            
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.draggedIndex);
+            
+            console.log(`🎯 Drag start: índice ${this.draggedIndex}`);
+        });
+        
+        newItem.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        
+        newItem.addEventListener('dragenter', (e) => {
+            if (newItem !== this.draggedItem) {
+                newItem.classList.add('drag-over');
+            }
+        });
+        
+        newItem.addEventListener('dragleave', (e) => {
+            newItem.classList.remove('drag-over');
+        });
+        
+        newItem.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.handleDrop(e, newItem, parseInt(newItem.dataset.flatIndex));
+        });
+        
+        newItem.addEventListener('dragend', (e) => {
+            this.handleDragEnd(e);
+        });
     });
 }
     
