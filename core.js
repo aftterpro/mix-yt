@@ -1900,8 +1900,6 @@ function preloadNextVideo() {
         }
     }
 }
-const segmentosCache = {};
-
 async function cargarSponsorBlock(videoId) {
     // Si ya tenemos datos o estamos buscando, no hacemos nada
     if (segmentosCache[videoId]) return;
