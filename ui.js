@@ -171,53 +171,76 @@ class UIManager {
     }
 
 movePlayersToFullView() {
-        const persistentLayer = document.getElementById('persistent-player-layer');
-        const videoWrapper = document.getElementById('videoWrapper');
+    console.log('🎬 movePlayersToFullView iniciado');
+    
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    const videoWrapper = document.getElementById('videoWrapper');
+    
+    // ✅ CREAR CAPA SI NO EXISTE
+    if (!persistentLayer) {
+        console.warn('⚠️ Creando persistent-player-layer...');
+        const layer = document.createElement('div');
+        layer.id = 'persistent-player-layer';
+        layer.style.cssText = `
+            position: fixed;
+            background: #000;
+            overflow: hidden;
+            pointer-events: auto;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        `;
+        document.body.appendChild(layer);
         
-        if (!persistentLayer || !videoWrapper) {
-            console.warn('⚠️ No se encontró persistent layer o videoWrapper');
-            return;
-        }
-
-        // Asegurar que videoWrapper sea visible y tenga dimensiones
-        const rect = videoWrapper.getBoundingClientRect();
+        // Mover players al layer
+        const p1 = document.getElementById('player1');
+        const p2 = document.getElementById('player2');
+        if (p1) layer.appendChild(p1);
+        if (p2) layer.appendChild(p2);
         
-        if (rect.width === 0 || rect.height === 0) {
-            console.warn('⚠️ videoWrapper no tiene dimensiones');
-            // Forzar dimensiones
-            videoWrapper.style.width = '100%';
-            videoWrapper.style.height = '100%';
-            videoWrapper.style.minHeight = '400px';
-            
-            // Reintentar después del reflow
-            requestAnimationFrame(() => this.movePlayersToFullView());
-            return;
-        }
-
-        console.log('🎬 Moviendo a Full View:', rect);
-        
-        persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-        persistentLayer.style.display = 'block';
-        persistentLayer.style.position = 'fixed';
-        persistentLayer.style.top = `${rect.top}px`;
-        persistentLayer.style.left = `${rect.left}px`;
-        persistentLayer.style.width = `${rect.width}px`;
-        persistentLayer.style.height = `${rect.height}px`;
-        persistentLayer.style.zIndex = '60';
-        persistentLayer.style.borderRadius = '12px';
-        persistentLayer.style.opacity = '1';
-        persistentLayer.style.pointerEvents = 'auto';
-        persistentLayer.style.backgroundColor = '#000';
-        
-        document.body.classList.remove('mini-player-active');
-        const players = persistentLayer.querySelectorAll('.video-player');
-        players.forEach(player => {
-            if (!player.classList.contains('hidden')) {
-                player.style.display = 'block';
-                player.style.visibility = 'visible';
-            }
-        });
+        // Reintentar
+        return this.movePlayersToFullView();
     }
+    
+    if (!videoWrapper) {
+        console.error('❌ videoWrapper no encontrado');
+        return;
+    }
+
+    const rect = videoWrapper.getBoundingClientRect();
+    
+    if (rect.width === 0 || rect.height === 0) {
+        console.warn('⚠️ videoWrapper sin dimensiones, forzando...');
+        videoWrapper.style.width = '100%';
+        videoWrapper.style.height = '100%';
+        videoWrapper.style.minHeight = '400px';
+        
+        requestAnimationFrame(() => this.movePlayersToFullView());
+        return;
+    }
+
+    console.log('✅ Dimensiones OK:', rect);
+    
+    persistentLayer.style.display = 'block';
+    persistentLayer.style.top = `${rect.top}px`;
+    persistentLayer.style.left = `${rect.left}px`;
+    persistentLayer.style.width = `${rect.width}px`;
+    persistentLayer.style.height = `${rect.height}px`;
+    persistentLayer.style.zIndex = '60';
+    persistentLayer.style.borderRadius = '12px';
+    persistentLayer.style.opacity = '1';
+    persistentLayer.style.pointerEvents = 'auto';
+    
+    document.body.classList.remove('mini-player-active');
+    
+    const players = persistentLayer.querySelectorAll('.video-player');
+    players.forEach(player => {
+        if (!player.classList.contains('hidden')) {
+            player.style.display = 'block';
+            player.style.visibility = 'visible';
+        }
+    });
+    
+    console.log('✅ movePlayersToFullView completado');
+}
 
     showMiniPlayerFloat() {
         const miniPlayer = document.getElementById('miniPlayerFloat');
@@ -315,57 +338,95 @@ movePlayersToFullView() {
     }
        
 createSearchResultCard(video) {
-        // 1. Validación temprana: Si no hay ID, no renderizamos nada (evita errores)
-        const videoId = video.videoId || video.id;
-        if (!videoId) return document.createDocumentFragment();
-
-        // 2. Normalización de datos (Fallbacks)
-        const title = video.title || 'Título desconocido';
-        const artist = video.uploaderName || video.artist || 'Artista desconocido';
-        const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
-        
-        // Formatear duración solo si es necesario
-        let durationDisplay = '';
-        if (typeof video.duration === 'number') {
-            durationDisplay = this.formatDuration(video.duration);
-        } else {
-            durationDisplay = video.duration || '';
-        }
-
-        // 3. Creación del Elemento
-        const div = document.createElement('div');
-        // Combinamos clases: 
-        // 'track-item' y 'card-track': Para que herede estilos de lista/grid de tu CSS.
-        // 'search-result-card': Por si tienes estilos específicos de búsqueda.
-        div.className = 'track-item card-track search-result-card';
-        div.dataset.videoId = videoId; // Útil para debug o clicks generales
-
-        // 4. HTML Optimizado
-        // Nota: Agregamos 'play-video-card-btn' al contenedor de la imagen para permitir play directo
-        div.innerHTML = `
-            <div class="search-result-thumbnail play-video-card-btn" data-video-id="${videoId}" role="button">
-                <img src="${thumbnail}" 
-                     alt="${this.escapeHTML(title)}" 
-                     loading="lazy" 
-                     onerror="this.src='./electronic.ico';">
-                ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
-                <div class="play-overlay"><i class="fas fa-play"></i></div>
-            </div>
-            
-            <div class="search-result-info">
-                <h3 title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
-                <p>${this.escapeHTML(artist)}</p>
-            </div>
-            
-            <button class="add-to-queue-btn" 
-                    data-video-id="${videoId}"
-                    title="Añadir a la cola">
-                <i class="fas fa-plus"></i>
-            </button>
-        `;
-
-        return div;
+    const videoId = video.videoId || video.id;
+    if (!videoId) {
+        console.warn('⚠️ Video sin ID, omitiendo:', video);
+        return document.createDocumentFragment();
     }
+
+    const title = video.title || 'Título desconocido';
+    const artist = video.uploaderName || video.artist || 'Artista desconocido';
+    const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
+    
+    let durationDisplay = '';
+    if (typeof video.duration === 'number') {
+        durationDisplay = this.formatDuration(video.duration);
+    } else {
+        durationDisplay = video.duration || '';
+    }
+
+    const div = document.createElement('div');
+    div.className = 'track-item card-track search-result-card';
+    div.dataset.videoId = videoId;
+
+    div.innerHTML = `
+        <div class="search-result-thumbnail">
+            <img src="${thumbnail}" 
+                 alt="${this.escapeHTML(title)}" 
+                 loading="lazy" 
+                 onerror="this.src='./electronic.ico';">
+            ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
+        </div>
+        
+        <div class="search-result-info">
+            <h3 title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
+            <p>${this.escapeHTML(artist)}</p>
+        </div>
+        
+        <button class="add-to-queue-btn" 
+                data-video-id="${videoId}"
+                data-title="${this.escapeHTML(title)}"
+                data-thumbnail="${thumbnail}"
+                data-duration="${video.duration || 0}"
+                data-artist="${this.escapeHTML(artist)}"
+                title="Añadir a la cola">
+            <i class="fas fa-plus"></i>
+        </button>
+    `;
+
+    // ✅ EVENTO CLICK EN EL BOTÓN
+    const addBtn = div.querySelector('.add-to-queue-btn');
+    addBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        console.log('🎵 Click en añadir:', videoId);
+        
+        const videoData = {
+            videoId: videoId,
+            title: addBtn.dataset.title,
+            thumbnail: addBtn.dataset.thumbnail,
+            duration: parseInt(addBtn.dataset.duration) || 0,
+            uploaderName: addBtn.dataset.artist,
+            artist: addBtn.dataset.artist
+        };
+
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            if (window.playlistManager) {
+                await window.playlistManager.addVideoToQueue(videoData);
+                addBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+                    addBtn.disabled = false;
+                }, 1500);
+            } else {
+                throw new Error('PlaylistManager no disponible');
+            }
+        } catch (error) {
+            console.error('❌ Error añadiendo video:', error);
+            addBtn.innerHTML = '<i class="fas fa-times"></i>';
+            setTimeout(() => {
+                addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+                addBtn.disabled = false;
+            }, 1500);
+        }
+    });
+
+    return div;
+}
 
     // ==========================================
     // NOTIFICACIONES Y ESTADÍSTICAS
