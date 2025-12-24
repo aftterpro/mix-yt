@@ -1711,7 +1711,7 @@ updatePlaylistsUI() {
     this.core?.updateOverviewStats?.();
 }
     
-    updateQueueUI() {
+   updateQueueUI() {
         console.log('🔄 Actualizando interfaz de cola...');
         
         // 1. Obtener datos actualizados
@@ -1722,44 +1722,10 @@ updatePlaylistsUI() {
         if (this.core && this.core.updateQueueCount) {
             this.core.updateQueueCount(videos.length);
         }
-        
-        // ✅ 3. AÑADIR BOTÓN DE PLAY SI HAY VIDEOS Y NO HAY REPRODUCCIÓN
-        const hasVideos = videos.length > 0;
-        const isPlaying = window.reproduccionIniciada;
-        
-        if (hasVideos && !isPlaying) {
-            // Mostrar botón de play en el header de la cola
-            const queueHeader = document.querySelector('.queue-header');
-            if (queueHeader && !queueHeader.querySelector('.play-queue-btn')) {
-                const playBtn = document.createElement('button');
-                playBtn.className = 'play-queue-btn';
-                playBtn.innerHTML = '<i class="fas fa-play"></i> Reproducir';
-                playBtn.style.cssText = `
-                    background: var(--primary-color);
-                    color: white;
-                    border: none;
-                    border-radius: 20px;
-                    padding: 8px 16px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    font-weight: 500;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: all 0.2s ease;
-                `;
-                playBtn.onclick = () => {
-                    if (this.core) {
-                        this.core.playVideoAtIndex(0);
-                    }
-                };
-                queueHeader.insertBefore(playBtn, queueHeader.querySelector('.clear-queue-btn'));
-            }
-        } else {
-            // Remover botón si ya está reproduciendo
-            const existingBtn = document.querySelector('.play-queue-btn');
-            if (existingBtn) existingBtn.remove();
-        }
+
+        // Aseguramos que si existía, se borre siempre
+        const existingBtn = document.querySelector('.play-queue-btn');
+        if (existingBtn) existingBtn.remove();
         
         // 4. Si existe un contenedor de lista de cola en el DOM, actualizarlo
         const queueListContainer = document.getElementById('queueContentList');
