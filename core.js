@@ -1559,22 +1559,11 @@ getFlattenedPlaylist() {
     return validVideos;
 }
 updatePersistentQueue() {
-    // 1. DELEGACIÓN INTELIGENTE (OPTIMIZACIÓN PRINCIPAL)
-    // Si el gestor de playlists está activo, dejemos que él maneje la UI.
-    // Esto evita doble renderizado, parpadeos y conflictos de eventos.
-    if (window.playlistManager && typeof window.playlistManager.updateQueueUI === 'function') {
-        window.playlistManager.updateQueueUI();
-        return; 
-    }
-
-    // 2. FALLBACK (CÓDIGO DE RESPALDO)
-    // Solo se ejecuta si playlist.js no ha cargado aún.
-    console.log('🔄 Actualizando cola persistente (Modo Fallback Core)...');
+    console.log('🔄 Actualizando cola persistente (Modo Optimizado)...');
     
     const queueContentList = document.getElementById('queueContentList');
     if (!queueContentList) return;
 
-    // Usamos this.playlistsData en lugar de la variable global para asegurar datos frescos
     const flatList = this.getFlattenedPlaylist();
     
     if (flatList.length === 0) {
@@ -1592,18 +1581,36 @@ updatePersistentQueue() {
         const isPlaying = currentIndex === index;
         const queueItem = document.createElement('div');
         queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
+        queueItem.dataset.videoId = video.videoId;
+        queueItem.dataset.flatIndex = index;
         
-        // Datos mínimos necesarios para que funcione el click básico
+        const duration = video.duration && video.duration > 0 
+            ? this.formatDuration(video.duration) 
+            : '--:--';
+        
         queueItem.innerHTML = `
             <div class="queue-item-number">
                 ${isPlaying ? '<i class="fas fa-play-circle"></i>' : (index + 1)}
             </div>
+            <div class="queue-item-thumbnail-wrapper">
+                <img src="${video.thumbnail || './electronic.ico'}" 
+                     alt="${this.escapeHTML(video.title)}" 
+                     onerror="this.src='./electronic.ico';">
+                <span class="queue-item-duration">${duration}</span>
+            </div>
             <div class="queue-item-info">
                 <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
+                <div class="queue-item-meta">
+                    <span class="queue-item-author">${this.escapeHTML(video.uploaderName || 'Desconocido')}</span>
+                </div>
             </div>
+            <button class="queue-item-remove" 
+                    data-video-id="${video.videoId}" 
+                    title="Eliminar de la cola">
+                <i class="fas fa-times"></i>
+            </button>
         `;
         
-        // Evento simple de reproducción
         queueItem.onclick = () => this.playVideoAtIndex(index);
         
         if (isPlaying) {
@@ -1616,6 +1623,11 @@ updatePersistentQueue() {
     queueContentList.innerHTML = '';
     queueContentList.appendChild(fragment);
     this.updateQueueCount(flatList.length);
+    
+    // ✅ Configurar listeners de eliminación
+    if (window.playlistManager && window.playlistManager.setupQueueItemListeners) {
+        window.playlistManager.setupQueueItemListeners();
+    }
 }
     async getBatchVideoDurations(videoIds) {
         if (!videoIds || videoIds.length === 0) return {};
