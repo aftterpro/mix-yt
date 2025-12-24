@@ -89,8 +89,14 @@ const PERSISTENCE_CONFIG = {
 
 function saveAllData() {
     try {
+        // CORRECCIÓN: Preferir siempre los datos de la instancia activa (window.unifiedCore)
+        // Si no existe, usar la global como fallback
+        const dataToSave = (window.unifiedCore && window.unifiedCore.playlistsData) 
+                           ? window.unifiedCore.playlistsData 
+                           : playlistsData;
+
         if (typeof savePlaylistsDataPersistent === 'function') {
-            const playlistsToSave = playlistsData.filter(p => p.source !== 'youtube_library');
+            const playlistsToSave = dataToSave.filter(p => p.source !== 'youtube_library');
             savePlaylistsDataPersistent(playlistsToSave);
         }
         console.log('💾 Datos guardados automáticamente');
@@ -566,28 +572,26 @@ addToQueue(videoObject) {
     }
 
 initializeUI() {
-    // Asegurar que existe la cola de reproducción VACÍA por defecto
-    if (!playlistsData.some(p => p.id === 'queue')) {
-        playlistsData.unshift({ // Usamos unshift para que sea la primera
+    if (!this.playlistsData.some(p => p.id === 'queue')) {
+        this.playlistsData.unshift({
             id: 'queue',
             name: 'Cola de Reproducción',
             thumbnailUrl: './electronic.ico',
-            videos: [], // <--- EMPIEZA VACÍA
+            videos: [],
             isExpanded: true,
             isQueue: true
         });
     } else {
-        // 🛠️ CORRECCIÓN: Si ya existe (por caché/localStorage), LA VACIAMOS
-        const q = playlistsData.find(p => p.id === 'queue');
+        const q = this.playlistsData.find(p => p.id === 'queue');
         if (q) {
             console.log('🧹 Limpiando cola de reproducción al iniciar...');
-            q.videos = []; // <--- ESTO ASEGURA QUE EMPIECE EN 0
+            q.videos = [];
         }
     }
 
     // Asegurar playlist manual
-    if (!playlistsData.some(p => p.id === 'manual')) {
-        playlistsData.push({
+    if (!this.playlistsData.some(p => p.id === 'manual')) {
+        this.playlistsData.push({
             id: 'manual',
             name: 'Mis Vídeos Añadidos',
             thumbnailUrl: './electronic.ico',
@@ -597,10 +601,8 @@ initializeUI() {
     }
 
     this.updateOverviewStats();
-    // Forzar actualización visual de la cola a 0
     this.updateQueueCount(0); 
     
-    // Forzar actualización de la UI de la cola para que se vea vacía
     if (this.updatePersistentQueue) {
         this.updatePersistentQueue();
     }
@@ -1476,10 +1478,10 @@ clearSearchResults() {
     }
 
 getFlattenedPlaylist() {
-    let queuePlaylist = playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
     if (!queuePlaylist) {
-        // Crear si no existe (solución de emergencia, debería estar en initializeUI)
+        // Crear si no existe
         queuePlaylist = {
             id: 'queue',
             name: 'Cola de Reproducción',
@@ -1488,7 +1490,8 @@ getFlattenedPlaylist() {
             isExpanded: true,
             isQueue: true
         };
-        playlistsData.unshift(queuePlaylist);
+        // Asegurar que lo añadimos a la instancia
+        this.playlistsData.unshift(queuePlaylist);
         console.warn('⚠️ Playlist de cola no encontrada, creándola y añadiéndola.');
     }
     
@@ -1496,16 +1499,12 @@ getFlattenedPlaylist() {
         return [];
     }
     
-    // Filtrar y mapear (asumiendo que la lógica de mapeo es correcta)
+    // Filtrar y mapear
     const validVideos = queuePlaylist.videos.filter(video => {
         if (!video.videoId || video.videoId === 'undefined') return false;
         const title = (video.title || '').toLowerCase();
         const isDeleted = title.includes('deleted video') || title.includes('private video');
-        if (isDeleted && window.playlistManager) {
-            window.playlistManager.removeVideoFromQueue(video.videoId);
-            return false;
-        }
-        return true;
+        return !isDeleted;
     }).map(video => {
         let duration = 0;
         if (video.duration) {
