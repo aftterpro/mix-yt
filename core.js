@@ -2090,78 +2090,6 @@ updateOverviewStats() {
     }
 }
 
-//  FUNCIÓN HELPER PARA DEBUGGING
-window.debugVideoVisibility = function() {
-    console.log('🔍 DEBUG VIDEO VISIBILITY:');
-    
-    const checks = {
-        player1Exists: !!window.player1,
-        player2Exists: !!window.player2,
-        currentPlayer: window.currentPlayer,
-        reproduccionIniciada: window.reproduccionIniciada
-    };
-    
-    ['player1', 'player2'].forEach(id => {
-        const div = document.getElementById(id);
-        if (div) {
-            const iframe = div.querySelector('iframe');
-            checks[id] = {
-                display: div.style.display,
-                visibility: div.style.visibility,
-                opacity: div.style.opacity,
-                zIndex: div.style.zIndex,
-                hasIframe: !!iframe,
-                iframeSrc: iframe?.src,
-                computedDisplay: getComputedStyle(div).display,
-                rect: div.getBoundingClientRect()
-            };
-        }
-    });
-    
-    console.table(checks);
-    return checks;
-};
-
-// FUNCIÓN HELPER PARA FORZAR VISIBILIDAD
-window.forceVideoVisible = function() {
-    const activeId = window.currentPlayer === 1 ? 'player1' : 'player2';
-    const div = document.getElementById(activeId);
-    
-    if (!div) {
-        console.error('❌ Div no encontrado:', activeId);
-        return;
-    }
-    
-    div.style.cssText = `
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 10 !important;
-        background: #000 !important;
-    `;
-    div.classList.remove('hidden', 'fade-out');
-    
-    const iframe = div.querySelector('iframe');
-    if (iframe) {
-        iframe.style.cssText = `
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            display: block !important;
-            visibility: visible !important;
-        `;
-    }
-    
-    console.log('✅ Visibilidad forzada para:', activeId);
-    window.debugVideoVisibility();
-};
 // Mostrar mensajes flotantes (Toast)
 showMessage(message, type = 'info') {
     this.ui.showMessage(message, type);
@@ -2657,6 +2585,78 @@ window.addEventListener('resize', () => {
     }, 300);
 });
 
+//  FUNCIÓN HELPER PARA DEBUGGING
+window.debugVideoVisibility = function() {
+    console.log('🔍 DEBUG VIDEO VISIBILITY:');
+    
+    const checks = {
+        player1Exists: !!window.player1,
+        player2Exists: !!window.player2,
+        currentPlayer: window.currentPlayer,
+        reproduccionIniciada: window.reproduccionIniciada
+    };
+    
+    ['player1', 'player2'].forEach(id => {
+        const div = document.getElementById(id);
+        if (div) {
+            const iframe = div.querySelector('iframe');
+            checks[id] = {
+                display: div.style.display,
+                visibility: div.style.visibility,
+                opacity: div.style.opacity,
+                zIndex: div.style.zIndex,
+                hasIframe: !!iframe,
+                iframeSrc: iframe?.src,
+                computedDisplay: getComputedStyle(div).display,
+                rect: div.getBoundingClientRect()
+            };
+        }
+    });
+    
+    console.table(checks);
+    return checks;
+};
+
+// FUNCIÓN HELPER PARA FORZAR VISIBILIDAD
+window.forceVideoVisible = function() {
+    const activeId = window.currentPlayer === 1 ? 'player1' : 'player2';
+    const div = document.getElementById(activeId);
+    
+    if (!div) {
+        console.error('❌ Div no encontrado:', activeId);
+        return;
+    }
+    
+    div.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 10 !important;
+        background: #000 !important;
+    `;
+    div.classList.remove('hidden', 'fade-out');
+    
+    const iframe = div.querySelector('iframe');
+    if (iframe) {
+        iframe.style.cssText = `
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+        `;
+    }
+    
+    console.log('✅ Visibilidad forzada para:', activeId);
+    window.debugVideoVisibility();
+};
 window.addEventListener('beforeunload', () => {
     console.log('🚪 Cerrando aplicación, limpiando recursos...');
     
