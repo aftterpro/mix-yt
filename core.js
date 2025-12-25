@@ -303,11 +303,6 @@ resetCrossfadeFlags() {
     }
 }
 
-// Llamar en caso de error:
-handlePlaybackError(error) {
-    this.resetCrossfadeFlags();
-    this.startMonitoring();
-}
 /**
  * Manejar error de reproducción con recuperación
  */
@@ -1641,15 +1636,6 @@ displaySearchResults(videos, isContinuation = false) {
     this.ui.renderSearchResults(videos, isContinuation);
 }
 
-    
-
-    parseDurationToSeconds(durationStr) {
-        if (!durationStr) return 0;
-        const parts = durationStr.split(':').map(Number);
-        if (parts.length === 2) return (parts[0] * 60) + parts[1];
-        if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
-        return 0;
-    }
 
     async addVideoToQueue(videoData) {
         if (!window.playlistManager) {
@@ -2174,68 +2160,83 @@ function preloadNextVideo() {
     }
 }
 async function cargarSponsorBlock(videoId) {
-    // Si ya tenemos datos o estamos buscando, no hacemos nada
-    if (segmentosCache[videoId]) {
-        // ✅ CORRECCIÓN: Verificar si es viejo y recargar
-        const cacheAge = Date.now() - (segmentosCache[videoId].timestamp || 0);
-        if (cacheAge < 10 * 60 * 1000) { // Menos de 10 minutos
-            return;
+    // ✅ Verificar estructura correcta del caché
+    const cached = segmentosCache[videoId];
+    
+    if (cached && typeof cached === 'object' && cached.segments) {
+        const cacheAge = Date.now() - (cached.timestamp || 0);
+        if (cacheAge < 10 * 60 * 1000) {
+            console.log(`✅ SB: Usando caché para ${videoId}`);
+            return cached.segments;
         }
     }
 
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd'; 
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
     const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
     
-    segmentosCache[videoId] = 'fetching'; // Marcar como cargando
+    segmentosCache[videoId] = 'fetching';
 
     try {
-        const response = await fetch(apiUrl, { headers: { 'X-UserID': userId } });
-        if (!response.ok) throw new Error(response.status);
+        const response = await fetch(apiUrl, { 
+            headers: { 'X-UserID': userId } 
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
         const data = await response.json();
-        if (Array.isArray(data)) {
-            // ✅ CORRECCIÓN: Añadir timestamp
-            segmentosCache[videoId] = {
-                segments: data.filter(s => s.startTime < s.endTime),
-                timestamp: Date.now() // Guardar cuándo se obtuvo
-            };
-            console.log(`✅ SB: ${segmentosCache[videoId].segments.length} segmentos para ${videoId}`);
-        } else {
-            segmentosCache[videoId] = { segments: [], timestamp: Date.now() };
-        }
+        
+        // ✅ Guardar con estructura correcta
+        const segments = Array.isArray(data) 
+            ? data.filter(s => s.startTime < s.endTime)
+            : [];
+        
+        segmentosCache[videoId] = {
+            segments: segments,
+            timestamp: Date.now()
+        };
+        
+        console.log(`✅ SB: ${segments.length} segmentos para ${videoId}`);
+        return segments;
+        
     } catch (e) {
         console.warn(`⚠️ SB Error ${videoId}:`, e.message);
-        segmentosCache[videoId] = { segments: [], timestamp: Date.now() };
+        segmentosCache[videoId] = { 
+            segments: [], 
+            timestamp: Date.now() 
+        };
+        return [];
     }
 }
 
 function checkAndSkipSegment(player) {
     const videoId = player.getVideoData()?.video_id;
-    if (!videoId || !segmentosCache[videoId] || segmentosCache[videoId] === 'fetching') return;
+    if (!videoId) return;
+    
+    const cached = segmentosCache[videoId];
+    
+    // ✅ Validar estructura del caché
+    if (!cached || cached === 'fetching' || typeof cached !== 'object') {
+        return;
+    }
+    
+    const segments = cached.segments || [];
+    if (segments.length === 0) return;
 
     const currentTime = player.getCurrentTime();
     const duration = player.getDuration();
 
-    // Evitar rebotes (si acabamos de saltar hace menos de 1s)
     if (Math.abs(currentTime - lastSkipTime) < 1.5) return;
 
-    // ✅ CORRECCIÓN: Acceder a la estructura correcta
-    const cacheData = segmentosCache[videoId];
-    const segmentos = cacheData.segments || cacheData; // Compatibilidad con formato viejo
-
-    for (const seg of segmentos) {
+    for (const seg of segments) {
         if (currentTime >= seg.startTime && currentTime < seg.endTime) {
             
             const nombreCat = nombresCategorias[seg.category] || seg.category;
 
-            // CASO 1: DETECCIÓN DE OUTRO
             if (seg.endTime >= (duration - 2)) {
-                console.log("🎬 SponsorBlock: Outro detectado. Forzando final.");
+                console.log("🎬 SponsorBlock: Outro detectado");
                 mostrarAvisoSB(`🎬 Final saltado`, player.getIframe().parentElement);
                 player.seekTo(duration, true);
-            } 
-            // CASO 2: SALTO NORMAL (Intros, etc)
-            else {
+            } else {
                 console.log(`⏩ SponsorBlock: Saltando ${nombreCat}`);
                 mostrarAvisoSB(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
                 player.seekTo(seg.endTime, true);
