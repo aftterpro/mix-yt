@@ -258,10 +258,24 @@ function handleAuthResult(accessToken) {
         
         // Llamada asíncrona: La interfaz ya es usable mientras esto ocurre
         window.loadUserPlaylistsAndStore().then(() => {
-            console.log('✅ Carga de playlists en segundo plano terminada');
-        }).catch(err => {
-            console.warn('⚠️ Error en carga de playlists (segundo plano):', err);
-        });
+      console.log('✅ Carga de playlists completada');
+    
+    // ✅ Actualizar UI después de cargar
+    if (window.playlistManager) {
+        window.playlistManager.updatePlaylistsUI();
+    }
+    
+}).catch(err => {
+    console.error('❌ Error fatal cargando playlists:', err);
+    
+    // ✅ Notificar al usuario
+    if (window.unifiedCore) {
+        window.unifiedCore.showMessage('Error cargando tus playlists de YouTube', 'error');
+    }
+    
+    // ✅ No romper la app - continuar sin playlists de YouTube
+    console.log('⚠️ Continuando sin playlists de YouTube Library');
+});
 
     }).catch(err => {
         console.error('❌ Error esperando sistema:', err);
