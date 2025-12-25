@@ -461,34 +461,42 @@ cleanupView(viewName) {
         });
     }
 
-   initializePlayers() {
-        if (player1 && player2) return;
-        console.log('🎮 Inicializando reproductores...');
-        
-        // Obtener el origen actual (ej: https://mix-yt.netlify.app)
-        const currentOrigin = window.location.origin;
+initializePlayers() {
+    if (player1 && player2) return;
+    console.log('🎮 Inicializando reproductores...');
+    
+    const currentOrigin = window.location.origin;
 
-        const playerConfig = {
-            height: '100%',
-            width: '100%',
-            playerVars: { 
-                'playsinline': 1,
-                'origin': currentOrigin,
-                'enablejsapi': 1 
+    const playerConfig = {
+        height: '100%',
+        width: '100%',
+        playerVars: { 
+            'playsinline': 1,
+            'origin': currentOrigin,
+            'enablejsapi': 1 
+        },
+        events: {
+            'onReady': (event) => {
+                this.onPlayerReady(event);
+                // ✅ NUEVA: Forzar visibilidad inmediata
+                const playerId = event.target.getIframe().id;
+                const playerDiv = document.getElementById(playerId);
+                if (playerDiv) {
+                    playerDiv.style.opacity = '1';
+                    playerDiv.style.visibility = 'visible';
+                    playerDiv.classList.remove('hidden');
+                }
             },
-            events: {
-                'onReady': (event) => this.onPlayerReady(event),
-                'onStateChange': (event) => this.onPlayerStateChange(event),
-                'onError': (event) => this.onPlayerError(event)
-            }
-        };
-        
-        // Agregar host explícito si es necesario
-        playerConfig.host = 'https://www.youtube.com';
+            'onStateChange': (event) => this.onPlayerStateChange(event),
+            'onError': (event) => this.onPlayerError(event)
+        }
+    };
+    
+    playerConfig.host = 'https://www.youtube.com';
 
-        player1 = new YT.Player('player1', playerConfig);
-        player2 = new YT.Player('player2', playerConfig);
-    }
+    player1 = new YT.Player('player1', playerConfig);
+    player2 = new YT.Player('player2', playerConfig);
+}
 
     onPlayerReady(event) {
         console.log('✅ Reproductor listo');
@@ -832,12 +840,11 @@ setupControlButtons() {
         }
     }
 
- setupPlayerContainerHandlers() {
+setupPlayerContainerHandlers() {
     console.log('🎬 Configurando handlers de barra inferior');
     const bottomPlayer = document.querySelector('.bottom-player');
     
     if (bottomPlayer) {
-    
         if (bottomPlayer.dataset.clickListenerAttached) return;
         
         bottomPlayer.addEventListener('click', (e) => {
@@ -846,7 +853,7 @@ setupControlButtons() {
                 e.target.closest('.volume-slider') || 
                 e.target.closest('.player-controls') ||
                 e.target.closest('.control-button') ||
-                e.target.closest('.progress-container')) { // Agregado progress-container
+                e.target.closest('.progress-container')) {
                 return;
             }
             
@@ -857,9 +864,20 @@ setupControlButtons() {
             }
         });
         
-        bottomPlayer.dataset.clickListenerAttached = "true";
+        // ✅ CORRECCIÓN: También permitir click en miniatura/info
+        const playerInfo = bottomPlayer.querySelector('.player-info');
+        if (playerInfo) {
+            playerInfo.style.cursor = 'pointer';
+            playerInfo.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
+                if (hasVideo) {
+                    this.switchView('fullPlayer');
+                }
+            });
+        }
         
-        // Setup de botones individuales (esto ya clona los botones internamente, está bien)
+        bottomPlayer.dataset.clickListenerAttached = "true";
         this.setupControlButtons();
         this.forceBottomPlayerVisible();
     }
@@ -1172,32 +1190,42 @@ movePlayersToFullView() {
         }
     }
 
-    handleNext() {
-        const flatList = this.getFlattenedPlaylist();
-        if (flatList.length === 0) {
-            this.showMessage("No hay videos en la cola", 'warning');
-            return;
-        }
-
-        const currentInfo = window.currentPlayingInfo || { flattenedIndex: -1 };
-        let currentIndex = currentInfo.flattenedIndex ?? -1;
-
-        if (currentIndex === -1) {
-            this.playVideoAtIndex(0);
-            return;
-        }
-
-        let nextIndex = currentIndex + 1;
-        if (nextIndex >= flatList.length) {
-            this.showMessage("Fin de la lista de reproducción", 'info');
-            return;
-        }
-
-        if (monitorInterval) clearInterval(monitorInterval);
-        hasOutroCrossfadeStarted = true; 
-        nextVideoScheduled = true;
-        this.playNextVideo();
+ handleNext() {
+    console.log('⏭️ handleNext llamado');
+    
+    const flatList = this.getFlattenedPlaylist();
+    if (flatList.length === 0) {
+        this.showMessage("No hay videos en la cola", 'warning');
+        return;
     }
+
+    const currentInfo = window.currentPlayingInfo || { flattenedIndex: -1 };
+    let currentIndex = currentInfo.flattenedIndex ?? -1;
+
+    if (currentIndex === -1) {
+        this.playVideoAtIndex(0);
+        return;
+    }
+
+    let nextIndex = currentIndex + 1;
+    if (nextIndex >= flatList.length) {
+        this.showMessage("Fin de la lista de reproducción", 'info');
+        return;
+    }
+
+    if (monitorInterval) {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+    }
+    
+    hasOutroCrossfadeStarted = false;
+    nextVideoScheduled = false;
+    isTransitioning = false;
+    
+    // ✅ Reproducir siguiente video
+    this.playVideoAtIndex(nextIndex);
+}
+
 
     handlePrevious() {
         console.log('⏮️ Función anterior no implementada aún');
@@ -1337,6 +1365,24 @@ startCrossfade(prevPlayer, nextPlayer) {
     }
     
     crossfadeInProgress = true;
+    
+    // ✅ CORRECCIÓN: Aplicar clases CSS para animación
+    const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+    const nextElement = document.getElementById(`player${currentPlayer}`);
+    
+    if (nextElement) {
+        nextElement.classList.remove('hidden', 'fade-out');
+        nextElement.classList.add('fade-in');
+        nextElement.style.display = 'block';
+        nextElement.style.visibility = 'visible';
+    }
+    
+    if (prevElement) {
+        prevElement.classList.remove('fade-in');
+        prevElement.classList.add('fade-out');
+    }
+    
+    // Iniciar reproducción del siguiente
     try { 
         if (nextPlayer && typeof nextPlayer.playVideo === 'function') {
             nextPlayer.playVideo(); 
@@ -1355,7 +1401,6 @@ startCrossfade(prevPlayer, nextPlayer) {
         step++;
         const progress = step / steps;
         
-        // Curva Equal Power para transición suave
         const gainNext = Math.sin(progress * (Math.PI / 2));
         const gainPrev = Math.cos(progress * (Math.PI / 2));
 
@@ -1376,7 +1421,7 @@ startCrossfade(prevPlayer, nextPlayer) {
             crossfadeInterval = null;
             crossfadeInProgress = false;
 
-            // ✅ Limpieza final
+            // Limpieza final
             try {
                 if (prevPlayer && typeof prevPlayer.stopVideo === 'function') {
                     prevPlayer.stopVideo();
@@ -1385,11 +1430,22 @@ startCrossfade(prevPlayer, nextPlayer) {
                 if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
                     nextPlayer.setVolume(100);
                 }
+                
+                // ✅ CORRECCIÓN: Limpiar clases visuales
+                if (prevElement) {
+                    prevElement.classList.remove('fade-out');
+                    prevElement.classList.add('hidden');
+                    prevElement.style.display = 'none';
+                }
+                
+                if (nextElement) {
+                    nextElement.classList.remove('fade-in');
+                }
+                
             } catch (e) {
                 console.warn('⚠️ Error en limpieza:', e);
             }
 
-            // ✅ RESETEAR BANDERAS CRÍTICAS
             hasOutroCrossfadeStarted = false;
             nextVideoScheduled = false;
             isTransitioning = false;
@@ -1398,13 +1454,16 @@ startCrossfade(prevPlayer, nextPlayer) {
             
             document.dispatchEvent(new CustomEvent('crossfadeCompleted'));
             
-            // ✅ Reiniciar monitor si no está activo
+            // Reiniciar monitor
             if (!monitorInterval && window.unifiedCore) {
-                window.unifiedCore.startMonitoring();
+                setTimeout(() => {
+                    window.unifiedCore.startMonitoring();
+                }, 500);
             }
         }
     }, stepTime);
 }
+
 
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
@@ -2072,15 +2131,42 @@ function checkAndSkipSegment(player) {
 }
 // Función visual simple (asegúrate de tener el CSS .sb-toast que te pasé antes)
 function mostrarAvisoSB(mensaje, container) {
-    let toast = document.querySelector('.sb-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.className = 'sb-toast';
-        (container || document.body).appendChild(toast);
-    }
+    // ✅ CORRECCIÓN: Limpiar avisos anteriores primero
+    const oldToasts = document.querySelectorAll('.sb-toast');
+    oldToasts.forEach(toast => toast.remove());
+    
+    let toast = document.createElement('div');
+    toast.className = 'sb-toast';
     toast.textContent = mensaje;
-    toast.classList.add('visible');
-    setTimeout(() => toast.classList.remove('visible'), 3000);
+    
+    // Estilos inline para asegurar visibilidad
+    toast.style.cssText = `
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        z-index: 100;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    `;
+    
+    (container || document.body).appendChild(toast);
+    
+    // Fade in
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+    });
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 2000);
 }
 function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
@@ -2090,6 +2176,29 @@ function monitorPlayers() {
         if (!activePlayer?.getPlayerState) return;
 
         const playerState = activePlayer.getPlayerState();
+        
+        // ✅ CRÍTICO: Detectar final de video
+        if (playerState === YT.PlayerState.ENDED) {
+            console.log('🎬 Video terminado, llamando a playNextVideo...');
+            
+            // Limpiar monitor para evitar llamadas múltiples
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+            
+            // Resetear flags
+            hasOutroCrossfadeStarted = false;
+            nextVideoScheduled = false;
+            isTransitioning = false;
+            
+            // Llamar a siguiente video
+            if (window.unifiedCore?.playNextVideo) {
+                window.unifiedCore.playNextVideo();
+            }
+            return;
+        }
+        
         if (playerState !== YT.PlayerState.PLAYING) return;
 
         const currentTime = activePlayer.getCurrentTime();
@@ -2097,39 +2206,26 @@ function monitorPlayers() {
         const videoData = activePlayer.getVideoData();
         const videoId = videoData?.video_id;
 
-        // ==========================================
-        // 0. AUTO-CARGA DE DATOS SPONSORBLOCK
-        // ==========================================
-        // Si no tenemos los segmentos en caché, pedirlos ahora
+        // SponsorBlock
         if (videoId && !segmentosCache[videoId]) {
             cargarSponsorBlock(videoId);
         }
 
-        // ==========================================
-        // 1. Lógica SponsorBlock (Saltar segmentos malos)
-        // ==========================================
-        // Ahora usamos la función real definida arriba
         if (videoId) {
             checkAndSkipSegment(activePlayer);
         }
 
         const timeRemaining = videoDuration - currentTime;
 
-        // ==========================================
-        // NUEVO: PRELOAD A LOS 25 SEGUNDOS
-        // ==========================================
+        // Preload
         if (timeRemaining < 25 && !isNextVideoPreloaded && !nextVideoScheduled) {
             preloadNextVideo();
             isNextVideoPreloaded = true; 
         }
 
-        // ==========================================
-        // LÓGICA CROSSFADE INTELIGENTE
-        // ==========================================
+        // ✅ CORRECCIÓN: Crossfade con mejor detección
         const triggerTime = calculateCrossfadeTriggerTime(videoDuration, videoId);
 
-        // La condición currentTime >= triggerTime detectará automáticamente 
-        // si SponsorBlock saltó un Outro y nos dejó cerca del final.
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
             !isTransitioning && 
@@ -2159,19 +2255,23 @@ function monitorPlayers() {
             }
         }
         
-        // ==========================================
-        // FALLBACK DE EMERGENCIA
-        // ==========================================
-        // IMPORTANTE: Si SponsorBlock salta un Outro y lleva el tiempo al final (duration),
-        // este bloque capturará el evento y pasará al siguiente video inmediatamente.
-        if (timeRemaining <= 1 && !nextVideoScheduled) {
-            console.log("⚠️ Fallback activado (posible salto de Outro SB)");
+        // ✅ CORRECCIÓN: Fallback mejorado
+        if (timeRemaining <= 0.5 && !nextVideoScheduled) {
+            console.log("⚠️ Fallback activado - Video casi terminado");
             nextVideoScheduled = true;
-            if (window.unifiedCore?.playNextVideo) window.unifiedCore.playNextVideo();
+            
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+            
+            if (window.unifiedCore?.playNextVideo) {
+                window.unifiedCore.playNextVideo();
+            }
         }
         
     } catch (error) { 
-        console.error('Error en monitorPlayers:', error); 
+        console.error('❌ Error en monitorPlayers:', error); 
     }
 }
 
