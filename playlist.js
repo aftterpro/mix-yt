@@ -144,15 +144,12 @@ class PlaylistManager {
     // =============================================
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
-    /**
- * Extraer artista del título correctamente
- */
- extractArtistFromTitle(fullTitle) {
+  
+extractArtistFromTitle(fullTitle) {
     if (!fullTitle) return 'Desconocido';
     
     let cleanTitle = fullTitle.trim();
     
-    // Limpiar patrones comunes primero
     cleanTitle = cleanTitle
         .replace(/\(official.*?video\)/gi, '')
         .replace(/\(lyric.*?video\)/gi, '')
@@ -162,11 +159,10 @@ class PlaylistManager {
         .replace(/\[lyric.*?\]/gi, '')
         .trim();
     
-    // Patrones de separación: "Artista - Título", "Artista: Título", etc.
     const separatorPatterns = [
-        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Guión
-        /^(.+?)\s*:\s*(.+?)$/,       // Dos puntos
-        /^(.+?)\s*\|\s*(.+?)$/,      // Pipe
+        /^(.+?)\s*[-–—]\s*(.+?)$/,
+        /^(.+?)\s*:\s*(.+?)$/,
+        /^(.+?)\s*\|\s*(.+?)$/,
     ];
     
     for (const pattern of separatorPatterns) {
@@ -175,16 +171,15 @@ class PlaylistManager {
             const artist = match[1].trim();
             const title = match[2].trim();
             
-            // Validar que el artista no sea muy largo (probablemente es título completo)
             if (artist.length < 50 && !artist.toLowerCase().includes('feat')) {
-                return { artist, title };
+                return artist; // ✅ RETORNAR STRING, no objeto
             }
         }
     }
     
-    // Si no hay separador, retornar el título completo y artista desconocido
-    return { artist: 'Desconocido', title: cleanTitle };
+    return 'Desconocido';
 }
+
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue llamado:', videoData);
     
@@ -654,35 +649,30 @@ async loadRelatedVideos() {
         return;
     }
 
-    // ✅ CACHÉ: Si ya están cargados, no recargar
     if (this.lastLoadedRelatedId === currentVideo.videoId) {
         const existingItems = relatedList.querySelectorAll('.related-video-item');
         if (existingItems.length > 0) {
             console.log('✅ Relacionados ya cargados');
-            return; // ← SALIR AQUÍ
+            return;
         }
     }
 
     this.lastLoadedRelatedId = currentVideo.videoId;
-
-    // ✅ LOADING LIGERO
     relatedList.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">Cargando...</p>`;
 
     try {
-        // ✅ USAR NUESTRA API EN LUGAR DE PIPED
-        console.log(`📡 Buscando relacionados con nuestra API...`);
+        // ✅ Usar extractArtistFromTitle correctamente
+        const artist = this.extractArtistFromTitle(currentVideo.title);
+        const searchQuery = artist !== 'Desconocido' ? artist : currentVideo.title;
         
-        const { artist, title } = this.extractArtistFromTitle(currentVideo.title);
-        const searchQuery = artist !== 'Desconocido' ? artist : title;
+        console.log(`🔍 Buscando relacionados: "${searchQuery}"`);
         
-        // Usar youtube-client.js que ya apunta a tu Netlify Function
         const searchResults = await window.youtubeJSClient.search(searchQuery);
         
         if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
             throw new Error('Sin resultados');
         }
         
-        // Filtrar el video actual
         const relatedVideos = searchResults.items
             .filter(video => video.videoId !== currentVideo.videoId)
             .slice(0, 15);
@@ -699,8 +689,9 @@ async loadRelatedVideos() {
         `;
     }
 }
+
  /**
- * ✅ NUEVA FUNCIÓN: Cargar relacionados para un video específico
+ * Cargar relacionados para un video específico
  */
 async loadRelatedForVideo(video) {
     const relatedList = document.getElementById('relatedVideosList');
@@ -762,11 +753,8 @@ async loadRelatedVideosFallback(currentVideo, relatedList) {
     console.log('🔄 Usando fallback para videos relacionados...');
     
     // CORRECCIÓN: Agregar 'this.' antes de extractArtistFromTitle
-    const extracted = this.extractArtistFromTitle(currentVideo.title); 
-    
-    const searchQuery = extracted.artist !== 'Desconocido' 
-        ? extracted.artist 
-        : currentVideo.title.split('-')[0].trim();
+const artist = this.extractArtistFromTitle(currentVideo.title);
+const searchQuery = artist !== 'Desconocido' ? artist : currentVideo.title.split('-')[0].trim();
     
     console.log(`🔍 Buscando: "${searchQuery}"`);
     
