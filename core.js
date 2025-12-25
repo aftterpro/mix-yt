@@ -465,51 +465,116 @@ initializePlayers() {
     if (player1 && player2) return;
     console.log('🎮 Inicializando reproductores...');
     
+    // ✅ CRÍTICO: Origin correcto y explícito
     const currentOrigin = window.location.origin;
+    console.log('🔗 Origin configurado:', currentOrigin);
 
     const playerConfig = {
         height: '100%',
         width: '100%',
+        videoId: '', // Vacío inicialmente
         playerVars: { 
             'playsinline': 1,
             'origin': currentOrigin,
-            'enablejsapi': 1 
+            'enablejsapi': 1,
+            'widget_referrer': currentOrigin,
+            'controls': 1,
+            'rel': 0,
+            'showinfo': 0,
+            'fs': 1,
+            'modestbranding': 1
         },
         events: {
-            'onReady': (event) => {
-                this.onPlayerReady(event);
-                // ✅ NUEVA: Forzar visibilidad inmediata
-                const playerId = event.target.getIframe().id;
-                const playerDiv = document.getElementById(playerId);
-                if (playerDiv) {
-                    playerDiv.style.opacity = '1';
-                    playerDiv.style.visibility = 'visible';
-                    playerDiv.classList.remove('hidden');
-                }
-            },
+            'onReady': (event) => this.onPlayerReady(event),
             'onStateChange': (event) => this.onPlayerStateChange(event),
             'onError': (event) => this.onPlayerError(event)
         }
     };
-    
-    playerConfig.host = 'https://www.youtube.com';
 
+    // ✅ CRÍTICO: Asegurar que los contenedores existan y estén visibles
+    const p1Container = document.getElementById('player1');
+    const p2Container = document.getElementById('player2');
+    
+    if (!p1Container || !p2Container) {
+        console.error('❌ Contenedores de players no encontrados');
+        return;
+    }
+
+    // ✅ Forzar visibilidad de contenedores
+    p1Container.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 10 !important;
+        background: #000 !important;
+    `;
+    
+    p2Container.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        z-index: 0 !important;
+        background: #000 !important;
+    `;
+
+    // Crear reproductores
     player1 = new YT.Player('player1', playerConfig);
     player2 = new YT.Player('player2', playerConfig);
+    
+    console.log('✅ Reproductores creados');
 }
-
-    onPlayerReady(event) {
-        console.log('✅ Reproductor listo');
-        if (player1 && player2) {
-            playersInitialized = true;
-            this.state.playersReady = true;
-            window.player1 = player1;
-            window.player2 = player2;
-            window.currentPlayer = currentPlayer;
-            this.updatePlayersStatus('Reproductores listos');
-            this.enablePlayButton();
+onPlayerReady(event) {
+    console.log('✅ Reproductor listo');
+    
+    const playerId = event.target.getIframe().id;
+    const playerDiv = document.getElementById(playerId);
+    
+    if (playerDiv) {
+        // ✅ Forzar visibilidad inmediata
+        playerDiv.style.display = 'block';
+        playerDiv.style.visibility = 'visible';
+        playerDiv.style.opacity = '1';
+        playerDiv.classList.remove('hidden');
+        
+        // ✅ Asegurar que el iframe dentro también esté visible
+        const iframe = playerDiv.querySelector('iframe');
+        if (iframe) {
+            iframe.style.cssText = `
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                border: none !important;
+                display: block !important;
+                visibility: visible !important;
+            `;
         }
     }
+    
+    if (player1 && player2) {
+        playersInitialized = true;
+        this.state.playersReady = true;
+        window.player1 = player1;
+        window.player2 = player2;
+        window.currentPlayer = currentPlayer;
+        this.updatePlayersStatus('Reproductores listos');
+        this.enablePlayButton();
+        
+        console.log('✅ Ambos reproductores listos y visibles');
+    }
+}
+
 onPlayerStateChange(event) {
     const player = event.target;
     const state = event.data;
@@ -1939,40 +2004,164 @@ updateOverviewStats() {
         }
     }
 
-    playVideoAtIndex(index) {
-        const flatList = this.getFlattenedPlaylist();
-        if (index < 0 || index >= flatList.length) return;
-
-        const video = flatList[index];
-        currentPlayingInfo = {
-            flattenedIndex: index,
-            videoId: video.videoId,
-            playlistId: video.sourcePlaylistId
-        };
-        window.currentPlayingInfo = currentPlayingInfo;
-        window.reproduccionIniciada = true;
-
-        try {
-            const activePlayer = currentPlayer === 1 ? player1 : player2;
-            activePlayer.loadVideoById(video.videoId);
-            reproduccionIniciada = true;
-            this.updatePlayButton('pause');
-            this.startMonitoring();
-            this.updateNowPlaying();
-            this.updatePlaylistsUI();
-            
-            if (this.currentView !== 'fullPlayer') {
-                setTimeout(() => this.showMiniPlayerFloat(), 500);
-            }
-            setTimeout(() => this.refreshActiveQueueTab(), 1000);
-        } catch (error) {
-            this.showMessage("Error al reproducir video", 'error');
-            reproduccionIniciada = false;
-            window.reproduccionIniciada = false;
-            this.updatePlayButton('play');
-        }
+  playVideoAtIndex(index) {
+    const flatList = this.getFlattenedPlaylist();
+    if (index < 0 || index >= flatList.length) {
+        console.warn('❌ Índice inválido:', index);
+        return;
     }
 
+    const video = flatList[index];
+    console.log('🎬 Reproduciendo:', video.title);
+    
+    currentPlayingInfo = {
+        flattenedIndex: index,
+        videoId: video.videoId,
+        playlistId: video.sourcePlaylistId
+    };
+    window.currentPlayingInfo = currentPlayingInfo;
+    window.reproduccionIniciada = true;
+
+    try {
+        const activePlayer = currentPlayer === 1 ? player1 : player2;
+        const activePlayerId = currentPlayer === 1 ? 'player1' : 'player2';
+        const inactivePlayerId = currentPlayer === 1 ? 'player2' : 'player1';
+        
+        console.log(`🎮 Player activo: ${activePlayerId}, Video: ${video.videoId}`);
+        
+        // ✅ CRÍTICO: Asegurar visibilidad ANTES de cargar video
+        const activeDiv = document.getElementById(activePlayerId);
+        const inactiveDiv = document.getElementById(inactivePlayerId);
+        
+        if (activeDiv) {
+            activeDiv.style.cssText = `
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 10 !important;
+                background: #000 !important;
+            `;
+            activeDiv.classList.remove('hidden');
+        }
+        
+        if (inactiveDiv) {
+            inactiveDiv.style.display = 'none';
+            inactiveDiv.style.opacity = '0';
+            inactiveDiv.style.zIndex = '0';
+            inactiveDiv.classList.add('hidden');
+        }
+        
+        // ✅ Cargar video
+        activePlayer.loadVideoById(video.videoId);
+        
+        // ✅ Verificar después de 2 segundos
+        setTimeout(() => {
+            const iframe = activeDiv?.querySelector('iframe');
+            if (iframe) {
+                console.log('✅ Iframe presente:', iframe.src);
+            } else {
+                console.error('❌ Iframe no encontrado');
+            }
+        }, 2000);
+        
+        reproduccionIniciada = true;
+        this.updatePlayButton('pause');
+        this.startMonitoring();
+        this.updateNowPlaying();
+        this.updatePlaylistsUI();
+        
+        if (this.currentView !== 'fullPlayer') {
+            setTimeout(() => this.showMiniPlayerFloat(), 500);
+        }
+        
+        setTimeout(() => this.refreshActiveQueueTab(), 1000);
+        
+    } catch (error) {
+        console.error('❌ Error al reproducir video:', error);
+        this.showMessage("Error al reproducir video: " + error.message, 'error');
+        reproduccionIniciada = false;
+        window.reproduccionIniciada = false;
+        this.updatePlayButton('play');
+    }
+}
+
+//  FUNCIÓN HELPER PARA DEBUGGING
+window.debugVideoVisibility = function() {
+    console.log('🔍 DEBUG VIDEO VISIBILITY:');
+    
+    const checks = {
+        player1Exists: !!window.player1,
+        player2Exists: !!window.player2,
+        currentPlayer: window.currentPlayer,
+        reproduccionIniciada: window.reproduccionIniciada
+    };
+    
+    ['player1', 'player2'].forEach(id => {
+        const div = document.getElementById(id);
+        if (div) {
+            const iframe = div.querySelector('iframe');
+            checks[id] = {
+                display: div.style.display,
+                visibility: div.style.visibility,
+                opacity: div.style.opacity,
+                zIndex: div.style.zIndex,
+                hasIframe: !!iframe,
+                iframeSrc: iframe?.src,
+                computedDisplay: getComputedStyle(div).display,
+                rect: div.getBoundingClientRect()
+            };
+        }
+    });
+    
+    console.table(checks);
+    return checks;
+};
+
+// FUNCIÓN HELPER PARA FORZAR VISIBILIDAD
+window.forceVideoVisible = function() {
+    const activeId = window.currentPlayer === 1 ? 'player1' : 'player2';
+    const div = document.getElementById(activeId);
+    
+    if (!div) {
+        console.error('❌ Div no encontrado:', activeId);
+        return;
+    }
+    
+    div.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 10 !important;
+        background: #000 !important;
+    `;
+    div.classList.remove('hidden', 'fade-out');
+    
+    const iframe = div.querySelector('iframe');
+    if (iframe) {
+        iframe.style.cssText = `
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+        `;
+    }
+    
+    console.log('✅ Visibilidad forzada para:', activeId);
+    window.debugVideoVisibility();
+};
 // Mostrar mensajes flotantes (Toast)
 showMessage(message, type = 'info') {
     this.ui.showMessage(message, type);
