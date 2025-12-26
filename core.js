@@ -322,19 +322,23 @@ handlePlaybackError(error, context = 'unknown') {
     
     return false;
 }  
-/**
- * Limpiar recursos al cambiar de vista
- */
 cleanupView(viewName) {
     console.log(`🧹 Limpiando recursos: ${viewName}`);
     
-    if (viewName !== 'search' && this.searchScrollObserver) {
-        try {
-            this.searchScrollObserver.disconnect();
-            this.searchScrollObserver = null;
-        } catch (e) {
-            console.warn('⚠️ Error:', e);
-            this.searchScrollObserver = null;
+    if (viewName !== 'search') {
+        // Limpiar sentinel
+        const sentinel = document.getElementById('search-sentinel');
+        if (sentinel) sentinel.remove();
+        
+        // Desconectar observador de forma segura
+        if (this.searchScrollObserver) {
+            try {
+                this.searchScrollObserver.disconnect();
+            } catch (e) {
+                console.warn('⚠️ Error en cleanup:', e);
+            } finally {
+                this.searchScrollObserver = null;
+            }
         }
     }
 }
@@ -1528,7 +1532,6 @@ startCrossfade(prevPlayer, nextPlayer) {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
-
 async performSearch(query, continuation = null) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
@@ -1539,48 +1542,49 @@ async performSearch(query, continuation = null) {
         nextPageContext = null;
         searchResults.innerHTML = '<div class="search-loading">🔍 Buscando...</div>';
         
-        // ✅ CORRECCIÓN: Desconectar observador anterior de forma segura
-        try {
-            if (this.searchScrollObserver) {
+        // ✅ CORRECCIÓN: Desconectar observador de forma segura
+        if (this.searchScrollObserver) {
+            try {
                 this.searchScrollObserver.disconnect();
+            } catch (e) {
+                console.warn('⚠️ Error desconectando observer:', e);
+            } finally {
                 this.searchScrollObserver = null;
             }
-        } catch (e) {
-            console.warn('⚠️ Error desconectando observer:', e);
-            this.searchScrollObserver = null;
         }
     }
 
     isLoadingMore = true;
-
     try {
         const data = await window.youtubeJSClient.search(query, continuation);
         
-        // Guardar token para siguiente página
         nextPageContext = data.nextpage || null;
         console.log('📄 Próxima página:', nextPageContext ? 'Disponible' : 'No hay más');
 
         this.displaySearchResults(data, !!continuation);
         
-        // Configurar scroll infinito solo si hay más páginas
+        // ✅ CORRECCIÓN: Solo configurar si hay más páginas
         if (nextPageContext) {
             requestAnimationFrame(() => {
                 this.setupInfiniteScroll(searchResults);
             });
+        } else {
+            // Limpiar sentinel si ya no hay más páginas
+            const sentinel = document.getElementById('search-sentinel');
+            if (sentinel) sentinel.remove();
         }
-        
-    } catch (error) {
+        } catch (error) {
         console.error("❌ Error en búsqueda:", error);
         
-        // ✅ CORRECCIÓN: Desconectar observer en caso de error
-        try {
-            if (this.searchScrollObserver) {
+        // ✅ CORRECCIÓN: Limpiar observador en caso de error
+        if (this.searchScrollObserver) {
+            try {
                 this.searchScrollObserver.disconnect();
+            } catch (e) {
+                console.warn('⚠️ Error desconectando observer tras error:', e);
+            } finally {
                 this.searchScrollObserver = null;
             }
-        } catch (e) {
-            console.warn('⚠️ Error desconectando observer tras error:', e);
-            this.searchScrollObserver = null;
         }
         
         searchResults.innerHTML = `
@@ -1596,25 +1600,30 @@ async performSearch(query, continuation = null) {
         isLoadingMore = false;
     }
 }
+            
 setupInfiniteScroll(container) {
     console.log('📜 Configurando scroll infinito...');
     
-    // Limpiar sentinel anterior
+    // 1. Limpiar sentinel anterior
     const oldSentinel = document.getElementById('search-sentinel');
     if (oldSentinel) oldSentinel.remove();
     
-    // Crear sentinel
+    // 2. Crear nuevo sentinel
     const sentinel = document.createElement('div');
     sentinel.id = 'search-sentinel';
     sentinel.style.cssText = 'height: 50px; width: 100%; pointer-events: none;';
     container.appendChild(sentinel);
 
-    // Desconectar observador anterior
+    // 3. Desconectar observador anterior de forma segura
     if (this.searchScrollObserver) {
-        this.searchScrollObserver.disconnect();
+        try {
+            this.searchScrollObserver.disconnect();
+        } catch (e) {
+            console.warn('⚠️ Error desconectando observer anterior:', e);
+        }
     }
 
-    // Crear nuevo observador
+    // 4. Crear nuevo observador
     this.searchScrollObserver = new IntersectionObserver((entries) => {
         const entry = entries[0];
         
@@ -1623,14 +1632,15 @@ setupInfiniteScroll(container) {
             this.performSearch(currentSearchQuery, nextPageContext);
         }
     }, {
-        root: null, // viewport
-        rootMargin: '200px', // Cargar antes de llegar al final
+        root: null,
+        rootMargin: '200px',
         threshold: 0.1
     });
 
     this.searchScrollObserver.observe(sentinel);
-    console.log('✅ Observador configurado');
+    console.log('✅ Observador configurado correctamente');
 }
+    
 // Renderizar resultados de búsqueda
 displaySearchResults(videos, isContinuation = false) {
     this.ui.renderSearchResults(videos, isContinuation);
