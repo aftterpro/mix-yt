@@ -471,7 +471,7 @@ initializePlayers() {
     const playerConfig = {
         height: '100%',
         width: '100%',
-        videoId: '', // Vacío inicialmente
+        videoId: '',
         playerVars: { 
             'playsinline': 1,
             'origin': currentOrigin,
@@ -489,17 +489,6 @@ initializePlayers() {
             'onError': (event) => this.onPlayerError(event)
         }
     };
-
-    // ✅ CRÍTICO: Asegurar que los contenedores existan y estén visibles
-    const p1Container = document.getElementById('player1');
-    const p2Container = document.getElementById('player2');
-    
-    if (!p1Container || !p2Container) {
-        console.error('❌ Contenedores de players no encontrados');
-        return;
-    }
-
-    // ✅ Forzar visibilidad de contenedores
     p1Container.style.cssText = `
         position: absolute !important;
         top: 0 !important;
@@ -525,13 +514,13 @@ initializePlayers() {
         z-index: 0 !important;
         background: #000 !important;
     `;
-
     // Crear reproductores
     player1 = new YT.Player('player1', playerConfig);
     player2 = new YT.Player('player2', playerConfig);
     
-    console.log('✅ Reproductores creados');
+    console.log('✅ Reproductores creados correctamente');
 }
+    
 onPlayerReady(event) {
     console.log('✅ Reproductor listo');
     
@@ -559,8 +548,7 @@ onPlayerReady(event) {
                 visibility: visible !important;
             `;
         }
-    }
-    
+        }
     if (player1 && player2) {
         playersInitialized = true;
         this.state.playersReady = true;
