@@ -909,35 +909,8 @@ setupPlayerContainerHandlers() {
     if (bottomPlayer) {
         if (bottomPlayer.dataset.clickListenerAttached) return;
         
-        bottomPlayer.addEventListener('click', (e) => {
-            // Ignorar clicks en controles interactivos
-            if (e.target.closest('button') || 
-                e.target.closest('.volume-slider') || 
-                e.target.closest('.player-controls') ||
-                e.target.closest('.control-button') ||
-                e.target.closest('.progress-container')) {
-                return;
-            }
-            
-            const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
-            if (hasVideo) {
-                console.log('🎬 Click en barra -> Full Player');
-                this.switchView('fullPlayer');
-            }
-        });
-        
-        // ✅ CORRECCIÓN: También permitir click en miniatura/info
-        const playerInfo = bottomPlayer.querySelector('.player-info');
-        if (playerInfo) {
-            playerInfo.style.cursor = 'pointer';
-            playerInfo.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const hasVideo = this.state?.currentPlayingInfo?.videoId || window.currentPlayingInfo?.videoId;
-                if (hasVideo) {
-                    this.switchView('fullPlayer');
-                }
-            });
-        }
+        // ✅ CORRECCIÓN: NO permitir click en la barra para abrir fullPlayer
+        // Solo el botón mini-player-expand debe abrir el fullPlayer
         
         bottomPlayer.dataset.clickListenerAttached = "true";
         this.setupControlButtons();
@@ -1428,15 +1401,25 @@ startCrossfade(prevPlayer, nextPlayer) {
     
     crossfadeInProgress = true;
     
-    // ✅ CORRECCIÓN: Aplicar clases CSS para animación
-    const prevElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-    const nextElement = document.getElementById(`player${currentPlayer}`);
+    // ✅ CORRECCIÓN: Obtener elementos DOM correctamente
+    const prevPlayerNum = (prevPlayer === window.player1) ? 1 : 2;
+    const nextPlayerNum = (nextPlayer === window.player1) ? 1 : 2;
     
+    const prevElement = document.getElementById(`player${prevPlayerNum}`);
+    const nextElement = document.getElementById(`player${nextPlayerNum}`);
+    
+    console.log(`🎨 Crossfade: Player${prevPlayerNum} → Player${nextPlayerNum}`);
+    
+    // ✅ CRÍTICO: Asegurar visibilidad del siguiente player ANTES de fade
     if (nextElement) {
-        nextElement.classList.remove('hidden', 'fade-out');
-        nextElement.classList.add('fade-in');
         nextElement.style.display = 'block';
         nextElement.style.visibility = 'visible';
+        nextElement.style.opacity = '0'; // Empezar invisible pero renderizado
+        nextElement.classList.remove('hidden', 'fade-out');
+        nextElement.classList.add('fade-in');
+        
+        // Forzar reflow para que el navegador aplique los estilos
+        void nextElement.offsetWidth;
     }
     
     if (prevElement) {
@@ -1466,6 +1449,7 @@ startCrossfade(prevPlayer, nextPlayer) {
         const gainNext = Math.sin(progress * (Math.PI / 2));
         const gainPrev = Math.cos(progress * (Math.PI / 2));
 
+        // ✅ Audio fade
         try {
             if (prevPlayer && typeof prevPlayer.setVolume === 'function') {
                 prevPlayer.setVolume(Math.round(100 * gainPrev));
@@ -1476,6 +1460,14 @@ startCrossfade(prevPlayer, nextPlayer) {
             }
         } catch (e) {
             console.warn('⚠️ Error ajustando volumen:', e);
+        }
+        
+        // ✅ Visual fade (opacity)
+        if (nextElement) {
+            nextElement.style.opacity = gainNext.toFixed(2);
+        }
+        if (prevElement) {
+            prevElement.style.opacity = gainPrev.toFixed(2);
         }
 
         if (step >= steps) {
@@ -1498,10 +1490,12 @@ startCrossfade(prevPlayer, nextPlayer) {
                     prevElement.classList.remove('fade-out');
                     prevElement.classList.add('hidden');
                     prevElement.style.display = 'none';
+                    prevElement.style.opacity = '0';
                 }
                 
                 if (nextElement) {
                     nextElement.classList.remove('fade-in');
+                    nextElement.style.opacity = '1';
                 }
                 
             } catch (e) {
@@ -1525,8 +1519,6 @@ startCrossfade(prevPlayer, nextPlayer) {
         }
     }, stepTime);
 }
-
-
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
@@ -2050,18 +2042,21 @@ updateOverviewStats() {
             inactiveDiv.classList.add('hidden');
         }
         
-        // ✅ Cargar video
+        //  Cargar video
         activePlayer.loadVideoById(video.videoId);
         
-        // ✅ Verificar después de 2 segundos
-        setTimeout(() => {
-            const iframe = activeDiv?.querySelector('iframe');
-            if (iframe) {
-                console.log('✅ Iframe presente:', iframe.src);
-            } else {
-                console.error('❌ Iframe no encontrado');
-            }
-        }, 2000);
+        // Verificar iframe con retry y sin error si no existe aún
+        const checkIframe = (attempts = 0) => {
+        if (attempts > 10) return; // Max 5 segundos
+    
+        const iframe = activeDiv?.querySelector('iframe');
+        if (iframe && iframe.src) {
+        console.log(' Iframe cargado:', iframe.src);
+        } else if (attempts < 10) {
+        setTimeout(() => checkIframe(attempts + 1), 500);
+        }
+    };
+    checkIframe();
         
         reproduccionIniciada = true;
         this.updatePlayButton('pause');
