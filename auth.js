@@ -53,38 +53,69 @@ const AUTH_STORAGE_KEY = 'ytcm_auth_data';
 const EXPIRATION_DAYS = 7;
 
 function saveAuthData(token) {
+    if (!token || typeof token !== 'string') {
+        console.error('❌ Token inválido para guardar');
+        return false;
+    }
+
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + EXPIRATION_DAYS);
     
     const authData = {
         token: token,
         expiry: expirationDate.getTime(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        version: '1.0' // Para futuras migraciones
     };
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
-    console.log('💾 Datos de autenticación guardados.');
+
+    try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
+        console.log('💾 Datos de autenticación guardados correctamente');
+        return true;
+    } catch (e) {
+        console.error('❌ Error guardando auth data:', e);
+        return false;
+    }
 }
 
 function loadAuthData() {
-    const data = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!data) return null;
-
     try {
+        const data = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!data) {
+            console.log('📭 No hay datos de autenticación guardados');
+            return null;
+        }
+
         const authData = JSON.parse(data);
-        if (Date.now() < authData.expiry) {
-            console.log('✅ Token de sesión cargado y válido.');
-            return authData.token;
-        } else {
-            console.log('🗑️ Token de sesión expirado, eliminando...');
+        
+        // Validar estructura
+        if (!authData.token || !authData.expiry) {
+            console.warn('⚠️ Datos de auth incompletos, limpiando...');
             localStorage.removeItem(AUTH_STORAGE_KEY);
             return null;
         }
+
+        // Validar expiración
+        const now = Date.now();
+        if (now >= authData.expiry) {
+            console.log('🗑️ Token expirado, eliminando...');
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            return null;
+        }
+
+        // Calcular días restantes
+        const daysRemaining = Math.ceil((authData.expiry - now) / (24 * 60 * 60 * 1000));
+        console.log(`✅ Token válido cargado (${daysRemaining} días restantes)`);
+        
+        return authData.token;
+        
     } catch (e) {
-        console.error('❌ Error al parsear datos de autenticación:', e);
+        console.error('❌ Error parseando auth data:', e);
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return null;
     }
 }
+
 
 // =============================================
 // INICIALIZACIÓN DE APIS
@@ -228,66 +259,78 @@ function checkAndUpdateUI() {
 // =============================================
 
 function handleAuthResult(accessToken) {
-    // 1. Verificación básica
-    if (!accessToken) {
+    // 1. Validación mejorada
+    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim() === '') {
         isAuthorized = false;
-        console.log('❌ No hay token de autenticación válido.');
+        console.log('❌ Token inválido o vacío');
         updateAuthUI();
         return;
     }
 
-    // 2. Establecer credenciales
-    gapi.client.setToken({ access_token: accessToken });
-    isAuthorized = true;
-    saveAuthData(accessToken);
-    
-    console.log('✅ Usuario autenticado. Token establecido.');
-    
-    // 3. Actualizar estado del Core (si ya existe)
-    if (window.unifiedCore) {
-        window.unifiedCore.state.authReady = true;
-    }
-    
-    // 4. Actualizar UI INMEDIATAMENTE (Botones Conectar/Salir)
-    updateAuthUI();
-    
-    // 5. Cargar Playlists en SEGUNDO PLANO (Non-blocking)
-    // Usamos .then() en lugar de await para no detener la carga de la página
-    waitForSystemReady().then(() => {
-        console.log('📡 Sistema listo, iniciando carga de playlists en segundo plano...');
+    try {
+        // 2. Establecer credenciales
+        gapi.client.setToken({ access_token: accessToken });
+        isAuthorized = true;
         
-        // Llamada asíncrona: La interfaz ya es usable mientras esto ocurre
-        window.loadUserPlaylistsAndStore().then(() => {
-      console.log('✅ Carga de playlists completada');
-    
-    // ✅ Actualizar UI después de cargar
-    if (window.playlistManager) {
-        window.playlistManager.updatePlaylistsUI();
+        // 3. Guardar token
+        const saved = saveAuthData(accessToken);
+        if (!saved) {
+            console.warn('⚠️ Token no se pudo guardar, pero sesión activa');
+        }
+        
+        console.log('✅ Usuario autenticado correctamente');
+        
+        // 4. Actualizar estado del Core
+        if (window.unifiedCore) {
+            window.unifiedCore.state.authReady = true;
+        }
+        
+        // 5. Actualizar UI INMEDIATAMENTE
+        updateAuthUI();
+        
+        // 6. Cargar Playlists en segundo plano (non-blocking)
+        setTimeout(() => {
+            loadPlaylistsInBackground();
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ Error en handleAuthResult:', error);
+        isAuthorized = false;
+        updateAuthUI();
+        showError('Error configurando autenticación: ' + error.message);
     }
-    
-}).catch(err => {
-    console.error('❌ Error fatal cargando playlists:', err);
-    
-    // ✅ Notificar al usuario
-    if (window.unifiedCore) {
-        window.unifiedCore.showMessage('Error cargando tus playlists de YouTube', 'error');
+}
+async function loadPlaylistsInBackground() {
+    try {
+        // Esperar a que el sistema esté listo
+        await waitForSystemReady();
+        
+        console.log('📡 Cargando playlists de YouTube en segundo plano...');
+        
+        const playlists = await window.loadUserPlaylistsAndStore();
+        
+        if (playlists) {
+            console.log('✅ Playlists cargadas correctamente');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando playlists:', error);
+        
+        // No mostrar error al usuario si ya está usando la app
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage(
+                'Las playlists de YouTube no se pudieron cargar', 
+                'warning'
+            );
+        }
     }
-    
-    // ✅ No romper la app - continuar sin playlists de YouTube
-    console.log('⚠️ Continuando sin playlists de YouTube Library');
-});
-
-    }).catch(err => {
-        console.error('❌ Error esperando sistema:', err);
-    });
 }
 
-/**
- * ✅ NUEVA FUNCIÓN: Esperar a que el sistema esté completamente listo
- */
 function waitForSystemReady() {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
+            clearInterval(checkInterval);
+            console.warn('⏰ Timeout esperando sistema (10s)');
             reject(new Error('Timeout esperando sistema'));
         }, 10000);
         
@@ -298,7 +341,7 @@ function waitForSystemReady() {
             if (coreReady && managerReady) {
                 clearInterval(checkInterval);
                 clearTimeout(timeout);
-                console.log('✅ Sistema completamente listo:', { coreReady, managerReady });
+                console.log('✅ Sistema listo:', { coreReady, managerReady });
                 resolve();
             }
         }, 100);
@@ -309,67 +352,122 @@ function waitForSystemReady() {
  * Iniciar sesión
  */
 function signIn() {
-    console.log('🔐 signIn() llamado');
-    console.log('Estados:', { 
-        gapiReady, 
-        gisReady, 
-        tokenClient: !!tokenClient,
-        CLIENT_ID 
-    });
+    console.log('🔐 Iniciando proceso de login...');
     
+    // Validar estado de las APIs
+    const status = {
+        gapiReady,
+        gisReady,
+        tokenClient: !!tokenClient,
+        CLIENT_ID: !!CLIENT_ID
+    };
+    
+    console.log('📊 Estado de APIs:', status);
+    
+    // Validaciones
     if (!gapiReady) {
-        console.error('❌ GAPI no está cargado');
-        showError('Google API no disponible. Por favor recarga la página.');
+        showError('Google API no está lista. Recarga la página.');
         return;
     }
     
     if (!gisReady || !tokenClient) {
-        console.error('❌ GIS no está listo');
-        showError('Sistema de autenticación no listo. Por favor recarga la página.');
+        showError('Sistema de autenticación no listo. Recarga la página.');
+        return;
+    }
+
+    if (!CLIENT_ID) {
+        showError('Configuración incompleta. Contacta al administrador.');
         return;
     }
 
     console.log('🚀 Solicitando token de acceso...');
     
+    // Mostrar mensaje al usuario
     if (window.unifiedCore) {
         window.unifiedCore.showMessage('Abriendo ventana de Google...', 'info');
     }
     
     try {
+        // Solicitar autorización
         tokenClient.requestAccessToken({ 
-            prompt: 'consent'
+            prompt: 'consent' // Forzar consentimiento para refresh
         });
-        console.log('✅ Solicitud de token enviada, esperando popup...');
+        
+        console.log('✅ Solicitud enviada, esperando respuesta del usuario...');
+        
     } catch (error) {
         console.error('❌ Error solicitando token:', error);
-        showError('Error solicitando autorización: ' + error.message);
+        showError('Error al iniciar sesión: ' + error.message);
     }
 }
+
 
 /**
  * Cerrar sesión
  */
 function signOut() {
     console.log('🚪 Cerrando sesión...');
-    gapi.client.setToken('');
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    isAuthorized = false;
-    updateAuthUI();
     
-    if (window.unifiedCore) {
-        window.unifiedCore.clearYouTubeLibrary();
+    try {
+        // Revocar token en Google
+        if (gapi?.client?.getToken()) {
+            const token = gapi.client.getToken();
+            if (token && token.access_token) {
+                // Intentar revocar (no bloqueante)
+                fetch(`https://oauth2.googleapis.com/revoke?token=${token.access_token}`, {
+                    method: 'POST'
+                }).catch(e => console.warn('⚠️ No se pudo revocar token:', e));
+            }
+        }
+        
+        // Limpiar token local
+        gapi.client.setToken('');
+        
+        // Limpiar storage
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        
+        // Actualizar estado
+        isAuthorized = false;
+        updateAuthUI();
+        
+        // Limpiar biblioteca de YouTube
+        if (window.unifiedCore) {
+            window.unifiedCore.clearYouTubeLibrary();
+        }
+        
+        // Disparar evento de logout
+        document.dispatchEvent(new CustomEvent('userLoggedOut'));
+        
+        console.log('✅ Sesión cerrada correctamente');
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('Sesión cerrada', 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cerrando sesión:', error);
+        // Forzar limpieza incluso si hay error
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        isAuthorized = false;
+        updateAuthUI();
     }
-    
-    // ✅ DISPARAR EVENTO DE LOGOUT
-    document.dispatchEvent(new CustomEvent('userLoggedOut'));
 }
+
 
 /**
  * Actualizar UI de autenticación
  */
 function updateAuthUI() {
     console.log('🔄 Actualizando UI de autenticación');
-    console.log('Estado:', { isAuthorized, gapiReady, gisReady, tokenClient: !!tokenClient });
+    
+    const status = {
+        isAuthorized,
+        gapiReady,
+        gisReady,
+        tokenClient: !!tokenClient
+    };
+    
+    console.log('📊 Estado:', status);
     
     const signInBtn = document.getElementById('googleSignInButton');
     const signOutBtn = document.getElementById('googleSignOutButton');
@@ -381,13 +479,13 @@ function updateAuthUI() {
         return;
     }
     
-    // Limpiar listeners anteriores usando cloneNode
+    // ✅ CORRECCIÓN: Limpiar listeners con cloneNode
     const newSignInBtn = signInBtn.cloneNode(true);
     const newSignOutBtn = signOutBtn.cloneNode(true);
     signInBtn.parentNode.replaceChild(newSignInBtn, signInBtn);
     signOutBtn.parentNode.replaceChild(newSignOutBtn, signOutBtn);
     
-    // Hacer lo mismo con botón móvil si existe
+    // Botón móvil
     if (mobileSignInBtn) {
         const newMobileBtn = mobileSignInBtn.cloneNode(true);
         mobileSignInBtn.parentNode.replaceChild(newMobileBtn, mobileSignInBtn);
@@ -401,15 +499,18 @@ function updateAuthUI() {
         } else {
             newMobileBtn.style.display = 'inline-flex';
             newMobileBtn.disabled = true;
+            newMobileBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
         }
     }
     
+    // Estado: Usuario autenticado
     if (isAuthorized) {
         newSignInBtn.classList.add('hidden');
         newSignOutBtn.classList.remove('hidden');
         newSignOutBtn.onclick = signOut;
         console.log('✅ UI: Usuario autenticado');
         
+    // Estado: Listo para login
     } else if (gapiReady && gisReady && tokenClient) {
         newSignInBtn.classList.remove('hidden');
         newSignOutBtn.classList.add('hidden');
@@ -420,12 +521,13 @@ function updateAuthUI() {
         newSignInBtn.onclick = function(e) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('🖱️ ¡Click en botón Conectar detectado!');
+            console.log('🖱️ Click en Conectar detectado');
             signIn();
         };
         
-        console.log('✅ Botón Conectar configurado y listo');
+        console.log('✅ Botón Conectar configurado');
         
+    // Estado: Cargando
     } else {
         newSignInBtn.classList.remove('hidden');
         newSignOutBtn.classList.add('hidden');
@@ -436,6 +538,7 @@ function updateAuthUI() {
         } else if (!gapiReady) {
             newSignInBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i><span> Error API</span>';
             newSignInBtn.disabled = true;
+            newSignInBtn.title = 'Error cargando Google API';
         } else if (!gisReady || !tokenClient) {
             newSignInBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Preparando...</span>';
             newSignInBtn.disabled = true;
@@ -445,6 +548,18 @@ function updateAuthUI() {
     }
 }
 
+function startTokenValidation() {
+    // Validar token cada 5 minutos
+    setInterval(() => {
+        if (isAuthorized) {
+            const savedToken = loadAuthData();
+            if (!savedToken) {
+                console.warn('⚠️ Token expirado detectado, cerrando sesión...');
+                signOut();
+            }
+        }
+    }, 5 * 60 * 1000);
+}
 /**
  * Mostrar error
  */
@@ -644,7 +759,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('✅ Sistema de autenticación iniciado');
 });
-
+// Iniciar validación automática
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startTokenValidation);
+} else {
+    startTokenValidation();
+}
 // =============================================
 // FUNCIÓN DE DEBUG
 // =============================================
