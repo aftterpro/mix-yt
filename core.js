@@ -463,6 +463,13 @@ cleanupView(viewName) {
 initializePlayers() {
     if (player1 && player2) return;
     console.log('🎮 Inicializando reproductores...');
+    const p1Container = document.getElementById('player1');
+    const p2Container = document.getElementById('player2');
+    
+    if (!p1Container || !p2Container) {
+        console.error('❌ No se encontraron los contenedores de los reproductores');
+        return;
+    }
     
     // ✅ CRÍTICO: Origin correcto y explícito
     const currentOrigin = window.location.origin;
@@ -489,6 +496,8 @@ initializePlayers() {
             'onError': (event) => this.onPlayerError(event)
         }
     };
+    
+    // ✅ Aplicar estilos a los contenedores
     p1Container.style.cssText = `
         position: absolute !important;
         top: 0 !important;
@@ -514,6 +523,7 @@ initializePlayers() {
         z-index: 0 !important;
         background: #000 !important;
     `;
+    
     // Crear reproductores
     player1 = new YT.Player('player1', playerConfig);
     player2 = new YT.Player('player2', playerConfig);
