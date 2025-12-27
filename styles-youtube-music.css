@@ -1406,21 +1406,20 @@ body {
 
 /* Glow sutil en el mini player cuando está activo */
 #miniPlayerFloat::after {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(45deg, 
-        rgba(255, 107, 53, 0.4), 
-        rgba(255, 138, 101, 0.4));
-    border-radius: 14px;
-    z-index: -1;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+    display: none !important; /* Eliminar pseudo-elemento si lo hay */
 }
-
+#miniPlayerFloat .video-player.fade-in,
+#miniPlayerFloat .video-player:not(.hidden) {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+    transition: opacity 0.3s ease !important;
+}
+body.mini-player-active #persistent-player-layer {
+    z-index: 999997 !important; /* MENOR que miniPlayerFloat (999998) */
+}
 #miniPlayerFloat:hover::after {
     opacity: 1;
     animation: pulse 2s ease-in-out infinite;
@@ -2607,11 +2606,6 @@ body {
 
 .mini-player-expand:hover {
     background: rgba(255, 107, 53, 0.9) !important;
-}
-.bottom-player {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 @media (max-width: 768px) {
     #miniPlayerFloat {
