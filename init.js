@@ -1,12 +1,15 @@
 // init.js - Script de Inicialización Unificada
 console.log('🚀 Iniciando YT CrossMix - Carga de APIs...');
 
-// Estado global de APIs
+// Estado global mejorado
 window.ytCrossMixAPIs = {
     gapi: false,
     gis: false,
     youtube: false,
-    ready: false
+    ready: false,
+    errors: [],
+    retryCount: 0,
+    maxRetries: 3
 };
 
 // =============================================
@@ -74,7 +77,7 @@ function checkAllAPIsReady() {
         window.ytCrossMixAPIs.ready = true;
         console.log('🎉 ¡Todas las APIs están listas!');
         
-        // Notificar al sistema unificado si ya está cargado
+        // Notificar al sistema unificado
         if (window.unifiedCore) {
             window.unifiedCore.state.authReady = true;
             window.unifiedCore.updateStatusIndicator('APIs listas', 'success');
@@ -82,15 +85,21 @@ function checkAllAPIsReady() {
         
         // Disparar evento global
         document.dispatchEvent(new CustomEvent('ytCrossMixAPIsReady', {
-            detail: { gapi, gis, youtube }
+            detail: { gapi, gis, youtube, timestamp: Date.now() }
         }));
         
-        // Inicializar autenticación si el módulo está disponible
-        if (typeof window.initializeAuth === 'function') {
-            window.initializeAuth();
-        }
+        console.log('✅ Evento ytCrossMixAPIsReady disparado');
+        
+    } else {
+        const missing = [];
+        if (!gapi) missing.push('GAPI');
+        if (!gis) missing.push('GIS');
+        if (!youtube) missing.push('YouTube');
+        
+        console.log(`⏳ Esperando APIs: ${missing.join(', ')}`);
     }
 }
+
 
 /**
  * Mostrar error de inicialización
@@ -129,9 +138,6 @@ function showInitError(message) {
 // CARGA AUTOMÁTICA DE SCRIPTS
 // =============================================
 
-/**
- Cargar YouTube API con origin correcto
- */
 function loadYouTubeAPI() {
     if (document.querySelector('script[src*="iframe_api"]')) {
         console.log('📺 YouTube API ya está cargándose...');
@@ -139,54 +145,84 @@ function loadYouTubeAPI() {
     }
     
     console.log('📺 Cargando YouTube IFrame API...');
+    
     const script = document.createElement('script');
-
     script.src = 'https://www.youtube.com/iframe_api';
-    script.setAttribute('data-origin', window.location.origin);
-
+    
+    // ✅ CRÍTICO: Configurar origin correctamente
+    const currentOrigin = window.location.origin;
+    script.setAttribute('data-origin', currentOrigin);
     script.async = true;
-        
+    
+    // ✅ CORRECCIÓN: Manejo de errores de carga
     script.onerror = () => {
         console.error('❌ Error cargando YouTube IFrame API');
-        showInitError('Error cargando YouTube API');
+        window.ytCrossMixAPIs.errors.push('YouTube API load failed');
+        
+        // Reintentar si no hemos excedido el límite
+        if (window.ytCrossMixAPIs.retryCount < window.ytCrossMixAPIs.maxRetries) {
+            window.ytCrossMixAPIs.retryCount++;
+            console.log(`🔄 Reintentando carga de YouTube API (${window.ytCrossMixAPIs.retryCount}/${window.ytCrossMixAPIs.maxRetries})...`);
+            
+            setTimeout(() => {
+                // Remover script fallido
+                script.remove();
+                loadYouTubeAPI();
+            }, 2000);
+        } else {
+            showInitError('Error cargando YouTube API después de múltiples intentos');
+        }
+    };
+    
+    script.onload = () => {
+        console.log('✅ YouTube API script cargado');
     };
     
     document.head.appendChild(script);
 }
+
 /**
  * Configurar players con origin correcto
  */
 window.onYouTubeIframeAPIReady = function() {
     try {
-        console.log('🎵 YouTube IFrame API cargada');
+        console.log('🎵 YouTube IFrame API lista');
         window.ytCrossMixAPIs.youtube = true;
         
-        // ✅ CONFIGURAR ORIGIN PARA EVITAR ERROR DE POSTMESSAGE
+        // ✅ CRÍTICO: Configurar origin global para todos los players
         if (window.YT && window.YT.Player) {
-            // Configurar origin global para todos los players
+            const currentOrigin = window.location.origin;
             const originalPlayer = window.YT.Player;
+            
+            // Wrapper para forzar origin correcto
             window.YT.Player = function(elementId, config) {
-                // Asegurar que playerVars tenga origin correcto
                 config = config || {};
                 config.playerVars = config.playerVars || {};
-                config.playerVars.origin = window.location.origin;
                 
-                // Llamar al constructor original
+                // ✅ FORZAR origin correcto
+                config.playerVars.origin = currentOrigin;
+                config.playerVars.widget_referrer = currentOrigin;
+                
+                console.log(`🎮 Creando player con origin: ${currentOrigin}`);
+                
                 return new originalPlayer(elementId, config);
             };
             
             // Preservar el prototipo
             window.YT.Player.prototype = originalPlayer.prototype;
             
-            console.log('✅ YouTube API configurada con origin:', window.location.origin);
+            console.log('✅ YouTube API configurada con origin:', currentOrigin);
         }
         
         checkAllAPIsReady();
+        
     } catch (error) {
-        console.error('❌ Error con YouTube API:', error);
-        showInitError('Error cargando YouTube API');
+        console.error('❌ Error en onYouTubeIframeAPIReady:', error);
+        window.ytCrossMixAPIs.errors.push('YouTube API init error: ' + error.message);
+        showInitError('Error inicializando YouTube API');
     }
 };
+
 
 // ✅ ASEGURAR QUE SE LLAME A loadYouTubeAPI
 if (document.readyState === 'loading') {
@@ -204,18 +240,37 @@ if (document.readyState === 'loading') {
  * Verificar y cargar APIs faltantes
  */
 function ensureAPIsLoaded() {
+    console.log('🔍 Verificando disponibilidad de APIs...');
+    
     // YouTube API
     if (!window.YT && !document.querySelector('script[src*="iframe_api"]')) {
+        console.log('📺 Cargando YouTube API...');
         loadYouTubeAPI();
+    } else if (window.YT) {
+        console.log('✅ YouTube API ya disponible');
+        window.ytCrossMixAPIs.youtube = true;
     }
     
-    // Google APIs (ya deberían estar en el HTML pero verificamos)
-    if (!window.gapi && !document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
-        console.warn('⚠️ Google API script no encontrado en HTML');
+    // Google APIs (gapi)
+    if (!window.gapi) {
+        if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
+            console.warn('⚠️ Google API script no encontrado en HTML');
+        } else {
+            console.log('⏳ Esperando carga de GAPI...');
+        }
+    } else {
+        console.log('✅ GAPI ya disponible');
     }
     
-    if (!window.google && !document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
-        console.warn('⚠️ Google Identity script no encontrado en HTML');
+    // Google Identity Services (GIS)
+    if (!window.google || !window.google.accounts) {
+        if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+            console.warn('⚠️ Google Identity script no encontrado en HTML');
+        } else {
+            console.log('⏳ Esperando carga de GIS...');
+        }
+    } else {
+        console.log('✅ GIS ya disponible');
     }
 }
 
@@ -247,6 +302,7 @@ if (document.readyState === 'loading') {
 // CONFIGURACIÓN DE CONTROLES DE AUDIO
 // =============================================
 
+// ✅ CORRECCIÓN: setupAudioControls con mejor manejo
 function setupAudioControls() {
     console.log('🔊 Configurando controles de audio...');
     
@@ -254,7 +310,8 @@ function setupAudioControls() {
     const volumeSlider = document.getElementById('volumeSlider');
     
     if (!volumeButton || !volumeSlider) {
-        console.warn('⚠️ Elementos de volumen no encontrados');
+        console.warn('⚠️ Elementos de volumen no encontrados, reintentando...');
+        setTimeout(setupAudioControls, 1000);
         return;
     }
     
@@ -263,14 +320,22 @@ function setupAudioControls() {
     let isMuted = false;
     let previousVolume = 100;
     
-    // Cargar volumen guardado
-    const savedVolume = localStorage.getItem('ytcm_volume');
-    if (savedVolume !== null) {
-        currentVolume = parseInt(savedVolume, 10);
-        updateVolumeUI(currentVolume);
+    // ✅ CORRECCIÓN: Cargar volumen guardado con validación
+    try {
+        const savedVolume = localStorage.getItem('ytcm_volume');
+        if (savedVolume !== null) {
+            const parsed = parseInt(savedVolume, 10);
+            if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+                currentVolume = parsed;
+                updateVolumeUI(currentVolume);
+                console.log(`✅ Volumen restaurado: ${currentVolume}%`);
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Error cargando volumen guardado:', e);
     }
     
-    // Toggle mute con click en botón
+    // Toggle mute
     volumeButton.addEventListener('click', () => {
         isMuted = !isMuted;
         
@@ -290,7 +355,7 @@ function setupAudioControls() {
         console.log(`🔊 ${isMuted ? 'Mute' : 'Unmute'}: ${currentVolume}%`);
     });
     
-    // Mostrar slider al pasar el mouse
+    // Mostrar slider
     volumeButton.addEventListener('mouseenter', () => {
         volumeSlider.classList.add('show');
     });
@@ -303,7 +368,7 @@ function setupAudioControls() {
         }, 300);
     });
     
-    // Control del slider
+    // Click en slider
     volumeSlider.addEventListener('click', (e) => {
         const rect = volumeSlider.getBoundingClientRect();
         const clickY = e.clientY - rect.top;
@@ -316,11 +381,9 @@ function setupAudioControls() {
         updateVolumeUI(currentVolume);
         applyVolumeToPlayers(currentVolume);
         saveVolume(currentVolume);
-        
-        console.log(`🔊 Volumen ajustado: ${currentVolume}%`);
     });
     
-    // Drag en el slider
+    // Drag en slider
     let isDragging = false;
     
     volumeSlider.addEventListener('mousedown', (e) => {
@@ -330,9 +393,7 @@ function setupAudioControls() {
     });
     
     document.addEventListener('mousemove', (e) => {
-        if (isDragging) {
-            handleVolumeDrag(e);
-        }
+        if (isDragging) handleVolumeDrag(e);
     });
     
     document.addEventListener('mouseup', () => {
@@ -357,9 +418,7 @@ function setupAudioControls() {
     
     function updateVolumeUI(volume) {
         const fill = volumeSlider.querySelector('.volume-fill');
-        if (fill) {
-            fill.style.height = `${volume}%`;
-        }
+        if (fill) fill.style.height = `${volume}%`;
         updateVolumeIcon(volume);
     }
     
@@ -392,10 +451,14 @@ function setupAudioControls() {
     }
     
     function saveVolume(volume) {
-        localStorage.setItem('ytcm_volume', volume.toString());
+        try {
+            localStorage.setItem('ytcm_volume', volume.toString());
+        } catch (e) {
+            console.warn('⚠️ No se pudo guardar volumen:', e);
+        }
     }
     
-    // Aplicar volumen inicial a los players cuando estén listos
+    // Aplicar volumen inicial a players cuando estén listos
     const checkPlayers = setInterval(() => {
         if (window.player1 || window.player2) {
             applyVolumeToPlayers(currentVolume);
@@ -404,19 +467,35 @@ function setupAudioControls() {
         }
     }, 500);
     
-    // Timeout de seguridad
     setTimeout(() => clearInterval(checkPlayers), 10000);
     
     console.log('✅ Controles de audio configurados');
 }
 
+
 // Inicializar controles cuando el DOM esté listo
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupAudioControls);
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📄 DOM cargado, verificando APIs...');
+        ensureAPIsLoaded();
+        loadYouTubeAPI();
+        
+        setTimeout(setupAudioControls, 1000);
+        
+        // Timeout de seguridad
+        setTimeout(() => {
+            if (!window.ytCrossMixAPIs.ready) {
+                console.warn('⏰ Timeout de APIs (10s), algunas pueden no estar disponibles');
+                console.log('Estado final:', window.ytCrossMixAPIs);
+                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout'));
+            }
+        }, 10000);
+    });
 } else {
-    setupAudioControls();
+    console.log('📄 DOM ya cargado, verificando APIs...');
+    ensureAPIsLoaded();
+    loadYouTubeAPI();
+    setTimeout(setupAudioControls, 1000);
 }
 
-// Exponer función globalmente
-window.setupAudioControls = setupAudioControls;
-console.log('✅ Script y audio de inicialización cargado');
+console.log('✅ Sistema de inicialización cargado');
