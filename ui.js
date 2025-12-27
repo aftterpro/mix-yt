@@ -131,75 +131,96 @@ class UIManager {
     // MOVIMIENTO DE REPRODUCTORES (VISUAL)
     // ==========================================
 
-    updatePlayerPosition(targetContainerId) {
-        const playersLayer = document.getElementById('persistent-player-layer');
-        const targetContainer = document.getElementById(targetContainerId);
+ updatePlayerPosition(targetContainerId) {
+    const playersLayer = document.getElementById('persistent-player-layer');
+    const targetContainer = document.getElementById(targetContainerId);
 
-        if (!playersLayer || !targetContainer || targetContainer.classList.contains('hidden')) {
-            if (playersLayer) {
-                playersLayer.style.opacity = '0';
-                playersLayer.style.pointerEvents = 'none';
-            }
-            return;
-        }
+    // Validaciones
+    if (!playersLayer) {
+        console.warn('⚠️ persistent-player-layer no encontrado');
+        return;
+    }
 
-        const rect = targetContainer.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return;
+    if (!targetContainer) {
+        console.warn(`⚠️ Contenedor ${targetContainerId} no encontrado`);
+        return;
+    }
 
-        // Ajuste de altura para Full Player
-        let finalHeight = rect.height;
-        if (targetContainerId === 'videoWrapper') {
-            const calculatedHeight = rect.width * (9 / 16);
-            if (finalHeight > 500 || finalHeight > rect.width) {
-                finalHeight = calculatedHeight;
-                targetContainer.style.height = `${calculatedHeight}px`;
-            }
-        }
+    if (targetContainer.classList.contains('hidden')) {
+        playersLayer.style.opacity = '0';
+        playersLayer.style.pointerEvents = 'none';
+        return;
+    }
 
-        playersLayer.style.top = `${rect.top}px`;
-        playersLayer.style.left = `${rect.left}px`;
-        playersLayer.style.width = `${rect.width}px`;
-        playersLayer.style.height = `${finalHeight}px`;
-        
-        // Estilos específicos según vista
-        if (targetContainerId === 'videoWrapper') {
-            playersLayer.style.opacity = '1';
-            playersLayer.style.pointerEvents = 'auto';
-            playersLayer.style.zIndex = '60'; // Corrección Z-Index
-            playersLayer.style.borderRadius = '12px';
+    const rect = targetContainer.getBoundingClientRect();
+    
+    // Validar dimensiones
+    if (rect.width === 0 || rect.height === 0) {
+        console.warn(`⚠️ ${targetContainerId} sin dimensiones válidas`);
+        return;
+    }
+
+    // Ajuste de altura para Full Player
+    let finalHeight = rect.height;
+    if (targetContainerId === 'videoWrapper') {
+        const calculatedHeight = rect.width * (9 / 16);
+        if (finalHeight > 500 || finalHeight > rect.width) {
+            finalHeight = calculatedHeight;
+            targetContainer.style.height = `${calculatedHeight}px`;
         }
     }
 
+    // Aplicar posición
+    playersLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    playersLayer.style.top = `${rect.top}px`;
+    playersLayer.style.left = `${rect.left}px`;
+    playersLayer.style.width = `${rect.width}px`;
+    playersLayer.style.height = `${finalHeight}px`;
+    
+    // Estilos específicos según vista
+    if (targetContainerId === 'videoWrapper') {
+        playersLayer.style.opacity = '1';
+        playersLayer.style.pointerEvents = 'auto';
+        playersLayer.style.zIndex = '60';
+        playersLayer.style.borderRadius = '12px';
+        playersLayer.style.display = 'block';
+    }
+
+    console.log(`✅ Player posicionado en ${targetContainerId}:`, {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: finalHeight
+    });
+}
 movePlayersToFullView() {
     console.log('🎬 movePlayersToFullView iniciado');
     
-    const persistentLayer = document.getElementById('persistent-player-layer');
-    const videoWrapper = document.getElementById('videoWrapper');
+    let persistentLayer = document.getElementById('persistent-player-layer');
     
-    // ✅ CREAR CAPA SI NO EXISTE
+    // ✅ Crear capa si no existe
     if (!persistentLayer) {
         console.warn('⚠️ Creando persistent-player-layer...');
-        const layer = document.createElement('div');
-        layer.id = 'persistent-player-layer';
-        layer.style.cssText = `
+        persistentLayer = document.createElement('div');
+        persistentLayer.id = 'persistent-player-layer';
+        persistentLayer.style.cssText = `
             position: fixed;
             background: #000;
             overflow: hidden;
             pointer-events: auto;
             transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 60;
         `;
-        document.body.appendChild(layer);
+        document.body.appendChild(persistentLayer);
         
         // Mover players al layer
         const p1 = document.getElementById('player1');
         const p2 = document.getElementById('player2');
-        if (p1) layer.appendChild(p1);
-        if (p2) layer.appendChild(p2);
-        
-        // Reintentar
-        return this.movePlayersToFullView();
+        if (p1) persistentLayer.appendChild(p1);
+        if (p2) persistentLayer.appendChild(p2);
     }
     
+    const videoWrapper = document.getElementById('videoWrapper');
     if (!videoWrapper) {
         console.error('❌ videoWrapper no encontrado');
         return;
@@ -219,18 +240,19 @@ movePlayersToFullView() {
 
     console.log('✅ Dimensiones OK:', rect);
     
+    // Aplicar posición
     persistentLayer.style.display = 'block';
     persistentLayer.style.top = `${rect.top}px`;
     persistentLayer.style.left = `${rect.left}px`;
     persistentLayer.style.width = `${rect.width}px`;
     persistentLayer.style.height = `${rect.height}px`;
-    persistentLayer.style.zIndex = '60';
     persistentLayer.style.borderRadius = '12px';
     persistentLayer.style.opacity = '1';
     persistentLayer.style.pointerEvents = 'auto';
     
     document.body.classList.remove('mini-player-active');
     
+    // Asegurar visibilidad de players
     const players = persistentLayer.querySelectorAll('.video-player');
     players.forEach(player => {
         if (!player.classList.contains('hidden')) {
@@ -294,69 +316,95 @@ movePlayersToFullView() {
         }
     }
 
-   renderSearchResults(items, isContinuation = false) {
-        const container = this.elements.searchResults;
-        if (!container) return;
-
-        // --- CORRECCIÓN 1: Asegurar que 'items' sea un array ---
-        let videosToRender = [];
-        
-        if (Array.isArray(items)) {
-            videosToRender = items;
-        } else if (items && Array.isArray(items.items)) {
-            // Si la API devuelve { items: [...], nextPageToken: ... }
-            videosToRender = items.items;
-        } else if (items && typeof items === 'object') {
-             // Caso raro: objeto único
-             console.warn('UI: Recibido objeto no array, intentando convertir', items);
-             videosToRender = [items];
-        }
-
-        if (!isContinuation) container.innerHTML = '';
-        else {
-             const loader = container.querySelector('.search-loading-more');
-             if (loader) loader.remove();
-        }
-
-        // Si después de limpiar sigue vacío o nulo
-        if (!videosToRender || videosToRender.length === 0) {
-            if (!isContinuation) container.innerHTML = '<div class="search-placeholder"><p>No se encontraron videos.</p></div>';
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        
-        // Usamos videosToRender en lugar de items
-        videosToRender.forEach(video => {
-            // Validación extra para evitar errores si llega un item vacío
-            if (!video) return; 
-            const card = this.createSearchResultCard(video);
-            fragment.appendChild(card);
-        });
-
-        container.appendChild(fragment);
+ renderSearchResults(items, isContinuation = false) {
+    const container = this.elements.searchResults;
+    if (!container) {
+        console.error('❌ Contenedor searchResults no encontrado');
+        return;
     }
+
+    // ✅ CORRECCIÓN: Validar y normalizar datos
+    let videosToRender = [];
+    
+    if (Array.isArray(items)) {
+        videosToRender = items;
+    } else if (items && Array.isArray(items.items)) {
+        videosToRender = items.items;
+    } else if (items && typeof items === 'object') {
+        console.warn('⚠️ UI: Objeto recibido no es array, intentando convertir');
+        videosToRender = [items];
+    } else {
+        console.error('❌ UI: Datos inválidos recibidos:', items);
+        container.innerHTML = '<div class="search-placeholder"><p>Error: datos inválidos</p></div>';
+        return;
+    }
+
+    // Limpiar contenedor si es búsqueda nueva
+    if (!isContinuation) {
+        container.innerHTML = '';
+    } else {
+        // Remover loader si existe
+        const loader = container.querySelector('.search-loading-more, .search-loading');
+        if (loader) loader.remove();
+    }
+
+    // Validar que hay videos para mostrar
+    if (!videosToRender || videosToRender.length === 0) {
+        if (!isContinuation) {
+            container.innerHTML = `
+                <div class="search-placeholder">
+                    <i class="fas fa-search"></i>
+                    <p>No se encontraron videos</p>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    console.log(`✅ Renderizando ${videosToRender.length} videos`);
+
+    // ✅ CORRECCIÓN: Usar DocumentFragment para mejor rendimiento
+    const fragment = document.createDocumentFragment();
+    
+    videosToRender.forEach(video => {
+        if (!video) return;
+        
+        const card = this.createSearchResultCard(video);
+        if (card) fragment.appendChild(card);
+    });
+
+    container.appendChild(fragment);
+    
+    console.log(`✅ ${container.children.length} videos en el DOM`);
+}
 createSearchResultCard(video) {
-    const videoId = video.videoId || video.id;
-    if (!videoId) {
-        console.warn('⚠️ Video sin ID, omitiendo:', video);
-        return document.createDocumentFragment();
+    // ✅ CORRECCIÓN: Validación robusta de videoId
+    let videoId = video.videoId || video.id;
+    
+    if (!videoId || videoId === 'undefined') {
+        console.warn('⚠️ Video sin ID válido, omitiendo:', video);
+        return null;
     }
 
     const title = video.title || 'Título desconocido';
     const artist = video.uploaderName || video.artist || 'Artista desconocido';
     const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
     
-    // ✅ CORRECCIÓN: Procesar duración correctamente
+    // ✅ CORRECCIÓN: Procesar duración de forma robusta
     let durationInSeconds = 0;
     let durationDisplay = '';
     
-    if (typeof video.duration === 'number') {
+    if (typeof video.duration === 'number' && video.duration > 0) {
         durationInSeconds = video.duration;
         durationDisplay = this.formatDuration(video.duration);
-    } else if (typeof video.duration === 'string') {
-        // Si es string tipo "3:45", convertir a segundos
-        durationInSeconds = window.youtubeClientUtils?.parseDurationString(video.duration) || 0;
+    } else if (typeof video.duration === 'string' && video.duration) {
+        // Convertir string "3:45" a segundos
+        const parts = video.duration.split(':').map(Number);
+        if (parts.length === 2) {
+            durationInSeconds = (parts[0] * 60) + parts[1];
+        } else if (parts.length === 3) {
+            durationInSeconds = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+        }
         durationDisplay = video.duration;
     }
 
@@ -374,8 +422,12 @@ createSearchResultCard(video) {
         </div>
         
         <div class="search-result-info">
-            <h3 title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
-            <p>${this.escapeHTML(artist)}</p>
+            <h3 class="search-result-title" title="${this.escapeHTML(title)}">
+                ${this.escapeHTML(title)}
+            </h3>
+            <p class="search-result-author">
+                ${this.escapeHTML(artist)}
+            </p>
         </div>
         
         <button class="add-to-queue-btn" 
@@ -389,46 +441,67 @@ createSearchResultCard(video) {
         </button>
     `;
 
-    // ✅ EVENTO CLICK EN EL BOTÓN
+    // ✅ CORRECCIÓN: Event listener con manejo de errores
     const addBtn = div.querySelector('.add-to-queue-btn');
-    addBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        
-        console.log('🎵 Click en añadir:', videoId, 'Duración:', durationInSeconds, 's');
-        
-        const videoData = {
-            videoId: videoId,
-            title: addBtn.dataset.title,
-            thumbnail: addBtn.dataset.thumbnail,
-            duration: durationInSeconds, // ✅ Enviar en segundos
-            uploaderName: addBtn.dataset.artist,
-            artist: addBtn.dataset.artist
-        };
+    if (addBtn) {
+        addBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            console.log(`🎵 Añadiendo: ${videoId} (${durationInSeconds}s)`);
+            
+            const videoData = {
+                videoId: videoId,
+                title: addBtn.dataset.title,
+                thumbnail: addBtn.dataset.thumbnail,
+                duration: durationInSeconds,
+                uploaderName: addBtn.dataset.artist,
+                artist: addBtn.dataset.artist
+            };
 
-        addBtn.disabled = true;
-        addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            // Estado de carga
+            addBtn.disabled = true;
+            const originalHTML = addBtn.innerHTML;
+            addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-        try {
-            if (window.playlistManager) {
-                await window.playlistManager.addVideoToQueue(videoData);
-                addBtn.innerHTML = '<i class="fas fa-check"></i>';
+            try {
+                if (window.playlistManager) {
+                    await window.playlistManager.addVideoToQueue(videoData);
+                    
+                    // Éxito
+                    addBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    addBtn.classList.add('success');
+                    
+                    setTimeout(() => {
+                        addBtn.innerHTML = originalHTML;
+                        addBtn.disabled = false;
+                        addBtn.classList.remove('success');
+                    }, 1500);
+                } else {
+                    throw new Error('PlaylistManager no disponible');
+                }
+            } catch (error) {
+                console.error('❌ Error añadiendo video:', error);
+                
+                // Error
+                addBtn.innerHTML = '<i class="fas fa-times"></i>';
+                addBtn.classList.add('error');
+                
+                if (window.unifiedCore) {
+                    window.unifiedCore.showMessage(
+                        'Error añadiendo video: ' + error.message, 
+                        'error'
+                    );
+                }
+                
                 setTimeout(() => {
-                    addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+                    addBtn.innerHTML = originalHTML;
                     addBtn.disabled = false;
+                    addBtn.classList.remove('error');
                 }, 1500);
-            } else {
-                throw new Error('PlaylistManager no disponible');
             }
-        } catch (error) {
-            console.error('❌ Error añadiendo video:', error);
-            addBtn.innerHTML = '<i class="fas fa-times"></i>';
-            setTimeout(() => {
-                addBtn.innerHTML = '<i class="fas fa-plus"></i>';
-                addBtn.disabled = false;
-            }, 1500);
-        }
-    });
+        });
+    }
 
     return div;
 }
