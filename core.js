@@ -3,18 +3,6 @@ console.log('Core cargando...');
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
-// --- VARIABLES GLOBALES PARA SPONSORBLOCK ---
-let lastSkipTime = 0;      // Evita bucles infinitos de saltos
-
-// Traducción de categorías
-const nombresCategorias = {
-    'sponsor': 'Patrocinio',
-    'intro': 'Intro',
-    'outro': 'Créditos',
-    'interaction': 'Interacción',
-    'selfpromo': 'Autopromo',
-    'music_offtopic': 'Intro no musical'
-};
 const playerConfig = {
     playerVars: { 
         'playsinline': 1,
@@ -24,9 +12,11 @@ const playerConfig = {
     host: 'https://www.youtube.com'
 };
 const CROSSFADE_DURATION = 10;
+
 window.player1 = null;
 window.player2 = null;
 window.currentPlayer = 1;
+//checkAndSkipSegment = window.
 window.reproduccionIniciada = false;
 window.currentPlayingInfo = {
     playlistId: null,
@@ -74,16 +64,7 @@ let lastSeekVideoId = null;
 let isNextVideoPreloaded = false;
 
 let segmentosCache = {};
-try {
-    const saved = sessionStorage.getItem('ytcm_sponsor_cache');
-    if (saved) {
-        segmentosCache = JSON.parse(saved);
-        console.log('📦 Cache de SponsorBlock restaurada de sesión.');
-    }
-} catch (e) { 
-    console.warn('⚠️ No se pudo acceder a sessionStorage para SponsorBlock'); 
-}
-const PIPED_SPONSOR_BLOCK_URL = 'https://api.piped.private.coffee/sponsors/';
+const PIPED__BLOCK_URL = 'https://api.piped.private.coffee/s/';
 
 const unifiedState = {
     initialized: false,
@@ -581,7 +562,7 @@ onPlayerStateChange(event) {
     if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.CUED) {
         const videoData = player.getVideoData();
         if (videoData?.video_id) {
-            checkAndSkipSegment(player);
+            //checkAndSkipSegment(player);
         }
     }
     
@@ -624,7 +605,7 @@ onPlayerStateChange(event) {
             }
             
             // Re-verificar SponsorBlock por si acaso (ej. intros muy cortas)
-            setTimeout(() => checkAndSkipSegment(player), 500);
+           // setTimeout(() => checkAndSkipSegment(player), 500);
         }
         
         this.updateCurrentPlayingIndex(); // Marcar canción actual
@@ -2132,8 +2113,7 @@ showMessage(message, type = 'info') {
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
 
-function preloadNextVideo() {
-    // Si no hay core o playlist, abortar
+function preloadNextVideo() {    // Si no hay core o playlist, abortar
     if (!window.unifiedCore) return;
 
     const flatList = window.unifiedCore.getFlattenedPlaylist();
@@ -2156,139 +2136,11 @@ function preloadNextVideo() {
                 videoId: nextVideo.videoId,
                 startSeconds: 0
             });
-            
-            // Opcional: Cargar también sus segmentos SponsorBlock ahora
-            cargarSponsorBlock(nextVideo.videoId);
+        
         }
     }
 }
-async function cargarSponsorBlock(videoId) {
-    // ✅ Verificar estructura correcta del caché
-    const cached = segmentosCache[videoId];
-    
-    if (cached && typeof cached === 'object' && cached.segments) {
-        const cacheAge = Date.now() - (cached.timestamp || 0);
-        if (cacheAge < 10 * 60 * 1000) {
-            console.log(`✅ SB: Usando caché para ${videoId}`);
-            return cached.segments;
-        }
-    }
 
-    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-    const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-    
-    segmentosCache[videoId] = 'fetching';
-
-    try {
-        const response = await fetch(apiUrl, { 
-            headers: { 'X-UserID': userId } 
-        });
-        
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        const data = await response.json();
-        
-        // ✅ Guardar con estructura correcta
-        const segments = Array.isArray(data) 
-            ? data.filter(s => s.startTime < s.endTime)
-            : [];
-        
-        segmentosCache[videoId] = {
-            segments: segments,
-            timestamp: Date.now()
-        };
-        
-        console.log(`✅ SB: ${segments.length} segmentos para ${videoId}`);
-        return segments;
-        
-    } catch (e) {
-        console.warn(`⚠️ SB Error ${videoId}:`, e.message);
-        segmentosCache[videoId] = { 
-            segments: [], 
-            timestamp: Date.now() 
-        };
-        return [];
-    }
-}
-
-function checkAndSkipSegment(player) {
-    const videoId = player.getVideoData()?.video_id;
-    if (!videoId) return;
-    
-    const cached = segmentosCache[videoId];
-    
-    // ✅ Validar estructura del caché
-    if (!cached || cached === 'fetching' || typeof cached !== 'object') {
-        return;
-    }
-    
-    const segments = cached.segments || [];
-    if (segments.length === 0) return;
-
-    const currentTime = player.getCurrentTime();
-    const duration = player.getDuration();
-
-    if (Math.abs(currentTime - lastSkipTime) < 1.5) return;
-
-    for (const seg of segments) {
-        if (currentTime >= seg.startTime && currentTime < seg.endTime) {
-            
-            const nombreCat = nombresCategorias[seg.category] || seg.category;
-
-            if (seg.endTime >= (duration - 2)) {
-                console.log("🎬 SponsorBlock: Outro detectado");
-                mostrarAvisoSB(`🎬 Final saltado`, player.getIframe().parentElement);
-                player.seekTo(duration, true);
-            } else {
-                console.log(`⏩ SponsorBlock: Saltando ${nombreCat}`);
-                mostrarAvisoSB(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
-                player.seekTo(seg.endTime, true);
-            }
-
-            lastSkipTime = seg.endTime;
-            break;
-        }
-    }
-}
-// Función visual simple (asegúrate de tener el CSS .sb-toast que te pasé antes)
-function mostrarAvisoSB(mensaje, container) {
-    // ✅ CORRECCIÓN: Limpiar avisos anteriores primero
-    const oldToasts = document.querySelectorAll('.sb-toast');
-    oldToasts.forEach(toast => toast.remove());
-    
-    let toast = document.createElement('div');
-    toast.className = 'sb-toast';
-    toast.textContent = mensaje;
-    
-    // Estilos inline para asegurar visibilidad
-    toast.style.cssText = `
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 12px;
-        z-index: 100;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    `;
-    
-    (container || document.body).appendChild(toast);
-    
-    // Fade in
-    requestAnimationFrame(() => {
-        toast.style.opacity = '1';
-    });
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
 function monitorPlayers() {
     if (!playersInitialized || !reproduccionIniciada) return;
 
@@ -2298,22 +2150,18 @@ function monitorPlayers() {
 
         const playerState = activePlayer.getPlayerState();
         
-        // ✅ CRÍTICO: Detectar final de video
         if (playerState === YT.PlayerState.ENDED) {
-            console.log('🎬 Video terminado, llamando a playNextVideo...');
+            console.log('🎬 Video terminado');
             
-            // Limpiar monitor para evitar llamadas múltiples
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
             
-            // Resetear flags
             hasOutroCrossfadeStarted = false;
             nextVideoScheduled = false;
             isTransitioning = false;
             
-            // Llamar a siguiente video
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
             }
@@ -2327,13 +2175,16 @@ function monitorPlayers() {
         const videoData = activePlayer.getVideoData();
         const videoId = videoData?.video_id;
 
-        // SponsorBlock
-        if (videoId && !segmentosCache[videoId]) {
-            cargarSponsorBlock(videoId);
-        }
-
-        if (videoId) {
-            checkAndSkipSegment(activePlayer);
+        // ✅ SPONSORBLOCK: Cargar segmentos si no existen
+        if (videoId && window.sponsorBlockManager) {
+            const cached = window.sponsorBlockManager.segmentosCache[videoId];
+            
+            if (!cached) {
+                window.sponsorBlockManager.cargarSegmentos(videoId);
+            } else if (cached !== 'fetching') {
+                // Verificar y saltar segmentos
+                window.sponsorBlockManager.checkAndSkip(activePlayer);
+            }
         }
 
         const timeRemaining = videoDuration - currentTime;
@@ -2344,8 +2195,16 @@ function monitorPlayers() {
             isNextVideoPreloaded = true; 
         }
 
-        // ✅ CORRECCIÓN: Crossfade con mejor detección
-        const triggerTime = calculateCrossfadeTriggerTime(videoDuration, videoId);
+        // ✅ CROSSFADE: Usar tiempo calculado con SponsorBlock
+        let triggerTime = videoDuration - CROSSFADE_DURATION - 0.5;
+        
+        if (videoId && window.sponsorBlockManager) {
+            triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
+                videoDuration,
+                videoId,
+                CROSSFADE_DURATION
+            );
+        }
 
         if (currentTime >= triggerTime && 
             !hasOutroCrossfadeStarted && 
@@ -2363,22 +2222,14 @@ function monitorPlayers() {
                 monitorInterval = null;
             }
 
-            document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
-                detail: { 
-                    prevPlayer: currentPlayer, 
-                    nextPlayer: currentPlayer === 1 ? 2 : 1,
-                    timeRemaining: timeRemaining
-                }
-            }));
-            
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
             }
         }
         
-        // ✅ CORRECCIÓN: Fallback mejorado
+        // Fallback
         if (timeRemaining <= 0.5 && !nextVideoScheduled) {
-            console.log("⚠️ Fallback activado - Video casi terminado");
+            console.log("⚠️ Fallback activado");
             nextVideoScheduled = true;
             
             if (monitorInterval) {
@@ -2396,86 +2247,6 @@ function monitorPlayers() {
     }
 }
 
-function calculateCrossfadeTriggerTime(videoDuration, videoId) {
-    // Margen de seguridad para que no corte antes de tiempo
-    const SAFETY_MARGIN = 0.5; 
-    
-    // Si no hay datos, usar el final normal menos la duración del efecto
-    if (!videoId || !segmentosCache[videoId] || !Array.isArray(segmentosCache[videoId])) {
-        return videoDuration - CROSSFADE_DURATION - SAFETY_MARGIN;
-    }
-
-    // 1. Encontrar el "Final Efectivo" (Donde termina la música realmente)
-    // Buscamos segmentos tipo 'outro', 'selfpromo', etc. que estén cerca del final
-    let effectiveEndTime = videoDuration;
-    
-    const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
-    
-    segmentosCache[videoId].forEach(segment => {
-        if (endCategories.includes(segment.category)) {
-            const start = segment.segment?.[0] ?? segment.startTime;
-            const end = segment.segment?.[1] ?? segment.endTime;
-            
-            // Si este segmento termina cerca del final del video (margen de 2s)
-            // entonces el video "musicalmente" termina donde empieza este segmento.
-            if (Math.abs(videoDuration - end) < 5) {
-                if (start < effectiveEndTime) {
-                    effectiveEndTime = start;
-                }
-            }
-        }
-    });
-
-    console.log(`⏱️ Video: ${videoDuration}s | Final Efectivo: ${effectiveEndTime}s | Trigger: ${effectiveEndTime - CROSSFADE_DURATION}s`);
-
-    // 2. El trigger es: Final Efectivo - Duración del Crossfade - Margen
-    return effectiveEndTime - CROSSFADE_DURATION - SAFETY_MARGIN;
-}
-
-window.reloadSponsorBlockSegments = function(videoId) {
-    if (!videoId) {
-        const activePlayer = (currentPlayer === 1) ? player1 : player2;
-        videoId = activePlayer?.getVideoData()?.video_id;
-    }
-    if (!videoId) return;
-    delete segmentosCache[videoId];
-    obtenerSegmentosSponsorBlock(videoId);
-};
-// =============================================
-// LIMPIEZA AUTOMÁTICA DE CACHÉ SPONSORBLOCK
-// =============================================
-
-/**
- * Limpiar segmentos de SponsorBlock antiguos para evitar memory leak
- */
-function cleanupSponsorBlockCache() {
-    const MAX_AGE = 10 * 60 * 1000; // 10 minutos
-    const MAX_ENTRIES = 100;
-    const now = Date.now();
-    
-    const entries = Object.entries(segmentosCache);
-    const validEntries = entries.filter(([videoId, data]) => {
-        if (!data.timestamp) return false;
-        return (now - data.timestamp) < MAX_AGE;
-    });
-    
-    if (validEntries.length > MAX_ENTRIES) {
-        validEntries.sort((a, b) => b[1].timestamp - a[1].timestamp);
-        validEntries.splice(MAX_ENTRIES);
-    }
-    
-    segmentosCache = Object.fromEntries(validEntries);
-    
-    try {
-        sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(segmentosCache));
-    } catch (e) {
-        console.warn('⚠️ Cache muy grande, limpiando...');
-        segmentosCache = {};
-    }
-}
-
-// Ejecutar cada 5 minutos
-setInterval(cleanupSponsorBlockCache, 5 * 60 * 1000);
 
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
@@ -2485,9 +2256,8 @@ window.debugUnified = function() {
         playlistsData,
         currentPlayingInfo,
         playersInitialized,
-        reproduccionIniciada,
-        crossfadeInProgress,
-        segmentosCache
+        reproduccionIniciada       
+       
     });
 };
 
@@ -2495,8 +2265,7 @@ window.resetUnified = function() {
     if (confirm('¿Resetear completamente el sistema?')) {
         localStorage.removeItem('ytcm_playlists');
         localStorage.removeItem('ytcm_debug');
-        localStorage.removeItem('google_token');
-        segmentosCache = {}; 
+        localStorage.removeItem('google_token'); 
         location.reload();
     }
 };
@@ -2732,15 +2501,6 @@ window.addEventListener('beforeunload', () => {
         }
     } catch (e) {
         console.warn('⚠️ Error deteniendo players:', e);
-    }
-    
-    // 6. Limpiar cache de SponsorBlock
-    if (typeof cleanupSponsorBlockCache === 'function') {
-        try {
-            cleanupSponsorBlockCache();
-        } catch (e) {
-            console.warn('⚠️ Error limpiando cache SB:', e);
-        }
     }
     
     // 7. Remover event listeners de resize
