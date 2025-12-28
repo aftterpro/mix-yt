@@ -144,12 +144,13 @@ class PlaylistManager {
     // =============================================
     // GESTIÓN DE VIDEOS EN COLA
     // =============================================
-  
+
 extractArtistFromTitle(fullTitle) {
     if (!fullTitle) return 'Desconocido';
     
     let cleanTitle = fullTitle.trim();
     
+    // Limpiar sufijos comunes
     cleanTitle = cleanTitle
         .replace(/\(official.*?video\)/gi, '')
         .replace(/\(lyric.*?video\)/gi, '')
@@ -159,20 +160,25 @@ extractArtistFromTitle(fullTitle) {
         .replace(/\[lyric.*?\]/gi, '')
         .trim();
     
+    // Patrones de separación
     const separatorPatterns = [
-        /^(.+?)\s*[-–—]\s*(.+?)$/,
-        /^(.+?)\s*:\s*(.+?)$/,
-        /^(.+?)\s*\|\s*(.+?)$/,
+        /^(.+?)\s*[-–—]\s*(.+?)$/, // Artista - Título
+        /^(.+?)\s*:\s*(.+?)$/,      // Artista: Título
+        /^(.+?)\s*\|\s*(.+?)$/,     // Artista | Título
     ];
     
     for (const pattern of separatorPatterns) {
         const match = cleanTitle.match(pattern);
         if (match && match[1] && match[2]) {
             const artist = match[1].trim();
-            const title = match[2].trim();
             
-            if (artist.length < 50 && !artist.toLowerCase().includes('feat')) {
-                return artist; // ✅ RETORNAR STRING, no objeto
+            // ✅ VALIDAR que no sea solo "Topic" o palabras genéricas
+            if (artist.length < 50 && 
+                !artist.toLowerCase().includes('feat') &&
+                artist !== 'YouTube' &&
+                artist !== 'Topic' &&
+                !artist.endsWith(' - Topic')) {
+                return artist;
             }
         }
     }
