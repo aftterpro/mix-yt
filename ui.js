@@ -261,49 +261,42 @@ movePlayersToFullView() {
         }
     });
     
-    console.log('✅ movePlayersToFullView completado');
+    console.log(' movePlayersToFullView completado');
 }
 
-  showMiniPlayerFloat() {
-    let miniPlayer = document.getElementById('miniPlayerFloat');
-    
-    // ✅ CREAR SI NO EXISTE
-    if (!miniPlayer) {
-        miniPlayer = document.createElement('div');
-        miniPlayer.id = 'miniPlayerFloat';
-        miniPlayer.className = 'mini-player-float';
-        miniPlayer.innerHTML = `
-            <div class="mini-player-video">
-                <div id="miniPlayer1Container" class="mini-video-container"></div>
-                <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
-            </div>
-            <button class="mini-player-expand" 
-                    onclick="window.unifiedCore?.switchView('fullPlayer')" 
-                    title="Expandir">
-                <i class="fas fa-expand"></i>
-            </button>
-        `;
-        document.body.appendChild(miniPlayer);
-    }
-    
+showMiniPlayerFloat() {
     const persistentLayer = document.getElementById('persistent-player-layer');
-    if (!persistentLayer) return;
-
-    miniPlayer.classList.remove('hidden');
-    miniPlayer.style.display = 'block';
     
-    const rect = miniPlayer.getBoundingClientRect();
+    if (!persistentLayer) {
+        console.error('❌ persistent-player-layer no encontrado');
+        return;
+    }
+
+    // Posición fija del mini player
+    const miniPosition = {
+        bottom: 110,
+        right: 20,
+        width: 320,
+        height: 180
+    };
     
     persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-    persistentLayer.style.top = `${rect.top}px`;
-    persistentLayer.style.left = `${rect.left}px`;
-    persistentLayer.style.width = `${rect.width}px`;
-    persistentLayer.style.height = `${rect.height}px`;
+    persistentLayer.style.position = 'fixed';
+    persistentLayer.style.bottom = `${miniPosition.bottom}px`;
+    persistentLayer.style.right = `${miniPosition.right}px`;
+    persistentLayer.style.top = 'auto'; // ✅ CRÍTICO
+    persistentLayer.style.left = 'auto'; // ✅ CRÍTICO
+    persistentLayer.style.width = `${miniPosition.width}px`;
+    persistentLayer.style.height = `${miniPosition.height}px`;
     persistentLayer.style.borderRadius = '12px';
     persistentLayer.style.zIndex = '999999';
     persistentLayer.style.opacity = '1';
+    persistentLayer.style.display = 'block';
+    persistentLayer.style.visibility = 'visible';
     
     document.body.classList.add('mini-player-active');
+    
+    console.log('✅ Mini player flotante activado');
 }
 
     forceMiniPlayerVisibility() {
