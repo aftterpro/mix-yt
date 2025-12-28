@@ -224,15 +224,17 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     }
 
     // 4. NORMALIZAR DATOS
-    const videoToAdd = {
-        videoId: videoData.videoId.trim(),
-        title: videoData.title.trim(),
-        thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
-        duration: parseInt(videoData.duration) || 0,
-        uploaderName: videoData.uploaderName || videoData.artist || 'Desconocido',
-        artist: videoData.artist || videoData.uploaderName || 'Desconocido',
-        sourcePlaylistId: 'queue'
-    };
+   const videoToAdd = {
+    videoId: videoData.videoId.trim(),
+    title: videoData.title.trim(),
+    thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
+    duration: parseInt(videoData.duration) || 0,
+
+    uploaderName: this.cleanArtistName(videoData.uploaderName || videoData.artist || 'Desconocido'),
+    artist: this.cleanArtistName(videoData.artist || videoData.uploaderName || 'Desconocido'),
+    
+    sourcePlaylistId: 'queue'
+};
 
     // 5. VERIFICAR DUPLICADOS
     const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
@@ -268,6 +270,15 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     setTimeout(() => {
         if (typeof window.saveAllData === 'function') window.saveAllData();
     }, 100);
+}
+    cleanArtistName(name) {
+    if (!name) return 'Desconocido';
+    
+    // Eliminar " - Topic" de YouTube
+    let cleaned = name.replace(/\s*-\s*Topic$/i, '').trim();
+    
+    // Si quedó vacío, devolver original
+    return cleaned.length > 0 ? cleaned : name;
 }
 // Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
