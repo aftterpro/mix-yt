@@ -16,7 +16,6 @@ const CROSSFADE_DURATION = 10;
 window.player1 = null;
 window.player2 = null;
 window.currentPlayer = 1;
-//checkAndSkipSegment = window.
 window.reproduccionIniciada = false;
 window.currentPlayingInfo = {
     playlistId: null,
@@ -562,7 +561,7 @@ onPlayerStateChange(event) {
     if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.CUED) {
         const videoData = player.getVideoData();
         if (videoData?.video_id) {
-            //checkAndSkipSegment(player);
+           window.sponsorBlockManager.checkAndSkip(player);
         }
     }
     
@@ -605,7 +604,7 @@ onPlayerStateChange(event) {
             }
             
             // Re-verificar SponsorBlock por si acaso (ej. intros muy cortas)
-           // setTimeout(() => checkAndSkipSegment(player), 500);
+            setTimeout(() => window.sponsorBlockManager.checkAndSkip(player), 500);
         }
         
         this.updateCurrentPlayingIndex(); // Marcar canción actual
@@ -1868,7 +1867,7 @@ updatePersistentQueue() {
         monitorInterval = setInterval(() => {
             monitorPlayers();
             const activePlayer = (currentPlayer === 1) ? player1 : player2;
-            if (activePlayer && reproduccionIniciada) checkAndSkipSegment(activePlayer);
+            if (activePlayer && reproduccionIniciada) window.sponsorBlockManager.checkAndSkip(activePlayer);
         }, 300);
     }
 
