@@ -1,8 +1,3 @@
-// =============================================
-// CORRECCIÓN: Cliente de YouTube en youtube-client.js
-// Reemplazar clase completa con mejor manejo de errores
-// =============================================
-
 class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
@@ -265,7 +260,231 @@ class YouTubeSimplifiedClient {
         };
     }
 }
+// =============================================
+// SPONSORBLOCK - Sistema de Detección y Salto
+// =============================================
 
+class SponsorBlockManager {
+    constructor() {
+        this.segmentosCache = {};
+        this.lastSkipTime = 0;
+        this.nombresCategorias = {
+            'sponsor': 'Patrocinio',
+            'intro': 'Intro',
+            'outro': 'Créditos',
+            'interaction': 'Interacción',
+            'selfpromo': 'Autopromo',
+            'music_offtopic': 'Intro no musical'
+        };
+        
+        // Cargar caché de sesión si existe
+        this.loadCache();
+    }
+
+    loadCache() {
+        try {
+            const saved = sessionStorage.getItem('ytcm_sponsor_cache');
+            if (saved) {
+                this.segmentosCache = JSON.parse(saved);
+                console.log('📦 Cache de SponsorBlock restaurada');
+            }
+        } catch (e) {
+            console.warn('⚠️ Error cargando caché SponsorBlock');
+        }
+    }
+
+    saveCache() {
+        try {
+            sessionStorage.setItem('ytcm_sponsor_cache', JSON.stringify(this.segmentosCache));
+        } catch (e) {
+            console.warn('⚠️ Error guardando caché SponsorBlock');
+        }
+    }
+
+    async cargarSegmentos(videoId) {
+        // Verificar caché
+        const cached = this.segmentosCache[videoId];
+        if (cached && typeof cached === 'object' && cached.segments) {
+            const cacheAge = Date.now() - (cached.timestamp || 0);
+            if (cacheAge < 10 * 60 * 1000) { // 10 minutos
+                console.log(`✅ SB: Usando caché para ${videoId}`);
+                return cached.segments;
+            }
+        }
+
+        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
+        const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
+        
+        this.segmentosCache[videoId] = 'fetching';
+
+        try {
+            const response = await fetch(apiUrl, { 
+                headers: { 'X-UserID': userId } 
+            });
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const data = await response.json();
+            
+            const segments = Array.isArray(data) 
+                ? data.filter(s => s.startTime < s.endTime)
+                : [];
+            
+            this.segmentosCache[videoId] = {
+                segments: segments,
+                timestamp: Date.now()
+            };
+            
+            this.saveCache();
+            console.log(`✅ SB: ${segments.length} segmentos para ${videoId}`);
+            return segments;
+            
+        } catch (e) {
+            console.warn(`⚠️ SB Error ${videoId}:`, e.message);
+            this.segmentosCache[videoId] = { 
+                segments: [], 
+                timestamp: Date.now() 
+            };
+            return [];
+        }
+    }
+
+    checkAndSkip(player) {
+        const videoId = player.getVideoData()?.video_id;
+        if (!videoId) return false;
+        
+        const cached = this.segmentosCache[videoId];
+        
+        if (!cached || cached === 'fetching' || typeof cached !== 'object') {
+            return false;
+        }
+        
+        const segments = cached.segments || [];
+        if (segments.length === 0) return false;
+
+        const currentTime = player.getCurrentTime();
+        const duration = player.getDuration();
+
+        // Evitar saltos repetitivos
+        if (Math.abs(currentTime - this.lastSkipTime) < 1.5) return false;
+
+        for (const seg of segments) {
+            if (currentTime >= seg.startTime && currentTime < seg.endTime) {
+                const nombreCat = this.nombresCategorias[seg.category] || seg.category;
+
+                if (seg.endTime >= (duration - 2)) {
+                    console.log("🎬 SponsorBlock: Outro detectado");
+                    this.mostrarAviso(`🎬 Final saltado`, player.getIframe().parentElement);
+                    player.seekTo(duration, true);
+                } else {
+                    console.log(`⏩ SponsorBlock: Saltando ${nombreCat}`);
+                    this.mostrarAviso(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
+                    player.seekTo(seg.endTime, true);
+                }
+
+                this.lastSkipTime = seg.endTime;
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    mostrarAviso(mensaje, container) {
+        // Limpiar avisos anteriores
+        const oldToasts = document.querySelectorAll('.sb-toast');
+        oldToasts.forEach(toast => toast.remove());
+        
+        let toast = document.createElement('div');
+        toast.className = 'sb-toast';
+        toast.textContent = mensaje;
+        
+        toast.style.cssText = `
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        
+        (container || document.body).appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+        });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }
+
+    calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
+        const SAFETY_MARGIN = 0.5;
+        
+        if (!videoId || !this.segmentosCache[videoId] || 
+            !Array.isArray(this.segmentosCache[videoId].segments)) {
+            return videoDuration - crossfadeDuration - SAFETY_MARGIN;
+        }
+
+        let effectiveEndTime = videoDuration;
+        
+        const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
+        
+        this.segmentosCache[videoId].segments.forEach(segment => {
+            if (endCategories.includes(segment.category)) {
+                const start = segment.segment?.[0] ?? segment.startTime;
+                const end = segment.segment?.[1] ?? segment.endTime;
+                
+                if (Math.abs(videoDuration - end) < 5) {
+                    if (start < effectiveEndTime) {
+                        effectiveEndTime = start;
+                    }
+                }
+            }
+        });
+
+        console.log(`⏱️ Video: ${videoDuration}s | Final Efectivo: ${effectiveEndTime}s | Trigger: ${effectiveEndTime - crossfadeDuration}s`);
+
+        return effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
+    }
+
+    cleanup() {
+        const MAX_AGE = 10 * 60 * 1000;
+        const MAX_ENTRIES = 100;
+        const now = Date.now();
+        
+        const entries = Object.entries(this.segmentosCache);
+        const validEntries = entries.filter(([videoId, data]) => {
+            if (!data.timestamp) return false;
+            return (now - data.timestamp) < MAX_AGE;
+        });
+        
+        if (validEntries.length > MAX_ENTRIES) {
+            validEntries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+            validEntries.splice(MAX_ENTRIES);
+        }
+        
+        this.segmentosCache = Object.fromEntries(validEntries);
+        this.saveCache();
+    }
+}
+
+// Instancia global
+window.sponsorBlockManager = new SponsorBlockManager();
+
+// Limpieza automática cada 5 minutos
+setInterval(() => {
+    window.sponsorBlockManager?.cleanup();
+}, 5 * 60 * 1000);
 // =============================================
 // UTILIDADES MEJORADAS
 // =============================================
