@@ -264,28 +264,47 @@ movePlayersToFullView() {
     console.log('✅ movePlayersToFullView completado');
 }
 
-    showMiniPlayerFloat() {
-        const miniPlayer = document.getElementById('miniPlayerFloat');
-        const persistentLayer = document.getElementById('persistent-player-layer');
-        
-        if (!miniPlayer || !persistentLayer) return;
-
-        miniPlayer.classList.remove('hidden');
-        miniPlayer.style.display = 'block';
-        
-        const rect = miniPlayer.getBoundingClientRect();
-        
-        persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-        persistentLayer.style.top = `${rect.top}px`;
-        persistentLayer.style.left = `${rect.left}px`;
-        persistentLayer.style.width = `${rect.width}px`;
-        persistentLayer.style.height = `${rect.height}px`;
-        persistentLayer.style.borderRadius = '12px';
-        persistentLayer.style.zIndex = '999999'; // Encima de todo
-        persistentLayer.style.opacity = '1';
-        
-        document.body.classList.add('mini-player-active');
+  showMiniPlayerFloat() {
+    let miniPlayer = document.getElementById('miniPlayerFloat');
+    
+    // ✅ CREAR SI NO EXISTE
+    if (!miniPlayer) {
+        miniPlayer = document.createElement('div');
+        miniPlayer.id = 'miniPlayerFloat';
+        miniPlayer.className = 'mini-player-float';
+        miniPlayer.innerHTML = `
+            <div class="mini-player-video">
+                <div id="miniPlayer1Container" class="mini-video-container"></div>
+                <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
+            </div>
+            <button class="mini-player-expand" 
+                    onclick="window.unifiedCore?.switchView('fullPlayer')" 
+                    title="Expandir">
+                <i class="fas fa-expand"></i>
+            </button>
+        `;
+        document.body.appendChild(miniPlayer);
     }
+    
+    const persistentLayer = document.getElementById('persistent-player-layer');
+    if (!persistentLayer) return;
+
+    miniPlayer.classList.remove('hidden');
+    miniPlayer.style.display = 'block';
+    
+    const rect = miniPlayer.getBoundingClientRect();
+    
+    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
+    persistentLayer.style.top = `${rect.top}px`;
+    persistentLayer.style.left = `${rect.left}px`;
+    persistentLayer.style.width = `${rect.width}px`;
+    persistentLayer.style.height = `${rect.height}px`;
+    persistentLayer.style.borderRadius = '12px';
+    persistentLayer.style.zIndex = '999999';
+    persistentLayer.style.opacity = '1';
+    
+    document.body.classList.add('mini-player-active');
+}
 
     forceMiniPlayerVisibility() {
         // Lógica para forzar visibilidad si CSS falla
