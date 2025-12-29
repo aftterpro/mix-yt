@@ -109,13 +109,17 @@ class UIManager {
         });
     }
 
-    enablePlayButton(enable = true) {
-        const ids = ['botonPlay', 'botonNext', 'prevButton', 'miniPlayBtn', 'miniNextBtn'];
-        ids.forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) btn.disabled = !enable;
-        });
-    }
+enablePlayButton(enable = true) {
+    const ids = [
+        'botonPlay', 'botonNext', 'prevButton', 
+        'miniPlayBtn', 'miniNextBtn', 'miniPrevBtn',  
+        'shuffleBtn', 'repeatBtn'
+    ];
+    ids.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = !enable;
+    });
+}
 
     updateProgressBar(current, total) {
         if (total > 0 && this.elements.progressBar) {
