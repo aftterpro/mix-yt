@@ -854,34 +854,24 @@ setupControlButtons() {
     // ===== NEXT (CORREGIDO - CON CROSSFADE) =====
     const nextButtons = ['botonNext', 'miniNextBtn'];
     nextButtons.forEach(btnId => {
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
+    const btn = document.getElementById(btnId);
+    if (btn) {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('⏭️ Click en Next');
             
-            newBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('⏭️ Click en Next (con crossfade)');
-                
-                // CORRECCIÓN: Determinar si usar handleNext o playNextVideo
-                const flatList = this.getFlattenedPlaylist();
-                const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-                
-                // Si hay reproducción activa Y crossfade disponible
-                if (window.reproduccionIniciada && currentIndex >= 0 && currentIndex < flatList.length - 1) {
-                    // Usar playNextVideo para activar crossfade
-                    this.playNextVideo();
-                } else {
-                    // Usar handleNext para casos edge (inicio, final, etc)
-                    this.handleNext();
-                }
-            });
-            
-            const flatList = this.getFlattenedPlaylist();
-            newBtn.disabled = flatList.length === 0;
-        }
-    });
+            // ✅ USAR SOLO playNextVideo()
+            this.playNextVideo();
+        });
+        
+        const flatList = this.getFlattenedPlaylist();
+        newBtn.disabled = flatList.length === 0;
+    }
+});
     
     // ===== PREVIOUS =====
     const prevButtons = ['prevButton', 'miniPrevBtn'];
@@ -1857,8 +1847,13 @@ async performSearch(query, continuation = null) {
         nextPageContext = data.nextpage || null;
         console.log('📄 Próxima página:', nextPageContext ? 'Disponible' : 'No hay más');
 
-        // FIX CRÍTICO: Llamar directamente a ui.renderSearchResults
-        this.ui.renderSearchResults(data, !!continuation);
+        // ✅ CORRECCIÓN: Llamar directamente a ui.renderSearchResults
+        if (this.ui && typeof this.ui.renderSearchResults === 'function') {
+            this.ui.renderSearchResults(data, !!continuation);
+        } else {
+            console.error('❌ ui.renderSearchResults no disponible');
+            return;
+        }
         
         if (nextPageContext) {
             requestAnimationFrame(() => {
@@ -1871,14 +1866,12 @@ async performSearch(query, continuation = null) {
     } catch (error) {
         console.error("❌ Error en búsqueda:", error);
         
+        // Limpiar observer en caso de error
         if (this.searchScrollObserver) {
             try {
                 this.searchScrollObserver.disconnect();
-            } catch (e) {
-                console.warn('⚠️ Error desconectando observer tras error:', e);
-            } finally {
-                this.searchScrollObserver = null;
-            }
+            } catch (e) {}
+            this.searchScrollObserver = null;
         }
         
         searchResults.innerHTML = `
@@ -1898,17 +1891,14 @@ async performSearch(query, continuation = null) {
 setupInfiniteScroll(container) {
     console.log('📜 Configurando scroll infinito...');
     
-    // 1. Limpiar sentinel anterior
     const oldSentinel = document.getElementById('search-sentinel');
     if (oldSentinel) oldSentinel.remove();
     
-    // 2. Crear nuevo sentinel
     const sentinel = document.createElement('div');
     sentinel.id = 'search-sentinel';
     sentinel.style.cssText = 'height: 50px; width: 100%; pointer-events: none;';
     container.appendChild(sentinel);
 
-    // 3. Desconectar observador anterior
     if (this.searchScrollObserver) {
         try {
             this.searchScrollObserver.disconnect();
@@ -1917,25 +1907,27 @@ setupInfiniteScroll(container) {
         }
     }
 
-    // 4. CORRECCIÓN: Crear observador con debounce
-    let isLoadingMore = false;
+    // ✅ CORRECCIÓN: Variable de control fuera del observer
+    let isCurrentlyLoading = false;
     
     this.searchScrollObserver = new IntersectionObserver((entries) => {
         const entry = entries[0];
         
-        // CRÍTICO: Evitar múltiples llamadas simultáneas
-        if (entry.isIntersecting && !isLoadingMore && nextPageContext) {
-            console.log('📜 Sentinel visible, cargando más...');
-            isLoadingMore = true;
-            
-            this.performSearch(currentSearchQuery, nextPageContext)
-                .finally(() => {
-                    // Resetear después de 2 segundos para permitir nueva carga
-                    setTimeout(() => {
-                        isLoadingMore = false;
-                    }, 2000);
-                });
-        }
+        // ✅ CRÍTICO: Verificar TODAS las condiciones antes de proceder
+        if (!entry.isIntersecting) return;
+        if (isCurrentlyLoading) return;
+        if (!nextPageContext) return;
+        
+        console.log('📜 Sentinel visible, cargando más...');
+        isCurrentlyLoading = true;
+        
+        this.performSearch(currentSearchQuery, nextPageContext)
+            .finally(() => {
+                // ✅ Resetear después de 1 segundo para permitir nueva carga
+                setTimeout(() => {
+                    isCurrentlyLoading = false;
+                }, 1000);
+            });
     }, {
         root: null,
         rootMargin: '200px',
@@ -1945,7 +1937,6 @@ setupInfiniteScroll(container) {
     this.searchScrollObserver.observe(sentinel);
     console.log('✅ Observador configurado correctamente');
 }
-    
 // Renderizar resultados de búsqueda
 displaySearchResults(videos, isContinuation = false) {
     this.ui.renderSearchResults(videos, isContinuation);
