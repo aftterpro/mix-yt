@@ -1452,7 +1452,14 @@ body.mini-player-active #persistent-player-layer {
     from { transform: translate(-50%, -50%) rotate(0deg); }
     to { transform: translate(-50%, -50%) rotate(360deg); }
 }
+.control-button.active {
+    color: var(--primary-color) !important;
+    background: rgba(255, 107, 53, 0.1) !important;
+}
 
+.control-button.active:hover {
+    background: rgba(255, 107, 53, 0.2) !important;
+}
 /* =============================================
    CORRECCIONES DE ACCESIBILIDAD
    ============================================= */
