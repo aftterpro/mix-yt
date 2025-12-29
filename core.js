@@ -851,7 +851,7 @@ setupControlButtons() {
         }
     });
     
-    // ===== NEXT (CORREGIDO) =====
+    // ===== NEXT (CORREGIDO - CON CROSSFADE) =====
     const nextButtons = ['botonNext', 'miniNextBtn'];
     nextButtons.forEach(btnId => {
         const btn = document.getElementById(btnId);
@@ -862,17 +862,28 @@ setupControlButtons() {
             newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('⏭️ Click en Next');
-                this.handleNext();
+                console.log('⏭️ Click en Next (con crossfade)');
+                
+                // CORRECCIÓN: Determinar si usar handleNext o playNextVideo
+                const flatList = this.getFlattenedPlaylist();
+                const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+                
+                // Si hay reproducción activa Y crossfade disponible
+                if (window.reproduccionIniciada && currentIndex >= 0 && currentIndex < flatList.length - 1) {
+                    // Usar playNextVideo para activar crossfade
+                    this.playNextVideo();
+                } else {
+                    // Usar handleNext para casos edge (inicio, final, etc)
+                    this.handleNext();
+                }
             });
             
-            // Habilitar el botón si hay videos
             const flatList = this.getFlattenedPlaylist();
             newBtn.disabled = flatList.length === 0;
         }
     });
     
-    // ===== PREVIOUS (NUEVO) =====
+    // ===== PREVIOUS =====
     const prevButtons = ['prevButton', 'miniPrevBtn'];
     prevButtons.forEach(btnId => {
         const btn = document.getElementById(btnId);
@@ -892,7 +903,7 @@ setupControlButtons() {
         }
     });
     
-    // ===== SHUFFLE (OPCIONAL) =====
+    // ===== SHUFFLE =====
     const shuffleBtn = document.getElementById('shuffleBtn');
     if (shuffleBtn) {
         shuffleBtn.disabled = false;
@@ -906,7 +917,7 @@ setupControlButtons() {
         });
     }
     
-    // ===== REPEAT (OPCIONAL) =====
+    // ===== REPEAT =====
     const repeatBtn = document.getElementById('repeatBtn');
     if (repeatBtn) {
         repeatBtn.disabled = false;
@@ -1301,13 +1312,11 @@ movePlayersToFullView() {
 handleNext() {
     console.log('⏭️ handleNext llamado');
     
-    // Detener monitor si está activo
     if (monitorInterval) {
         clearInterval(monitorInterval);
         monitorInterval = null;
     }
     
-    // Resetear banderas INMEDIATAMENTE
     this.resetCrossfadeFlags();
     
     const flatList = this.getFlattenedPlaylist();
@@ -1319,27 +1328,46 @@ handleNext() {
     const currentInfo = window.currentPlayingInfo || { flattenedIndex: -1 };
     let currentIndex = currentInfo.flattenedIndex ?? -1;
 
-    // Si no hay video actual, reproducir el primero
     if (currentIndex === -1) {
         console.log('📌 No hay video actual, reproduciendo primero');
         this.playVideoAtIndex(0);
         return;
     }
 
-    let nextIndex = currentIndex + 1;
+    let nextIndex;
     
-    // Verificar si llegamos al final
-    if (nextIndex >= flatList.length) {
+    // CORRECCIÓN: Implementar shuffle
+    if (this.state.shuffleEnabled) {
+        // Generar índice aleatorio diferente al actual
+        const availableIndices = [];
+        for (let i = 0; i < flatList.length; i++) {
+            if (i !== currentIndex) {
+                availableIndices.push(i);
+            }
+        }
+        
+        if (availableIndices.length === 0) {
+            // Solo hay una canción
+            nextIndex = 0;
+        } else {
+            nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+        }
+        
+        console.log(`🔀 Shuffle: saltando al índice ${nextIndex}`);
+    } else {
+        // Modo normal
+        nextIndex = currentIndex + 1;
+    }
+    
+    // Verificar si llegamos al final (solo en modo normal)
+    if (!this.state.shuffleEnabled && nextIndex >= flatList.length) {
         console.log('🏁 Fin de la lista alcanzado');
         
-        // Si repeat está activado, volver al inicio
         if (this.state?.repeatEnabled) {
             this.showMessage("Reiniciando lista", 'info');
             this.playVideoAtIndex(0);
         } else {
             this.showMessage("Fin de la lista de reproducción", 'info');
-            
-            // Detener reproducción
             this.stopMonitoring();
             try {
                 const activePlayer = window.currentPlayer === 1 ? window.player1 : window.player2;
@@ -1352,11 +1380,8 @@ handleNext() {
     }
 
     console.log(`🎵 Reproduciendo siguiente: índice ${nextIndex}`);
-    
-    // Reproducir siguiente video
     this.playVideoAtIndex(nextIndex);
 }
-
 
   handlePrevious() {
     console.log('⏮️ handlePrevious llamado');
@@ -1809,13 +1834,11 @@ async performSearch(query, continuation = null) {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
 
-    // Si es búsqueda nueva
     if (!continuation) {
         currentSearchQuery = query;
         nextPageContext = null;
         searchResults.innerHTML = '<div class="search-loading">🔍 Buscando...</div>';
         
-        // ✅ CORRECCIÓN: Desconectar observador de forma segura
         if (this.searchScrollObserver) {
             try {
                 this.searchScrollObserver.disconnect();
@@ -1834,22 +1857,20 @@ async performSearch(query, continuation = null) {
         nextPageContext = data.nextpage || null;
         console.log('📄 Próxima página:', nextPageContext ? 'Disponible' : 'No hay más');
 
-        this.displaySearchResults(data, !!continuation);
+        // FIX CRÍTICO: Llamar directamente a ui.renderSearchResults
+        this.ui.renderSearchResults(data, !!continuation);
         
-        // ✅ CORRECCIÓN: Solo configurar si hay más páginas
         if (nextPageContext) {
             requestAnimationFrame(() => {
                 this.setupInfiniteScroll(searchResults);
             });
         } else {
-            // Limpiar sentinel si ya no hay más páginas
             const sentinel = document.getElementById('search-sentinel');
             if (sentinel) sentinel.remove();
         }
-        } catch (error) {
+    } catch (error) {
         console.error("❌ Error en búsqueda:", error);
         
-        // ✅ CORRECCIÓN: Limpiar observador en caso de error
         if (this.searchScrollObserver) {
             try {
                 this.searchScrollObserver.disconnect();
@@ -1887,7 +1908,7 @@ setupInfiniteScroll(container) {
     sentinel.style.cssText = 'height: 50px; width: 100%; pointer-events: none;';
     container.appendChild(sentinel);
 
-    // 3. Desconectar observador anterior de forma segura
+    // 3. Desconectar observador anterior
     if (this.searchScrollObserver) {
         try {
             this.searchScrollObserver.disconnect();
@@ -1896,13 +1917,24 @@ setupInfiniteScroll(container) {
         }
     }
 
-    // 4. Crear nuevo observador
+    // 4. CORRECCIÓN: Crear observador con debounce
+    let isLoadingMore = false;
+    
     this.searchScrollObserver = new IntersectionObserver((entries) => {
         const entry = entries[0];
         
+        // CRÍTICO: Evitar múltiples llamadas simultáneas
         if (entry.isIntersecting && !isLoadingMore && nextPageContext) {
             console.log('📜 Sentinel visible, cargando más...');
-            this.performSearch(currentSearchQuery, nextPageContext);
+            isLoadingMore = true;
+            
+            this.performSearch(currentSearchQuery, nextPageContext)
+                .finally(() => {
+                    // Resetear después de 2 segundos para permitir nueva carga
+                    setTimeout(() => {
+                        isLoadingMore = false;
+                    }, 2000);
+                });
         }
     }, {
         root: null,
