@@ -5,26 +5,27 @@ console.log('🎵 Cargando gestor de playlists...');
 // =============================================
 class PlaylistManager {
     constructor(core) {
-        // 1. Referencia al Núcleo
-        this.core = core;
-
-        // 2. Inicialización de Datos
-        // Intentamos cargar del core si ya tiene datos, si no, array vacío
-        this.playlists = this.core?.playlistsData || []; 
-
-        // 3. Configuración de Letras (Persistencia + Caché)
-        this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
-        this.lastLoadedLyricsId = null;
-        this.currentLrc = [];
-        this.lyricsSyncInterval = null;
-        this.lyricsTranslated = false;
-
-        // 4. Configuración de Relacionados (Caché)
-        this.lastLoadedRelatedId = null;
-
-        // 5. Arranque
-        this.init(); 
-    }
+    this.core = core;
+    // Usar SIEMPRE la referencia del core
+    Object.defineProperty(this, 'playlistsData', {
+        get() { return this.core?.playlistsData || []; },
+        set(value) { 
+            if (this.core) {
+                this.core.playlistsData = value;
+                window.playlistsData = value;
+            }
+        }
+    });
+    
+    this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
+    this.lastLoadedLyricsId = null;
+    this.currentLrc = [];
+    this.lyricsSyncInterval = null;
+    this.lyricsTranslated = false;
+    this.lastLoadedRelatedId = null;
+    
+    this.init(); 
+}
     init() {
         console.log('🔧 Inicializando PlaylistManager...');
 
@@ -2839,85 +2840,84 @@ setupPlaylistPopupEvents(popup, playlist) {
     // PLAYLISTS DE YOUTUBE LIBRARY
     // =============================================
 
-    /**
-     * Añadir playlists de YouTube Library
-     */
 addYouTubeLibraryPlaylists(youtubePlaylists) {
-        console.log(`📥 addYouTubeLibraryPlaylists llamada con ${youtubePlaylists?.length || 0} playlists`);
-        
-        if (!youtubePlaylists?.length) {
-            console.warn("❌ No se recibieron playlists válidas");
-            return;
-        }
-
-        // ✅ VERIFICAR SI YA ESTÁN CARGADAS (evitar duplicados)
-        const currentYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
-        
-        if (currentYouTubeCount >= youtubePlaylists.length) {
-            console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
-            return;
-        }
-
-        if (currentYouTubeCount > 0) {
-            console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
-            this.playlistsData = this.playlistsData.filter(p => p.source !== 'youtube_library');
-        }
-
-        // ✅ PROCESAR PLAYLISTS CON VIDEOS YA CARGADOS
-        const validPlaylists = youtubePlaylists
-            .filter(playlist => {
-                // Verificar que tenga videos cargados (vienen de auth.js)
-                const hasVideos = playlist.videos && Array.isArray(playlist.videos);
-                const hasValidVideos = hasVideos && playlist.videos.length > 0;
-                
-                if (!hasValidVideos) {
-                    console.warn(`⚠️ Playlist "${playlist.title || playlist.name}" sin videos válidos`);
-                }
-                
-                return hasValidVideos;
-            })
-            .map(playlist => {
-                // ✅ OBTENER THUMBNAIL DEL PRIMER VIDEO
-                let thumbnailUrl = './electronic.ico';
-                if (playlist.videos && playlist.videos.length > 0) {
-                    thumbnailUrl = playlist.videos[0].thumbnail || './electronic.ico';
-                }
-                
-                return {
-                    id: playlist.id,
-                    name: playlist.title || playlist.name || 'Playlist Sin Nombre',
-                    thumbnailUrl: thumbnailUrl,
-                    videos: playlist.videos, // ✅ VIDEOS YA VIENEN CARGADOS
-                    isExpanded: false,
-                    source: 'youtube_library',
-                    isLoaded: true, // ✅ YA ESTÁ CARGADA
-                    count: playlist.videos.length
-                };
-            });
-
-        if (validPlaylists.length === 0) {
-            console.warn("❌ No hay playlists con videos válidos para añadir");
-            return;
-        }
-
-        // ✅ INSERTAR DESPUÉS DE LA COLA
-        const queueIndex = this.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
-        const insertIndex = queueIndex !== -1 ? queueIndex + 1 : 0;
-        
-        this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
-        
-        console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
-        console.log(`📊 Total de videos: ${validPlaylists.reduce((sum, p) => sum + p.videos.length, 0)}`);
-
-        // ✅ ACTUALIZAR UI INMEDIATAMENTE
-        requestAnimationFrame(() => {
-            this.updatePlaylistsUI();
-            
-            if (this.core?.showMessage) {
-                this.core.showMessage(`${validPlaylists.length} playlists sincronizadas`, 'success');
-            }
-        });
+    console.log(`📥 addYouTubeLibraryPlaylists llamada con ${youtubePlaylists?.length || 0} playlists`);
+    
+    if (!youtubePlaylists?.length) {
+        console.warn("❌ No se recibieron playlists válidas");
+        return;
     }
+
+    const currentYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
+    
+    if (currentYouTubeCount >= youtubePlaylists.length) {
+        console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
+        return;
+    }
+
+    if (currentYouTubeCount > 0) {
+        console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
+        // CORRECCIÓN: Actualizar tanto local como core
+        const filtered = this.playlistsData.filter(p => p.source !== 'youtube_library');
+        this.playlistsData = filtered;
+        if (this.core) this.core.playlistsData = filtered;
+    }
+
+    const validPlaylists = youtubePlaylists
+        .filter(playlist => {
+            const hasVideos = playlist.videos && Array.isArray(playlist.videos);
+            const hasValidVideos = hasVideos && playlist.videos.length > 0;
+            
+            if (!hasValidVideos) {
+                console.warn(`⚠️ Playlist "${playlist.title || playlist.name}" sin videos válidos`);
+            }
+            
+            return hasValidVideos;
+        })
+        .map(playlist => {
+            let thumbnailUrl = './electronic.ico';
+            if (playlist.videos && playlist.videos.length > 0) {
+                thumbnailUrl = playlist.videos[0].thumbnail || './electronic.ico';
+            }
+            
+            return {
+                id: playlist.id,
+                name: playlist.title || playlist.name || 'Playlist Sin Nombre',
+                thumbnailUrl: thumbnailUrl,
+                videos: playlist.videos,
+                isExpanded: false,
+                source: 'youtube_library',
+                isLoaded: true,
+                count: playlist.videos.length
+            };
+        });
+
+    if (validPlaylists.length === 0) {
+        console.warn("❌ No hay playlists con videos válidos para añadir");
+        return;
+    }
+
+    const queueIndex = this.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
+    const insertIndex = queueIndex !== -1 ? queueIndex + 1 : 0;
+    
+    this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
+    
+    // CORRECCIÓN: Sincronizar con core
+    if (this.core) {
+        this.core.playlistsData = this.playlistsData;
+        window.playlistsData = this.playlistsData;
+    }
+    
+    console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
+
+    requestAnimationFrame(() => {
+        this.updatePlaylistsUI();
+        
+        if (this.core?.showMessage) {
+            this.core.showMessage(`${validPlaylists.length} playlists sincronizadas`, 'success');
+        }
+    });
+}
 
     /**
      * Forzar recreación de UI
