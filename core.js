@@ -38,8 +38,6 @@ let nextVideoScheduled = false;
 let lastCrossfadeTime = 0;
 const CROSSFADE_DEBOUNCE = 500;
 const CROSSFADE_TRIGGER_TIME = 10;
-
-let playlistsData = [];
 let currentPlayingInfo = {
     playlistId: null,
     videoId: null,
@@ -89,22 +87,16 @@ const PERSISTENCE_CONFIG = {
 
 function saveAllData() {
     try {
-        // CORRECCIÓN: Usar datos de la instancia activa, NO la variable global
+   
         let dataToSave = [];
         
         if (window.playlistManager && window.playlistManager.playlistsData) {
-            // Prioridad 1: Datos del gestor de playlists
             dataToSave = window.playlistManager.playlistsData;
         } else if (window.unifiedCore && window.unifiedCore.playlistsData) {
-            // Prioridad 2: Datos del núcleo
             dataToSave = window.unifiedCore.playlistsData;
-        } else {
-            // Fallback: Variable global (solo si nada más existe)
-            dataToSave = playlistsData;
         }
 
         if (typeof savePlaylistsDataPersistent === 'function') {
-            // Filtramos para no guardar cosas de YouTube Library que se recargan solas
             const playlistsToSave = dataToSave.filter(p => p.source !== 'youtube_library');
             savePlaylistsDataPersistent(playlistsToSave);
         }
@@ -167,27 +159,25 @@ function loadPlaylistsDataPersistent() {
 
 class UnifiedCore {
     constructor(config) {
-        this.state = {
+    this.state = {
         ...unifiedState,
         shuffleEnabled: false,    
         repeatEnabled: false       
     };
-        this.views = ['home', 'search', 'library', 'playing'];
-        this.currentView = 'home';
-        this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
-        this.playlistsData = playlistsData;
-        this.scrollObserver = null; // Inicializar observador de scroll
-        this.ui = window.uiManager; // Referencia corta
-        // Inicializar
-        this.init();
-        this.setupAutomaticSaving();
-        this.setupPlayerContainerHandlers();
-
-        // Exportar funciones globales vinculadas a esta instancia
-        window.forceMiniPlayerVisibility = this.forceMiniPlayerVisibility.bind(this);
-        window.setupSearchButtonListeners = this.setupSearchButtonListeners.bind(this);
-        window.checkAndShowMiniPlayer = this.checkAndShowMiniPlayer.bind(this);
-    }
+    this.views = ['home', 'search', 'library', 'playing'];
+    this.currentView = 'home';
+    this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
+    
+    // CORRECCIÓN: Usar referencia única
+    this.playlistsData = [];
+    window.playlistsData = this.playlistsData; // Exponer globalmente
+    
+    this.scrollObserver = null;
+    this.ui = window.uiManager;
+    this.init();
+    this.setupAutomaticSaving();
+    this.setupPlayerContainerHandlers();
+}
 
     setupAutomaticSaving() {
         this.saveInterval = setInterval(() => {
@@ -2009,7 +1999,7 @@ clearSearchResults() {
     }
 
 getFlattenedPlaylist() {
-    // ✅ IMPLEMENTAR CACHÉ
+    // ✅ IMPLEMENTAR CACHÉ PARA MEJOR RENDIMIENTO
     const cacheKey = JSON.stringify(
         this.playlistsData.map(p => ({
             id: p.id,
@@ -2017,13 +2007,20 @@ getFlattenedPlaylist() {
         }))
     );
     
+    // Verificar si tenemos caché válida
     if (this._flattenedCache && this._flattenedCacheKey === cacheKey) {
+        console.log('✅ Usando caché de playlist aplanada');
         return this._flattenedCache;
     }
     
+    console.log('🔄 Regenerando playlist aplanada...');
+    
+    // Buscar la cola de reproducción
     let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
+    // Si no existe, crearla
     if (!queuePlaylist) {
+        console.warn('⚠️ Cola no encontrada, creándola...');
         queuePlaylist = {
             id: 'queue',
             name: 'Cola de Reproducción',
@@ -2033,39 +2030,125 @@ getFlattenedPlaylist() {
             isQueue: true
         };
         this.playlistsData.unshift(queuePlaylist);
-        console.warn('⚠️ Playlist de cola creada');
     }
     
+    // Validar que tiene array de videos
     if (!queuePlaylist.videos || !Array.isArray(queuePlaylist.videos)) {
+        console.warn('⚠️ Cola sin array de videos, inicializando...');
         queuePlaylist.videos = [];
     }
     
+    // Filtrar y normalizar videos válidos
     const validVideos = queuePlaylist.videos
         .filter(video => {
-            if (!video || !video.videoId || video.videoId === 'undefined') {
+            // ✅ VALIDACIONES EXHAUSTIVAS
+            if (!video) {
+                console.warn('⚠️ Video nulo o undefined');
                 return false;
             }
-            const title = (video.title || '').toLowerCase();
-            const isDeleted = title.includes('deleted video') || 
-                            title.includes('private video');
-            return !isDeleted;
-        })
-        .map(video => {
-            let duration = 0;
-            if (video.duration) {
-                duration = typeof video.duration === 'number' 
-                    ? video.duration 
-                    : this.parseDuration(video.duration);
+            
+            if (!video.videoId || video.videoId === 'undefined' || video.videoId === '') {
+                console.warn('⚠️ Video sin videoId válido:', video);
+                return false;
             }
             
-            let artist = video.artist || video.uploaderName || video.author || 'YouTube';
+            // Validar que el videoId sea una string válida de YouTube (11 caracteres)
+            if (typeof video.videoId !== 'string' || video.videoId.length !== 11) {
+                console.warn('⚠️ VideoId con formato inválido:', video.videoId);
+                return false;
+            }
             
+            // Filtrar videos eliminados o privados
+            const title = (video.title || '').toLowerCase();
+            const isDeleted = title.includes('deleted video') || 
+                            title.includes('private video') ||
+                            title.includes('[deleted]') ||
+                            title.includes('[private]');
+            
+            if (isDeleted) {
+                console.warn('⚠️ Video eliminado/privado omitido:', video.title);
+                return false;
+            }
+            
+            return true;
+        })
+        .map((video, index) => {
+            // ✅ NORMALIZAR DURACIÓN
+            let duration = 0;
+            
+            if (video.duration) {
+                if (typeof video.duration === 'number' && video.duration > 0) {
+                    // Ya está en segundos
+                    duration = Math.floor(video.duration);
+                } else if (typeof video.duration === 'string') {
+                    // Convertir string a segundos
+                    duration = this.parseDuration(video.duration);
+                }
+            }
+            
+            // ✅ NORMALIZAR ARTISTA/UPLOADER
+            let artist = video.artist || 
+                        video.uploaderName || 
+                        video.author || 
+                        video.channelName ||
+                        'YouTube';
+            
+            // Limpiar " - Topic" de YouTube
+            artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+            
+            // Si quedó vacío, usar fallback
+            if (artist === '') {
+                artist = 'Desconocido';
+            }
+            
+            // ✅ NORMALIZAR THUMBNAIL
+            let thumbnail = video.thumbnail || 
+                          video.thumbnailUrl || 
+                          './electronic.ico';
+            
+            // Validar que la URL sea válida
+            if (thumbnail && !thumbnail.startsWith('http') && !thumbnail.startsWith('./')) {
+                thumbnail = './electronic.ico';
+            }
+            
+            // ✅ NORMALIZAR TÍTULO
+            let title = video.title || 'Sin título';
+            
+            // Limpiar título de caracteres problemáticos
+            title = title.trim();
+            if (title === '') {
+                title = 'Sin título';
+            }
+            
+            // ✅ RETORNAR VIDEO NORMALIZADO
             return { 
-                ...video, 
-                duration, 
-                artist, 
-                uploaderName: artist, 
-                author: artist 
+                // IDs y referencias
+                videoId: video.videoId,
+                sourcePlaylistId: video.sourcePlaylistId || 'queue',
+                
+                // Información de display
+                title: title,
+                thumbnail: thumbnail,
+                
+                // Información de autor (múltiples propiedades para compatibilidad)
+                artist: artist,
+                uploaderName: artist,
+                author: artist,
+                channelName: artist,
+                
+                // Duración en segundos
+                duration: duration,
+                
+                // Metadata adicional
+                index: index,
+                addedAt: video.addedAt || Date.now(),
+                
+                // Mantener datos originales si existen
+                originalData: {
+                    uploadDate: video.uploadDate,
+                    views: video.views,
+                    isLive: video.isLive || false
+                }
             };
         });
     
@@ -2073,13 +2156,67 @@ getFlattenedPlaylist() {
     this._flattenedCache = validVideos;
     this._flattenedCacheKey = cacheKey;
     
+    console.log(`✅ Playlist aplanada generada: ${validVideos.length} videos válidos de ${queuePlaylist.videos.length} totales`);
+    
+    // ✅ VALIDACIÓN FINAL
+    if (validVideos.length === 0 && queuePlaylist.videos.length > 0) {
+        console.error('❌ CRÍTICO: Todos los videos fueron filtrados. Videos originales:', queuePlaylist.videos);
+    }
+    
     return validVideos;
 }
-
-// ✅ AÑADIR MÉTODO PARA INVALIDAR CACHÉ
+parseDuration(durationInput) {
+    // Validación inicial
+    if (!durationInput) return 0;
+    
+    // Si ya es un número válido, devolverlo
+    if (typeof durationInput === 'number' && !isNaN(durationInput) && durationInput >= 0) {
+        return Math.floor(Math.abs(durationInput));
+    }
+    
+    // Si no es string, intentar convertir
+    if (typeof durationInput !== 'string') {
+        const num = Number(durationInput);
+        return isNaN(num) ? 0 : Math.floor(Math.abs(num));
+    }
+    
+    const duration = durationInput.trim();
+    
+    // Formato ISO 8601 (PT1H2M3S)
+    const isoMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
+    if (isoMatch) {
+        const hours = parseInt(isoMatch[1] || '0', 10);
+        const minutes = parseInt(isoMatch[2] || '0', 10);
+        const seconds = parseFloat(isoMatch[3] || '0');
+        return Math.floor(hours * 3600 + minutes * 60 + seconds);
+    }
+    
+    // Formato HH:MM:SS o MM:SS
+    const timeParts = duration.split(':').map(part => parseInt(part, 10));
+    
+    if (timeParts.some(isNaN)) {
+        console.warn('⚠️ Duración con formato inválido:', durationInput);
+        return 0;
+    }
+    
+    if (timeParts.length === 2) {
+        // MM:SS
+        return timeParts[0] * 60 + timeParts[1];
+    }
+    
+    if (timeParts.length === 3) {
+        // HH:MM:SS
+        return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+    }
+    
+    // Último intento: parsear como número directo
+    const parsed = parseInt(duration, 10);
+    return isNaN(parsed) ? 0 : Math.floor(Math.abs(parsed));
+}
 invalidateFlattenedCache() {
     this._flattenedCache = null;
     this._flattenedCacheKey = null;
+    console.log('🗑️ Caché de playlist aplanada invalidada');
 }
 updatePersistentQueue() {
     console.log('🔄 Actualizando cola persistente...');
@@ -2263,25 +2400,6 @@ updatePersistentQueue() {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => func.apply(this, args), delay);
         };
-    }
-
-    parseDuration(durationInput) {
-        if (typeof durationInput === 'number' && !isNaN(durationInput)) return Math.floor(Math.abs(durationInput));
-        if (typeof durationInput !== 'string') return 0;
-        
-        const isoMatch = durationInput.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?/);
-        if (isoMatch) {
-            const hours = parseInt(isoMatch[1] || '0', 10);
-            const minutes = parseInt(isoMatch[2] || '0', 10);
-            const seconds = parseFloat(isoMatch[3] || '0');
-            return Math.floor(hours * 3600 + minutes * 60 + seconds);
-        }
-        
-        const timeParts = durationInput.split(':').map(part => parseInt(part, 10));
-        if (timeParts.length === 2) return timeParts[0] * 60 + timeParts[1];
-        if (timeParts.length === 3) return timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-        
-        return parseInt(durationInput, 10) || 0;
     }
 
     startMonitoring() {
