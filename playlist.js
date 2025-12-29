@@ -2327,16 +2327,17 @@ renderQueueContent(flatList) {
     html += '</div>';
     return html;
 }
-    /**
-     * Crear tarjeta visual de playlist
-     */
-createPlaylistCard(playlist) {
+
+    createPlaylistCard(playlist) {
     const card = document.createElement('div');
     card.className = 'playlist-card';
     card.dataset.playlistId = playlist.id;
 
     const videoCount = playlist.videos?.length || 0;
     const isYouTubeLibrary = playlist.source === 'youtube_library';
+    
+    // CORRECCIÓN: Usar artista si está disponible
+    const artistInfo = playlist.artist || 'YouTube';
 
     card.innerHTML = `
         <div class="playlist-card-image">
@@ -2351,7 +2352,7 @@ createPlaylistCard(playlist) {
             <h3 class="playlist-card-title" title="${playlist.name}">${playlist.name}</h3>
             <p class="playlist-card-count">${videoCount} videos</p>
             ${isYouTubeLibrary ? 
-                '<span class="playlist-source-badge"><i class="fab fa-youtube"></i> YouTube</span>' : 
+                `<span class="playlist-source-badge"><i class="fas fa-user"></i> ${artistInfo}</span>` : 
                 '<span class="playlist-source-badge"><i class="fas fa-user"></i> Personal</span>'
             }
             <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Eliminar playlist">
@@ -2359,6 +2360,7 @@ createPlaylistCard(playlist) {
             </button>
         </div>
     `;
+    
     const playBtn = card.querySelector('.play-playlist-btn');
     playBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
@@ -2628,9 +2630,6 @@ createPlaylistPopup(playlist) {
     console.log(`✅ Popup creado con ${playlist.videos?.length || 0} videos`);
 }
 
-    /**
-     * Renderizar contenido de playlist
-     */
 renderPlaylistContent(playlist) {
     if (!playlist.videos || playlist.videos.length === 0) {
         return `
@@ -2652,17 +2651,22 @@ renderPlaylistContent(playlist) {
                 return `
                     <div class="popup-video-item" data-index="${index}">
                         <div class="popup-video-index">${index + 1}</div>
-                        <img src="${video.thumbnail}" 
-                             alt="${this.escapeHTML(video.title)}" 
-                             class="popup-video-thumbnail"
-                             onerror="this.src='./electronic.ico';">
+                        
+                        <!-- CORRECCIÓN: Wrapper con duración dentro -->
+                        <div class="popup-video-thumbnail-wrapper">
+                            <img src="${video.thumbnail}" 
+                                 alt="${this.escapeHTML(video.title)}" 
+                                 class="popup-video-thumbnail"
+                                 onerror="this.src='./electronic.ico';">
+                            <span class="popup-video-duration">${duration}</span>
+                        </div>
+                        
                         <div class="popup-video-info">
                             <div class="popup-video-title" title="${this.escapeHTML(video.title)}">
                                 ${this.escapeHTML(video.title)}
                             </div>
                             <div class="popup-video-meta">
                                 <span class="popup-video-channel">${this.escapeHTML(video.uploaderName || 'YouTube')}</span>
-                                <span class="popup-video-duration">${duration}</span>
                             </div>
                         </div>
                         <div class="popup-video-actions">
@@ -2857,7 +2861,6 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
 
     if (currentYouTubeCount > 0) {
         console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
-        // CORRECCIÓN: Actualizar tanto local como core
         const filtered = this.playlistsData.filter(p => p.source !== 'youtube_library');
         this.playlistsData = filtered;
         if (this.core) this.core.playlistsData = filtered;
@@ -2875,9 +2878,24 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
             return hasValidVideos;
         })
         .map(playlist => {
+            // CORRECCIÓN: Extraer artista del primer video
+            let artist = 'YouTube';
             let thumbnailUrl = './electronic.ico';
+            
             if (playlist.videos && playlist.videos.length > 0) {
-                thumbnailUrl = playlist.videos[0].thumbnail || './electronic.ico';
+                const firstVideo = playlist.videos[0];
+                
+                // Intentar obtener el artista del video
+                artist = firstVideo.artist || 
+                         firstVideo.uploaderName || 
+                         firstVideo.author || 
+                         'YouTube';
+                
+                // Limpiar " - Topic"
+                artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+                
+                // Thumbnail del primer video
+                thumbnailUrl = firstVideo.thumbnail || './electronic.ico';
             }
             
             return {
@@ -2888,7 +2906,8 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
                 isExpanded: false,
                 source: 'youtube_library',
                 isLoaded: true,
-                count: playlist.videos.length
+                count: playlist.videos.length,
+                artist: artist  // NUEVO: Guardar artista
             };
         });
 
@@ -2902,7 +2921,6 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
     
     this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
     
-    // CORRECCIÓN: Sincronizar con core
     if (this.core) {
         this.core.playlistsData = this.playlistsData;
         window.playlistsData = this.playlistsData;
@@ -2918,7 +2936,6 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         }
     });
 }
-
     /**
      * Forzar recreación de UI
      */
