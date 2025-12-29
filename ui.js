@@ -339,33 +339,46 @@ showMiniPlayerFloat() {
         return;
     }
 
-    // ✅ CORRECCIÓN: Validar y normalizar datos
+    // CORRECCIÓN: Validación robusta
     let videosToRender = [];
+    
+    if (!items) {
+        console.error('❌ UI: items es null/undefined');
+        container.innerHTML = '<div class="search-placeholder"><p>No hay resultados</p></div>';
+        return;
+    }
     
     if (Array.isArray(items)) {
         videosToRender = items;
     } else if (items && Array.isArray(items.items)) {
         videosToRender = items.items;
-    } else if (items && typeof items === 'object') {
-        console.warn('⚠️ UI: Objeto recibido no es array, intentando convertir');
-        videosToRender = [items];
     } else {
-        console.error('❌ UI: Datos inválidos recibidos:', items);
+        console.error('❌ UI: Formato de datos desconocido:', items);
         container.innerHTML = '<div class="search-placeholder"><p>Error: datos inválidos</p></div>';
         return;
     }
 
-    // Limpiar contenedor si es búsqueda nueva
+    // Filtrar videos inválidos
+    videosToRender = videosToRender.filter(video => {
+        const hasValidId = video && (video.videoId || video.id) && 
+                          (video.videoId !== 'undefined') && 
+                          (video.id !== 'undefined');
+        
+        if (!hasValidId) {
+            console.warn('⚠️ Video sin ID válido omitido:', video);
+        }
+        
+        return hasValidId;
+    });
+
     if (!isContinuation) {
         container.innerHTML = '';
     } else {
-        // Remover loader si existe
         const loader = container.querySelector('.search-loading-more, .search-loading');
         if (loader) loader.remove();
     }
 
-    // Validar que hay videos para mostrar
-    if (!videosToRender || videosToRender.length === 0) {
+    if (videosToRender.length === 0) {
         if (!isContinuation) {
             container.innerHTML = `
                 <div class="search-placeholder">
@@ -377,14 +390,11 @@ showMiniPlayerFloat() {
         return;
     }
 
-    console.log(`✅ Renderizando ${videosToRender.length} videos`);
+    console.log(`✅ Renderizando ${videosToRender.length} videos válidos`);
 
-    // ✅ CORRECCIÓN: Usar DocumentFragment para mejor rendimiento
     const fragment = document.createDocumentFragment();
     
     videosToRender.forEach(video => {
-        if (!video) return;
-        
         const card = this.createSearchResultCard(video);
         if (card) fragment.appendChild(card);
     });
