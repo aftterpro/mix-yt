@@ -257,6 +257,9 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
+            if (this.core && typeof this.core.invalidateFlattenedCache === 'function') {
+            this.core.invalidateFlattenedCache();
+            }
         } else {
             queue.videos.splice(currentIndex + 1, 0, videoToAdd);
         }
@@ -528,7 +531,9 @@ removeVideoFromQueue(videoId) {
     
     // ✅ ELIMINAR VIDEO
     queuePlaylist.videos.splice(videoIndex, 1);
-    
+    if (this.core && typeof this.core.invalidateFlattenedCache === 'function') {
+    this.core.invalidateFlattenedCache();
+    }
     console.log(`✅ Eliminado. Quedan ${queuePlaylist.videos.length} videos`);
     
     // ✅ AJUSTAR ÍNDICE DE REPRODUCCIÓN
