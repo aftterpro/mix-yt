@@ -825,75 +825,100 @@ refreshActiveQueueTab() {
         }, 100);
     }
 }
-    /**
-     * Parsea un string de formato LRC [00:00.00]texto a un array de objetos
-     */
-    parseLRC(lrcText) {
-        const lines = lrcText.split('\n');
-        const lrcData = [];
-        const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+    
+parseLRC(lrcText) {
+    if (!lrcText || typeof lrcText !== 'string') {
+        console.warn('⚠️ Texto LRC inválido');
+        return [];
+    }
+    
+    const lines = lrcText.split('\n');
+    const lrcData = [];
+    const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+    
+    for (const line of lines) {
+        const match = line.match(timeRegex);
         
-        for (const line of lines) {
-            const match = line.match(timeRegex);
-            if (match) {
-                const minutes = parseInt(match[1]);
-                const seconds = parseInt(match[2]);
-                const milliseconds = parseInt(match[3].padEnd(3, '0'));
-                const time = minutes * 60 + seconds + milliseconds / 1000;
-                const text = line.replace(timeRegex, '').trim();
-                
-                // Añadir solo si tiene texto (ignora líneas vacías)
-                if (text) {
-                    lrcData.push({ time, text });
-                }
+        if (match) {
+            const minutes = parseInt(match[1], 10);
+            const seconds = parseInt(match[2], 10);
+            const milliseconds = parseInt(match[3].padEnd(3, '0'), 10);
+            
+            const time = minutes * 60 + seconds + milliseconds / 1000;
+            const text = line.replace(timeRegex, '').trim();
+            
+            // ✅ Solo añadir si tiene texto
+            if (text && text.length > 0) {
+                lrcData.push({ time, text });
             }
         }
-        return lrcData;
     }
-
-    /**
-     * ✅ NUEVA FUNCIÓN
-     * Inicia el intervalo que revisa el tiempo de la canción
-     */
+    
+    // ✅ ORDENAR POR TIEMPO (por si acaso)
+    lrcData.sort((a, b) => a.time - b.time);
+    
+    console.log(`✅ Parseadas ${lrcData.length} líneas LRC`);
+    
+    return lrcData;
+}
 startLyricsSync() {
-    // ✅ CRÍTICO: Limpiar intervalo anterior si existe
+    // ✅ LIMPIAR INTERVALO ANTERIOR
     if (this.lyricsSyncInterval) {
         clearInterval(this.lyricsSyncInterval);
         this.lyricsSyncInterval = null;
     }
     
-    // ✅ Resetear índice anterior
+    // ✅ RESETEAR ÍNDICE
     this.lastActiveLineIndex = -1;
     
     console.log('🎵 Iniciando sincronización de letras...');
     
-    // ✅ Revisa cada 250ms (4 veces por segundo)
+    // ✅ VALIDAR QUE HAY LETRAS
+    if (!this.currentLrc || this.currentLrc.length === 0) {
+        console.warn('⚠️ No hay letras para sincronizar');
+        return;
+    }
+    
+    // ✅ INTERVALO DE SINCRONIZACIÓN (250ms = 4 veces/segundo)
     this.lyricsSyncInterval = setInterval(() => {
         this.syncLyricsLine();
     }, 250);
     
-    console.log('✅ Sincronización de letras activa (ID:', this.lyricsSyncInterval, ')');
+    console.log('✅ Sincronización activa (ID:', this.lyricsSyncInterval, ')');
 }
 
     /**
      * Sincroniza la línea activa de la letra con el tiempo del video
      */
 syncLyricsLine() {
-    // Validaciones básicas
-    if (!this.core || !this.currentLrc || this.currentLrc.length === 0) return;
+    // ===== VALIDACIONES =====
+    if (!this.core || !this.currentLrc || this.currentLrc.length === 0) {
+        return;
+    }
 
-    // Detectar qué reproductor está sonando realmente
+    // ===== DETECTAR REPRODUCTOR ACTIVO =====
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
-    // Asegurar que el reproductor está activo y tiene la función getCurrentTime
-    if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') return;
+    if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') {
+        return;
+    }
 
     const currentTime = activePlayer.getCurrentTime();
     const container = document.getElementById('syncedLyricsContainer');
-    if (!container) return;
+    
+    if (!container) {
+        // ✅ Si el contenedor ya no existe, detener sincronización
+        if (this.lyricsSyncInterval) {
+            clearInterval(this.lyricsSyncInterval);
+            this.lyricsSyncInterval = null;
+            console.log('🛑 Sincronización detenida (contenedor no existe)');
+        }
+        return;
+    }
 
-    // Encontrar la línea activa (con una compensación de 0.2s para que se sienta a tiempo)
+    // ===== ENCONTRAR LÍNEA ACTIVA =====
     let activeLineIndex = -1;
+    
     for (let i = this.currentLrc.length - 1; i >= 0; i--) {
         if (currentTime >= (this.currentLrc[i].time - 0.2)) {
             activeLineIndex = i;
@@ -901,30 +926,32 @@ syncLyricsLine() {
         }
     }
 
-    // OPTIMIZACIÓN CLAVE: Solo actualizar el DOM si la línea cambió
-    // Esto evita que se "trabe" o parpadee
-    if (this.lastActiveLineIndex === activeLineIndex) return;
+    // ===== OPTIMIZACIÓN: Solo actualizar si cambió =====
+    if (this.lastActiveLineIndex === activeLineIndex) {
+        return;
+    }
+    
     this.lastActiveLineIndex = activeLineIndex;
 
+    // ===== ACTUALIZAR CLASES CSS =====
     const allLines = container.querySelectorAll('p');
     
     allLines.forEach((line, index) => {
-        // Limpiar clases anteriores
-        line.className = ''; 
-
+        line.className = ''; // Limpiar todas las clases
+        
         if (index === activeLineIndex) {
             line.classList.add('active');
             
-            // Scroll suave tipo Spotify: siempre al centro
+            // ✅ SCROLL SUAVE AL CENTRO (tipo Spotify)
             line.scrollIntoView({ 
                 behavior: 'smooth', 
                 block: 'center',
                 inline: 'nearest'
             });
         } else if (index < activeLineIndex) {
-            line.classList.add('past'); // Líneas ya cantadas
+            line.classList.add('past');
         } else {
-            line.classList.add('future'); // Líneas futuras
+            line.classList.add('future');
         }
     });
 }
@@ -964,83 +991,114 @@ findRelatedVideoData(itemElement) {
      /**
      * Renderizar letras (Puente compatible)
      */
-    renderLyrics(data) {
-        // Obtener metadatos actuales para el header
-        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-        const flatList = this.core?.getFlattenedPlaylist() || [];
-        const currentVideo = flatList[currentIndex];
-        
-        // Llamar a la función UI real pasando los datos
-        // renderLyricsUI espera: (match, originalArtist, originalTitle)
-        
-        // Adaptar el objeto 'data' al formato 'match' que espera renderLyricsUI
-        const match = {
-            syncedLyrics: data.syncedLyrics,
-            plainLyrics: data.plainLyrics,
-            source: data.source || 'Desconocido',
-            trackName: currentVideo?.title,
-            artistName: currentVideo?.artist || currentVideo?.uploaderName
-        };
+renderLyrics(data) {
+    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+    const flatList = this.core?.getFlattenedPlaylist() || [];
+    const currentVideo = flatList[currentIndex];
+    
+    if (!currentVideo) {
+        console.warn('⚠️ No hay video actual para renderizar letras');
+        return;
+    }
+    
+    const match = {
+        syncedLyrics: data.syncedLyrics,
+        plainLyrics: data.plainLyrics,
+        instrumental: data.instrumental || false,
+        source: data.source || 'Desconocido',
+        trackName: data.trackName || currentVideo.title,
+        artistName: data.artistName || currentVideo.artist || currentVideo.uploaderName,
+        albumName: data.albumName || null
+    };
 
-        this.renderLyricsUI(match, match.artistName, match.trackName);
-    }   
+    this.renderLyricsUI(match, match.artistName, match.trackName);
+}  
 renderLyricsUI(match, originalArtist, originalTitle) {
-        const lyricsContainer = document.getElementById('lyricsContent');
-        const trackName = match.trackName || originalTitle;
-        const artistName = match.artistName || originalArtist;
-        const albumInfo = match.albumName ? ` • 💿 ${match.albumName}` : '';
+    const lyricsContainer = document.getElementById('lyricsContent');
+    if (!lyricsContainer) {
+        console.error('❌ Contenedor de letras no encontrado');
+        return;
+    }
+    
+    const trackName = match.trackName || originalTitle;
+    const artistName = match.artistName || originalArtist;
+    const albumInfo = match.albumName ? ` • 💿 ${match.albumName}` : '';
 
-        // Header con botón de traducir
-        const headerHtml = `
-            <div class="lyrics-header">
-                <i class="fas fa-music"></i>
-                <div style="flex:1; overflow:hidden;">
-                    <p style="font-weight:bold;">${this.escapeHTML(trackName)}</p>
-                    <p class="lyrics-artist-header" style="margin:0; font-size:12px;">
-                        ${this.escapeHTML(artistName)}${this.escapeHTML(albumInfo)}
-                    </p>
-                </div>
-                <button id="translateLyricsBtn" class="lyrics-provider-btn" title="Traducir al español">
-                    <i class="fas fa-language"></i>
-                </button>
-                <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar proveedor">
-                    <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
-                </button>
+    // ===== HEADER CON BOTONES =====
+    const headerHtml = `
+        <div class="lyrics-header">
+            <i class="fas fa-music"></i>
+            <div style="flex:1; overflow:hidden;">
+                <p style="font-weight:bold; margin:0;">${this.escapeHTML(trackName)}</p>
+                <p class="lyrics-artist-header" style="margin:0; font-size:12px; color:rgba(255,255,255,0.7);">
+                    ${this.escapeHTML(artistName)}${this.escapeHTML(albumInfo)}
+                </p>
+            </div>
+            <button id="translateLyricsBtn" class="lyrics-provider-btn" title="Traducir al español">
+                <i class="fas fa-language"></i>
+            </button>
+            <button id="lyricsProviderToggle" class="lyrics-provider-btn" title="Cambiar proveedor">
+                <i class="fas fa-sync-alt"></i> ${this.lyricsProvider}
+            </button>
+        </div>`;
+
+    let contentHtml = '';
+
+    // ===== INSTRUMENTAL =====
+    if (match.instrumental) {
+        contentHtml = `
+            <div class="lyrics-text plain" style="display:flex; justify-content:center; align-items:center; 
+                 height:300px; flex-direction:column;">
+                <i class="fas fa-guitar" style="font-size:40px; margin-bottom:15px; opacity:0.5;"></i>
+                <p>Instrumental</p>
             </div>`;
-
-        let contentHtml = '';
-
-        if (match.instrumental) {
-            contentHtml = `
-                <div class="lyrics-text plain" style="display:flex; justify-content:center; align-items:center; height:300px; flex-direction:column;">
-                    <i class="fas fa-guitar" style="font-size:40px; margin-bottom:15px; opacity:0.5;"></i>
-                    <p>Instrumental</p>
-                </div>`;
-        } else if (match.syncedLyrics) {
-            this.currentLrc = this.parseLRC(match.syncedLyrics);
-            contentHtml = `
-                <div class="lyrics-text synced" id="syncedLyricsContainer">
-                    ${this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('')}
-                </div>`;
-            setTimeout(() => this.startLyricsSync(), 100);
-        } else if (match.plainLyrics) {
+            
+    // ===== LETRAS SINCRONIZADAS =====
+    } else if (match.syncedLyrics) {
+        // ✅ PARSEAR LRC
+        this.currentLrc = this.parseLRC(match.syncedLyrics);
+        
+        if (this.currentLrc.length === 0) {
+            console.warn('⚠️ No se pudieron parsear letras sincronizadas, usando plain');
             contentHtml = `
                 <div class="lyrics-text plain">
-                    ${this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>')}
+                    ${this.escapeHTML(match.plainLyrics || match.syncedLyrics).replace(/\n/g, '<br>')}
                 </div>`;
         } else {
-            throw new Error('Sin datos de letra');
+            contentHtml = `
+                <div class="lyrics-text synced" id="syncedLyricsContainer">
+                    ${this.currentLrc.map(l => 
+                        `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`
+                    ).join('')}
+                </div>`;
+            
+            // ✅ INICIAR SINCRONIZACIÓN
+            setTimeout(() => this.startLyricsSync(), 100);
         }
-
-        lyricsContainer.innerHTML = `
-            <div class="lyrics-container">
-                ${headerHtml}
-                ${contentHtml}
-                <p class="lyrics-source">Fuente: ${match.source}</p>
+        
+    // ===== LETRAS PLANAS =====
+    } else if (match.plainLyrics) {
+        contentHtml = `
+            <div class="lyrics-text plain">
+                ${this.escapeHTML(match.plainLyrics).replace(/\n/g, '<br>')}
             </div>`;
+    } else {
+        throw new Error('Sin datos de letra');
+    }
 
-        // Configurar los botones
-        this.setupLyricsHeaderButtons();
+    // ===== RENDERIZAR =====
+    lyricsContainer.innerHTML = `
+        <div class="lyrics-container">
+            ${headerHtml}
+            ${contentHtml}
+            <p class="lyrics-source" style="text-align:center; font-size:11px; color:rgba(255,255,255,0.4); 
+               margin-top:32px; font-style:italic;">
+                Fuente: ${match.source}
+            </p>
+        </div>`;
+
+    // ===== CONFIGURAR BOTONES =====
+    this.setupLyricsHeaderButtons();
 }
     setupLyricsHeaderButtons() {
         // Botón Proveedor
@@ -1117,7 +1175,7 @@ async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
     const providerBtn = document.getElementById('lyricsProviderToggle');
     
-    // Obtener video actual
+    // ===== OBTENER VIDEO ACTUAL =====
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
     const allPlaylists = this.playlists || window.unifiedCore?.playlistsData || [];
     const queue = allPlaylists.find(p => p.id === 'queue');
@@ -1125,11 +1183,11 @@ async loadLyrics() {
 
     if (!currentVideo) {
         lyricsContainer.innerHTML = '<p class="lyrics-info">Reproduce música...</p>';
-        if(providerBtn) providerBtn.style.display = 'none';
+        if (providerBtn) providerBtn.style.display = 'none';
         return;
     }
 
-    // ✅ CORRECCIÓN: Validar caché correctamente
+    // ===== VALIDAR CACHÉ =====
     const cacheKey = `${currentVideo.videoId}_${this.lyricsProvider}`;
     const cachedLyrics = sessionStorage.getItem(cacheKey);
     
@@ -1148,7 +1206,10 @@ async loadLyrics() {
     
     this.lastLoadedLyricsId = currentVideo.videoId;
 
-    // ✅ Loading mejorado
+    // ===== CONFIGURACIÓN DE TIMEOUT =====
+    const LYRICS_TIMEOUT = 10000; // 10 segundos
+    
+    // ===== LOADING STATE =====
     lyricsContainer.innerHTML = `
         <div class="lyrics-loading">
             <i class="fas fa-spinner fa-spin"></i>
@@ -1156,7 +1217,7 @@ async loadLyrics() {
         </div>
     `;
     
-    if(providerBtn) providerBtn.style.display = 'none';
+    if (providerBtn) providerBtn.style.display = 'none';
 
     try {
         const artist = currentVideo.artist || currentVideo.uploaderName || '';
@@ -1168,53 +1229,77 @@ async loadLyrics() {
         let data = null;
         let usedProvider = this.lyricsProvider;
 
-        // 1. INTENTO PRINCIPAL
+        // ===== INTENTO PRINCIPAL CON TIMEOUT =====
         try {
-            data = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), LYRICS_TIMEOUT);
+            
+            data = await Promise.race([
+                this.fetchLyrics(this.lyricsProvider, artist, title, duration),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), LYRICS_TIMEOUT)
+                )
+            ]);
+            
+            clearTimeout(timeoutId);
+            
         } catch (e) {
             console.warn(`⚠️ Falló proveedor principal (${this.lyricsProvider}):`, e.message);
         }
 
-        // 2. FALLBACK AUTOMÁTICO
+        // ===== FALLBACK AUTOMÁTICO CON TIMEOUT =====
         if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
             const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
             console.log(`🔄 Intentando fallback: ${fallbackProvider}`);
             
             try {
-                data = await this.fetchLyrics(fallbackProvider, artist, title, duration);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), LYRICS_TIMEOUT);
+                
+                data = await Promise.race([
+                    this.fetchLyrics(fallbackProvider, artist, title, duration),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout')), LYRICS_TIMEOUT)
+                    )
+                ]);
+                
+                clearTimeout(timeoutId);
+                
                 if (data && (data.syncedLyrics || data.plainLyrics)) {
                     usedProvider = fallbackProvider;
+                    console.log(`✅ Fallback exitoso con ${fallbackProvider}`);
                 }
             } catch (e) {
                 console.warn('❌ Fallback también falló:', e.message);
             }
         }
 
-        // 3. RENDERIZADO
+        // ===== RENDERIZADO =====
         if (data && (data.syncedLyrics || data.plainLyrics)) {
-            // Guardar en caché
+            // ✅ GUARDAR EN CACHÉ
             try {
                 sessionStorage.setItem(cacheKey, JSON.stringify(data));
             } catch (e) {
-                console.warn('⚠️ No se pudo cachear letras');
+                console.warn('⚠️ No se pudo cachear letras:', e);
             }
             
+            // ✅ RENDERIZAR
             this.renderLyrics(data);
             
-            // LÓGICA DEL BOTÓN
+            // ===== LÓGICA DEL BOTÓN =====
             if (usedProvider !== this.lyricsProvider) {
                 // Fallback usado - ocultar botón
-                if(providerBtn) providerBtn.style.display = 'none';
+                if (providerBtn) providerBtn.style.display = 'none';
                 console.log('✅ Letra encontrada con fallback. Botón oculto.');
             } else {
                 // Proveedor original funcionó - mostrar botón
-                if(providerBtn) {
+                if (providerBtn) {
                     providerBtn.style.display = 'inline-flex';
                     providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
                 }
             }
         } else {
-            // No se encontró en NINGUNO
+            // ===== NO SE ENCONTRARON LETRAS =====
             lyricsContainer.innerHTML = `
                 <div class="lyrics-container">
                     <div class="lyrics-header">
@@ -1222,26 +1307,49 @@ async loadLyrics() {
                         <p>No encontradas</p>
                     </div>
                     <p class="lyrics-info">"${this.escapeHTML(title)}"</p>
-                    <p class="lyrics-info" style="font-size:11px; opacity:0.5">Intenta cambiar de proveedor</p>
+                    <p class="lyrics-info" style="font-size:11px; opacity:0.5">
+                        Intenta cambiar de proveedor o añade las letras manualmente
+                    </p>
                 </div>
             `;
-            if(providerBtn) providerBtn.style.display = 'inline-flex';
+            if (providerBtn) providerBtn.style.display = 'inline-flex';
         }
 
     } catch (error) {
-        console.error('❌ Error general letras:', error);
+        console.error('❌ Error general cargando letras:', error);
+        
+        // ===== MANEJO DE ERRORES ESPECÍFICOS =====
+        let errorMessage = 'Error cargando letra';
+        let errorDetails = error.message;
+        
+        if (error.message === 'Timeout') {
+            errorMessage = 'Tiempo de espera agotado';
+            errorDetails = 'El servidor tardó demasiado en responder';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'Error de conexión';
+            errorDetails = 'Verifica tu conexión a internet';
+        } else if (error.message.includes('NetworkError')) {
+            errorMessage = 'Error de red';
+            errorDetails = 'No se pudo conectar al servidor';
+        }
+        
         lyricsContainer.innerHTML = `
             <div class="lyrics-error">
                 <i class="fas fa-times-circle"></i>
-                <p>Error cargando letra</p>
-                <small>${error.message}</small>
+                <p>${errorMessage}</p>
+                <small>${errorDetails}</small>
+                <button class="retry-lyrics-btn" 
+                        onclick="window.playlistManager?.loadLyrics()"
+                        style="margin-top: 12px; padding: 8px 16px; background: var(--primary-color); 
+                               border: none; border-radius: 20px; color: white; cursor: pointer;">
+                    <i class="fas fa-redo"></i> Reintentar
+                </button>
             </div>
         `;
-        if(providerBtn) providerBtn.style.display = 'none';
+        if (providerBtn) providerBtn.style.display = 'none';
     }
 }
 
-// ✅ CORRECCIÓN: fetchLyrics con mejor manejo de errores
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
     const title = this.cleanTrackTitle(rawTitle);
     let artist = rawArtist || 'Desconocido';
@@ -1249,18 +1357,31 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
     console.log(`📡 Buscando [${provider}]: "${title}" - "${artist}"`);
 
+    // ===== VALIDACIÓN DE CONEXIÓN =====
+    if (!navigator.onLine) {
+        throw new Error('Sin conexión a internet');
+    }
+
     try {
         if (provider === 'lrclib') {
+            // ===== LRCLIB API =====
+            
             // Intento 1: Búsqueda exacta
             const urlExact = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${Math.round(duration)}`;
-            let response = await fetch(urlExact);
+            
+            let response = await fetch(urlExact, {
+                signal: AbortSignal.timeout(8000) // 8 segundos
+            });
             
             // Intento 2: Búsqueda flexible
             if (!response.ok) {
                 console.log('⚠️ LRCLIB exacto falló, búsqueda flexible...');
                 const query = `${artist} ${title}`;
                 const urlSearch = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
-                response = await fetch(urlSearch);
+                
+                response = await fetch(urlSearch, {
+                    signal: AbortSignal.timeout(8000)
+                });
             }
 
             if (!response.ok) {
@@ -1268,6 +1389,8 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
             }
 
             const data = await response.json();
+            
+            // ✅ MANEJAR RESPUESTA (array o objeto)
             const track = Array.isArray(data) ? data[0] : data;
 
             if (!track || (!track.syncedLyrics && !track.plainLyrics)) {
@@ -1276,39 +1399,64 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
             return {
                 syncedLyrics: track.syncedLyrics, 
-                plainLyrics: track.plainLyrics,   
+                plainLyrics: track.plainLyrics,
+                instrumental: track.instrumental || false,
                 source: 'LRCLIB',
-                provider: 'lrclib'
+                provider: 'lrclib',
+                trackName: track.trackName || title,
+                artistName: track.artistName || artist,
+                albumName: track.albumName || null
             };
 
         } else if (provider === 'lujjjh') {
+            // ===== LUJJJH API (via proxy) =====
+            
             const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
             const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
 
-            const response = await fetch(proxyUrl);
+            const response = await fetch(proxyUrl, {
+                signal: AbortSignal.timeout(8000)
+            });
+            
             if (!response.ok) {
                 throw new Error(`Lujjjh HTTP ${response.status}`);
             }
 
             const textData = await response.text();
             
-            if (!textData || textData.length < 10 || textData.includes('Not found')) {
+            // ✅ VALIDAR RESPUESTA
+            if (!textData || textData.length < 10) {
+                throw new Error('Respuesta vacía');
+            }
+            
+            if (textData.toLowerCase().includes('not found') || 
+                textData.toLowerCase().includes('error')) {
                 throw new Error('Sin letras disponibles');
             }
 
+            // ✅ GENERAR PLAIN LYRICS
             const plain = textData.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
 
             return {
                 syncedLyrics: textData,
                 plainLyrics: plain,
+                instrumental: false,
                 source: 'Lujjjh API',
-                provider: 'lujjjh'
+                provider: 'lujjjh',
+                trackName: title,
+                artistName: artist
             };
         }
 
     } catch (error) {
         console.warn(`❌ Error en fetchLyrics (${provider}):`, error.message);
-        throw error; // Re-lanzar para que el llamador maneje
+        
+        // ✅ ENRIQUECER ERROR
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout');
+        }
+        
+        throw error;
     }
 
     throw new Error('Proveedor no soportado');
