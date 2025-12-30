@@ -3300,3 +3300,6 @@ iframe[style*="opacity: 1"],
 body.mini-player-active {
     z-index: 999999 !important;
 }
+body.mini-player-active #persistent-player-layer {
+    z-index: 1001 !important;
+}
