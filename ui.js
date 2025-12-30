@@ -212,74 +212,26 @@ enablePlayButton(enable = true) {
     });
 }
 movePlayersToFullView() {
-    console.log('🎬 movePlayersToFullView iniciado');
-    
-    let persistentLayer = document.getElementById('persistent-player-layer');
-    
-    // ✅ Crear capa si no existe
-    if (!persistentLayer) {
-        console.warn('⚠️ Creando persistent-player-layer...');
-        persistentLayer = document.createElement('div');
-        persistentLayer.id = 'persistent-player-layer';
-        persistentLayer.style.cssText = `
-            position: fixed;
-            background: #000;
-            overflow: hidden;
-            pointer-events: auto;
-            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-            z-index: 60;
-        `;
-        document.body.appendChild(persistentLayer);
-        
-        // Mover players al layer
-        const p1 = document.getElementById('player1');
-        const p2 = document.getElementById('player2');
-        if (p1) persistentLayer.appendChild(p1);
-        if (p2) persistentLayer.appendChild(p2);
-    }
-    
-    const videoWrapper = document.getElementById('videoWrapper');
-    if (!videoWrapper) {
-        console.error('❌ videoWrapper no encontrado');
-        return;
-    }
+    const p1 = document.getElementById('player1');
+    const p2 = document.getElementById('player2');
+    const fullContainer = document.getElementById('videoWrapper'); 
 
-    const rect = videoWrapper.getBoundingClientRect();
-    
-    if (rect.width === 0 || rect.height === 0) {
-        console.warn('⚠️ videoWrapper sin dimensiones, forzando...');
-        videoWrapper.style.width = '100%';
-        videoWrapper.style.height = '100%';
-        videoWrapper.style.minHeight = '400px';
+    if (fullContainer) {
+        // Mover los reproductores de vuelta al contenedor grande
+        if (p1 && p1.parentElement !== fullContainer) fullContainer.appendChild(p1);
+        if (p2 && p2.parentElement !== fullContainer) fullContainer.appendChild(p2);
         
-        requestAnimationFrame(() => this.movePlayersToFullView());
-        return;
-    }
-
-    console.log('✅ Dimensiones OK:', rect);
-    
-    // Aplicar posición
-    persistentLayer.style.display = 'block';
-    persistentLayer.style.top = `${rect.top}px`;
-    persistentLayer.style.left = `${rect.left}px`;
-    persistentLayer.style.width = `${rect.width}px`;
-    persistentLayer.style.height = `${rect.height}px`;
-    persistentLayer.style.borderRadius = '12px';
-    persistentLayer.style.opacity = '1';
-    persistentLayer.style.pointerEvents = 'auto';
-    
-    document.body.classList.remove('mini-player-active');
-    
-    // Asegurar visibilidad de players
-    const players = persistentLayer.querySelectorAll('.video-player');
-    players.forEach(player => {
-        if (!player.classList.contains('hidden')) {
-            player.style.display = 'block';
-            player.style.visibility = 'visible';
+        const layer = document.getElementById('persistent-player-layer');
+        if (layer) {
+            layer.style.display = 'none';
+            layer.style.width = '100%'; 
+            layer.style.height = '100%';
         }
-    });
-    
-    console.log(' movePlayersToFullView completado');
+        
+        // Quitar la clase del body
+        document.body.classList.remove('mini-player-active');
+        console.log('Hz Vueltos los reproductores al Full View');
+    }
 }
 showMiniPlayerFloat() {
     let persistentLayer = document.getElementById('persistent-player-layer');
