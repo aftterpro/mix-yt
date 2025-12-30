@@ -305,26 +305,38 @@ body {
 /* =============================================
    CONTENT AREA
    ============================================= */
-.content-area {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0; /* Sin padding global */
-    padding-bottom: calc(var(--player-height) + 20px);
-    position: relative;
-    background: var(--yt-bg-base);
-}
-
-.content-view {
-    min-height: 100%;
-    display: none;
+.view-section, .content-view {
+    display: none !important; /* Oculto por defecto */
     width: 100%;
+    /* Altura = Pantalla menos Header (64px) y Player (90px) aprox */
+    height: calc(100vh - 160px); 
+    overflow-y: auto !important; /* Habilita el scroll interno */
+    overflow-x: hidden;
+    position: relative;
+    padding-bottom: 20px;
 }
 
-.content-view.active {
+.view-section.active, .content-view.active {
     display: block !important;
 }
+#searchView {
+    display: none; 
+}
+#searchView.active {
+    display: block !important;
+}
+#persistent-player-layer {
+    position: fixed;
+    z-index: 1000;
+    /* Los estilos de posición (top/left/width) los maneja JS, 
+       aquí solo aseguramos que flote sobre todo */
+    pointer-events: none; /* Por defecto no bloquea clicks hasta que tenga video */
+}
 
+/* Cuando el mini player tiene contenido activo */
+body.mini-player-active #persistent-player-layer {
+    pointer-events: auto;
+}
 /* =============================================
    WELCOME SECTION
    ============================================= */
@@ -362,12 +374,9 @@ body {
 /* =============================================
    BÚSQUEDA - CONTENEDOR PRINCIPAL
    ============================================= */
+
 #searchView {
-    width: 100% !important;
-    height: 100% !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    display: block !important; 
+    display: none; /* Asegura que no aparezca solo */
 }
 
 .search-results-wrapper {
@@ -384,7 +393,6 @@ body {
     width: 100% !important;
     margin: 0 auto !important;
     max-width: 1400px !important;
-    /* ✅ ELIMINAR CUALQUIER PROPIEDAD QUE OCULTE */
     visibility: visible !important;
     opacity: 1 !important;
 }
@@ -2692,9 +2700,6 @@ font-size: 1.5rem; /* Tamaño base */
     color: rgba(255, 255, 255, 0.8);
     filter: blur(0);
 }
-/* Asegura que el contenedor de la cuadrícula de búsqueda
-  ocupe todo el ancho disponible.
-*/
 .carousel-section {
     width: 100%;
 }
@@ -3278,8 +3283,7 @@ iframe[style*="opacity: 1"],
 /* Forzar que la capa del video esté encima */
 #persistent-player-layer {
     background: transparent !important;
-    pointer-events: auto !important; /* Importante para poder dar click en pausar/play */
-    z-index: 60 !important; /* Debe ser mayor que el full-player-view (50) */
+    z-index: 60 !important; 
 }
 #miniPlayerFloat, #miniPlayerContainer {
     z-index: 999999 !important; /* Más de 9000 */
