@@ -1623,15 +1623,34 @@ startCrossfade(prevPlayer, nextPlayer) {
     
     console.log(`🎨 Crossfade: Player${prevPlayerNum} → Player${nextPlayerNum}`);
     
-    // ✅ PASO 1: PREPARAR VISIBILIDAD
-    nextElement.style.display = 'block';
-    nextElement.style.visibility = 'visible';
-    nextElement.style.opacity = '0';
-    nextElement.classList.remove('hidden', 'fade-out');
+    // ✅ PASO 1: PREPARAR NEXT PLAYER
+    if (nextElement) {
+        // Limpiar clases conflictivas
+        nextElement.className = 'video-player';
+        
+        // Forzar visibilidad con display/visibility
+        nextElement.style.cssText = `
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 0 !important;
+            z-index: 3 !important;
+            background: #000 !important;
+        `;
+        
+        void nextElement.offsetWidth; // Force reflow
+    }
     
-    void nextElement.offsetWidth; // Force reflow
+    if (prevElement) {
+        prevElement.style.opacity = '1';
+        prevElement.style.zIndex = '2';
+    }
     
-    // ✅ PASO 2: INICIAR AUDIO Y VIDEO JUNTOS
+    // ✅ PASO 2: INICIAR PLAYBACK
     try { 
         nextPlayer.playVideo();
         console.log('✅ NextPlayer iniciado');
@@ -1639,16 +1658,18 @@ startCrossfade(prevPlayer, nextPlayer) {
         console.warn('⚠️ Error iniciando nextPlayer:', e);
     }
     
-    // ✅ PASO 3: CROSSFADE SIMULTÁNEO (Audio + Visual)
+    // ✅ PASO 3: CROSSFADE LOOP
     const steps = 50;
     const stepTime = (CROSSFADE_DURATION * 1000) / steps;
     let step = 0;
+    
+    console.log(`🎚️ Iniciando crossfade: ${steps} pasos de ${stepTime}ms`);
     
     crossfadeInterval = setInterval(() => {
         step++;
         const progress = step / steps;
         
-        // Curva de mezcla (coseno/seno para suavidad)
+        // Curvas de mezcla
         const gainNext = Math.sin(progress * (Math.PI / 2));
         const gainPrev = Math.cos(progress * (Math.PI / 2));
         
@@ -1661,15 +1682,20 @@ startCrossfade(prevPlayer, nextPlayer) {
                 nextPlayer.setVolume(Math.round(100 * gainNext));
             }
         } catch (e) {
-            console.warn('⚠️ Error ajustando volumen');
+            console.warn('⚠️ Error ajustando volumen:', e);
         }
         
-        // ✅ VIDEO (sincronizado con audio)
+        // ✅ VIDEO - Sincronizado con audio
         if (nextElement) {
             nextElement.style.opacity = gainNext.toFixed(3);
         }
         if (prevElement) {
             prevElement.style.opacity = gainPrev.toFixed(3);
+        }
+        
+        // ✅ LOG DE PROGRESO (cada 25%)
+        if (step % Math.floor(steps / 4) === 0) {
+            console.log(`🎚️ Crossfade: ${Math.round(progress * 100)}%`);
         }
         
         // ✅ FINALIZAR
@@ -1678,41 +1704,64 @@ startCrossfade(prevPlayer, nextPlayer) {
             crossfadeInterval = null;
             crossfadeInProgress = false;
             
-            // Limpieza
+            console.log('🎨 Finalizando crossfade...');
+            
+            // ✅ LIMPIEZA FINAL
             try {
-                if (prevPlayer) {
+                // Detener player anterior
+                if (prevPlayer && typeof prevPlayer.stopVideo === 'function') {
                     prevPlayer.stopVideo();
                     prevPlayer.setVolume(100);
                 }
-                if (nextPlayer) {
+                
+                // Asegurar volumen del player activo
+                if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
                     nextPlayer.setVolume(100);
                 }
                 
+                // Ocultar player anterior
                 if (prevElement) {
-                    prevElement.style.display = 'none';
-                    prevElement.style.opacity = '0';
-                    prevElement.classList.add('hidden');
+                    prevElement.className = 'video-player hidden';
+                    prevElement.style.cssText = `
+                        display: none !important;
+                        opacity: 0 !important;
+                        z-index: -1 !important;
+                    `;
                 }
                 
+                // Asegurar visibilidad del player activo
                 if (nextElement) {
-                    nextElement.style.opacity = '1';
-                    nextElement.classList.remove('fade-in');
+                    nextElement.className = 'video-player fade-in';
+                    nextElement.style.cssText = `
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        z-index: 3 !important;
+                        background: #000 !important;
+                    `;
                 }
                 
             } catch (e) {
-                console.warn('⚠️ Error en limpieza');
+                console.warn('⚠️ Error en limpieza:', e);
             }
             
+            // Resetear banderas
             hasOutroCrossfadeStarted = false;
             nextVideoScheduled = false;
             isTransitioning = false;
             
             console.log('✅ Crossfade completado');
             
-            // Reiniciar monitor
+            // ✅ REINICIAR MONITOR
             if (!monitorInterval && window.unifiedCore) {
                 setTimeout(() => {
                     if (window.reproduccionIniciada) {
+                        console.log('🔄 Reiniciando monitor');
                         window.unifiedCore.startMonitoring();
                     }
                 }, 500);
@@ -2432,12 +2481,11 @@ updateOverviewStats() {
         }
     }
 
-  playVideoAtIndex(index) {
+ playVideoAtIndex(index) {
     console.log(`🎬 playVideoAtIndex: ${index}`);
     
-    // ✅ VALIDAR SI HAY CROSSFADE EN PROGRESO
     if (crossfadeInProgress || isTransitioning) {
-        console.warn('⚠️ Crossfade en progreso, postponiendo reproducción');
+        console.warn('⚠️ Crossfade en progreso, postponiendo');
         setTimeout(() => this.playVideoAtIndex(index), 1000);
         return;
     }
@@ -2446,28 +2494,25 @@ updateOverviewStats() {
     
     if (index < 0 || index >= flatList.length) {
         console.warn('❌ Índice inválido:', index);
-        this.showMessage('Índice de video inválido', 'error');
         return;
     }
 
     const video = flatList[index];
     
-    // ✅ VALIDAR VIDEO
     if (!video || !video.videoId || video.videoId === 'undefined') {
         console.error('❌ Video inválido en índice', index);
-        this.showMessage('Video no válido', 'error');
         return;
     }
     
-    console.log(`🎵 Reproduciendo: "${video.title}" (índice ${index})`);
+    console.log(`🎵 Reproduciendo: "${video.title}"`);
     
-    // ✅ DETENER MONITOR ANTERIOR
+    // Detener monitor
     if (monitorInterval) {
         clearInterval(monitorInterval);
         monitorInterval = null;
     }
     
-    // ✅ RESETEAR TODAS LAS BANDERAS
+    // Resetear banderas
     this.resetCrossfadeFlags();
     
     // Actualizar estado
@@ -2486,11 +2531,12 @@ updateOverviewStats() {
         
         console.log(`🎮 Player activo: ${activePlayerId}`);
         
-        // ✅ ASEGURAR VISIBILIDAD
         const activeDiv = document.getElementById(activePlayerId);
         const inactiveDiv = document.getElementById(inactivePlayerId);
         
+        // ✅ ASEGURAR VISIBILIDAD DEL PLAYER ACTIVO
         if (activeDiv) {
+            activeDiv.className = 'video-player fade-in';
             activeDiv.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -2503,40 +2549,25 @@ updateOverviewStats() {
                 z-index: 10 !important;
                 background: #000 !important;
             `;
-            activeDiv.classList.remove('hidden', 'fade-out');
-            activeDiv.classList.add('fade-in');
         }
         
+        // ✅ OCULTAR PLAYER INACTIVO
         if (inactiveDiv) {
-            inactiveDiv.style.display = 'none';
-            inactiveDiv.style.opacity = '0';
-            inactiveDiv.style.zIndex = '0';
-            inactiveDiv.classList.add('hidden');
+            inactiveDiv.className = 'video-player hidden';
+            inactiveDiv.style.cssText = `
+                display: none !important;
+                opacity: 0 !important;
+                z-index: -1 !important;
+            `;
         }
         
-        // ✅ VALIDAR PLAYER ANTES DE CARGAR
+        // ✅ VALIDAR PLAYER
         if (!activePlayer || typeof activePlayer.loadVideoById !== 'function') {
-            throw new Error('Player no disponible o sin método loadVideoById');
+            throw new Error('Player no disponible');
         }
         
         // Cargar video
         activePlayer.loadVideoById(video.videoId);
-        
-        // ✅ VERIFICAR IFRAME CON RETRY
-        const checkIframe = (attempts = 0) => {
-            if (attempts > 10) {
-                console.warn('⚠️ Iframe no se cargó después de 5 segundos');
-                return;
-            }
-        
-            const iframe = activeDiv?.querySelector('iframe');
-            if (iframe && iframe.src) {
-                console.log('✅ Iframe cargado:', iframe.src.substring(0, 50));
-            } else if (attempts < 10) {
-                setTimeout(() => checkIframe(attempts + 1), 500);
-            }
-        };
-        checkIframe();
         
         // Actualizar UI
         this.updatePlayButton('pause');
@@ -2544,21 +2575,15 @@ updateOverviewStats() {
         this.updateNowPlaying();
         this.updatePlaylistsUI();
         
-        // Mostrar mini player si no estamos en full view
         if (this.currentView !== 'fullPlayer') {
             setTimeout(() => this.showMiniPlayerFloat(), 500);
         }
-        
-        // Refrescar tab activo después de un momento
-        setTimeout(() => this.refreshActiveQueueTab(), 1000);
         
         console.log('✅ Video cargado exitosamente');
         
     } catch (error) {
         console.error('❌ Error reproduciendo video:', error);
         this.showMessage("Error al reproducir: " + error.message, 'error');
-        
-        // ✅ LIMPIEZA EN CASO DE ERROR
         window.reproduccionIniciada = false;
         this.updatePlayButton('play');
         this.resetCrossfadeFlags();
