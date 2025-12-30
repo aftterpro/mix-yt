@@ -267,16 +267,20 @@ movePlayersToFullView() {
     
     console.log(' movePlayersToFullView completado');
 }
-
 showMiniPlayerFloat() {
-    const persistentLayer = document.getElementById('persistent-player-layer');
+    let persistentLayer = document.getElementById('persistent-player-layer');
     
+    // Si no existe, lo creamos para que no rompa el código,
+ 
     if (!persistentLayer) {
-        console.error('❌ persistent-player-layer no encontrado');
-        return;
+        console.warn('⚠️ persistent-player-layer no encontrado, creando contenedor vacío...');
+        persistentLayer = document.createElement('div');
+        persistentLayer.id = 'persistent-player-layer';
+        persistentLayer.className = 'persistent-player-layer';
+        document.body.appendChild(persistentLayer);
     }
 
-    // Posición fija del mini player
+    // Configuración de posición para el Mini Player
     const miniPosition = {
         bottom: 110,
         right: 20,
@@ -284,23 +288,30 @@ showMiniPlayerFloat() {
         height: 180
     };
     
+   
     persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
     persistentLayer.style.position = 'fixed';
+    
+    // Aplicar coordenadas finales
     persistentLayer.style.bottom = `${miniPosition.bottom}px`;
     persistentLayer.style.right = `${miniPosition.right}px`;
-    persistentLayer.style.top = 'auto'; // ✅ CRÍTICO
-    persistentLayer.style.left = 'auto'; // ✅ CRÍTICO
+    persistentLayer.style.top = 'auto';  
+    persistentLayer.style.left = 'auto'; 
+    
     persistentLayer.style.width = `${miniPosition.width}px`;
     persistentLayer.style.height = `${miniPosition.height}px`;
+    
+    // Asegurar visibilidad y capas
     persistentLayer.style.borderRadius = '12px';
     persistentLayer.style.zIndex = '999999';
     persistentLayer.style.opacity = '1';
     persistentLayer.style.display = 'block';
     persistentLayer.style.visibility = 'visible';
+    persistentLayer.style.pointerEvents = 'auto';
     
     document.body.classList.add('mini-player-active');
     
-    console.log('✅ Mini player flotante activado');
+    console.log('✅ Mini player flotante activado (Efecto Zoom)');
 }
 
     forceMiniPlayerVisibility() {
