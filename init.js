@@ -297,6 +297,21 @@ if (document.readyState === 'loading') {
 } else {
     console.log('📄 DOM ya cargado, verificando APIs...');
     ensureAPIsLoaded();
+    // Detectar scroll en el contenedor correcto
+const searchContainer = document.getElementById('searchView'); // O '.content-area'
+
+if (searchContainer) {
+    searchContainer.addEventListener('scroll', () => {
+        // Verificar si llegamos al final
+        if (searchContainer.scrollTop + searchContainer.clientHeight >= searchContainer.scrollHeight - 100) {
+            console.log('📜 Final del scroll detectado, cargando más...');
+            // Llamar a tu función de búsqueda con el token de paginación
+            if (window.unifiedCore && window.unifiedCore.searchNextPage) {
+                window.unifiedCore.searchNextPage();
+            }
+        }
+    });
+}
 }
 // =============================================
 // CONFIGURACIÓN DE CONTROLES DE AUDIO
