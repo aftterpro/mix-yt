@@ -23,26 +23,40 @@ class UIManager {
     // GESTIÓN DE VISTAS Y PANELES
     // ==========================================
     
-    switchView(viewId) {
-    // 1. Ocultar TODAS las vistas primero
-    const allViews = document.querySelectorAll('.view-section'); 
-    allViews.forEach(view => {
-        view.style.display = 'none';
-        view.classList.remove('active');
+switchView(viewName) {
+    const targetId = viewName.endsWith('View') ? viewName : viewName + 'View';
+    
+    console.log(`🔄 Cambiando vista a: ${viewName} (Buscando ID: ${targetId})`);
+
+    // 2. Actualizar botones del menú (nav-items)
+    document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.view === viewName) {
+            item.classList.add('active');
+        }
     });
 
-    // 2. Desactivar todos los botones de navegación
-    const allTabs = document.querySelectorAll('.nav-tab'); 
-    allTabs.forEach(tab => tab.classList.remove('active'));
+    // 3. Ocultar TODAS las vistas primero
+    document.querySelectorAll('.content-view').forEach(view => {
+        view.classList.remove('active');
+        view.style.display = 'none'; // Forzar ocultamiento
+    });
 
-    // 3. Mostrar SOLO la vista deseada
-    const targetView = document.getElementById(viewId);
+    // 4. Mostrar la vista correcta
+    const targetView = document.getElementById(targetId);
     if (targetView) {
-        targetView.style.display = 'block'; // O 'flex', según tu diseño
         targetView.classList.add('active');
-        console.log(`✅ Vista cambiada a: ${viewId}`);
+        // Quitar el 'display: none' inline para que el CSS (.active) mande
+        targetView.style.display = ''; 
+        // O forzarlo si es necesario: targetView.style.display = 'block';
     } else {
-        console.error(`❌ No se encontró la vista: ${viewId}`);
+        console.error(`❌ No se encontró la vista con ID: ${targetId}`);
+        return; // Salir si falla
+    }
+
+    // 5. Gestión del Mini Player (Expandir/Contraer)
+    if (typeof this.togglePlayerVisibility === 'function') {
+        this.togglePlayerVisibility(viewName);
     }
 }
 
