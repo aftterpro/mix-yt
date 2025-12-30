@@ -23,28 +23,28 @@ class UIManager {
     // GESTIÓN DE VISTAS Y PANELES
     // ==========================================
     
-    switchView(viewName) {
-        // 1. Actualizar Tabs/Botones de navegación
-        document.querySelectorAll('.nav-item, .tab, .nav-tab').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.view === viewName) item.classList.add('active');
-        });
+    switchView(viewId) {
+    // 1. Ocultar TODAS las vistas primero
+    const allViews = document.querySelectorAll('.view-section'); 
+    allViews.forEach(view => {
+        view.style.display = 'none';
+        view.classList.remove('active');
+    });
 
-        // 2. Ocultar/Mostrar Contenedores
-        document.querySelectorAll('.content-view').forEach(view => {
-            view.classList.remove('active');
-            // Scroll al top si no es el reproductor full
-            if (viewName !== 'fullPlayer' && view.dataset.view !== viewName) {
-                view.scrollTop = 0;
-            }
-        });
+    // 2. Desactivar todos los botones de navegación
+    const allTabs = document.querySelectorAll('.nav-tab'); 
+    allTabs.forEach(tab => tab.classList.remove('active'));
 
-        const targetView = document.getElementById(`${viewName}View`);
-        if (targetView) targetView.classList.add('active');
-
-        // 3. Gestión específica del Mini Player vs Full Player
-        this.togglePlayerVisibility(viewName);
+    // 3. Mostrar SOLO la vista deseada
+    const targetView = document.getElementById(viewId);
+    if (targetView) {
+        targetView.style.display = 'block'; // O 'flex', según tu diseño
+        targetView.classList.add('active');
+        console.log(`✅ Vista cambiada a: ${viewId}`);
+    } else {
+        console.error(`❌ No se encontró la vista: ${viewId}`);
     }
+}
 
     togglePlayerVisibility(viewName) {
         const miniPlayer = document.getElementById('miniPlayerFloat');
