@@ -11,18 +11,16 @@
    REPRODUCTORES CON EFECTOS AVANZADOS
    ============================================= */
 .video-player {
-  position: absolute;
-  top: 0; 
-  left: 0;
-  width: 100%; 
-  height: 100%;
-  background: #000;
-  z-index: 1;
-  /* IMPORTANTE: Transición suave por defecto */
-  opacity: 0;
-  transition: opacity 1s ease-in-out, transform 1s ease-in-out, filter 1s ease-in-out;
-  will-change: opacity, transform; /* Ayuda al navegador a preparar la GPU */
-  backface-visibility: hidden; /* Evita parpadeos en algunas GPUs */
+    position: absolute;
+    top: 0; 
+    left: 0;
+    width: 100%; 
+    height: 100%;
+    background: #000;
+    z-index: 1;
+    opacity: 0;
+    will-change: opacity;
+    backface-visibility: hidden;
 }
 /* Optimizar el pulse */
 @keyframes subtlePulse {
@@ -46,24 +44,16 @@
    ENTRADA VISUAL IMPACTANTE
    ============================================= */
 .video-player.fade-in {
-opacity: 1 !important;
-  z-index: 3;
-  display: block !important;
-  visibility: visible !important;
-  /* Aquí puedes poner tus filtros de brillo/saturación */
-  filter: blur(0px) brightness(1);
+    opacity: 1 !important;
+    z-index: 3;
 }
 
 /* =============================================
    SALIDA VISUAL DRAMÁTICA  
    ============================================= */
 .video-player.fade-out {
-opacity: 0 !important;
-  z-index: 2;
-  display: block !important; /* Mantener block mientras se desvanece */
-  pointer-events: none;
-  filter: blur(5px) brightness(0.5);
-  transform: scale(0.95);
+    opacity: 0 !important;
+    z-index: 2;
 }
 
 @keyframes fadeOutEffect {
@@ -93,9 +83,8 @@ opacity: 0 !important;
    OCULTAMIENTO COMPLETO
    ============================================= */
 .video-player.hidden {
-display: none !important;
-  opacity: 0 !important;
-  z-index: -1;
+    display: none !important;
+    opacity: 0 !important;
 }
 
 /* =============================================
