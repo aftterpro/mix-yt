@@ -127,14 +127,16 @@
           </div>
         </div>
 
-        <div class="content-view" id="searchView">
-          <div class="carousel-section">
-            <div class="carousel-header"><h2 class="carousel-title">Resultados de Búsqueda</h2></div>
-            <div class="search-results-grid" id="searchResults">
-              <div class="search-placeholder"><i class="fas fa-search"></i><p>Busca música, artistas o playlists</p></div>
+      <div class="content-view" id="searchView">
+      <div class="search-results-wrapper">
+        <div class="search-results-grid" id="searchResults">
+            <div class="search-placeholder">
+                <i class="fas fa-search"></i>
+                <p>Busca música, artistas o playlists</p>
             </div>
           </div>
         </div>
+      </div>
 
         <div class="content-view" id="libraryView">
           <div class="carousel-section">
@@ -144,11 +146,6 @@
         </div>
 
         <!-- MINI PLAYER FLOAT -->
-      <!--  // <div id="miniPlayerFloat" class="mini-player-float hidden"> loc controla ui.js -->
-          <div class="mini-player-video">
-            <div id="miniPlayer1Container" class="mini-video-container"></div>
-            <div id="miniPlayer2Container" class="mini-video-container hidden"></div>
-          </div>
           <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
             <i class="fas fa-expand"></i>
           </button>
