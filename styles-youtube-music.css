@@ -309,21 +309,20 @@ body {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--spacing-xl);
-    padding-bottom: calc(var(--player-height) + var(--spacing-xl));
+    padding: 0; /* Sin padding global */
+    padding-bottom: calc(var(--player-height) + 20px);
     position: relative;
+    background: var(--yt-bg-base);
 }
 
 .content-view {
     min-height: 100%;
     display: none;
-    opacity: 0;
-    transition: opacity var(--transition-normal);
+    width: 100%;
 }
 
 .content-view.active {
-    display: block;
-    opacity: 1;
+    display: block !important;
 }
 
 /* =============================================
@@ -364,56 +363,69 @@ body {
 /* =============================================
    BÚSQUEDA - GRID 3x3 CORREGIDO
    ============================================= */
-.search-results-grid {
-   display: grid !important;
-    /* Forzar exactamente 4 columnas que ocupen el 100% del ancho */
-    grid-template-columns: repeat(4, 1fr) !important; 
-    gap: 16px !important; /* Espacio entre baldosas */
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+/* =============================================
+   BÚSQUEDA - CONTENEDOR PRINCIPAL
+   ============================================= */
+#searchView {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.search-results-wrapper {
+    width: 100%;
+    padding: 20px;
     box-sizing: border-box;
 }
 
-.search-result-card {
-   width: 100%;
-    display: flex;
-    flex-direction: column;
-    background: var(--yt-bg-elevated);
-    border-radius: 8px;
-    /* Altura balanceada para que sean "medianas" */
-    min-height: 260px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+.search-results-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    max-width: 1400px !important;
+}
 
+/* =============================================
+   TARJETAS DE BÚSQUEDA
+   ============================================= */
+.search-result-card {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: var(--yt-bg-elevated) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    cursor: pointer !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+    position: relative !important;
+    /* ✅ CRÍTICO: Asegurar visibilidad */
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
+    min-height: 280px !important;
 }
 
 .search-result-card:hover {
-    border-color: var(--yt-layer-15);
-    background: var(--yt-bg-menu);
-   transform: translateY(-6px) !important;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
 }
 
+/* Thumbnail */
 .search-result-thumbnail {
     width: 100%;
-    /* Ratio 16:9 estándar para videos */
-    padding-bottom: 56.25%; 
+    aspect-ratio: 16/9;
     position: relative;
     overflow: hidden;
-    border-radius: 8px 8px 0 0;
+    background: #000;
 }
 
 .search-result-thumbnail img {
-     position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform var(--transition-slow);
-}
-.search-result-card:hover .search-result-thumbnail img {
-    transform: scale(1.05);
 }
 
 .search-result-duration {
@@ -428,94 +440,60 @@ body {
     font-weight: 600;
 }
 
+/* Info */
 .search-result-info {
     padding: 12px;
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px !important;
 }
 
 .search-result-title {
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    line-height: 1.4 !important;
-    color: var(--yt-text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
     margin-bottom: 8px;
+    line-height: 1.4;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    min-height: 2.8em;
 }
-.search-result-author::before {
-    content: '👤 ';
-    opacity: 0.6;
-    margin-right: 4px;
-}
+
 .search-result-author {
     font-size: 12px;
-    color: var(--yt-text-secondary);
-    margin-bottom: 8px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    color: rgba(255, 255, 255, 0.6);
 }
 
-.search-result-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: auto;
-}
-
-.search-result-add-btn,
-.search-result-add-next-btn {
-    flex: 1;
-    background: rgba(255, 107, 53, 0.1);
-    border: 1px solid rgba(255, 107, 53, 0.3);
-    border-radius: 6px;
-    color: var(--primary-color);
-    font-size: 12px;
-    font-weight: 500;
-    padding: 8px 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    transition: all var(--transition-fast);
-}
-
-.search-result-add-next-btn {
-    flex: 1 !important;
-    background: rgba(255, 107, 53, 0.1) !important;
-    border: 1px solid rgba(255, 107, 53, 0.3) !important;
-    border-radius: 6px !important;
-    color: var(--primary-color) !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    padding: 8px 12px !important;
+/* Botón añadir */
+.add-to-queue-btn {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    width: 36px !important;
+    height: 36px !important;
+    background: rgba(255, 107, 53, 0.9) !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 50% !important;
+    color: white !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
-    transition: all 0.2s ease !important;
-    opacity: 1 !important;
-    transform: translateY(0) !important;
+    opacity: 0 !important;
+    transition: all 0.2s !important;
+    z-index: 10 !important;
 }
 
-
-.search-result-card:hover .search-result-add-next-btn {
+.search-result-card:hover .add-to-queue-btn {
     opacity: 1 !important;
-    transform: translateY(0) !important;
 }
 
-.search-result-add-btn:hover,
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    transform: translateY(-2px);
+/* Placeholder/Loading */
+.search-placeholder,
+.search-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 /* Touch devices - siempre visible */
@@ -2712,10 +2690,6 @@ font-size: 1.5rem; /* Tamaño base */
     color: rgba(255, 255, 255, 0.8);
     filter: blur(0);
 }
-/* =============================================
-   CORRECCIÓN DE LAYOUT DE BÚSQUEDA
-   ============================================= */
-
 /* Asegura que el contenedor de la cuadrícula de búsqueda
   ocupe todo el ancho disponible.
 */
@@ -3275,32 +3249,6 @@ element.style {
     .queue-item-remove {
         padding: 6px;
     }
-}
-/* Contenedor de resultados de búsqueda */
-#searchResults, .search-results-grid {
-    display: grid;
-    /* Esto crea columnas automáticas pero con un ancho mínimo de 160px */
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
-    gap: 20px; /* ESPACIO ENTRE BALDOSAS (Lo que pediste) */
-    padding: 20px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Ajuste de la tarjeta individual */
-.track-item.card-track, .search-result-card {
-    margin: 0; /* Quitamos margin porque usamos gap */
-    width: 100%;
-    background: #1a1a1a;
-    border-radius: 8px;
-    overflow: hidden;
-    transition: transform 0.2s, background 0.2s;
-}
-
-.track-item.card-track:hover {
-    transform: translateY(-5px);
-    background: #2a2a2a;
-    z-index: 2;
 }
 /* --- CORRECCIÓN LETRAS: Sin barra de scroll --- */
 .lyrics-scroll-area, .plain-lyrics, .lyrics-lines {
