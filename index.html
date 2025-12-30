@@ -78,10 +78,8 @@
 </head>
 
 <body>
-  <!-- ESTRUCTURA YT MUSIC -->
   <div class="app-container">
 
-    <!-- ===== SIDEBAR DESKTOP ===== -->
     <aside class="desktop-sidebar" id="desktopSidebar">
       <div class="sidebar-header">
         <button class="menu-toggle-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
@@ -98,7 +96,6 @@
       </nav>
     </aside>
 
-    <!-- ===== MAIN CONTENT ===== -->
     <main class="main-content">
       <header class="top-bar">
         <div class="sidebar-search">
@@ -111,8 +108,8 @@
       </header>
 
       <div class="content-area">
-        <!-- HOME, SEARCH y LIBRARY views -->
-        <div class="content-view active" id="homeView">
+        
+        <div class="content-view active view-section" id="homeView">
           <div class="welcome-section">
             <div class="welcome-icon"><i class="fas fa-music"></i></div>
             <h1 class="welcome-title">Bienvenido a YT CrossMix</h1>
@@ -127,111 +124,91 @@
           </div>
         </div>
 
-      <div class="content-view" id="searchView">
-      <div class="search-results-wrapper">
-        <div class="search-results-grid" id="searchResults">
-            <div class="search-placeholder">
+        <div class="content-view view-section" id="searchView">
+          <div class="search-results-wrapper">
+            <div class="search-results-grid" id="searchResults">
+              <div class="search-placeholder">
                 <i class="fas fa-search"></i>
                 <p>Busca música, artistas o playlists</p>
+              </div>
             </div>
+            <div id="search-sentinel" style="height: 20px; width: 100%;"></div>
           </div>
         </div>
-      </div>
 
-        <div class="content-view" id="libraryView">
+        <div class="content-view view-section" id="libraryView">
           <div class="carousel-section">
             <div class="carousel-header"><h2 class="carousel-title">Tu Biblioteca</h2></div>
             <div class="playlists-grid" id="playlistsGrid"></div>
           </div>
         </div>
 
-        <!-- MINI PLAYER FLOAT -->
-          <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
-            <i class="fas fa-expand"></i>
-          </button>
-        </div>
-
-        <!-- FULL PLAYER VIEW -->
-        <div class="content-view full-player-view" id="fullPlayerView">
-      <div class="player-queue-layout">
-    <!--  CONTENEDOR DE VIDEO -->
-    <div class="video-container-full">
-      <div class="video-wrapper" id="videoWrapper">
-      <div id="player1" class="video-player"></div>
-      <div id="player2" class="video-player hidden"></div>
-    </div>
-  </div>
-  <!--  COLUMNA DE COLA A LA DERECHA -->
-<div class="persistent-queue-sidebar">
-    <!-- Header de la Cola -->
-    <div class="queue-header">
-        <div class="queue-header-title">
-            <h3>Cola de reproducción</h3>
-            <span id="queueCount" class="queue-count-badge">0</span>
-        </div>
-        <button class="clear-queue-btn"
-                onclick="if(window.playlistManager) window.playlistManager.clearQueue()"
-                title="Limpiar cola">
-            <i class="fas fa-trash"></i>
+        <button class="mini-player-expand" onclick="window.unifiedCore?.switchView('fullPlayer')" title="Expandir">
+          <i class="fas fa-expand"></i>
         </button>
-    </div>
 
-    <!-- Tabs de Navegación -->
-    <div class="queue-tabs">
-        <button class="queue-tab active" data-tab="next" onclick="window.playlistManager?.switchQueueTab('next')">
-            <i class="fas fa-list"></i>
-            <span>Siguiente</span>
-        </button>
-        <button class="queue-tab" data-tab="lyrics" onclick="window.playlistManager?.switchQueueTab('lyrics')">
-            <i class="fas fa-music"></i>
-            <span>Letras</span>
-        </button>
-        <button class="queue-tab" data-tab="related" onclick="window.playlistManager?.switchQueueTab('related')">
-            <i class="fas fa-sparkles"></i>
-            <span>Relacionado</span>
-        </button>
-    </div>
-
-    <!-- CONTENIDO DE LOS TABS -->
-    <div class="queue-tab-content">
-        <!-- Tab: Siguiente (Cola) -->
-        <div id="queueContentList" class="queue-list-content active" data-tab-content="next">
-            <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
-        </div>
-
-        <!-- Tab: Letras -->
-        <div id="lyricsContent" class="queue-list-content" data-tab-content="lyrics">
-           
-          <div class="lyrics-container">
-                <div class="lyrics-header">
-                    <i class="fas fa-music"></i>
-                    <p>Letras no disponibles</p>
-                </div>
-                <p class="lyrics-info">Las letras aparecerán aquí cuando estén disponibles</p>
-            </div>
-        </div>
-
-        <!-- Tab: Relacionado -->
-        <div id="relatedContent" class="queue-list-content" data-tab-content="related">
-            <div class="related-container">
-                <div class="related-header">
-                    <i class="fas fa-sparkles"></i>
-                    <p>Videos relacionados</p>
-                </div>
-                <div id="relatedVideosList"></div>
+        <div class="content-view full-player-view view-section" id="fullPlayerView">
+          <div class="player-queue-layout">
+            
+            <div class="video-container-full">
+              <div class="video-wrapper" id="videoWrapper">
+                <div id="player1" class="video-player"></div>
+                <div id="player2" class="video-player hidden"></div>
               </div>
             </div>
-          </div>
-      </div>
-          </div>
-          </div>
-        </div>
-      </div><!-- content-area -->
-    </main>
-  </div><!-- cierre de app-container -->
 
-  <!-- ===== BOTTOM PLAYER (fuera del contenedor principal) ===== -->
-  <div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
+            <div class="persistent-queue-sidebar">
+              <div class="queue-header">
+                <div class="queue-header-title">
+                  <h3>Cola de reproducción</h3>
+                  <span id="queueCount" class="queue-count-badge">0</span>
+                </div>
+                <button class="clear-queue-btn" onclick="if(window.playlistManager) window.playlistManager.clearQueue()" title="Limpiar cola">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+
+              <div class="queue-tabs">
+                <button class="queue-tab active" data-tab="next" onclick="window.playlistManager?.switchQueueTab('next')">
+                  <i class="fas fa-list"></i>
+                  <span>Siguiente</span>
+                </button>
+                <button class="queue-tab" data-tab="lyrics" onclick="window.playlistManager?.switchQueueTab('lyrics')">
+                  <i class="fas fa-music"></i>
+                  <span>Letras</span>
+                </button>
+                <button class="queue-tab" data-tab="related" onclick="window.playlistManager?.switchQueueTab('related')">
+                  <i class="fas fa-sparkles"></i>
+                  <span>Relacionado</span>
+                </button>
+              </div>
+
+              <div class="queue-tab-content">
+                <div id="queueContentList" class="queue-list-content active" data-tab-content="next">
+                  <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+                </div>
+
+                <div id="lyricsContent" class="queue-list-content" data-tab-content="lyrics">
+                  <div class="lyrics-container">
+                    <div class="lyrics-header">
+                      <i class="fas fa-music"></i>
+                      <p>Letras no disponibles</p>
+                    </div>
+                    <p class="lyrics-info">Las letras aparecerán aquí cuando estén disponibles</p>
+                  </div>
+                </div>
+
+                <div id="relatedContent" class="queue-list-content" data-tab-content="related">
+                  <div class="related-container">
+                    <div class="related-header">
+                      <i class="fas fa-sparkles"></i>
+                      <p>Videos relacionados</p>
+                    </div>
+                    <div id="relatedVideosList"></div>
+                  </div>
+                </div>
+              </div> </div> </div> </div> </div></main>
+  </div><div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
     <div class="player-info">
       <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
       <div class="player-text">
@@ -262,7 +239,8 @@
       </div>
     </div>
   </div>
-<div id="persistent-player-layer" class="persistent-player-layer"></div>
+
+  <div id="persistent-player-layer" class="persistent-player-layer"></div>
   <!-- ===== FOOTER Y SCRIPTS ===== -->
   <footer class="page-footer">
     <p>Powered by <a href="https://sponsor.ajay.app/" target="_blank">SponsorBlock</a> • <a href="https://piped.video/" target="_blank">Piped API</a></p>
