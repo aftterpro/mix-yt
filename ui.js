@@ -331,19 +331,23 @@ showMiniPlayerFloat() {
             `;
         }
     }
-
- renderSearchResults(items, isContinuation = false) {
+renderSearchResults(items, isContinuation = false) {
     const container = this.elements.searchResults;
     if (!container) {
         console.error('❌ Contenedor searchResults no encontrado');
         return;
     }
 
-    // CORRECCIÓN: Validación robusta
+    // ✅ FORZAR VISIBILIDAD DEL CONTENEDOR
+    container.style.display = 'grid';
+    container.style.visibility = 'visible';
+    container.style.opacity = '1';
+
+    // Validar datos
     let videosToRender = [];
     
     if (!items) {
-        console.error('❌ UI: items es null/undefined');
+        console.error('❌ items es null/undefined');
         container.innerHTML = '<div class="search-placeholder"><p>No hay resultados</p></div>';
         return;
     }
@@ -353,24 +357,20 @@ showMiniPlayerFloat() {
     } else if (items && Array.isArray(items.items)) {
         videosToRender = items.items;
     } else {
-        console.error('❌ UI: Formato de datos desconocido:', items);
-        container.innerHTML = '<div class="search-placeholder"><p>Error: datos inválidos</p></div>';
+        console.error('❌ Formato inválido:', items);
+        container.innerHTML = '<div class="search-placeholder"><p>Error de datos</p></div>';
         return;
     }
 
-    // Filtrar videos inválidos
+    // Filtrar inválidos
     videosToRender = videosToRender.filter(video => {
         const hasValidId = video && (video.videoId || video.id) && 
                           (video.videoId !== 'undefined') && 
                           (video.id !== 'undefined');
-        
-        if (!hasValidId) {
-            console.warn('⚠️ Video sin ID válido omitido:', video);
-        }
-        
         return hasValidId;
     });
 
+    // Limpiar contenedor si es nueva búsqueda
     if (!isContinuation) {
         container.innerHTML = '';
     } else {
@@ -390,18 +390,37 @@ showMiniPlayerFloat() {
         return;
     }
 
-    console.log(`✅ Renderizando ${videosToRender.length} videos válidos`);
+    console.log(`✅ Renderizando ${videosToRender.length} videos`);
 
+    // Crear fragmento
     const fragment = document.createDocumentFragment();
     
     videosToRender.forEach(video => {
         const card = this.createSearchResultCard(video);
-        if (card) fragment.appendChild(card);
+        if (card) {
+            // ✅ FORZAR VISIBILIDAD DE CADA TARJETA
+            card.style.display = 'flex';
+            card.style.visibility = 'visible';
+            card.style.opacity = '1';
+            fragment.appendChild(card);
+        }
     });
 
     container.appendChild(fragment);
     
-    console.log(`✅ ${container.children.length} videos en el DOM`);
+    // ✅ VERIFICACIÓN FINAL
+    const totalCards = container.querySelectorAll('.search-result-card').length;
+    console.log(`✅ ${totalCards} tarjetas en DOM y visibles`);
+    
+    // ✅ Scroll al contenedor si es continuación
+    if (isContinuation && totalCards > 20) {
+        requestAnimationFrame(() => {
+            const lastCard = container.querySelector('.search-result-card:last-child');
+            if (lastCard) {
+                lastCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    }
 }
 createSearchResultCard(video) {
     // ✅ CORRECCIÓN: Validación robusta de videoId
