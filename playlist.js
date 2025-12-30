@@ -406,18 +406,12 @@ async loadPlaylistVideos(playlistId) {
     }
     
     try {
-        if (!window.gapi?.client?.youtube) {
-            console.error('❌ Google API no está disponible');
-            this.core?.showMessage('Error: API de YouTube no disponible', 'error');
-            return false;
-        }
-        
         this.core?.showMessage('Cargando videos...', 'info');
         
         let allVideos = [];
         let nextPageToken = null;
         
-        // ✅ PASO 1: Cargar metadata de la playlist
+        // PASO 1: Cargar metadata
         do {
             const response = await gapi.client.youtube.playlistItems.list({
                 part: ['snippet', 'contentDetails'],
@@ -428,17 +422,27 @@ async loadPlaylistVideos(playlistId) {
             
             if (response.result.items) {
                 const videos = response.result.items
-                    .map(item => ({
-                        videoId: item.contentDetails?.videoId,
-                        title: item.snippet?.title || 'Sin título',
-                        thumbnail: item.snippet?.thumbnails?.high?.url || 
-                                  item.snippet?.thumbnails?.default?.url || 
-                                  './electronic.ico',
-                        duration: 0, // Se obtendrá después
-                        uploaderName: item.snippet?.videoOwnerChannelTitle || 'YouTube',
-                        author: item.snippet?.videoOwnerChannelTitle || 'YouTube',
-                        sourcePlaylistId: playlistId
-                    }))
+                    .map(item => {
+                        const videoId = item.contentDetails?.videoId;
+                        const title = item.snippet?.title || 'Sin título';
+                        
+                        // ✅ CORRECCIÓN: Extraer artista del TÍTULO
+                        const artist = this.extractArtistFromTitle(title);
+                        
+                        return {
+                            videoId: videoId,
+                            title: title,
+                            thumbnail: item.snippet?.thumbnails?.high?.url || 
+                                      item.snippet?.thumbnails?.default?.url || 
+                                      './electronic.ico',
+                            duration: 0, // Se llenará después
+                            uploaderName: artist, // ✅ Artista extraído
+                            author: artist,        // ✅ Artista extraído
+                            artist: artist,        // ✅ Artista extraído
+                            channelTitle: item.snippet?.videoOwnerChannelTitle || 'YouTube',
+                            sourcePlaylistId: playlistId
+                        };
+                    })
                     .filter(v => v.videoId && !v.title.toLowerCase().includes('deleted'));
                 
                 allVideos.push(...videos);
@@ -450,44 +454,33 @@ async loadPlaylistVideos(playlistId) {
         
         console.log(`📦 ${allVideos.length} videos obtenidos, cargando duraciones...`);
         
-        // ✅ PASO 2: Obtener duraciones en lotes
+        // PASO 2: Obtener duraciones
         if (allVideos.length > 0 && this.core) {
-            try {
-                const videoIds = allVideos.map(v => v.videoId);
+            const videoIds = allVideos.map(v => v.videoId);
+            
+            for (let i = 0; i < videoIds.length; i += 50) {
+                const batch = videoIds.slice(i, i + 50);
                 
-                // Procesar en lotes de 50
-                for (let i = 0; i < videoIds.length; i += 50) {
-                    const batch = videoIds.slice(i, i + 50);
-                    
-                    console.log(`⏱️ Cargando duraciones del lote ${Math.floor(i/50) + 1}...`);
-                    
-                    const response = await gapi.client.youtube.videos.list({
-                        part: ['contentDetails'],
-                        id: batch.join(',')
+                const response = await gapi.client.youtube.videos.list({
+                    part: ['contentDetails'],
+                    id: batch.join(',')
+                });
+                
+                if (response.result.items) {
+                    response.result.items.forEach(videoData => {
+                        const video = allVideos.find(v => v.videoId === videoData.id);
+                        if (video && videoData.contentDetails?.duration) {
+                            video.duration = this.core.parseDuration(videoData.contentDetails.duration);
+                        }
                     });
-                    
-                    if (response.result.items) {
-                        response.result.items.forEach(videoData => {
-                            const video = allVideos.find(v => v.videoId === videoData.id);
-                            if (video && videoData.contentDetails?.duration) {
-                                // ✅ Usar parseDuration del core
-                                video.duration = this.core.parseDuration(videoData.contentDetails.duration);
-                                console.log(`✅ ${video.videoId}: ${video.duration}s`);
-                            }
-                        });
-                    }
                 }
-                
-                console.log(`✅ Duraciones cargadas para ${allVideos.length} videos`);
-            } catch (durationError) {
-                console.warn('⚠️ Error obteniendo duraciones:', durationError);
             }
         }
         
         playlist.videos = allVideos;
         playlist.isLoaded = true;
         
-        this.core?.showMessage(`${allVideos.length} videos cargados con duraciones`, 'success');
+        this.core?.showMessage(`${allVideos.length} videos cargados`, 'success');
         return true;
         
     } catch (error) {
@@ -496,6 +489,42 @@ async loadPlaylistVideos(playlistId) {
         return false;
     }
 }
+ extractArtistFromTitle(title) {
+    if (!title) return 'Desconocido';
+    
+    // Limpiar título
+    let cleanTitle = title
+        .replace(/\(official.*?video\)/gi, '')
+        .replace(/\(lyric.*?video\)/gi, '')
+        .replace(/\(visualizer\)/gi, '')
+        .replace(/\(audio\)/gi, '')
+        .replace(/\[official.*?\]/gi, '')
+        .trim();
+    
+    // Patrones de separación
+    const separators = [
+        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Artista - Título
+        /^(.+?)\s*:\s*(.+?)$/,      // Artista: Título
+        /^(.+?)\s*\|\s*(.+?)$/,     // Artista | Título
+    ];
+    
+    for (const pattern of separators) {
+        const match = cleanTitle.match(pattern);
+        if (match && match[1]) {
+            let artist = match[1].trim();
+            
+            // ✅ Validaciones
+            if (artist.length < 50 && 
+                artist !== 'YouTube' &&
+                artist !== 'Topic' &&
+                !artist.endsWith(' - Topic')) {
+                return artist;
+            }
+        }
+    }
+    
+    return 'Desconocido';
+}   
     /**
      * Eliminar video de la cola
      */
