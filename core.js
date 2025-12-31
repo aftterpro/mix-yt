@@ -1869,11 +1869,9 @@ async performSearch(searchQuery, continuation = null) {
     }
 
     try {
-        // ✅ CORRECCIÓN 4: Llamar a la función global de búsqueda
-        console.log(`📡 Llamando a search con: "${query}"`);
-        
-        const results = await window.search(query, continuation);
-        
+   
+        console.log(`📡 Llamando a YouTube Client con: "${query}"`);
+        const results = await window.youtubeJSClient.search(query, continuation);        
         console.log('📦 Resultados recibidos:', results);
         
         if (!results || !results.items || results.items.length === 0) {
