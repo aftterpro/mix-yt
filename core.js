@@ -887,31 +887,70 @@ setupControlButtons() {
     
     console.log('✅ Controles configurados correctamente');
 }
-    setupSearch() {
-        const searchInputs = [
-            document.getElementById('searchInput'),
-            document.getElementById('sidebarSearchInput'),
-            document.getElementById('mobileSearchInput')
-        ].filter(Boolean);
+  setupSearch() {
+    console.log('🔍 Configurando búsqueda...');
+    
+    const searchInputs = [
+        document.getElementById('searchInput'),
+        document.getElementById('sidebarSearchInput'),
+        document.getElementById('mobileSearchInput')
+    ].filter(Boolean);
 
-       const debouncedSearch = this.debounce((query) => {
-    this.performSearch(query);
-    }, 800); 
-
-        searchInputs.forEach(input => {
-            input.addEventListener('input', (event) => {
-                const query = event.target.value.trim();
-                if (query.length > 2) {
-                    debouncedSearch(query);
-                    if (this.currentView !== 'search') {
-                        this.switchView('search'); 
-                    }
-                } else {
-                    this.clearSearchResults();
-                }
-            });
-        });
+    if (searchInputs.length === 0) {
+        console.warn('⚠️ No se encontraron inputs de búsqueda');
+        return;
     }
+
+    const debouncedSearch = this.debounce((query) => {
+        console.log(`🔎 Debounced search ejecutado: "${query}"`);
+        
+        // ✅ CORRECCIÓN: Cambiar a vista de búsqueda primero
+        if (this.currentView !== 'search') {
+            this.switchView('search');
+        }
+        
+        // ✅ Esperar un tick para que el DOM se actualice
+        setTimeout(() => {
+            this.performSearch(query);
+        }, 100);
+    }, 800);
+
+    searchInputs.forEach(input => {
+        console.log(`✅ Configurando listener en: ${input.id}`);
+        
+        input.addEventListener('input', (event) => {
+            const query = event.target.value.trim();
+            
+            if (query.length > 2) {
+                console.log(`🔎 Input detectado: "${query}"`);
+                debouncedSearch(query);
+            } else if (query.length === 0) {
+                // Limpiar resultados si se borra la búsqueda
+                this.clearSearchResults();
+            }
+        });
+        
+        // ✅ AÑADIR: Listener para Enter
+        input.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                const query = event.target.value.trim();
+                if (query.length > 0) {
+                    console.log(`⏎ Enter presionado: "${query}"`);
+                    
+                    if (this.currentView !== 'search') {
+                        this.switchView('search');
+                    }
+                    
+                    setTimeout(() => {
+                        this.performSearch(query);
+                    }, 100);
+                }
+            }
+        });
+    });
+    
+    console.log('✅ Búsqueda configurada correctamente');
+}
 
     setupQueue() {
         const queueBtn = document.getElementById('queueButton');
@@ -1787,44 +1826,107 @@ async playNextVideo() {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
-async performSearch(queryParam, container, continuation = null) {
-  const input = document.getElementById('searchInput');
-      
-    if (!input || !container) {
-        console.error('❌ Elementos de búsqueda no encontrados');
+async performSearch(searchQuery, continuation = null) {
+    console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
+    
+    // ✅ CORRECCIÓN 1: Validar query primero
+    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+        console.error('❌ Query inválido:', searchQuery);
         return;
     }
-
-    const query = queryParam || input.value.trim();     
-    if (!query) {
-        console.warn('⚠️ Query vacío');
-        return;
+    
+    const query = searchQuery.trim();
+    
+    // ✅ CORRECCIÓN 2: Buscar contenedor con múltiples intentos
+    let container = document.getElementById('searchResults');
+    
+    if (!container) {
+        console.warn('⚠️ searchResults no encontrado, reintentando...');
+        
+        // Intentar con selector alternativo
+        container = document.querySelector('.search-results-grid') || 
+                    document.querySelector('#searchView .search-results-wrapper');
+        
+        if (!container) {
+            console.error('❌ No se encontró contenedor de resultados');
+            this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
+            return;
+        }
     }
+    
+    console.log('✅ Contenedor encontrado:', container.id || container.className);
 
-    console.log(`🔎 Iniciando búsqueda: "${query}"`);
-
-    // RESETEAR ESTADO GLOBAL
+    // ✅ CORRECCIÓN 3: Estado global antes de buscar
     window.currentSearchQuery = query;
-    window.currentNextPageToken = null;
-    isLoadingMore = false;
+    window.isLoadingMore = false;
     
-    // LIMPIAR RESULTADOS ANTERIORES
-    container.innerHTML = '<p style="color: white; text-align: center; padding: 20px;">Buscando...</p>';
+    // Si es una nueva búsqueda (no continuación)
+    if (!continuation) {
+        window.currentNextPageToken = null;
+        
+        // Limpiar resultados anteriores
+        container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    }
 
-    // PRIMERA BÚSQUEDA
-    const results = await searchYouTube(query);
-    
-    if (results.items && results.items.length > 0) {
-        container.innerHTML = ''; // Limpiar mensaje
-        displaySearchResults(results.items);
-        window.currentNextPageToken = results.nextPageToken;
+    try {
+        // ✅ CORRECCIÓN 4: Llamar a la función global de búsqueda
+        console.log(`📡 Llamando a searchYouTube con: "${query}"`);
         
-        // ACTIVAR SCROLL INFINITO
-        setupInfiniteScroll();
+        const results = await window.searchYouTube(query, continuation);
         
-        console.log(`✅ ${results.items.length} resultados iniciales mostrados`);
-    } else {
-        container.innerHTML = '<p style="color: white; text-align: center; padding: 20px;">No se encontraron resultados</p>';
+        console.log('📦 Resultados recibidos:', results);
+        
+        if (!results || !results.items || results.items.length === 0) {
+            if (!continuation) {
+                container.innerHTML = `
+                    <div class="search-placeholder">
+                        <i class="fas fa-search"></i>
+                        <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        // ✅ CORRECCIÓN 5: Si es la primera búsqueda, limpiar
+        if (!continuation) {
+            container.innerHTML = '';
+        }
+
+        // ✅ CORRECCIÓN 6: Renderizar resultados
+        console.log(`🎨 Renderizando ${results.items.length} resultados`);
+        
+        results.items.forEach(video => {
+            const card = this.createSearchResultCard(video);
+            if (card) {
+                container.appendChild(card);
+            }
+        });
+
+        // ✅ CORRECCIÓN 7: Guardar token para siguiente página
+        window.currentNextPageToken = results.nextPageToken || null;
+        
+        // ✅ CORRECCIÓN 8: Configurar scroll infinito
+        this.setupInfiniteScroll();
+        
+        console.log(`✅ ${results.items.length} resultados mostrados. NextToken: ${window.currentNextPageToken ? 'SÍ' : 'NO'}`);
+
+    } catch (error) {
+        console.error('❌ Error en performSearch:', error);
+        
+        if (!continuation) {
+            container.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error al buscar: ${error.message}</p>
+                    <button onclick="window.unifiedCore.performSearch('${this.escapeHTML(query)}')">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
+        }
+        
+        this.showMessage('Error en la búsqueda', 'error');
     }
 }
             
