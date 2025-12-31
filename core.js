@@ -1828,168 +1828,139 @@ async playNextVideo() {
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
 async performSearch(searchQuery, continuation = null) {
-    console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
-    
-    // ✅ CORRECCIÓN 1: Validar query primero
-    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
-        console.error('❌ Query inválido:', searchQuery);
-        return;
-    }
-    
-    const query = searchQuery.trim();
-    
-    // ✅ CORRECCIÓN 2: Buscar contenedor con múltiples intentos
-    let container = document.getElementById('searchResults');
-    
-    if (!container) {
-        console.warn('⚠️ searchResults no encontrado, reintentando...');
+        console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
         
-        // Intentar con selector alternativo
-        container = document.querySelector('.search-results-grid') || 
-                    document.querySelector('#searchView .search-results-wrapper');
+        if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+            console.error('❌ Query inválido:', searchQuery);
+            return;
+        }
         
+        const query = searchQuery.trim();
+        
+        // Buscar contenedor
+        let container = document.getElementById('searchResults');
         if (!container) {
-            console.error('❌ No se encontró contenedor de resultados');
-            this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
-            return;
-        }
-    }
-    
-    console.log('✅ Contenedor encontrado:', container.id || container.className);
-
-    // ✅ CORRECCIÓN 3: Estado global antes de buscar
-    window.currentSearchQuery = query;
-    window.isLoadingMore = false;
-    
-    // Si es una nueva búsqueda (no continuación)
-    if (!continuation) {
-        window.currentNextPageToken = null;
-        
-        // Limpiar resultados anteriores
-        container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
-    }
-
-    try {
-   
-        console.log(`📡 Llamando a YouTube Client con: "${query}"`);
-        const results = await window.youtubeJSClient.search(query, continuation);        
-        console.log('📦 Resultados recibidos:', results);
-        
-        if (!results || !results.items || results.items.length === 0) {
-            if (!continuation) {
-                container.innerHTML = `
-                    <div class="search-placeholder">
-                        <i class="fas fa-search"></i>
-                        <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
-                    </div>
-                `;
+            container = document.querySelector('.search-results-grid') || 
+                        document.querySelector('#searchView .search-results-wrapper');
+            if (!container) {
+                console.error('❌ No se encontró contenedor de resultados');
+                this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
+                return;
             }
-            return;
         }
-
-        // ✅ CORRECCIÓN 5: Si es la primera búsqueda, limpiar
+        
+        window.currentSearchQuery = query;
+        window.isLoadingMore = false;
+        
+        // Si es búsqueda nueva, limpiar todo
         if (!continuation) {
-            container.innerHTML = '';
+            window.currentNextPageToken = null;
+            container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
         }
 
-        // ✅ CORRECCIÓN 6: Renderizar resultados
-        console.log(`🎨 Renderizando ${results.items.length} resultados`);
-        
-        results.items.forEach(video => {
-            const card = this.createSearchResultCard(video);
-            if (card) {
-                container.appendChild(card);
+        try {
+            console.log(`📡 Llamando a YouTube Client con: "${query}"`);
+            const results = await window.youtubeJSClient.search(query, continuation);        
+            
+            // Si es búsqueda nueva, limpiar el loader
+            if (!continuation) {
+                container.innerHTML = '';
             }
+
+            if (!results || !results.items || results.items.length === 0) {
+                if (!continuation) {
+                    container.innerHTML = `
+                        <div class="search-placeholder">
+                            <i class="fas fa-search"></i>
+                            <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+
+            console.log(`🎨 Renderizando ${results.items.length} resultados`);
+            
+            // 1. Renderizar tarjetas
+            results.items.forEach(video => {
+                const card = this.createSearchResultCard(video);
+                if (card) {
+                    container.appendChild(card);
+                }
+            });
+
+            // 2. Guardar token
+            window.currentNextPageToken = results.nextPageToken || null;
+            
+            // 3. ✅ AGREGAR SENTINEL (Elemento invisible al final para detectar scroll)
+            if (window.currentNextPageToken) {
+                let sentinel = document.getElementById('scrollSentinel');
+                if (!sentinel) {
+                    sentinel = document.createElement('div');
+                    sentinel.id = 'scrollSentinel';
+                    sentinel.style.width = '100%';
+                    sentinel.style.height = '20px';
+                    sentinel.style.margin = '10px 0';
+                    // sentinel.style.background = 'red'; // Descomentar para debug
+                }
+                // Mover siempre al final
+                container.appendChild(sentinel);
+                
+                // 4. ✅ Configurar observador (Pasando el container)
+                this.setupInfiniteScroll(container);
+            }
+
+        } catch (error) {
+            console.error('❌ Error en performSearch:', error);
+            if (!continuation) {
+                container.innerHTML = `<div class="search-error"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+    }
+            
+    setupInfiniteScroll(container) {
+        console.log('📜 Configurando scroll infinito...');
+
+        if (!container) {
+            console.error('❌ setupInfiniteScroll: Contenedor no proporcionado');
+            return;
+        }
+
+        const sentinel = document.getElementById('scrollSentinel');
+        if (!sentinel) {
+            console.warn('⚠️ Sentinel no encontrado, no se puede configurar scroll');
+            return;
+        }
+
+        // Limpiar observador anterior
+        if (this.searchScrollObserver) {
+            this.searchScrollObserver.disconnect();
+        }
+
+        // Crear nuevo observador
+        this.searchScrollObserver = new IntersectionObserver(async (entries) => {
+            const entry = entries[0];
+            
+            if (entry.isIntersecting && 
+                !window.isLoadingMore && 
+                window.currentNextPageToken && 
+                window.currentSearchQuery) {
+                
+                console.log('📜 Scroll detectado: Cargando siguiente página...');
+                window.isLoadingMore = true; // Evitar múltiples cargas
+                
+                // ✅ Usar performSearch recursivamente para la siguiente página
+                await this.performSearch(window.currentSearchQuery, window.currentNextPageToken);
+            }
+        }, {
+            root: null, // Viewport
+            rootMargin: '200px', // Cargar 200px antes de llegar al final
+            threshold: 0.1
         });
 
-        // ✅ CORRECCIÓN 7: Guardar token para siguiente página
-        window.currentNextPageToken = results.nextPageToken || null;
-        
-        // ✅ CORRECCIÓN 8: Configurar scroll infinito
-        this.setupInfiniteScroll();
-        
-        console.log(`✅ ${results.items.length} resultados mostrados. NextToken: ${window.currentNextPageToken ? 'SÍ' : 'NO'}`);
-
-    } catch (error) {
-        console.error('❌ Error en performSearch:', error);
-        
-        if (!continuation) {
-            container.innerHTML = `
-                <div class="search-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error al buscar: ${error.message}</p>
-                    <button onclick="window.unifiedCore.performSearch('${this.escapeHTML(query)}')">
-                        <i class="fas fa-redo"></i> Reintentar
-                    </button>
-                </div>
-            `;
-        }
-        
-        this.showMessage('Error en la búsqueda', 'error');
+        this.searchScrollObserver.observe(sentinel);
+        console.log('✅ Observador de scroll activado');
     }
-}
-            
-setupInfiniteScroll(container) {
-    console.log('📜 Configurando scroll infinito...');
-
-    const sentinel = document.getElementById('scrollSentinel');
-   
-    
-    if (!sentinel) {
-        console.error('❌ Sentinel no encontrado');
-        return;
-    }
-
-    if (!container) {
-        console.error('❌ Contenedor searchResults no encontrado');
-        return;
-    }
-
-    // LIMPIAR OBSERVADOR ANTERIOR
-    if (window.scrollObserver) {
-        window.scrollObserver.disconnect();
-        console.log('🧹 Observador anterior desconectado');
-    }
-
-    window.scrollObserver = new IntersectionObserver(async (entries) => {
-        const entry = entries[0];
-        
-        // CONDICIONES PARA CARGAR MÁS:
-        // 1. Sentinel visible
-        // 2. NO está cargando
-        // 3. HAY token de siguiente página
-        // 4. HAY query actual
-        if (entry.isIntersecting && 
-            !isLoadingMore && 
-            window.currentNextPageToken && 
-            window.currentSearchQuery) {
-            
-            console.log('📜 Cargando siguiente página...');
-            
-            const results = await searchYouTube(window.currentSearchQuery, window.currentNextPageToken);
-            
-            if (results.items && results.items.length > 0) {
-                displaySearchResults(results.items);
-                window.currentNextPageToken = results.nextPageToken;
-                
-                if (!results.nextPageToken) {
-                    console.log('🏁 No hay más páginas disponibles');
-                }
-            } else {
-                console.log('🏁 No hay más resultados');
-                window.currentNextPageToken = null;
-            }
-        }
-    }, {
-        root: null,
-        rootMargin: '200px', // Cargar antes de llegar al final
-        threshold: 0.1
-    });
-
-    window.scrollObserver.observe(sentinel);
-    console.log('✅ Observador configurado');
-}
-
 displaySearchResults(videos, container) {
     if (!container) {
         console.error('❌ Contenedor searchResults no encontrado');
@@ -2400,7 +2371,6 @@ updatePersistentQueue() {
     this.updateQueueCount(flatList.length);
     
     // ===== EVENT DELEGATION (OPTIMIZADO) =====
-    // Remover listener anterior (si existe)
     const oldList = queueContentList.cloneNode(true);
     queueContentList.parentNode.replaceChild(oldList, queueContentList);
     
@@ -2409,23 +2379,31 @@ updatePersistentQueue() {
     
     if (freshList) {
         // ===== CLICK EN ITEMS =====
-        freshList.addEventListener('click', (e) => {
-            // Ignorar clicks en botones de eliminar
-            if (e.target.closest('.queue-item-remove')) {
-                return;
+    freshList.addEventListener('click', (e) => {
+        // Ignorar clicks en botones de eliminar
+        if (e.target.closest('.queue-item-remove')) {
+            return;
+        }
+        
+        const item = e.target.closest('.queue-item');
+        if (!item) return;
+        
+        const index = parseInt(item.dataset.flatIndex);
+        if (!isNaN(index) && index >= 0) {
+            console.log(`▶️ Reproduciendo desde cola: índice ${index}`);
+           
+            window.currentPlayingInfo.flattenedIndex = index - 1;
+ 
+            if (!window.reproduccionIniciada) {
+                window.reproduccionIniciada = true;
+                if (typeof monitorPlayers === 'function' && !window.monitorInterval) {
+                     // monitorInterval es una variable global en core.js
+                     window.monitorInterval = setInterval(monitorPlayers, 500);
+                }
             }
-            
-            const item = e.target.closest('.queue-item');
-            if (!item) return;
-            
-            const index = parseInt(item.dataset.flatIndex);
-            if (!isNaN(index) && index >= 0) {
-                console.log(`▶️ Reproduciendo desde cola: índice ${index}`);
-               
-            playNextVideo(index);
-               
-            }
-        });
+                     this.playNextVideo();
+        }
+    });
         
         // ===== BOTONES DE ELIMINAR =====
         freshList.querySelectorAll('.queue-item-remove').forEach(btn => {
