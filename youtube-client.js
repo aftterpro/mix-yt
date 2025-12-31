@@ -18,7 +18,7 @@ class YouTubeSimplifiedClient {
     async search(query, continuation = null) {
         if (!query?.trim()) {
             console.error('❌ Query vacío');
-            return { items: [], nextPageToken: null };
+            return { items: [], continuation: null };
         }
 
         const cacheKey = `${query}_${continuation || 'first'}`;
@@ -32,16 +32,16 @@ class YouTubeSimplifiedClient {
         // ✅ Usar this.isLoadingMore
         if (this.isLoadingMore && continuation) {
             console.log('⏳ Ya hay una carga en progreso...');
-            return { items: [], nextPageToken: null };
+            return { items: [], continuation: null };
         }
 
         this.isLoadingMore = true; // ✅ Bloquear
 
-    console.log(`🔍 Buscando: "${query}"${nextPageToken ? ' (Pág. siguiente)' : ''}`);
+    console.log(`🔍 Buscando: "${query}"${continuation ? ' (Pág. siguiente)' : ''}`);
     
     const params = new URLSearchParams({ q: query });
-    if (nextPageToken) {
-        params.append('nextpage', nextPageToken);
+    if (continuation) {
+        params.append('nextpage', continuation);
     }
 
     const url = `https://mix-yt.netlify.app/.netlify/functions/search?${params}`;
@@ -56,14 +56,14 @@ class YouTubeSimplifiedClient {
         if (!data?.items?.length) {
             console.warn('⚠️ Sin resultados');
             isLoadingMore = false;
-            return { items: [], nextPageToken: null };
+            return { items: [], continuation: null };
         }
 
         console.log(`✅ ${data.items.length} resultados encontrados`);
 
         const result = {
             items: data.items,
-            nextPageToken: data.nextPageToken || null
+            continuation: data.continuation || null
         };
 
         searchCache.set(cacheKey, result);
@@ -79,7 +79,7 @@ class YouTubeSimplifiedClient {
     } catch (error) {
         console.error('❌ Error en búsqueda:', error);
         isLoadingMore = false;
-        return { items: [], nextPageToken: null };
+        return { items: [], continuation: null };
     }
 }
 
