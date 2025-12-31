@@ -1796,8 +1796,7 @@ async performSearch(queryParam, continuation = null) {
         return;
     }
 
-    const query = input.value.trim();
-    
+    const query = queryParam || input.value.trim();     
     if (!query) {
         console.warn('⚠️ Query vacío');
         return;
