@@ -1787,7 +1787,7 @@ async playNextVideo() {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
-async performSearch(query, continuation = null) {
+async performSearch(queryParam, continuation = null) {
   const input = document.getElementById('searchInput');
     const container = document.getElementById('searchResults');
     
