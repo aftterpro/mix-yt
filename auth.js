@@ -583,46 +583,54 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 
     try {
         do {
-            // 1. Obtener lista básica (1 unidad)
             const response = await gapi.client.youtube.playlistItems.list({
                 playlistId: playlistId,
-                part: 'snippet,contentDetails', // contentDetails aquí solo da el ID, no la duración
+                part: 'snippet,contentDetails',
                 maxResults: 50,
                 pageToken: nextPageToken
             });
 
             const items = response.result.items;
-            const videoIds = [];
-            
-            // Recolectar IDs válidos
-            items.forEach(item => {
-                const vidId = item.snippet?.resourceId?.videoId;
-                if (vidId) videoIds.push(vidId);
-            });
+            const videoIds = items.map(item => item.snippet?.resourceId?.videoId).filter(Boolean);
 
-            // 2. Obtener duraciones reales (1 unidad extra por cada 50 videos - ¡Muy barato!)
+            // 1. Obtener duraciones reales
             let durationsMap = {};
             if (videoIds.length > 0) {
                 const videosResponse = await gapi.client.youtube.videos.list({
                     part: 'contentDetails',
                     id: videoIds.join(',')
                 });
-                
                 videosResponse.result.items.forEach(v => {
                     durationsMap[v.id] = parseDuration(v.contentDetails.duration);
                 });
             }
 
-            // 3. Unir datos
+            // 2. Unir datos con LIMPIEZA DE ARTISTA
             items.forEach(item => {
                 const vidId = item.snippet?.resourceId?.videoId;
+                const title = item.snippet.title;
+                
                 if (vidId && durationsMap[vidId]) {
+                    let rawArtist = item.snippet.videoOwnerChannelTitle || '';
+                    let cleanArtist = rawArtist.replace(/\s*-\s*Topic$/i, '').trim();
+
+                    if (!cleanArtist || 
+                        cleanArtist.toLowerCase() === 'youtube' || 
+                        cleanArtist.toLowerCase() === 'youtube music') {
+                        
+                        if (title.includes(' - ')) {
+                            cleanArtist = title.split(' - ')[0].trim();
+                        } else {
+                            cleanArtist = 'Artista Desconocido';
+                        }
+                    }
+
                     videos.push({
                         videoId: vidId,
-                        title: item.snippet.title,
+                        title: title,
                         thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
-                        duration: durationsMap[vidId], // ¡Aquí tendrás la duración real!
-                        artist: item.snippet.videoOwnerChannelTitle,
+                        duration: durationsMap[vidId],
+                        artist: cleanArtist, 
                         source: 'youtube_library',
                         playlistId: playlistId
                     });
@@ -634,7 +642,7 @@ async function getYouTubeLibraryPlaylistItems(playlistId) {
 
         return videos;
     } catch (error) {
-        console.error("Error cargando playlist:", error);
+        console.error("❌ Error cargando playlist de YouTube:", error);
         return [];
     }
 }
