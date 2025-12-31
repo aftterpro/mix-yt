@@ -6,17 +6,6 @@ console.log('🎵 Cargando gestor de playlists...');
 class PlaylistManager {
     constructor(core) {
     this.core = core;
-    // Usar SIEMPRE la referencia del core
-    Object.defineProperty(this, 'playlistsData', {
-        get() { return this.core?.playlistsData || []; },
-        set(value) { 
-            if (this.core) {
-                this.core.playlistsData = value;
-                window.playlistsData = value;
-            }
-        }
-    });
-    
     this.lyricsProvider = localStorage.getItem('ytcm_lyrics_provider') || 'lrclib';
     this.lastLoadedLyricsId = null;
     this.currentLrc = [];
@@ -57,7 +46,7 @@ class PlaylistManager {
         // 1. Intentar cargar desde el Core (si ya tiene datos)
         if (this.core && this.core.playlistsData && this.core.playlistsData.length > 0) {
             console.log('✅ Usando datos existentes del Core');
-            this.playlistsData = this.core.playlistsData; // Sincronizar referencia
+            this.core.playlistsData = this.core.playlistsData; // Sincronizar referencia
         } 
         // 2. Si no, intentar cargar desde localStorage (persistencia propia de playlist.js si existiera)
         else {
@@ -67,19 +56,19 @@ class PlaylistManager {
             if (storedData) {
                 try {
                     const parsed = JSON.parse(storedData);
-                    this.playlistsData = parsed.data || [];
-                    console.log(`✅ ${this.playlistsData.length} playlists recuperadas de localStorage local`);
+                    this.core.playlistsData = parsed.data || [];
+                    console.log(`✅ ${this.core.playlistsData.length} playlists recuperadas de localStorage local`);
                 } catch (e) {
                     console.warn('⚠️ Error al leer localStorage local, iniciando vacío');
-                    this.playlistsData = [];
+                    this.core.playlistsData = [];
                 }
             } else {
-                this.playlistsData = [];
+                this.core.playlistsData = [];
             }
         }
 
         // 3. Asegurar que existe la Cola de Reproducción
-        let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+        let queue = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
         if (!queue) {
             console.log('✨ Creando cola de reproducción inicial');
             queue = {
@@ -90,11 +79,11 @@ class PlaylistManager {
                 isExpanded: true,
                 isQueue: true
             };
-            this.playlistsData.unshift(queue); // Añadir al principio
+            this.core.playlistsData.unshift(queue); // Añadir al principio
         }
 
         // 4. Asegurar que existe la Playlist Manual
-        let manual = this.playlistsData.find(p => p.id === 'manual');
+        let manual = this.core.playlistsData.find(p => p.id === 'manual');
         if (!manual) {
             manual = {
                 id: 'manual',
@@ -103,16 +92,16 @@ class PlaylistManager {
                 videos: [],
                 isExpanded: true
             };
-            this.playlistsData.push(manual);
+            this.core.playlistsData.push(manual);
         }
 
         // 5. Sincronizar de vuelta al Core para que ambos compartan la misma referencia
         if (this.core) {
-            this.core.playlistsData = this.playlistsData;
+            this.core.playlistsData = this.core.playlistsData;
         }
         
         // Asignar alias para compatibilidad con código que use this.playlists
-        this.playlists = this.playlistsData; 
+        this.playlists = this.core.playlistsData; 
     }
 
     /**
@@ -210,11 +199,11 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
 
     // 2. SINCRONIZACIÓN CRÍTICA CON CORE
     if (this.core && this.core.playlistsData) {
-        this.playlistsData = this.core.playlistsData;
+        this.core.playlistsData = this.core.playlistsData;
     }
 
     // 3. OBTENCIÓN DE LA COLA
-    let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    let queue = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
 
     if (!queue) {
         console.log('✨ Creando cola nueva...');
@@ -226,8 +215,8 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
             isExpanded: true,
             isQueue: true
         };
-        this.playlistsData.unshift(queue);
-        if (this.core) this.core.playlistsData = this.playlistsData;
+        this.core.playlistsData.unshift(queue);
+        if (this.core) this.core.playlistsData = this.core.playlistsData;
     }
 
     // 4. NORMALIZAR DATOS
@@ -323,7 +312,7 @@ handleLibraryItemClick(item, isPlaylist) {
             return;
         }
 
-        let queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+        let queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
         
         if (!queuePlaylist) {
             queuePlaylist = {
@@ -334,7 +323,7 @@ handleLibraryItemClick(item, isPlaylist) {
                 isExpanded: true,
                 isQueue: true
             };
-            this.playlistsData.unshift(queuePlaylist);
+            this.core.playlistsData.unshift(queuePlaylist);
         }
 
         // Verificar duplicados
@@ -394,7 +383,7 @@ handleLibraryItemClick(item, isPlaylist) {
 async loadPlaylistVideos(playlistId) {
     console.log(`📥 Cargando videos de playlist: ${playlistId}`);
     
-    const playlist = this.playlistsData.find(p => p.id === playlistId);
+    const playlist = this.core.playlistsData.find(p => p.id === playlistId);
     if (!playlist) {
         console.error(`❌ Playlist ${playlistId} no encontrada`);
         return false;
@@ -529,136 +518,68 @@ async loadPlaylistVideos(playlistId) {
      * Eliminar video de la cola
      */
 
+// Reemplazar línea 250-350 en playlist.js
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ removeVideoFromQueue: ${videoId}`);
     
-    // ✅ VALIDACIÓN MEJORADA
+    // Validación
     if (!videoId || videoId === 'undefined' || typeof videoId !== 'string') {
         console.error('❌ videoId inválido:', videoId);
         return false;
     }
     
-    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-    if (!queuePlaylist || !queuePlaylist.videos) {
+    const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    if (!queuePlaylist?.videos) {
         console.error('❌ Cola no encontrada');
         return false;
     }
     
-    const videoIndex = queuePlaylist.videos.findIndex(v => v && v.videoId === videoId);
+    const videoIndex = queuePlaylist.videos.findIndex(v => v?.videoId === videoId);
     
     if (videoIndex === -1) {
         console.error(`❌ Video ${videoId} no encontrado en cola`);
         return false;
     }
     
+    // Eliminar
     const removedVideo = queuePlaylist.videos[videoIndex];
-    const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-    const wasCurrentlyPlaying = (currentIndex === videoIndex);
-    
-    console.log(`🗑️ Eliminando: "${removedVideo.title}" (índice ${videoIndex})`);
-    console.log(`📊 Estado antes: currentIndex=${currentIndex}, queueLength=${queuePlaylist.videos.length}`);
-    
-    // ✅ ELIMINAR VIDEO
     queuePlaylist.videos.splice(videoIndex, 1);
+    
+    // Invalidar caché
     if (this.core && typeof this.core.invalidateFlattenedCache === 'function') {
-    this.core.invalidateFlattenedCache();
-    }
-    console.log(`✅ Eliminado. Quedan ${queuePlaylist.videos.length} videos`);
-    
-    // ✅ AJUSTAR ÍNDICE DE REPRODUCCIÓN
-    if (wasCurrentlyPlaying) {
-        console.log('⚠️ Video eliminado era el que estaba sonando');
-        
-        if (queuePlaylist.videos.length > 0) {
-            // Calcular nuevo índice
-            let newIndex = videoIndex;
-            if (newIndex >= queuePlaylist.videos.length) {
-                newIndex = queuePlaylist.videos.length - 1;
-            }
-            
-            // Actualizar índice global
-            if (window.currentPlayingInfo) {
-                window.currentPlayingInfo.flattenedIndex = newIndex;
-                window.currentPlayingInfo.videoId = queuePlaylist.videos[newIndex].videoId;
-            }
-            
-            console.log(`📊 Nuevo índice: ${newIndex}`);
-            
-            // Reproducir siguiente video después de un breve delay
-            setTimeout(() => {
-                const nextVideo = queuePlaylist.videos[newIndex];
-                if (nextVideo && this.core?.playVideoAtIndex) {
-                    this.core.playVideoAtIndex(newIndex);
-                }
-            }, 300);
-        } else {
-            // Cola vacía
-            console.log('📭 Cola vacía después de eliminar');
-            this.core?.handleEmptyPlaylist?.();
-        }
-    } else if (window.currentPlayingInfo && videoIndex < currentIndex) {
-        // Si eliminamos un video ANTES del actual, ajustar índice
-        window.currentPlayingInfo.flattenedIndex = currentIndex - 1;
-        console.log(`📊 Índice ajustado a: ${window.currentPlayingInfo.flattenedIndex}`);
+        this.core.invalidateFlattenedCache();
     }
     
-    // ✅ ELIMINAR ELEMENTO DEL DOM CON ANIMACIÓN
-    const queueItems = document.querySelectorAll(`.queue-item[data-video-id="${videoId}"]`);
-    queueItems.forEach(item => {
-        item.classList.add('removing');
-        setTimeout(() => item.remove(), 300);
-    });
+    // Actualizar UI
+    this.updatePlaylistsUI();
     
-    // ✅ ACTUALIZAR UI (después de la animación)
-    setTimeout(() => {
-        this.updatePlaylistsUI();
-        this.updateQueuePopup();
-        
-        if (this.core && this.core.updatePersistentQueue) {
-            this.core.updatePersistentQueue();
-        }
-        
-        this.core?.updateNowPlaying?.();
-        
-        // Sincronizar indicadores
-        if (window.playlistManager?.syncQueueIndicator) {
-            window.playlistManager.syncQueueIndicator();
-        }
-        
-        // Re-activar drag & drop
-        if (window.queueDragDrop) {
-            setTimeout(() => {
-                window.queueDragDrop.attachDragListeners();
-            }, 100);
-        }
-    }, 350);
+    if (this.core) {
+        this.core.updatePersistentQueue();
+        this.core.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+    }
     
-    // ✅ GUARDAR CAMBIOS
+    // Guardar
     setTimeout(() => {
         if (typeof window.saveAllData === 'function') {
             window.saveAllData();
         }
-    }, 400);
-    
-    this.core?.showMessage(`Eliminado: ${removedVideo.title}`, 'success');
+    }, 100);
     
     return true;
 }
-    
 // =============================================
 // GESTIÓN DE TABS EN LA COLA
 // =============================================
 switchQueueTab(tabName) {
-    console.log(`🔄 Cambiando a tab: ${tabName}`);
-    
-    // 1. Detener sincronización de letras si salimos
+   console.log(`🔄 Cambiando a tab: ${tabName}`);
     if (tabName !== 'lyrics') {
         if (this.lyricsSyncInterval) {
             clearInterval(this.lyricsSyncInterval);
             this.lyricsSyncInterval = null;
+            console.log('🛑 Sincronización detenida al cambiar de tab');
         }
     }
-    
+      
     // 2. Actualizar UI
     document.querySelectorAll('.queue-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -826,7 +747,7 @@ refreshActiveQueueTab() {
     }
     
     // ✅ BÚSQUEDA DIRECTA Y SEGURA (sin llamar a getFlattenedPlaylist)
-    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+    const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
     
     if (!queuePlaylist || !queuePlaylist.videos) {
         console.warn('⚠️ Cola no encontrada');
@@ -903,9 +824,6 @@ startLyricsSync() {
         this.lyricsSyncInterval = null;
     }
     
-    // ✅ RESETEAR ÍNDICE
-    this.lastActiveLineIndex = -1;
-    
     console.log('🎵 Iniciando sincronización de letras...');
     
     // ✅ VALIDAR QUE HAY LETRAS
@@ -914,24 +832,22 @@ startLyricsSync() {
         return;
     }
     
-    // ✅ INTERVALO DE SINCRONIZACIÓN (250ms = 4 veces/segundo)
+    // ✅ RESETEAR ÍNDICE
+    this.lastActiveLineIndex = -1;
+    
     this.lyricsSyncInterval = setInterval(() => {
         this.syncLyricsLine();
     }, 250);
     
-    console.log('✅ Sincronización activa (ID:', this.lyricsSyncInterval, ')');
+    console.log('✅ Sincronización activa');
 }
 
-    /**
-     * Sincroniza la línea activa de la letra con el tiempo del video
-     */
 syncLyricsLine() {
     // ===== VALIDACIONES =====
     if (!this.core || !this.currentLrc || this.currentLrc.length === 0) {
         return;
     }
 
-    // ===== DETECTAR REPRODUCTOR ACTIVO =====
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getCurrentTime !== 'function') {
@@ -941,8 +857,8 @@ syncLyricsLine() {
     const currentTime = activePlayer.getCurrentTime();
     const container = document.getElementById('syncedLyricsContainer');
     
+    // ✅ Si el contenedor ya no existe, detener sincronización
     if (!container) {
-        // ✅ Si el contenedor ya no existe, detener sincronización
         if (this.lyricsSyncInterval) {
             clearInterval(this.lyricsSyncInterval);
             this.lyricsSyncInterval = null;
@@ -972,12 +888,11 @@ syncLyricsLine() {
     const allLines = container.querySelectorAll('p');
     
     allLines.forEach((line, index) => {
-        line.className = ''; // Limpiar todas las clases
+        line.className = '';
         
         if (index === activeLineIndex) {
             line.classList.add('active');
             
-            // ✅ SCROLL SUAVE AL CENTRO (tipo Spotify)
             line.scrollIntoView({ 
                 behavior: 'smooth', 
                 block: 'center',
@@ -1509,7 +1424,7 @@ toggleLyricsProvider() {
     
     // ✅ CORRECCIÓN: Limpiar caché del video actual
     const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-    const queue = this.playlistsData.find(p => p.id === 'queue');
+    const queue = this.core.playlistsData.find(p => p.id === 'queue');
     const currentVideo = queue?.videos[currentIndex];
     
     if (currentVideo) {
@@ -1787,7 +1702,7 @@ async translateLyrics() {
     container.innerHTML = '';
     
     // ✅ FILTRAR: NO MOSTRAR LA COLA EN BIBLIOTECA
-    const visiblePlaylists = this.playlistsData.filter(p => 
+    const visiblePlaylists = this.core.playlistsData.filter(p => 
         p.id !== 'queue' && !p.isQueue
     );
     
@@ -1822,7 +1737,7 @@ updateQueueUI() {
     console.log('🔄 Actualizando interfaz de cola...');
     
     // 1. Obtener datos actualizados
-    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+    const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     const videos = queuePlaylist ? queuePlaylist.videos : [];
     
     // 2. Actualizar contadores globales
@@ -1893,7 +1808,7 @@ updateQueueUI() {
      */
     clearQueue() {
         if (confirm('¿Estás seguro de que quieres borrar toda la cola?')) {
-            const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+            const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
             if (queuePlaylist) {
                 queuePlaylist.videos = [];
             }
@@ -1908,10 +1823,6 @@ updateQueueUI() {
             }
         }
     }
-// =============================================
-// CORRECCIÓN: Videos Relacionados en playlist.js
-// Reemplazar loadRelatedVideos() y funciones relacionadas
-// =============================================
 
 async loadRelatedVideos() {
     const relatedList = document.getElementById('relatedVideosList');
@@ -1926,7 +1837,6 @@ async loadRelatedVideos() {
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
         relatedList.innerHTML = `<p class="related-placeholder">No hay video reproduciéndose</p>`;
-        this.lastLoadedRelatedId = null;
         return;
     }
     
@@ -1935,7 +1845,6 @@ async loadRelatedVideos() {
     
     if (!currentVideoId) {
         relatedList.innerHTML = `<p class="related-placeholder">Reproduce una canción</p>`;
-        this.lastLoadedRelatedId = null;
         return;
     }
 
@@ -1970,15 +1879,9 @@ async loadRelatedVideos() {
     }
 
     this.lastLoadedRelatedId = currentVideo.videoId;
-    relatedList.innerHTML = `
-        <div class="related-loading">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Cargando sugerencias...</p>
-        </div>
-    `;
+    relatedList.innerHTML = `<div class="related-loading"><i class="fas fa-spinner fa-spin"></i><p>Cargando sugerencias...</p></div>`;
 
     try {
-        // ✅ CORRECCIÓN: Usar extractArtistFromTitle correctamente
         const artist = this.extractArtistFromTitle(currentVideo.title);
         const searchQuery = artist !== 'Desconocido' ? artist : currentVideo.title;
         
@@ -1990,18 +1893,12 @@ async loadRelatedVideos() {
             throw new Error('Sin resultados');
         }
         
-        // Filtrar video actual y limitar a 15
         const relatedVideos = searchResults.items
             .filter(video => video.videoId !== currentVideo.videoId)
             .slice(0, 15);
         
         if (relatedVideos.length === 0) {
-            relatedList.innerHTML = `
-                <div class="related-placeholder">
-                    <i class="fas fa-music-slash"></i>
-                    <p>No se encontraron videos relacionados</p>
-                </div>
-            `;
+            relatedList.innerHTML = `<div class="related-placeholder"><i class="fas fa-music-slash"></i><p>No se encontraron videos relacionados</p></div>`;
             return;
         }
         
@@ -2009,17 +1906,9 @@ async loadRelatedVideos() {
 
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
-        relatedList.innerHTML = `
-            <div class="related-error">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>No se pudieron cargar sugerencias</p>
-                <small>${error.message}</small>
-            </div>
-        `;
+        relatedList.innerHTML = `<div class="related-error"><i class="fas fa-exclamation-triangle"></i><p>No se pudieron cargar sugerencias</p></div>`;
     }
 }
-
-// ✅ CORRECCIÓN: renderRelatedVideos con duraciones correctas
 renderRelatedVideos(videos, container) {
     if (!videos || videos.length === 0) {
         container.innerHTML = '<p class="related-placeholder">Sin videos para mostrar</p>';
@@ -2413,7 +2302,7 @@ renderQueueContent(flatList) {
     }
     
     // ✅ Obtener playlist actualizada
-    const updatedPlaylist = this.playlistsData.find(p => p.id === playlistId);
+    const updatedPlaylist = this.core.playlistsData.find(p => p.id === playlistId);
     
     if (!updatedPlaylist?.videos?.length) {
         this.core?.showMessage('La playlist está vacía', 'error');
@@ -2437,7 +2326,7 @@ renderQueueContent(flatList) {
         };
         
         // ✅ Verificar duplicados
-        const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+        const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
         const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
         
         if (!isDuplicate) {
@@ -2471,7 +2360,7 @@ renderQueueContent(flatList) {
             
             console.log(`🗑️ Solicitud eliminar playlist: ${playlistId}`);
             
-            const playlistToDelete = this.playlistsData.find(p => p.id === playlistId);
+            const playlistToDelete = this.core.playlistsData.find(p => p.id === playlistId);
             if (playlistToDelete) {
                 const confirmMessage = isYouTubeLibrary 
                     ? `¿Eliminar "${playlistToDelete.name}" de la biblioteca? (Solo se elimina de la app, no de YouTube)`
@@ -2515,7 +2404,7 @@ renderQueueContent(flatList) {
      * Eliminar playlist
      */
     deletePlaylist(playlistId) {
-        const playlist = this.playlistsData.find(p => p.id === playlistId);
+        const playlist = this.core.playlistsData.find(p => p.id === playlistId);
         if (!playlist) {
             console.warn(`⚠️ Playlist ${playlistId} no encontrada`);
             return;
@@ -2528,12 +2417,12 @@ renderQueueContent(flatList) {
             return;
         }
         
-        const indexToRemove = this.playlistsData.findIndex(p => p.id === playlistId);
+        const indexToRemove = this.core.playlistsData.findIndex(p => p.id === playlistId);
         if (indexToRemove !== -1) {
-            this.playlistsData.splice(indexToRemove, 1);
+            this.core.playlistsData.splice(indexToRemove, 1);
             
             if (this.core && this.core.playlistsData) {
-                this.core.playlistsData = this.playlistsData;
+                this.core.playlistsData = this.core.playlistsData;
             }
             
             console.log(`✅ Playlist "${playlist.name}" eliminada`);
@@ -2800,7 +2689,7 @@ setupPlaylistPopupEvents(popup, playlist) {
                 author: video.author || video.uploaderName || 'YouTube'
             };
             
-            const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
+            const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
             const isDuplicate = queuePlaylist?.videos.some(v => v.videoId === video.videoId);
             
             if (!isDuplicate) {
@@ -2886,7 +2775,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         return;
     }
 
-    const currentYouTubeCount = this.playlistsData.filter(p => p.source === 'youtube_library').length;
+    const currentYouTubeCount = this.core.playlistsData.filter(p => p.source === 'youtube_library').length;
     
     if (currentYouTubeCount >= youtubePlaylists.length) {
         console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
@@ -2895,8 +2784,8 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
 
     if (currentYouTubeCount > 0) {
         console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
-        const filtered = this.playlistsData.filter(p => p.source !== 'youtube_library');
-        this.playlistsData = filtered;
+        const filtered = this.core.playlistsData.filter(p => p.source !== 'youtube_library');
+        this.core.playlistsData = filtered;
         if (this.core) this.core.playlistsData = filtered;
     }
 
@@ -2950,14 +2839,14 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         return;
     }
 
-    const queueIndex = this.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
+    const queueIndex = this.core.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
     const insertIndex = queueIndex !== -1 ? queueIndex + 1 : 0;
     
-    this.playlistsData.splice(insertIndex, 0, ...validPlaylists);
+    this.core.playlistsData.splice(insertIndex, 0, ...validPlaylists);
     
     if (this.core) {
-        this.core.playlistsData = this.playlistsData;
-        window.playlistsData = this.playlistsData;
+        this.core.playlistsData = this.core.playlistsData;
+        window.playlistsData = this.core.playlistsData;
     }
     
     console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
@@ -2984,7 +2873,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         
         container.innerHTML = '';
         
-        if (this.playlistsData.length === 0) {
+        if (this.core.playlistsData.length === 0) {
             container.innerHTML = `
                 <div class="search-placeholder">
                     <i class="fas fa-music"></i>
@@ -2994,16 +2883,16 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
                 </div>
             `;
         } else {
-            console.log(`📊 Recreando ${this.playlistsData.length} playlists en DOM`);
+            console.log(`📊 Recreando ${this.core.playlistsData.length} playlists en DOM`);
             
-            this.playlistsData.forEach((playlist, index) => {
+            this.core.playlistsData.forEach((playlist, index) => {
                 const card = this.createPlaylistCard(playlist);
                 container.appendChild(card);
                 console.log(`✅ Playlist ${index + 1} renderizada: ${playlist.name}`);
             });
             
             const finalCount = container.querySelectorAll('.playlist-card').length;
-            console.log(`🎯 Renderizado final: ${finalCount} de ${this.playlistsData.length} playlists`);
+            console.log(`🎯 Renderizado final: ${finalCount} de ${this.core.playlistsData.length} playlists`);
         }
         
         this.core?.updateOverviewStats?.();
@@ -3013,12 +2902,12 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
      * Limpiar playlists de YouTube Library
      */
     clearYouTubeLibraryPlaylists() {
-        const initialCount = this.playlistsData.length;
-        this.playlistsData = this.playlistsData.filter(p => p.source !== 'youtube_library');
-        const removedCount = initialCount - this.playlistsData.length;
+        const initialCount = this.core.playlistsData.length;
+        this.core.playlistsData = this.core.playlistsData.filter(p => p.source !== 'youtube_library');
+        const removedCount = initialCount - this.core.playlistsData.length;
         
         if (this.core && this.core.playlistsData) {
-            this.core.playlistsData = this.playlistsData;
+            this.core.playlistsData = this.core.playlistsData;
         }
         
         if (removedCount > 0) {
@@ -3073,7 +2962,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
 
         const playlistId = playlistInfo.id || `playlist_${Date.now()}`;
 
-        if (this.playlistsData.some(p => p.id === playlistId)) {
+        if (this.core.playlistsData.some(p => p.id === playlistId)) {
             this.core?.showMessage(`La playlist "${playlistInfo.name || playlistId}" ya está cargada`, 'warning');
             return;
         }
@@ -3106,15 +2995,15 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
             isExpanded: true
         };
 
-        const manualIndex = this.playlistsData.findIndex(p => p.id === 'manual');
+        const manualIndex = this.core.playlistsData.findIndex(p => p.id === 'manual');
         if (manualIndex !== -1) {
-            this.playlistsData.splice(manualIndex + 1, 0, newPlaylist);
+            this.core.playlistsData.splice(manualIndex + 1, 0, newPlaylist);
         } else {
-            this.playlistsData.push(newPlaylist);
+            this.core.playlistsData.push(newPlaylist);
         }
 
         if (this.core && this.core.playlistsData) {
-            this.core.playlistsData = this.playlistsData;
+            this.core.playlistsData = this.core.playlistsData;
         }
 
         this.core?.showMessage(`Playlist "${newPlaylist.name}" cargada (${loadedVideos.length} videos)`, 'success');
@@ -3127,7 +3016,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
     // =============================================
 
     playPlaylist(playlistId) {
-        const playlist = this.playlistsData.find(p => p.id === playlistId);
+        const playlist = this.core.playlistsData.find(p => p.id === playlistId);
         if (!playlist?.videos?.length) {
             this.core?.showMessage("La playlist está vacía", 'warning');
             return;
@@ -3144,13 +3033,13 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
 
     syncWithCore() {
         if (this.core && this.core.playlistsData) {
-            this.playlistsData = this.core.playlistsData;
+            this.core.playlistsData = this.core.playlistsData;
         }
     }
 
     updateCore() {
         if (this.core) {
-            this.core.playlistsData = this.playlistsData;
+            this.core.playlistsData = this.core.playlistsData;
         }
     }
 }
