@@ -1828,139 +1828,108 @@ async playNextVideo() {
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
 async performSearch(searchQuery, continuation = null) {
-        console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
-        
-        if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
-            console.error('❌ Query inválido:', searchQuery);
+    console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
+    
+    if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+        console.error('❌ Query inválido:', searchQuery);
+        return;
+    }
+    
+    const query = searchQuery.trim();
+    
+    // Identificar el contenedor de resultados en el DOM
+    let container = document.getElementById('searchResults');
+    if (!container) {
+        container = document.querySelector('.search-results-grid') || 
+                    document.querySelector('#searchView .search-results-wrapper');
+        if (!container) {
+            console.error('❌ No se encontró contenedor de resultados');
+            this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
             return;
         }
+    }
+    
+    window.currentSearchQuery = query;
+    window.isLoadingMore = false;
+    
+    // Si es una búsqueda nueva (no una carga de página siguiente), limpiar el contenedor
+    if (!continuation) {
+        window.currentNextPageToken = null;
+        container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    }
+
+    try {
+        console.log(`📡 Llamando a YouTube Client con: "${query}"`);
+        const results = await window.youtubeJSClient.search(query, continuation);        
         
-        const query = searchQuery.trim();
-        
-        // Buscar contenedor
-        let container = document.getElementById('searchResults');
-        if (!container) {
-            container = document.querySelector('.search-results-grid') || 
-                        document.querySelector('#searchView .search-results-wrapper');
-            if (!container) {
-                console.error('❌ No se encontró contenedor de resultados');
-                this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
-                return;
-            }
-        }
-        
-        window.currentSearchQuery = query;
-        window.isLoadingMore = false;
-        
-        // Si es búsqueda nueva, limpiar todo
+        // Limpiar el loader si es búsqueda nueva
         if (!continuation) {
-            window.currentNextPageToken = null;
-            container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+            container.innerHTML = '';
         }
 
-        try {
-            console.log(`📡 Llamando a YouTube Client con: "${query}"`);
-            const results = await window.youtubeJSClient.search(query, continuation);        
-            
-            // Si es búsqueda nueva, limpiar el loader
+        if (!results || !results.items || results.items.length === 0) {
             if (!continuation) {
-                container.innerHTML = '';
+                container.innerHTML = `
+                    <div class="search-placeholder">
+                        <i class="fas fa-search"></i>
+                        <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
+                    </div>
+                `;
             }
+            return;
+        }
 
-            if (!results || !results.items || results.items.length === 0) {
-                if (!continuation) {
-                    container.innerHTML = `
-                        <div class="search-placeholder">
-                            <i class="fas fa-search"></i>
-                            <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
-                        </div>
-                    `;
-                }
-                return;
-            }
-
-            console.log(`🎨 Renderizando ${results.items.length} resultados`);
-            
-            // 1. Renderizar tarjetas
+        console.log(`🎨 Renderizando ${results.items.length} resultados`);
+        
+        // DELEGACIÓN A UI: Crear y añadir cada tarjeta al DOM
+        if (window.uiManager && typeof window.uiManager.createSearchResultCard === 'function') {
             results.items.forEach(video => {
-                const card = this.createSearchResultCard(video);
+                const card = window.uiManager.createSearchResultCard(video);
                 if (card) {
                     container.appendChild(card);
                 }
             });
+        }
 
-            // 2. Guardar token
-            window.currentNextPageToken = results.nextPageToken || null;
-            
-            // 3. ✅ AGREGAR SENTINEL (Elemento invisible al final para detectar scroll)
-            if (window.currentNextPageToken) {
-                let sentinel = document.getElementById('scrollSentinel');
-                if (!sentinel) {
-                    sentinel = document.createElement('div');
-                    sentinel.id = 'scrollSentinel';
-                    sentinel.style.width = '100%';
-                    sentinel.style.height = '20px';
-                    sentinel.style.margin = '10px 0';
-                    // sentinel.style.background = 'red'; // Descomentar para debug
-                }
-                // Mover siempre al final
-                container.appendChild(sentinel);
-                
-                // 4. ✅ Configurar observador (Pasando el container)
-                this.setupInfiniteScroll(container);
+        // Guardar token para el scroll infinito
+        window.currentNextPageToken = results.nextPageToken || null;
+        
+        // Configurar el Sentinel para detectar el final del scroll
+        if (window.currentNextPageToken) {
+            let sentinel = document.getElementById('scrollSentinel');
+            if (!sentinel) {
+                sentinel = document.createElement('div');
+                sentinel.id = 'scrollSentinel';
+                sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
             }
+            container.appendChild(sentinel);
+            this.setupInfiniteScroll(container);
+        }
 
-        } catch (error) {
-            console.error('❌ Error en performSearch:', error);
-            if (!continuation) {
-                container.innerHTML = `<div class="search-error"><p>Error: ${error.message}</p></div>`;
-            }
+    } catch (error) {
+        console.error('❌ Error en performSearch:', error);
+        if (!continuation) {
+            container.innerHTML = `<div class="search-error"><p>Error: ${error.message}</p></div>`;
         }
     }
+}
             
-    setupInfiniteScroll(container) {
-        console.log('📜 Configurando scroll infinito...');
+  setupInfiniteScroll(container) {
+    if (!container || this.searchScrollObserver) return;
 
-        if (!container) {
-            console.error('❌ setupInfiniteScroll: Contenedor no proporcionado');
-            return;
+    const sentinel = document.getElementById('scrollSentinel');
+    if (!sentinel) return;
+
+    this.searchScrollObserver = new IntersectionObserver(async (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !window.isLoadingMore && window.currentNextPageToken) {
+            window.isLoadingMore = true;
+            await this.performSearch(window.currentSearchQuery, window.currentNextPageToken);
         }
+    }, { root: null, rootMargin: '200px', threshold: 0.1 });
 
-        const sentinel = document.getElementById('scrollSentinel');
-        if (!sentinel) {
-            console.warn('⚠️ Sentinel no encontrado, no se puede configurar scroll');
-            return;
-        }
-
-        // Limpiar observador anterior
-        if (this.searchScrollObserver) {
-            this.searchScrollObserver.disconnect();
-        }
-
-        // Crear nuevo observador
-        this.searchScrollObserver = new IntersectionObserver(async (entries) => {
-            const entry = entries[0];
-            
-            if (entry.isIntersecting && 
-                !window.isLoadingMore && 
-                window.currentNextPageToken && 
-                window.currentSearchQuery) {
-                
-                console.log('📜 Scroll detectado: Cargando siguiente página...');
-                window.isLoadingMore = true; // Evitar múltiples cargas
-                
-                // ✅ Usar performSearch recursivamente para la siguiente página
-                await this.performSearch(window.currentSearchQuery, window.currentNextPageToken);
-            }
-        }, {
-            root: null, // Viewport
-            rootMargin: '200px', // Cargar 200px antes de llegar al final
-            threshold: 0.1
-        });
-
-        this.searchScrollObserver.observe(sentinel);
-        console.log('✅ Observador de scroll activado');
-    }
+    this.searchScrollObserver.observe(sentinel);
+}
 displaySearchResults(videos, container) {
     if (!container) {
         console.error('❌ Contenedor searchResults no encontrado');
@@ -2035,8 +2004,15 @@ displaySearchResults(videos, container) {
         if (window.playlistManager) window.playlistManager.updateQueuePopup();
     }
 
-    createSearchResultCard(video, videoId) {
-        if (!videoId || videoId === 'undefined') return document.createElement('div');
+   createSearchResultCard(video) {
+        // ✅ CORRECCIÓN: Extraer el ID directamente del objeto video
+        const videoId = video.videoId || video.id;
+        
+        if (!videoId || videoId === 'undefined') {
+            console.warn('⚠️ Video ignorado por falta de ID:', video);
+            return null; // Devolver null para no crear elementos vacíos
+        }
+
         const card = document.createElement('div');
         card.className = 'search-result-card';
         card.dataset.videoId = videoId;
@@ -2064,12 +2040,38 @@ displaySearchResults(videos, container) {
                         <i class="fas fa-forward"></i>
                         Añadir Siguiente
                     </button>
+                    <button class="add-to-queue-btn" 
+                            onclick="window.unifiedCore.addVideoToQueue({
+                                videoId: '${videoId}',
+                                title: '${this.escapeHTML(title.replace(/'/g, "\\'"))}',
+                                thumbnail: '${thumbnail}',
+                                duration: ${video.duration || 0},
+                                uploaderName: '${this.escapeHTML(artist.replace(/'/g, "\\'"))}'
+                            })">
+                        <i class="fas fa-plus"></i>
+                    </button>
                 </div>
             </div>
         `;
+        
+        // Agregar evento de click a la tarjeta completa para reproducir
+        card.addEventListener('click', (e) => {
+            // Evitar que se dispare si se hizo click en los botones
+            if (e.target.closest('button')) return;
+            
+            console.log(`▶️ Click en tarjeta: ${title}`);
+            // Añadir a cola y reproducir
+            this.playVideoFromSearch({
+                id: videoId,
+                title: title,
+                thumbnail: thumbnail,
+                channel: artist,
+                duration: video.duration
+            });
+        });
+
         return card;
     }
-
  // Limpiar resultados
 clearSearchResults() {
     this.ui.clearSearchResults();
@@ -2083,7 +2085,7 @@ clearSearchResults() {
     }
 
 getFlattenedPlaylist() {
-    // ✅ IMPLEMENTAR CACHÉ PARA MEJOR RENDIMIENTO
+    // Implementación de caché para rendimiento
     const cacheKey = JSON.stringify(
         this.playlistsData.map(p => ({
             id: p.id,
@@ -2091,161 +2093,58 @@ getFlattenedPlaylist() {
         }))
     );
     
-    // Verificar si tenemos caché válida
     if (this._flattenedCache && this._flattenedCacheKey === cacheKey) {
-        console.log('✅ Usando caché de playlist aplanada');
         return this._flattenedCache;
     }
     
-    console.log('🔄 Regenerando playlist aplanada...');
-    
-    // Buscar la cola de reproducción
     let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
     
-    // Si no existe, crearla
     if (!queuePlaylist) {
-        console.warn('⚠️ Cola no encontrada, creándola...');
-        queuePlaylist = {
-            id: 'queue',
-            name: 'Cola de Reproducción',
-            thumbnailUrl: './electronic.ico',
-            videos: [],
-            isExpanded: true,
-            isQueue: true
-        };
-        this.playlistsData.unshift(queuePlaylist);
+        queuePlaylist = { id: 'queue', videos: [] };
     }
     
-    // Validar que tiene array de videos
-    if (!queuePlaylist.videos || !Array.isArray(queuePlaylist.videos)) {
-        console.warn('⚠️ Cola sin array de videos, inicializando...');
-        queuePlaylist.videos = [];
-    }
-    
-    // Filtrar y normalizar videos válidos
-    const validVideos = queuePlaylist.videos
-        .filter(video => {
-            // ✅ VALIDACIONES EXHAUSTIVAS
-            if (!video) {
-                console.warn('⚠️ Video nulo o undefined');
-                return false;
-            }
-            
-            if (!video.videoId || video.videoId === 'undefined' || video.videoId === '') {
-                console.warn('⚠️ Video sin videoId válido:', video);
-                return false;
-            }
-            
-            // Validar que el videoId sea una string válida de YouTube (11 caracteres)
-            if (typeof video.videoId !== 'string' || video.videoId.length !== 11) {
-                console.warn('⚠️ VideoId con formato inválido:', video.videoId);
-                return false;
-            }
-            
-            // Filtrar videos eliminados o privados
-            const title = (video.title || '').toLowerCase();
-            const isDeleted = title.includes('deleted video') || 
-                            title.includes('private video') ||
-                            title.includes('[deleted]') ||
-                            title.includes('[private]');
-            
-            if (isDeleted) {
-                console.warn('⚠️ Video eliminado/privado omitido:', video.title);
-                return false;
-            }
-            
-            return true;
-        })
+    const validVideos = (queuePlaylist.videos || [])
+        .filter(video => video && video.videoId && video.videoId.length === 11)
         .map((video, index) => {
-            // ✅ NORMALIZAR DURACIÓN
-            let duration = 0;
-            
-            if (video.duration) {
-                if (typeof video.duration === 'number' && video.duration > 0) {
-                    // Ya está en segundos
-                    duration = Math.floor(video.duration);
-                } else if (typeof video.duration === 'string') {
-                    // Convertir string a segundos
-                    duration = this.parseDuration(video.duration);
-                }
-            }
-            
-            // ✅ NORMALIZAR ARTISTA/UPLOADER
-            let artist = video.artist || 
-                        video.uploaderName || 
+            // ✅ NORMALIZACIÓN DE ARTISTA (Evita el error "YouTube")
+            let artist = video.uploaderName || 
                         video.author || 
-                        video.channelName ||
-                        'YouTube';
-            
-            // Limpiar " - Topic" de YouTube
+                        video.artist || 
+                        video.channelName || 
+                        video.channelTitle || 
+                        '';
+
+            // Limpiar " - Topic" y espacios
             artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
             
-            // Si quedó vacío, usar fallback
-            if (artist === '') {
-                artist = 'Desconocido';
+            // Si el nombre es genérico o vacío, intentar extraer del título
+            if (!artist || artist.toLowerCase() === 'youtube') {
+                if (video.title && video.title.includes(' - ')) {
+                    artist = video.title.split(' - ')[0].trim();
+                } else {
+                    artist = 'Artista Desconocido'; 
+                }
             }
-            
-            // ✅ NORMALIZAR THUMBNAIL
-            let thumbnail = video.thumbnail || 
-                          video.thumbnailUrl || 
-                          './electronic.ico';
-            
-            // Validar que la URL sea válida
-            if (thumbnail && !thumbnail.startsWith('http') && !thumbnail.startsWith('./')) {
-                thumbnail = './electronic.ico';
-            }
-            
-            // ✅ NORMALIZAR TÍTULO
-            let title = video.title || 'Sin título';
-            
-            // Limpiar título de caracteres problemáticos
-            title = title.trim();
-            if (title === '') {
-                title = 'Sin título';
-            }
-            
-            // ✅ RETORNAR VIDEO NORMALIZADO
+
+            // Normalización de duración
+            let duration = 0;
+            if (typeof video.duration === 'number') duration = video.duration;
+            else if (typeof video.duration === 'string') duration = this.parseDuration(video.duration);
+
             return { 
-                // IDs y referencias
                 videoId: video.videoId,
                 sourcePlaylistId: video.sourcePlaylistId || 'queue',
-                
-                // Información de display
-                title: title,
-                thumbnail: thumbnail,
-                
-                // Información de autor (múltiples propiedades para compatibilidad)
-                artist: artist,
+                title: video.title || 'Sin título',
+                thumbnail: video.thumbnail || video.thumbnailUrl || './electronic.ico',
+                artist: artist, // Este valor lo usará LRCLIB
                 uploaderName: artist,
-                author: artist,
-                channelName: artist,
-                
-                // Duración en segundos
                 duration: duration,
-                
-                // Metadata adicional
-                index: index,
-                addedAt: video.addedAt || Date.now(),
-                
-                // Mantener datos originales si existen
-                originalData: {
-                    uploadDate: video.uploadDate,
-                    views: video.views,
-                    isLive: video.isLive || false
-                }
+                index: index
             };
         });
     
-    // ✅ GUARDAR EN CACHÉ
     this._flattenedCache = validVideos;
     this._flattenedCacheKey = cacheKey;
-    
-    console.log(`✅ Playlist aplanada generada: ${validVideos.length} videos válidos de ${queuePlaylist.videos.length} totales`);
-    
-    // ✅ VALIDACIÓN FINAL
-    if (validVideos.length === 0 && queuePlaylist.videos.length > 0) {
-        console.error('❌ CRÍTICO: Todos los videos fueron filtrados. Videos originales:', queuePlaylist.videos);
-    }
     
     return validVideos;
 }
