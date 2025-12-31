@@ -4,36 +4,38 @@ class YouTubeSimplifiedClient {
         this.searchApiUrl = 'https://mix-yt.netlify.app/.netlify/functions/search';
         this.requestCache = new Map();
         this.maxCacheSize = 50;
-        this.cacheExpiry = 5 * 60 * 1000; // 5 minutos
+        this.cacheExpiry = 5 * 60 * 1000;
+        this.searchCache = new Map();
+        this.isLoadingMore = false;
     }
-
+    
     async init() {
         this.initialized = true;
         console.log('✅ YouTube Client inicializado');
         return true;
     }
-const searchCache = new Map();
-let isLoadingMore = false; // Prevenir múltiples cargas simultáneas
     
     async search(query, continuation = null) {
         if (!query?.trim()) {
-        console.error('❌ Query vacío');
-        return { items: [], nextPageToken: null };
-    }
+            console.error('❌ Query vacío');
+            return { items: [], nextPageToken: null };
+        }
 
-    const cacheKey = `${query}_${nextPageToken || 'first'}`;
-    
-    // Verificar caché
-    if (searchCache.has(cacheKey)) {
-        console.log(`💾 Resultado cacheado: ${cacheKey} (Total: ${searchCache.size}/50)`);
-        return searchCache.get(cacheKey);
-    }
+        const cacheKey = `${query}_${continuation || 'first'}`;
+        
+        // ✅ Usar this.searchCache
+        if (this.searchCache.has(cacheKey)) {
+            console.log(`💾 Resultado cacheado: ${cacheKey}`);
+            return this.searchCache.get(cacheKey);
+        }
 
-    // PREVENIR CARGA MÚLTIPLE
-    if (isLoadingMore && nextPageToken) {
-        console.log('⏳ Ya hay una carga en progreso...');
-        return { items: [], nextPageToken: null };
-    }
+        // ✅ Usar this.isLoadingMore
+        if (this.isLoadingMore && continuation) {
+            console.log('⏳ Ya hay una carga en progreso...');
+            return { items: [], nextPageToken: null };
+        }
+
+        this.isLoadingMore = true; // ✅ Bloquear
 
     console.log(`🔍 Buscando: "${query}"${nextPageToken ? ' (Pág. siguiente)' : ''}`);
     
@@ -81,7 +83,7 @@ let isLoadingMore = false; // Prevenir múltiples cargas simultáneas
     }
 }
 
-    // ✅ NUEVA FUNCIÓN: Fetch con reintentos
+ 
     async fetchWithRetry(url, maxRetries = 3, delay = 1000) {
         let lastError;
         
