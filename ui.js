@@ -126,56 +126,47 @@ class UIManager {
         }
     }
 showMiniPlayerFloat() {
-        let persistentLayer = document.getElementById('persistent-player-layer');
-        const p1 = document.getElementById('player1');
-        const p2 = document.getElementById('player2');
-        
-        // 1. Crear capa si no existe (Safety Check)
-        if (!persistentLayer) {
-            console.warn('⚠️ persistent-player-layer no encontrado, creando contenedor...');
-            persistentLayer = document.createElement('div');
-            persistentLayer.id = 'persistent-player-layer';
-            persistentLayer.className = 'persistent-player-layer';
-            document.body.appendChild(persistentLayer);
-        } 
-
-        // ✅ CORRECCIÓN: Definir miniPosition
-        const miniPosition = {
-            bottom: 80,    // Altura desde abajo (ajustar según tu barra de navegación)
-            right: 20,     // Distancia desde la derecha
-            width: 320,    // Ancho del mini player
-            height: 180    // Alto del mini player (16:9)
-        };
-
-        // 4. Aplicar estilos y animación (Zoom Effect)
-        // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio
-        requestAnimationFrame(() => {
-            persistentLayer.style.display = 'block';
-            persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-            persistentLayer.style.position = 'fixed';
-            
-            // Coordenadas (Ahora sí usa la variable definida arriba)
-            persistentLayer.style.bottom = `${miniPosition.bottom}px`;
-            persistentLayer.style.right = `${miniPosition.right}px`;
-            persistentLayer.style.top = 'auto';  
-            persistentLayer.style.left = 'auto'; 
-            
-            // Dimensiones
-            persistentLayer.style.width = `${miniPosition.width}px`;
-            persistentLayer.style.height = `${miniPosition.height}px`;
-            
-            // Visibilidad
-            persistentLayer.style.borderRadius = '12px';
-            persistentLayer.style.zIndex = '999999'; // Encima de todo
-            persistentLayer.style.opacity = '1';
-            persistentLayer.style.visibility = 'visible';
-            persistentLayer.style.pointerEvents = 'auto';
-            
-            document.body.classList.add('mini-player-active');
-        });
-        
-        console.log('✅ Mini player activado');
+    let persistentLayer = document.getElementById('persistent-player-layer');
+    
+    if (!persistentLayer) {
+        console.warn('⚠️ persistent-player-layer no encontrado');
+        return;
     }
+
+    // Definición de la posición del mini reproductor (efecto visual)
+    const miniPosition = {
+        bottom: 100, // Ajustado para que no tape la barra inferior
+        right: 20,
+        width: 300,
+        height: 168 // Proporción 16:9
+    };
+
+    requestAnimationFrame(() => {
+        // Aseguramos que el contenedor sea visible y tenga transiciones
+        persistentLayer.style.display = 'block';
+        persistentLayer.style.position = 'fixed';
+        persistentLayer.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+        
+        // Aplicamos el "efecto pequeño"
+        persistentLayer.style.bottom = `${miniPosition.bottom}px`;
+        persistentLayer.style.right = `${miniPosition.right}px`;
+        persistentLayer.style.width = `${miniPosition.width}px`;
+        persistentLayer.style.height = `${miniPosition.height}px`;
+        
+        // Estilos visuales
+        persistentLayer.style.borderRadius = '12px';
+        persistentLayer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        persistentLayer.style.zIndex = '9999';
+        persistentLayer.style.opacity = '1';
+        persistentLayer.style.visibility = 'visible';
+        persistentLayer.style.pointerEvents = 'auto';
+        persistentLayer.style.transform = 'scale(1)'; // Efecto de zoom suave
+
+        document.body.classList.add('mini-player-active');
+    });
+    
+    console.log('✅ Mini player activado (Efecto Visual)');
+}
     forceMiniPlayerVisibility() {
         // Fallback de emergencia
         const persistentLayer = document.getElementById('persistent-player-layer');
@@ -264,126 +255,91 @@ showMiniPlayerFloat() {
     }
 }
 
-    renderSearchResults(items) {
-       }
+createSearchResultCard(video) {
+    // Validación y extracción de ID de video (soporta múltiples formatos de respuesta)
+    let videoId = video.videoId || video.id;
+    if (!videoId || videoId === 'undefined') {
+        if (video.id && typeof video.id === 'object') videoId = video.id.videoId;
+        if (!videoId) return null;
+    }
 
-    createSearchResultCard(video) {
-        // ✅ Validación robusta de ID
-        let videoId = video.videoId || video.id;
-        
-        if (!videoId || videoId === 'undefined') return null;
+    const title = video.title || 'Título desconocido';
+    const artist = video.uploaderName || video.artist || 'Artista desconocido';
+    const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
+    
+    // Formateo de duración
+    let durationDisplay = '';
+    if (video.duration) {
+        durationDisplay = typeof video.duration === 'number' 
+            ? this.formatDuration(video.duration) 
+            : video.duration;
+    }
 
-        const title = video.title || 'Título desconocido';
-        const artist = video.uploaderName || video.artist || 'Artista desconocido';
-        const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
-        
-        // ✅ Procesar duración de forma robusta
-        let durationInSeconds = 0;
-        let durationDisplay = '';
-        
-        if (typeof video.duration === 'number') {
-            durationInSeconds = video.duration;
-            durationDisplay = this.formatDuration(video.duration);
-        } else if (typeof video.duration === 'string') {
-            // Intentar parsear "3:45"
-            const parts = video.duration.split(':').map(Number);
-            if (parts.length === 2) durationInSeconds = parts[0] * 60 + parts[1];
-            if (parts.length === 3) durationInSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-            durationDisplay = video.duration;
-        }
+    const div = document.createElement('div');
+    div.className = 'track-item card-track search-result-card';
+    div.dataset.videoId = videoId;
 
-        const div = document.createElement('div');
-        div.className = 'track-item card-track search-result-card';
-        div.dataset.videoId = videoId;
-
-        // Estructura HTML de la tarjeta
-        div.innerHTML = `
-            <div class="search-result-thumbnail">
-                <img src="${thumbnail}" 
-                     alt="${this.escapeHTML(title)}" 
-                     loading="lazy" 
-                     onerror="this.src='./electronic.ico';">
-                ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
-            </div>
-            
-            <div class="search-result-info">
-                <h3 class="search-result-title" title="${this.escapeHTML(title)}">
-                    ${this.escapeHTML(title)}
-                </h3>
-                <p class="search-result-author">
-                    ${this.escapeHTML(artist)}
-                </p>
-            </div>
-            
-            <button class="add-to-queue-btn" 
-                    data-video-id="${videoId}"
-                    data-title="${this.escapeHTML(title)}"
-                    data-thumbnail="${thumbnail}"
-                    data-duration="${durationInSeconds}"
-                    data-artist="${this.escapeHTML(artist)}"
-                    title="Añadir a la cola">
+    div.innerHTML = `
+        <div class="search-result-thumbnail">
+            <img src="${thumbnail}" alt="${this.escapeHTML(title)}" loading="lazy" onerror="this.src='./electronic.ico';">
+            ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
+        </div>
+        <div class="search-result-info">
+            <h3 class="search-result-title" title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
+            <p class="search-result-author">${this.escapeHTML(artist)}</p>
+        </div>
+        <div class="search-result-actions">
+             <button class="search-result-add-next-btn" title="Reproducir siguiente">
+                <i class="fas fa-forward"></i>
+            </button>
+            <button class="add-to-queue-btn" title="Añadir a la cola">
                 <i class="fas fa-plus"></i>
             </button>
-        `;
+        </div>
+    `;
 
-        // ✅ Event Listener para añadir a cola
-        const addBtn = div.querySelector('.add-to-queue-btn');
-        if (addBtn) {
-            addBtn.addEventListener('click', async (e) => {
-                e.stopPropagation(); // Evitar click en la tarjeta padre
-                e.preventDefault();
-                
-                console.log(`🎵 Añadiendo: ${videoId}`);
-                
-                const videoData = {
-                    videoId: videoId,
-                    title: addBtn.dataset.title,
-                    thumbnail: addBtn.dataset.thumbnail,
-                    duration: parseInt(addBtn.dataset.duration) || 0,
-                    uploaderName: addBtn.dataset.artist,
-                    artist: addBtn.dataset.artist
-                };
-
-                // Feedback visual: Cargando
-                addBtn.disabled = true;
-                const originalHTML = addBtn.innerHTML;
-                addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-                try {
-                    if (window.playlistManager) {
-                        await window.playlistManager.addVideoToQueue(videoData);
-                        
-                        // Feedback: Éxito
-                        addBtn.innerHTML = '<i class="fas fa-check"></i>';
-                        addBtn.classList.add('success');
-                        
-                        setTimeout(() => {
-                            addBtn.innerHTML = originalHTML;
-                            addBtn.disabled = false;
-                            addBtn.classList.remove('success');
-                        }, 1500);
-                    } else {
-                        throw new Error('Gestor de playlist no listo');
-                    }
-                } catch (error) {
-                    console.error('❌ Error:', error);
-                    // Feedback: Error
-                    addBtn.innerHTML = '<i class="fas fa-times"></i>';
-                    addBtn.classList.add('error');
-                    setTimeout(() => {
-                        addBtn.innerHTML = originalHTML;
-                        addBtn.disabled = false;
-                        addBtn.classList.remove('error');
-                    }, 1500);
-                }
+    // Evento: Reproducción inmediata al hacer click en la tarjeta (vía Core)
+    div.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        if (window.unifiedCore && window.unifiedCore.playVideoFromSearch) {
+            window.unifiedCore.playVideoFromSearch({
+                id: videoId, title, thumbnail, channel: artist, duration: video.duration
             });
         }
+    });
 
-        // Click en la tarjeta para reproducir inmediatamente (Opcional)
-        // div.addEventListener('click', () => { ... });
+    // Evento: Botón añadir a la cola
+    const addBtn = div.querySelector('.add-to-queue-btn');
+    addBtn?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const icon = addBtn.querySelector('i');
+        icon.className = 'fas fa-spinner fa-spin';
+        try {
+            await window.unifiedCore.addVideoToQueue({
+                videoId, title, thumbnail, duration: video.duration, artist
+            });
+            icon.className = 'fas fa-check';
+            setTimeout(() => icon.className = 'fas fa-plus', 1500);
+        } catch (err) { icon.className = 'fas fa-times'; }
+    });
 
-        return div;
-    }
+    // Evento: Botón reproducir a continuación
+    const nextBtn = div.querySelector('.search-result-add-next-btn');
+    nextBtn?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const icon = nextBtn.querySelector('i');
+        icon.className = 'fas fa-spinner fa-spin';
+        try {
+            await window.unifiedCore.addVideoToQueueAfterCurrent({
+                videoId, title, thumbnail, duration: video.duration, artist
+            });
+            icon.className = 'fas fa-check';
+            setTimeout(() => icon.className = 'fas fa-forward', 1500);
+        } catch (err) { icon.className = 'fas fa-times'; }
+    });
+
+    return div;
+}
 
     // ==========================================
     // NOTIFICACIONES Y ESTADÍSTICAS
