@@ -1995,7 +1995,7 @@ setupRelatedVideosListeners() {
                 const flatList = this.core?.getFlattenedPlaylist();
                 const index = flatList?.findIndex(v => v.videoId === video.videoId);
                 if (index !== -1 && this.core) {
-                    this.core.playVideoAtIndex(index);
+                    this.core.playNextVideo(index);
                 }
             }, 100);
         });
@@ -2342,7 +2342,7 @@ renderQueueContent(flatList) {
         const flatList = this.core?.getFlattenedPlaylist();
         if (flatList?.length > 0 && !window.reproduccionIniciada) {
             setTimeout(() => {
-                this.core?.playVideoAtIndex(0);
+                this.core?.playNextVideo(0);
             }, 300);
         }
     } else {
@@ -2471,7 +2471,7 @@ setupQueueItemListeners() {
                 const flatList = this.core?.getFlattenedPlaylist() || [];
                 if (itemIndex >= 0 && itemIndex < flatList.length) {
                     console.log(`▶️ Reproduciendo: ${flatList[itemIndex].title}`);
-                    this.core?.playVideoAtIndex(itemIndex);
+                    this.core?.playNextVideo(itemIndex);
                 }
             }
         });
@@ -2665,7 +2665,7 @@ setupPlaylistPopupEvents(popup, playlist) {
                     const flatList = this.core?.getFlattenedPlaylist();
                     const index = flatList?.findIndex(v => v.videoId === video.videoId);
                     if (index !== -1 && this.core) {
-                        this.core.playVideoAtIndex(index);
+                        this.core.playNextVideo(index);
                         this.core.switchView('fullPlayer');
                     }
                 }, 100);
@@ -2747,7 +2747,7 @@ setupPlaylistPopupEvents(popup, playlist) {
                         const flatList = this.core?.getFlattenedPlaylist();
                         const index = flatList?.findIndex(v => v.videoId === video.videoId);
                         if (index !== -1) {
-                            this.core?.playVideoAtIndex(index);
+                            this.core?.playNextVideo(index);
                             this.core?.switchView('playing');
                         }
                     }, 100);
@@ -3026,7 +3026,7 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
         const firstVideoIndex = flatList.findIndex(v => v.sourcePlaylistId === playlistId);
         
         if (firstVideoIndex !== -1) {
-            this.core?.playVideoAtIndex(firstVideoIndex);
+            this.core?.playNextVideo(firstVideoIndex);
             this.core?.switchView('playing');
         }
     }
