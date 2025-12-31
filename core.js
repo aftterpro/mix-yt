@@ -80,7 +80,7 @@ const PERSISTENCE_CONFIG = {
     PLAYLISTS_DURATION: 7 * 24 * 60 * 60 * 1000,
     QUEUE_DURATION: 7 * 24 * 60 * 60 * 1000
 };
-
+ const container = document.getElementById('searchResults');
 // =============================================
 // SISTEMA UNIFICADO - CORE
 // =============================================
@@ -1787,10 +1787,9 @@ async playNextVideo() {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
-async performSearch(queryParam, continuation = null) {
+async performSearch(queryParam, container, continuation = null) {
   const input = document.getElementById('searchInput');
-    const container = document.getElementById('searchResults');
-    
+      
     if (!input || !container) {
         console.error('❌ Elementos de búsqueda no encontrados');
         return;
@@ -1833,7 +1832,7 @@ setupInfiniteScroll(container) {
     console.log('📜 Configurando scroll infinito...');
 
     const sentinel = document.getElementById('scrollSentinel');
-    const container = document.getElementById('searchResults');
+   
     
     if (!sentinel) {
         console.error('❌ Sentinel no encontrado');
@@ -1890,8 +1889,7 @@ setupInfiniteScroll(container) {
     console.log('✅ Observador configurado');
 }
 
-displaySearchResults(videos) {
-      const container = document.getElementById('searchResults');
+displaySearchResults(videos, container) {
     if (!container) {
         console.error('❌ Contenedor searchResults no encontrado');
         return;
