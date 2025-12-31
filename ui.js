@@ -242,16 +242,20 @@ class UIManager {
     // BÚSQUEDA Y RESULTADOS
     // ==========================================
 
-    clearSearchResults() {
-        if (this.elements.searchResults) {
-            this.elements.searchResults.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>Busca música, artistas o playlists</p>
-                </div>
-            `;
-        }
+   clearSearchResults() {
+    const container = document.getElementById('searchResults');
+    if (container) {
+        container.innerHTML = `
+            <div class="search-placeholder">
+                <i class="fas fa-search"></i>
+                <p>Busca música, artistas o playlists</p>
+            </div>
+        `;
+        console.log('✅ Resultados de búsqueda limpiados');
+    } else {
+        console.warn('⚠️ searchResults no encontrado en clearSearchResults');
     }
+}
 
     renderSearchResults(items) {
        }
