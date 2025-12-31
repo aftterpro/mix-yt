@@ -1444,102 +1444,53 @@ toggleLyricsProvider() {
         );
     }
 }
- /**
- * ✅ NUEVA FUNCIÓN: Cargar letras para un video específico
- */
-async loadLyricsForVideo(video) {
-    const lyricsContainer = document.getElementById('lyricsContent');
-    const providerBtn = document.getElementById('lyricsProviderToggle');
     
-    if (!video || !video.videoId) {
-        lyricsContainer.innerHTML = '<p class="lyrics-info">Video no válido</p>';
-        if (providerBtn) providerBtn.style.display = 'none';
-        return;
+    async loadLyricsForVideo() {
+    const info = window.currentPlayingInfo;
+    if (!info || info.flattenedIndex === -1) return;
+
+    // Obtener la lista aplanada (con artistas ya corregidos)
+    const flatList = window.unifiedCore.getFlattenedPlaylist();
+    const videoData = flatList[info.flattenedIndex];
+
+    if (!videoData) return;
+
+    const lyricsContainer = document.getElementById('lyricsContainer');
+    if (lyricsContainer) {
+        lyricsContainer.innerHTML = '<div class="lyrics-loading">🔍 Buscando letras para ' + videoData.title + '...</div>';
     }
-    
-    console.log(`🎵 Cargando letras EXPLÍCITAS para: ${video.title} (${video.videoId})`);
-    
-    // ✅ CACHÉ: Si ya están cargadas para ESTE video específico
-    if (this.lastLoadedLyricsId === video.videoId) {
-        const existingLyrics = lyricsContainer.querySelector('.lyrics-text');
-        if (existingLyrics && existingLyrics.textContent.trim().length > 0) {
-            console.log('✅ Letras ya cargadas para este video');
-            if (this.currentLrc && this.currentLrc.length > 0) {
+
+    try {
+        console.log(`📡 Buscando letras: "${videoData.title}" - "${videoData.artist}"`);
+        
+        // Llamada al motor de búsqueda de letras (fetchLyrics)
+        // Se pasan: título, artista corregido y duración
+        const lyrics = await this.fetchLyrics(
+            videoData.title, 
+            videoData.artist, 
+            videoData.duration
+        );
+
+        if (lyrics) {
+            this.displayLyrics(lyrics);
+            // Iniciar sincronización si las letras tienen tiempos
+            if (this.hasTimestamps(lyrics)) {
                 this.startLyricsSync();
             }
-            if (providerBtn) providerBtn.style.display = 'inline-flex';
-            return;
-        }
-    }
-    
-    // ✅ Marcar este video como el último procesado
-    this.lastLoadedLyricsId = video.videoId;
-    
-    // Loading
-    lyricsContainer.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Cargando letras...</p>`;
-    if (providerBtn) providerBtn.style.display = 'none';
-    
-    try {
-        const artist = video.artist || video.uploaderName || '';
-        const title = video.title || '';
-        const duration = video.duration || 0;
-        
-        console.log(`🔍 Búsqueda: "${title}" por "${artist}" (${duration}s)`);
-        
-        let data = null;
-        let usedProvider = this.lyricsProvider;
-        
-        // Intento principal
-        try {
-            data = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
-        } catch (e) {
-            console.warn(`⚠️ Falló ${this.lyricsProvider}, probando alternativa...`);
-        }
-        
-        // Fallback
-        if (!data) {
-            const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
-            console.log(`🔄 Usando ${fallbackProvider}...`);
-            
-            try {
-                data = await this.fetchLyrics(fallbackProvider, artist, title, duration);
-                if (data) usedProvider = fallbackProvider;
-            } catch (e) {
-                console.warn('❌ Fallback también falló');
-            }
-        }
-        
-        // Renderizar
-        if (data) {
-            this.renderLyrics(data);
-            
-            if (usedProvider !== this.lyricsProvider) {
-                if (providerBtn) providerBtn.style.display = 'none';
-                console.log('✅ Letras con fallback, botón oculto');
-            } else {
-                if (providerBtn) {
-                    providerBtn.style.display = 'inline-flex';
-                    providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
-                }
-            }
         } else {
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    <div class="lyrics-header">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>No encontradas</p>
-                    </div>
-                    <p class="lyrics-info">"${this.escapeHTML(title)}"</p>
-                </div>`;
-            if (providerBtn) providerBtn.style.display = 'none';
+            throw new Error("No se encontraron letras");
         }
-        
     } catch (error) {
-        console.error('❌ Error cargando letras:', error);
-        lyricsContainer.innerHTML = '<p class="lyrics-error">Error cargando letra.</p>';
-        if (providerBtn) providerBtn.style.display = 'none';
+        console.warn(`⚠️ Error cargando letras: ${error.message}`);
+        if (lyricsContainer) {
+            lyricsContainer.innerHTML = `
+                <div class="lyrics-error">
+                    <p>No pudimos encontrar las letras de esta canción.</p>
+                    <button onclick="window.playlistManager.loadLyricsForVideo()">🔄 Reintentar</button>
+                </div>`;
+        }
     }
-}   
+}
     
     setupTranslateButton() {
     const translateBtn = document.getElementById('lyricsTranslateToggle');
