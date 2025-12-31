@@ -138,21 +138,7 @@ class UIManager {
             persistentLayer.id = 'persistent-player-layer';
             persistentLayer.className = 'persistent-player-layer';
             document.body.appendChild(persistentLayer);
-        }
-
-        // 2. Mover los iframes DENTRO de la capa flotante si no están ahí
-        // Esto es crucial para que el video viaje con el mini player
-        if (p1 && p1.parentElement !== persistentLayer) persistentLayer.appendChild(p1);
-        if (p2 && p2.parentElement !== persistentLayer) persistentLayer.appendChild(p2);
-
-        // 3. Configuración de posición para el Mini Player
-        const miniPosition = {
-            bottom: 110, // Encima del Bottom Player
-            right: 20,
-            width: 320,
-            height: 180
-        };
-        
+        } 
         // 4. Aplicar estilos y animación (Zoom Effect)
         // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio de parentElement antes de animar
         requestAnimationFrame(() => {
@@ -267,83 +253,8 @@ class UIManager {
         }
     }
 
-    renderSearchResults(items, isContinuation = false) {
-        const container = this.elements.searchResults;
-        if (!container) {
-            console.error('❌ Contenedor searchResults no encontrado');
-            return;
-        }
-
-        // ✅ FORZAR VISIBILIDAD DEL CONTENEDOR
-        container.style.display = 'grid';
-        container.style.visibility = 'visible';
-        container.style.opacity = '1';
-
-        // Validar datos
-        let videosToRender = [];
-        
-        if (!items) {
-            if (!isContinuation) {
-                container.innerHTML = '<div class="search-placeholder"><p>No hay resultados</p></div>';
-            }
-            return;
-        }
-        
-        if (Array.isArray(items)) {
-            videosToRender = items;
-        } else if (items && Array.isArray(items.items)) {
-            videosToRender = items.items;
-        } else {
-            console.error('❌ Formato de items inválido');
-            return;
-        }
-
-        // Filtrar inválidos
-        videosToRender = videosToRender.filter(video => {
-            return video && (video.videoId || video.id);
-        });
-
-        // Limpiar contenedor si es nueva búsqueda
-        if (!isContinuation) {
-            container.innerHTML = '';
-        } else {
-            const loader = container.querySelector('.search-loading-more, .search-loading');
-            if (loader) loader.remove();
-        }
-
-        if (videosToRender.length === 0 && !isContinuation) {
-            container.innerHTML = `
-                <div class="search-placeholder">
-                    <i class="fas fa-search"></i>
-                    <p>No se encontraron videos</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Crear fragmento para rendimiento
-        const fragment = document.createDocumentFragment();
-        
-        videosToRender.forEach(video => {
-            const card = this.createSearchResultCard(video);
-            if (card) {
-                // ✅ FORZAR VISIBILIDAD DE CADA TARJETA
-                card.style.display = 'flex';
-                fragment.appendChild(card);
-            }
-        });
-
-        container.appendChild(fragment);
-        
-        // Scroll al final si es paginación
-        if (isContinuation) {
-            // Pequeño delay para dejar que el DOM pinte
-            setTimeout(() => {
-                const lastCard = container.lastElementChild;
-                if (lastCard) lastCard.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }, 100);
-        }
-    }
+    renderSearchResults(items) {
+       }
 
     createSearchResultCard(video) {
         // ✅ Validación robusta de ID
