@@ -1870,9 +1870,9 @@ async performSearch(searchQuery, continuation = null) {
 
     try {
         // ✅ CORRECCIÓN 4: Llamar a la función global de búsqueda
-        console.log(`📡 Llamando a searchYouTube con: "${query}"`);
+        console.log(`📡 Llamando a search con: "${query}"`);
         
-        const results = await window.searchYouTube(query, continuation);
+        const results = await window.search(query, continuation);
         
         console.log('📦 Resultados recibidos:', results);
         
