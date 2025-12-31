@@ -15,6 +15,7 @@ const CROSSFADE_DURATION = 10;
 
 window.player1 = null;
 window.player2 = null;
+let lastLogTime = -1;
 window.currentPlayingInfo = {
     playlistId: null,
     videoId: null,
