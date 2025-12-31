@@ -98,74 +98,61 @@ class UIManager {
     // MOVIMIENTO DE REPRODUCTORES (CORE LÓGICO)
     // ==========================================
 
-    movePlayersToFullView() {
-        console.log('🎬 Maximizando reproductor...');
-        const p1 = document.getElementById('player1');
-        const p2 = document.getElementById('player2');
-        const fullContainer = document.getElementById('videoWrapper'); 
-        const persistentLayer = document.getElementById('persistent-player-layer');
+   movePlayersToFullView() {
+    const layer = document.getElementById('persistent-player-layer');
+    if (!layer) return;
 
-        if (fullContainer) {
-            // 1. Mover los reproductores de vuelta al contenedor grande
-            // Solo si no están ya ahí para evitar recargas innecesarias
-            if (p1 && p1.parentElement !== fullContainer) fullContainer.appendChild(p1);
-            if (p2 && p2.parentElement !== fullContainer) fullContainer.appendChild(p2);
-            
-            // 2. Resetear estilos del contenedor flotante
-            if (persistentLayer) {
-                persistentLayer.style.transition = 'none'; // Quitar animación para reset instantáneo
-                persistentLayer.style.display = 'none';
-                persistentLayer.style.opacity = '0';
-                persistentLayer.style.pointerEvents = 'none';
-                persistentLayer.style.width = '100%'; 
-                persistentLayer.style.height = '100%';
-            }
-            
-            // 3. Actualizar estado global
-            document.body.classList.remove('mini-player-active');
-        }
-    }
-showMiniPlayerFloat() {
-    let persistentLayer = document.getElementById('persistent-player-layer');
+    console.log('🎬 Expandiendo a pantalla completa');
+
+    layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
     
-    if (!persistentLayer) {
-        console.warn('⚠️ persistent-player-layer no encontrado');
-        return;
-    }
+    requestAnimationFrame(() => {
+        layer.style.top = '0';
+        layer.style.left = '0';
+        layer.style.width = '100vw';
+        layer.style.height = '100vh';
+        layer.style.bottom = 'auto';
+        layer.style.right = 'auto';
+        layer.style.borderRadius = '0px';
+        layer.style.boxShadow = 'none';
+        
+        document.body.classList.remove('mini-player-active');
+    });
+}
+showMiniPlayerFloat() {
+    const layer = document.getElementById('persistent-player-layer');
+    if (!layer) return;
 
-    // Definición de la posición del mini reproductor (efecto visual)
-    const miniPosition = {
-        bottom: 100, // Ajustado para que no tape la barra inferior
-        right: 20,
-        width: 300,
-        height: 168 // Proporción 16:9
-    };
+    console.log('🔍 Aplicando efecto miniatura (zoom hacia esquina)');
+
+    // Aseguramos que el contenedor tenga las propiedades base para la animación
+    layer.style.display = 'block';
+    layer.style.position = 'fixed';
+    layer.style.zIndex = '9999';
+    layer.style.pointerEvents = 'auto';
+    layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    layer.style.transformOrigin = 'bottom right'; // El zoom se dirige hacia la esquina inferior derecha
+
+    // Valores para el "estado miniatura"
+    const miniWidth = 300;
+    const miniHeight = 168; // Proporción 16:9
+    const offset = 20; // Espacio desde el borde
 
     requestAnimationFrame(() => {
-        // Aseguramos que el contenedor sea visible y tenga transiciones
-        persistentLayer.style.display = 'block';
-        persistentLayer.style.position = 'fixed';
-        persistentLayer.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+        layer.style.bottom = `${offset}px`;
+        layer.style.right = `${offset}px`;
+        layer.style.width = `${miniWidth}px`;
+        layer.style.height = `${miniHeight}px`;
+        layer.style.borderRadius = '12px';
+        layer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        layer.style.opacity = '1';
+        layer.style.visibility = 'visible';
         
-        // Aplicamos el "efecto pequeño"
-        persistentLayer.style.bottom = `${miniPosition.bottom}px`;
-        persistentLayer.style.right = `${miniPosition.right}px`;
-        persistentLayer.style.width = `${miniPosition.width}px`;
-        persistentLayer.style.height = `${miniPosition.height}px`;
+        // Si quieres un efecto de escala real además del cambio de tamaño:
+        // layer.style.transform = 'scale(1)'; 
         
-        // Estilos visuales
-        persistentLayer.style.borderRadius = '12px';
-        persistentLayer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
-        persistentLayer.style.zIndex = '9999';
-        persistentLayer.style.opacity = '1';
-        persistentLayer.style.visibility = 'visible';
-        persistentLayer.style.pointerEvents = 'auto';
-        persistentLayer.style.transform = 'scale(1)'; // Efecto de zoom suave
-
         document.body.classList.add('mini-player-active');
     });
-    
-    console.log('✅ Mini player activado (Efecto Visual)');
 }
     forceMiniPlayerVisibility() {
         // Fallback de emergencia
