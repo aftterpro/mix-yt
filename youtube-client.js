@@ -15,7 +15,7 @@ class YouTubeSimplifiedClient {
         return true;
     }
     
-    async search(query, continuation = null) {
+  async search(query, continuation = null) {
         if (!query?.trim()) {
             console.error('❌ Query vacío');
             return { items: [], continuation: null };
@@ -23,13 +23,13 @@ class YouTubeSimplifiedClient {
 
         const cacheKey = `${query}_${continuation || 'first'}`;
         
-        // ✅ Usar this.searchCache
+        // ✅ CORRECTO: Usar this.searchCache
         if (this.searchCache.has(cacheKey)) {
             console.log(`💾 Resultado cacheado: ${cacheKey}`);
             return this.searchCache.get(cacheKey);
         }
 
-        // ✅ Usar this.isLoadingMore
+        // ✅ CORRECTO: Usar this.isLoadingMore
         if (this.isLoadingMore && continuation) {
             console.log('⏳ Ya hay una carga en progreso...');
             return { items: [], continuation: null };
@@ -37,53 +37,52 @@ class YouTubeSimplifiedClient {
 
         this.isLoadingMore = true; // ✅ Bloquear
 
-    console.log(`🔍 Buscando: "${query}"${continuation ? ' (Pág. siguiente)' : ''}`);
-    
-    const params = new URLSearchParams({ q: query });
-    if (continuation) {
-        params.append('nextpage', continuation);
-    }
+        console.log(`🔍 Buscando: "${query}"${continuation ? ' (Pág. siguiente)' : ''}`);
+        
+        const params = new URLSearchParams({ q: query });
+        if (continuation) {
+            params.append('nextpage', continuation);
+        }
 
-    const url = `https://mix-yt.netlify.app/.netlify/functions/search?${params}`;
-    console.log(`📡 Llamando a: ${url}`);
+        const url = `https://mix-yt.netlify.app/.netlify/functions/search?${params}`;
+        console.log(`📡 Llamando a: ${url}`);
 
-    isLoadingMore = true; // BLOQUEAR NUEVAS CARGAS
+        try {
+           
+            const response = await this.fetchWithRetry(url); 
+            const data = await response.json();
 
-    try {
-        const response = await fetchWithRetry(url);
-        const data = await response.json();
+            if (!data?.items?.length) {
+                console.warn('⚠️ Sin resultados');
+                this.isLoadingMore = false; 
+                return { items: [], continuation: null };
+            }
 
-        if (!data?.items?.length) {
-            console.warn('⚠️ Sin resultados');
-            isLoadingMore = false;
+            console.log(`✅ ${data.items.length} resultados encontrados`);
+
+            const result = {
+                items: data.items,
+                continuation: data.continuation || null
+            };
+
+           
+            this.searchCache.set(cacheKey, result);
+
+          
+            if (this.searchCache.size > 50) {
+                const firstKey = this.searchCache.keys().next().value;
+                this.searchCache.delete(firstKey);
+            }
+
+            this.isLoadingMore = false; 
+            return result;
+
+        } catch (error) {
+            console.error('❌ Error en búsqueda:', error);
+            this.isLoadingMore = false; 
             return { items: [], continuation: null };
         }
-
-        console.log(`✅ ${data.items.length} resultados encontrados`);
-
-        const result = {
-            items: data.items,
-            continuation: data.continuation || null
-        };
-
-        searchCache.set(cacheKey, result);
-
-        if (searchCache.size > 50) {
-            const firstKey = searchCache.keys().next().value;
-            searchCache.delete(firstKey);
-        }
-
-        isLoadingMore = false; // DESBLOQUEAR
-        return result;
-
-    } catch (error) {
-        console.error('❌ Error en búsqueda:', error);
-        isLoadingMore = false;
-        return { items: [], continuation: null };
     }
-}
-
- 
     async fetchWithRetry(url, maxRetries = 3, delay = 1000) {
         let lastError;
         
