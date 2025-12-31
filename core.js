@@ -1960,67 +1960,39 @@ clearSearchResults() {
     }
 
 getFlattenedPlaylist() {
-    // Implementación de caché para rendimiento
-    const cacheKey = JSON.stringify(
-        this.playlistsData.map(p => ({
-            id: p.id,
-            videoCount: p.videos?.length || 0
-        }))
-    );
-    
-    if (this._flattenedCache && this._flattenedCacheKey === cacheKey) {
-        return this._flattenedCache;
-    }
-    
-    let queuePlaylist = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-    
-    if (!queuePlaylist) {
-        queuePlaylist = { id: 'queue', videos: [] };
-    }
-    
-    const validVideos = (queuePlaylist.videos || [])
-        .filter(video => video && video.videoId && video.videoId.length === 11)
-        .map((video, index) => {
-            // ✅ NORMALIZACIÓN DE ARTISTA (Evita el error "YouTube")
-            let artist = video.uploaderName || 
-                        video.author || 
-                        video.artist || 
-                        video.channelName || 
-                        video.channelTitle || 
-                        '';
+    const cacheKey = JSON.stringify(this.playlistsData.map(p => ({ id: p.id, count: p.videos?.length || 0 })));
+    if (this._flattenedCache && this._flattenedCacheKey === cacheKey) return this._flattenedCache;
 
-            // Limpiar " - Topic" y espacios
-            artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
-            
-            // Si el nombre es genérico o vacío, intentar extraer del título
-            if (!artist || artist.toLowerCase() === 'youtube') {
-                if (video.title && video.title.includes(' - ')) {
-                    artist = video.title.split(' - ')[0].trim();
-                } else {
-                    artist = 'Artista Desconocido'; 
-                }
+    const queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue) || { videos: [] };
+
+    const validVideos = queue.videos.map((video, index) => {
+        // ✅ CORRECCIÓN: Evitar "YouTube" como artista
+        let artist = video.uploaderName || video.author || video.artist || video.channelName || '';
+        artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+
+        if (!artist || artist.toLowerCase() === 'youtube') {
+            // Intentar extraer del título si es "Artista - Canción"
+            if (video.title && video.title.includes(' - ')) {
+                artist = video.title.split(' - ')[0].trim();
+            } else {
+                artist = 'Artista Desconocido';
             }
+        }
 
-            // Normalización de duración
-            let duration = 0;
-            if (typeof video.duration === 'number') duration = video.duration;
-            else if (typeof video.duration === 'string') duration = this.parseDuration(video.duration);
+        return {
+            videoId: video.videoId,
+            title: video.title || 'Sin título',
+            artist: artist, // Usado para letras (LRCLIB)
+            uploaderName: artist,
+            thumbnail: video.thumbnail || video.thumbnailUrl || './electronic.ico',
+            duration: typeof video.duration === 'number' ? video.duration : this.parseDuration(video.duration || "0"),
+            index: index,
+            sourcePlaylistId: 'queue'
+        };
+    });
 
-            return { 
-                videoId: video.videoId,
-                sourcePlaylistId: video.sourcePlaylistId || 'queue',
-                title: video.title || 'Sin título',
-                thumbnail: video.thumbnail || video.thumbnailUrl || './electronic.ico',
-                artist: artist, // Este valor lo usará LRCLIB
-                uploaderName: artist,
-                duration: duration,
-                index: index
-            };
-        });
-    
     this._flattenedCache = validVideos;
     this._flattenedCacheKey = cacheKey;
-    
     return validVideos;
 }
 parseDuration(durationInput) {
