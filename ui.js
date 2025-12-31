@@ -125,8 +125,7 @@ class UIManager {
             document.body.classList.remove('mini-player-active');
         }
     }
-
-    showMiniPlayerFloat() {
+showMiniPlayerFloat() {
         let persistentLayer = document.getElementById('persistent-player-layer');
         const p1 = document.getElementById('player1');
         const p2 = document.getElementById('player2');
@@ -139,14 +138,23 @@ class UIManager {
             persistentLayer.className = 'persistent-player-layer';
             document.body.appendChild(persistentLayer);
         } 
+
+        // ✅ CORRECCIÓN: Definir miniPosition
+        const miniPosition = {
+            bottom: 80,    // Altura desde abajo (ajustar según tu barra de navegación)
+            right: 20,     // Distancia desde la derecha
+            width: 320,    // Ancho del mini player
+            height: 180    // Alto del mini player (16:9)
+        };
+
         // 4. Aplicar estilos y animación (Zoom Effect)
-        // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio de parentElement antes de animar
+        // Usamos requestAnimationFrame para asegurar que el navegador procese el cambio
         requestAnimationFrame(() => {
             persistentLayer.style.display = 'block';
             persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
             persistentLayer.style.position = 'fixed';
             
-            // Coordenadas
+            // Coordenadas (Ahora sí usa la variable definida arriba)
             persistentLayer.style.bottom = `${miniPosition.bottom}px`;
             persistentLayer.style.right = `${miniPosition.right}px`;
             persistentLayer.style.top = 'auto';  
@@ -168,7 +176,6 @@ class UIManager {
         
         console.log('✅ Mini player activado');
     }
-
     forceMiniPlayerVisibility() {
         // Fallback de emergencia
         const persistentLayer = document.getElementById('persistent-player-layer');
