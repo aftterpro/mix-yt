@@ -127,7 +127,6 @@ class YouTubeSimplifiedClient {
         throw lastError;
     }
 
-    // ✅ NUEVA FUNCIÓN: Sistema de caché
     getCachedResult(key) {
         const cached = this.requestCache.get(key);
         if (!cached) return null;
@@ -142,19 +141,22 @@ class YouTubeSimplifiedClient {
     }
 
     cacheResult(key, data) {
-        // Limpiar caché si está llena
-        if (this.requestCache.size >= this.maxCacheSize) {
-            const firstKey = this.requestCache.keys().next().value;
-            this.requestCache.delete(firstKey);
-        }
-        
-        this.requestCache.set(key, {
-            data,
-            timestamp: Date.now()
-        });
+   
+    if (this.requestCache.size >= this.maxCacheSize) {
+        // Eliminar la entrada más antigua
+        const firstKey = this.requestCache.keys().next().value;
+        this.requestCache.delete(firstKey);
+        console.log(`🗑️ Caché llena, eliminando: ${firstKey}`);
     }
+    
+    this.requestCache.set(key, {
+        data,
+        timestamp: Date.now()
+    });
+    
+    console.log(`💾 Resultado cacheado: ${key} (Total: ${this.requestCache.size}/${this.maxCacheSize})`);
+}
 
-    // ✅ CORRECCIÓN: Trending con fallback
     async getTrending(region = 'US') {
         console.log(`🔥 Cargando trending (${region})...`);
         
