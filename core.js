@@ -177,6 +177,7 @@ class UnifiedCore {
     this.init();
     this.setupAutomaticSaving();
     this.setupPlayerContainerHandlers();
+    this.lastPlayNextCall = 0;
 }
 
     setupAutomaticSaving() {
@@ -834,14 +835,16 @@ updatePlayerPosition(targetContainerId) {
 setupControlButtons() {
     console.log('🎮 Configurando controles de reproducción...');
     
-    // ===== PLAY/PAUSE =====
+   // ===== PLAY/PAUSE =====
     const playButtons = ['botonPlay', 'miniPlayBtn'];
     playButtons.forEach(btnId => {
         const btn = document.getElementById(btnId);
         if (btn) {
+            // ✅ LIMPIAR: Clonar nodo para eliminar TODOS los listeners
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
             
+            // ✅ Añadir listener limpio
             newBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1119,7 +1122,7 @@ setupSearchButtonListeners() {
 switchView(viewName) {
     const previousView = this.currentView;
     
-    // ✅ LIMPIAR RECURSOS DE VISTA ANTERIOR
+    
     if (previousView && previousView !== viewName) {
         this.cleanupView(previousView);
     }
@@ -1133,6 +1136,27 @@ switchView(viewName) {
     }));
     
     console.log(`🔄 Vista cambiada: ${previousView} → ${viewName}`);
+}
+
+cleanupView(viewName) {
+    console.log(`🧹 Limpiando recursos: ${viewName}`);
+    
+    if (viewName !== 'search') {
+        // Limpiar sentinel
+        const sentinel = document.getElementById('search-sentinel');
+        if (sentinel) sentinel.remove();
+        
+        // Desconectar observador de forma segura
+        if (this.searchScrollObserver) {
+            try {
+                this.searchScrollObserver.disconnect();
+            } catch (e) {
+                console.warn('⚠️ Error en cleanup:', e);
+            } finally {
+                this.searchScrollObserver = null;
+            }
+        }
+    }
 }
 
 // Expande el reproductor a pantalla completa
@@ -1473,18 +1497,29 @@ toggleRepeat() {
 async playNextVideo() {
     console.log('🎬 playNextVideo iniciado');
     
-    // ===== DEBOUNCE =====
+    // ✅ PROTECCIÓN: Evitar llamadas múltiples
     const now = Date.now();
-    if (now - lastCrossfadeTime < 1000) {
-        console.log('⚠️ Debounce activo, ignorando');
+    if (!this.lastPlayNextCall) this.lastPlayNextCall = 0;
+    
+    if (now - this.lastPlayNextCall < 1000) {
+        console.log('⚠️ playNextVideo ya en progreso, ignorando');
         return;
     }
-    lastCrossfadeTime = now;
+    this.lastPlayNextCall = now;
     
-    // ===== RESETEAR BANDERAS AL INICIO =====
-    this.resetCrossfadeFlags();
+    // ✅ PROTECCIÓN: Limpiar crossfade pendiente anterior
+    if (this.pendingCrossfade?.active) {
+        console.warn('⚠️ Crossfade previo aún activo, cancelando');
+        this.pendingCrossfade.active = false;
+    }
     
-    // ===== VALIDACIONES =====
+    // ✅ PROTECCIÓN: Detener crossfade en progreso
+    if (crossfadeInProgress) {
+        console.warn('⚠️ Crossfade en progreso, esperando...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // VALIDACIONES
     if (!playersInitialized) {
         console.error('❌ Players no inicializados');
         return;
@@ -1500,7 +1535,6 @@ async playNextVideo() {
 
     let nextIndex = currentFlatIndex + 1;
     
-    // ===== VERIFICAR FIN DE LISTA =====
     if (nextIndex >= flatList.length) {
         console.log('🏁 Fin de lista alcanzado');
         
@@ -1520,7 +1554,6 @@ async playNextVideo() {
         return;
     }
 
-    // ===== ACTUALIZAR ESTADO =====
     console.log(`🎵 Siguiente: "${nextVideo.title}" (índice ${nextIndex})`);
     
     window.currentPlayingInfo = {
@@ -1530,8 +1563,6 @@ async playNextVideo() {
     };
     
     this.state.currentPlayingInfo = window.currentPlayingInfo;
-    
-    // ===== ACTUALIZAR UI INMEDIATAMENTE =====
     this.updateNowPlaying();
     
     if (window.playlistManager) {
@@ -1540,7 +1571,6 @@ async playNextVideo() {
         window.playlistManager.refreshActiveQueueTab();
     }
 
-    // ===== PREPARAR REPRODUCTORES =====
     const prevPlayerInstance = window.currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = window.currentPlayer === 1 ? player2 : player1;
     
@@ -1550,15 +1580,13 @@ async playNextVideo() {
     try {
         console.log(`⏳ Cargando video ${nextVideo.videoId} en player${window.currentPlayer}`);
 
-        // ===== CARGAR VIDEO =====
         nextPlayerInstance.loadVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
         
-        nextPlayerInstance.setVolume(0); // Empezar en silencio
+        nextPlayerInstance.setVolume(0);
 
-        // ===== CONFIGURAR CROSSFADE PENDIENTE =====
         this.pendingCrossfade = {
             active: true,
             prev: prevPlayerInstance,
@@ -1569,7 +1597,6 @@ async playNextVideo() {
 
         console.log(`✅ Crossfade configurado: Player${prevPlayerNum} → Player${window.currentPlayer}`);
         
-        // ===== DISPARAR EVENTO =====
         document.dispatchEvent(new CustomEvent('crossfadeTriggered', {
             detail: { 
                 prevPlayer: prevPlayerNum, 
@@ -1580,19 +1607,16 @@ async playNextVideo() {
     } catch (error) {
         console.error("❌ Error crítico en playNextVideo:", error);
         
-        // ===== ROLLBACK COMPLETO =====
         this.resetCrossfadeFlags();
         
         if (this.pendingCrossfade) {
             this.pendingCrossfade.active = false;
         }
         
-        // Restaurar player anterior
         window.currentPlayer = prevPlayerNum;
         
         this.showMessage('Error cambiando de video', 'error');
         
-        // ===== REINTENTAR DESPUÉS DE 2 SEGUNDOS =====
         setTimeout(() => {
             if (flatList.length > nextIndex) {
                 console.log('🔄 Reintentando reproducción...');
@@ -1831,8 +1855,7 @@ async performSearch(query, continuation = null) {
             
 setupInfiniteScroll(container) {
     console.log('📜 Configurando scroll infinito...');
-    
-    // Limpiar sentinel anterior
+ 
     const oldSentinel = document.getElementById('search-sentinel');
     if (oldSentinel) oldSentinel.remove();
     
@@ -3043,8 +3066,6 @@ window.forceVideoVisible = function() {
 window.addEventListener('beforeunload', () => {
     console.log('🚪 Cerrando aplicación, limpiando recursos...');
     
-    // ✅ CORRECCIÓN: LIMPIEZA COMPLETA DE RECURSOS
-    
     // 1. Guardar datos y detener monitoring
     if (window.unifiedCore?.state?.initialized) {
         try {
@@ -3057,7 +3078,6 @@ window.addEventListener('beforeunload', () => {
     
     // 2. Desconectar observers
     if (window.unifiedCore) {
-        // Search scroll observer
         if (window.unifiedCore.searchScrollObserver) {
             try {
                 window.unifiedCore.searchScrollObserver.disconnect();
@@ -3067,7 +3087,6 @@ window.addEventListener('beforeunload', () => {
             }
         }
         
-        // Mini player observer (si existe)
         if (window.unifiedCore.miniPlayerObserver) {
             try {
                 window.unifiedCore.miniPlayerObserver.disconnect();
@@ -3077,7 +3096,6 @@ window.addEventListener('beforeunload', () => {
             }
         }
         
-        // Limpiar interval de guardado automático
         if (window.unifiedCore.saveInterval) {
             clearInterval(window.unifiedCore.saveInterval);
             window.unifiedCore.saveInterval = null;
@@ -3095,10 +3113,11 @@ window.addEventListener('beforeunload', () => {
         monitorInterval = null;
     }
     
-    // 4. Limpiar interval de letras
+    // 4. ✅ CRÍTICO: Limpiar interval de letras
     if (window.playlistManager?.lyricsSyncInterval) {
         clearInterval(window.playlistManager.lyricsSyncInterval);
         window.playlistManager.lyricsSyncInterval = null;
+        console.log('🛑 Sincronización de letras detenida');
     }
     
     // 5. Detener reproductores
@@ -3112,9 +3131,6 @@ window.addEventListener('beforeunload', () => {
     } catch (e) {
         console.warn('⚠️ Error deteniendo players:', e);
     }
-    
-    // 7. Remover event listeners de resize
-    window.removeEventListener('resize', window.resizeTimeout);
     
     console.log('✅ Recursos limpiados correctamente');
 });
