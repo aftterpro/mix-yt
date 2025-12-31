@@ -38,8 +38,6 @@ const CROSSFADE_DEBOUNCE = 500;
 const CROSSFADE_TRIGGER_TIME = 10;
 window.currentPlayer = 1;
 window.reproduccionIniciada = false;
-let playersInitialized = false;
-
 let currentPlayingInfo = {
     playlistId: null,
     videoId: null,
