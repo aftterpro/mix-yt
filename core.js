@@ -740,12 +740,49 @@ initializeUI() {
     }
 }
 updatePlayerPosition(targetContainerId) {
-    // Validar que el UI Manager esté listo antes de llamar al método
-    if (this.ui && typeof this.ui.updatePlayerPosition === 'function') {
-        this.ui.updatePlayerPosition(targetContainerId);
-    } else {
-        console.error('❌ UI Manager no tiene definido updatePlayerPosition');
+    console.log(`🎬 Moviendo reproductores a: ${targetContainerId}`);
+    
+    const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
+    const inactivePlayerId = window.currentPlayer === 1 ? 'player2' : 'player1';
+    
+    const activePlayer = document.getElementById(activePlayerId);
+    const inactivePlayer = document.getElementById(inactivePlayerId);
+    const targetContainer = document.getElementById(targetContainerId);
+    
+    if (!activePlayer || !targetContainer) {
+        console.error('❌ No se encontraron elementos necesarios');
+        return;
     }
+    
+    // Mover solo el reproductor activo
+    if (activePlayer.parentNode !== targetContainer) {
+        targetContainer.appendChild(activePlayer);
+    }
+    
+    // Asegurar visibilidad del activo
+    activePlayer.style.cssText = `
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 10 !important;
+        background: #000 !important;
+    `;
+    
+    // Ocultar el inactivo
+    if (inactivePlayer) {
+        inactivePlayer.style.cssText = `
+            display: none !important;
+            opacity: 0 !important;
+            z-index: 0 !important;
+        `;
+    }
+    
+    console.log(`✅ Reproductor movido a ${targetContainerId}`);
 }
     updatePlaylistsUI() {
         if (window.playlistManager && window.playlistManager.updatePlaylistsUI) {
@@ -1538,25 +1575,14 @@ toggleRepeat() {
         }
     }
 
-    async playNextVideo() {
+async playNextVideo() {
     console.log('🎬 playNextVideo iniciado');
     
-    // 1. Resetear banderas de control del monitor
-    nextVideoScheduled = false;
-    hasOutroCrossfadeStarted = false;
-    lastLogTime = -1;
-    
-    // Protección contra llamadas múltiples (Debounce)
+    // Protección contra llamadas múltiples
     const now = Date.now();
     if (!this.lastPlayNextCall) this.lastPlayNextCall = 0;
     if (now - this.lastPlayNextCall < 1000) return;
     this.lastPlayNextCall = now;
-    
-    // Si ya hay un crossfade físico en progreso, esperar
-    if (crossfadeInProgress) {
-        console.warn('⚠️ Crossfade en progreso, esperando...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
     
     if (!playersInitialized) {
         console.error('❌ Players no inicializados');
@@ -1587,7 +1613,7 @@ toggleRepeat() {
 
     console.log(`🎵 Siguiente pista: "${nextVideo.title}" (índice ${nextIndex})`);
     
-    // Actualizar información global de reproducción
+    // Actualizar información global
     window.currentPlayingInfo = {
         flattenedIndex: nextIndex,
         videoId: nextVideo.videoId,
@@ -1598,104 +1624,65 @@ toggleRepeat() {
     if (window.playlistManager) {
         window.playlistManager.syncQueueIndicator();
         this.updatePersistentQueue();
-        window.playlistManager.refreshActiveQueueTab(); // Recarga letras/relacionados
+        window.playlistManager.refreshActiveQueueTab();
     }
 
-    // Determinar qué reproductor es el actual y cuál el siguiente
+    // Determinar reproductores
     const prevPlayerInstance = window.currentPlayer === 1 ? player1 : player2;
     const nextPlayerInstance = window.currentPlayer === 1 ? player2 : player1;
     const prevPlayerNum = window.currentPlayer;
     const nextPlayerNum = window.currentPlayer === 1 ? 2 : 1;
 
     try {
-        crossfadeInProgress = true;
-        
-        // Cargar video en el reproductor secundario con volumen 0
+        // ✅ SIMPLIFICADO: Cargar y reproducir directamente
         nextPlayerInstance.loadVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
-        nextPlayerInstance.setVolume(0);
-
-        // Esperar brevemente a que el buffer inicie
-        await new Promise(resolve => setTimeout(resolve, 800));
-
+        
+        // Cambiar reproductor activo
+        window.currentPlayer = nextPlayerNum;
+        
         const prevElement = document.getElementById(`player${prevPlayerNum}`);
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
         
-        // Preparar capas visuales
+        // ✅ TRANSICIÓN INSTANTÁNEA Y LIMPIA
         if (nextElement) {
             nextElement.style.cssText = `
                 position: absolute !important;
-                top: 0 !important; left: 0 !important;
-                width: 100% !important; height: 100% !important;
-                display: block !important; visibility: visible !important;
-                opacity: 0 !important; z-index: 3 !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 10 !important;
                 background: #000 !important;
             `;
         }
-        if (prevElement) prevElement.style.zIndex = '2';
-
-        nextPlayerInstance.playVideo();
-        window.currentPlayer = nextPlayerNum;
         
-        // --- LÓGICA DE CROSSFADE (10 SEGUNDOS) ---
-        const duration = 10000; // 10s en ms
-        const steps = 50;
-        const stepTime = duration / steps;
-        let step = 0;
-        
-        crossfadeInterval = setInterval(() => {
-            step++;
-            const progress = step / steps;
+        if (prevElement) {
+            prevElement.style.cssText = `
+                display: none !important;
+                opacity: 0 !important;
+                z-index: 0 !important;
+            `;
             
-            // Curvas de ganancia constante (Seno/Coseno) para evitar caídas de volumen
-            const gainNext = Math.sin(progress * (Math.PI / 2));
-            const gainPrev = Math.cos(progress * (Math.PI / 2));
-            
-            // Aplicar Audio Fade
-            try {
-                prevPlayerInstance.setVolume(Math.round(100 * gainPrev));
-                nextPlayerInstance.setVolume(Math.round(100 * gainNext));
-            } catch (e) {}
-            
-            // Aplicar Video Fade
-            if (nextElement) nextElement.style.opacity = gainNext.toFixed(3);
-            if (prevElement) prevElement.style.opacity = gainPrev.toFixed(3);
-            
-            if (step >= steps) {
-                clearInterval(crossfadeInterval);
-                crossfadeInterval = null;
-                crossfadeInProgress = false;
-                
-                // Limpieza final
+            // Detener reproductor anterior
+            setTimeout(() => {
                 try {
                     prevPlayerInstance.stopVideo();
-                    prevPlayerInstance.setVolume(100);
-                    nextPlayerInstance.setVolume(100);
-                    
-                    if (prevElement) {
-                        prevElement.style.display = 'none';
-                        prevElement.style.opacity = '0';
-                    }
-                    if (nextElement) nextElement.style.opacity = '1';
-                } catch (e) {}
-                
-                // Reset de banderas para que el monitor pueda actuar de nuevo
-                isTransitioning = false;
-                nextVideoScheduled = false;
-                hasOutroCrossfadeStarted = false;
-                
-                console.log(`✅ Transición a "${nextVideo.title}" completada`);
-            }
-        }, stepTime);
+                } catch (e) {
+                    console.warn('⚠️ Error deteniendo player anterior');
+                }
+            }, 500);
+        }
+        
+        console.log(`✅ Transición a "${nextVideo.title}" completada`);
 
     } catch (error) {
         console.error("❌ Error en playNextVideo:", error);
-        crossfadeInProgress = false;
-        isTransitioning = false;
-        nextVideoScheduled = false;
-        if (crossfadeInterval) clearInterval(crossfadeInterval);
         this.showMessage('Error al cambiar de pista', 'error');
     }
 }
@@ -1711,35 +1698,39 @@ async performSearch(searchQuery, continuation = null) {
     }
     
     const query = searchQuery.trim();
-    
-    // Identificar el contenedor de resultados en el DOM
     let container = document.getElementById('searchResults');
+    
     if (!container) {
-        container = document.querySelector('.search-results-grid') || 
-                    document.querySelector('#searchView .search-results-wrapper');
-        if (!container) {
-            console.error('❌ No se encontró contenedor de resultados');
-            this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
-            return;
-        }
+        console.error('❌ No se encontró contenedor de resultados');
+        this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
+        return;
     }
     
+    // Guardar query actual
     window.currentSearchQuery = query;
-    window.isLoadingMore = false;
     
-    // Si es una búsqueda nueva (no una carga de página siguiente), limpiar el contenedor
+    // Si es búsqueda nueva, limpiar
     if (!continuation) {
         window.currentNextPageToken = null;
         container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+    } else {
+        // Mostrar loading al final para paginación
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'search-loading-more';
+        loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
+        container.appendChild(loadingDiv);
     }
 
     try {
         console.log(`📡 Llamando a YouTube Client con: "${query}"`);
         const results = await window.youtubeJSClient.search(query, continuation);        
         
-        // Limpiar el loader si es búsqueda nueva
+        // Limpiar loading
         if (!continuation) {
             container.innerHTML = '';
+        } else {
+            const loader = container.querySelector('.search-loading-more');
+            if (loader) loader.remove();
         }
 
         if (!results || !results.items || results.items.length === 0) {
@@ -1751,59 +1742,124 @@ async performSearch(searchQuery, continuation = null) {
                     </div>
                 `;
             }
+            window.isLoadingMore = false;
             return;
         }
 
         console.log(`🎨 Renderizando ${results.items.length} resultados`);
         
-        // DELEGACIÓN A UI: Crear y añadir cada tarjeta al DOM
-        if (window.uiManager && typeof window.uiManager.createSearchResultCard === 'function') {
-            results.items.forEach(video => {
-                const card = window.uiManager.createSearchResultCard(video);
-                if (card) {
-                    container.appendChild(card);
-                }
-            });
-        }
-
-        // Guardar token para el scroll infinito
-        window.currentNextPageToken = results.nextPageToken || null;
+        // Crear fragmento para mejor rendimiento
+        const fragment = document.createDocumentFragment();
         
-        // Configurar el Sentinel para detectar el final del scroll
-        if (window.currentNextPageToken) {
-            let sentinel = document.getElementById('scrollSentinel');
-            if (!sentinel) {
-                sentinel = document.createElement('div');
-                sentinel.id = 'scrollSentinel';
-                sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
+        results.items.forEach(video => {
+            const card = this.ui.createSearchResultCard(video);
+            if (card) {
+                fragment.appendChild(card);
             }
+        });
+        
+        container.appendChild(fragment);
+        
+        // Actualizar token de paginación
+        window.currentNextPageToken = results.continuation || null;
+        window.isLoadingMore = false;
+        
+        // Configurar scroll infinito si hay más resultados
+        if (window.currentNextPageToken) {
+            // Limpiar sentinel anterior
+            const oldSentinel = document.getElementById('scrollSentinel');
+            if (oldSentinel) oldSentinel.remove();
+            
+            // Crear nuevo sentinel
+            const sentinel = document.createElement('div');
+            sentinel.id = 'scrollSentinel';
+            sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
             container.appendChild(sentinel);
+            
+            // Configurar observador
             this.setupInfiniteScroll(container);
         }
+        
+        // Configurar event listeners de botones
+        setTimeout(() => {
+            this.setupSearchButtonListeners();
+        }, 100);
 
     } catch (error) {
         console.error('❌ Error en performSearch:', error);
+        window.isLoadingMore = false;
+        
         if (!continuation) {
-            container.innerHTML = `<div class="search-error"><p>Error: ${error.message}</p></div>`;
+            container.innerHTML = `
+                <div class="search-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error: ${error.message}</p>
+                    <button onclick="window.unifiedCore.performSearch('${query}')">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
         }
     }
 }
+
             
-  setupInfiniteScroll(container) {
-    if (!container || this.searchScrollObserver) return;
-
-    const sentinel = document.getElementById('scrollSentinel');
-    if (!sentinel) return;
-
+setupInfiniteScroll(container) {
+    // Limpiar observador anterior
+    if (this.searchScrollObserver) {
+        try {
+            this.searchScrollObserver.disconnect();
+        } catch (e) {
+            console.warn('⚠️ Error desconectando observador anterior');
+        }
+        this.searchScrollObserver = null;
+    }
+    
+    // Verificar que hay más contenido para cargar
+    if (!window.currentNextPageToken) {
+        console.log('✅ No hay más páginas para cargar');
+        return;
+    }
+    
+    // Crear o reutilizar sentinel
+    let sentinel = document.getElementById('scrollSentinel');
+    if (!sentinel) {
+        sentinel = document.createElement('div');
+        sentinel.id = 'scrollSentinel';
+        sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
+        container.appendChild(sentinel);
+    }
+    
+    // Crear nuevo observador
     this.searchScrollObserver = new IntersectionObserver(async (entries) => {
         const entry = entries[0];
-        if (entry.isIntersecting && !window.isLoadingMore && window.currentNextPageToken) {
+        
+        if (entry.isIntersecting && 
+            !window.isLoadingMore && 
+            window.currentNextPageToken) {
+            
+            console.log('📜 Cargando más resultados...');
             window.isLoadingMore = true;
-            await this.performSearch(window.currentSearchQuery, window.currentNextPageToken);
+            
+            try {
+                await this.performSearch(
+                    window.currentSearchQuery, 
+                    window.currentNextPageToken
+                );
+            } catch (error) {
+                console.error('❌ Error cargando más resultados:', error);
+            } finally {
+                window.isLoadingMore = false;
+            }
         }
-    }, { root: null, rootMargin: '200px', threshold: 0.1 });
-
+    }, { 
+        root: null, 
+        rootMargin: '200px', 
+        threshold: 0.1 
+    });
+    
     this.searchScrollObserver.observe(sentinel);
+    console.log('✅ Scroll infinito configurado');
 }
 displaySearchResults(videos, container) {
     if (!container) {
