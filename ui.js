@@ -265,28 +265,37 @@ showMiniPlayerFloat() {
 }
 
 createSearchResultCard(video) {
-    // Validación y extracción de ID de video (soporta múltiples formatos de respuesta)
+    // ✅ VALIDACIÓN ROBUSTA DEL VIDEO ID
     let videoId = video.videoId || video.id;
-    if (!videoId || videoId === 'undefined') {
-        if (video.id && typeof video.id === 'object') videoId = video.id.videoId;
-        if (!videoId) return null;
+    
+    // Si el ID es un objeto, extraer el videoId interno
+    if (videoId && typeof videoId === 'object') {
+        videoId = videoId.videoId || null;
+    }
+    
+    // Validación estricta
+    if (!videoId || videoId === 'undefined' || typeof videoId !== 'string' || videoId.trim() === '') {
+        console.error('❌ Video ID inválido:', video);
+        return null; // No crear tarjeta si no hay ID válido
     }
 
     const title = video.title || 'Título desconocido';
     const artist = video.uploaderName || video.artist || 'Artista desconocido';
     const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
     
-    // Formateo de duración
+    // ✅ VALIDACIÓN MEJORADA DE DURACIÓN
     let durationDisplay = '';
     if (video.duration) {
-        durationDisplay = typeof video.duration === 'number' 
-            ? this.formatDuration(video.duration) 
-            : video.duration;
+        if (typeof video.duration === 'number') {
+            durationDisplay = this.formatDuration(video.duration);
+        } else if (typeof video.duration === 'string') {
+            durationDisplay = video.duration;
+        }
     }
 
     const div = document.createElement('div');
     div.className = 'track-item card-track search-result-card';
-    div.dataset.videoId = videoId;
+    div.dataset.videoId = videoId; // ✅ Guardar ID validado
 
     div.innerHTML = `
         <div class="search-result-thumbnail">
@@ -298,54 +307,144 @@ createSearchResultCard(video) {
             <p class="search-result-author">${this.escapeHTML(artist)}</p>
         </div>
         <div class="search-result-actions">
-             <button class="search-result-add-next-btn" title="Reproducir siguiente">
+            <button class="search-result-add-next-btn" 
+                    data-video-id="${videoId}"
+                    data-title="${this.escapeHTML(title)}"
+                    data-thumbnail="${thumbnail}"
+                    data-duration="${video.duration || 0}"
+                    data-artist="${this.escapeHTML(artist)}"
+                    title="Reproducir siguiente">
                 <i class="fas fa-forward"></i>
             </button>
-            <button class="add-to-queue-btn" title="Añadir a la cola">
+            <button class="add-to-queue-btn" 
+                    data-video-id="${videoId}"
+                    title="Añadir a la cola">
                 <i class="fas fa-plus"></i>
             </button>
         </div>
     `;
 
-    // Evento: Reproducción inmediata al hacer click en la tarjeta (vía Core)
+    // ✅ EVENTO: Click en tarjeta para reproducir
     div.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
+        if (e.target.closest('button')) return; // Ignorar clicks en botones
+        
         if (window.unifiedCore && window.unifiedCore.playVideoFromSearch) {
             window.unifiedCore.playVideoFromSearch({
-                id: videoId, title, thumbnail, channel: artist, duration: video.duration
+                id: videoId,
+                title: title,
+                thumbnail: thumbnail,
+                channel: artist,
+                duration: video.duration || 0
             });
         }
     });
 
-    // Evento: Botón añadir a la cola
+    // ✅ EVENTO: Botón "Añadir a cola" MEJORADO
     const addBtn = div.querySelector('.add-to-queue-btn');
-    addBtn?.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const icon = addBtn.querySelector('i');
-        icon.className = 'fas fa-spinner fa-spin';
-        try {
-            await window.unifiedCore.addVideoToQueue({
-                videoId, title, thumbnail, duration: video.duration, artist
-            });
-            icon.className = 'fas fa-check';
-            setTimeout(() => icon.className = 'fas fa-plus', 1500);
-        } catch (err) { icon.className = 'fas fa-times'; }
-    });
+    if (addBtn) {
+        addBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const btnVideoId = addBtn.dataset.videoId;
+            if (!btnVideoId || btnVideoId === 'undefined') {
+                console.error('❌ ID inválido en botón');
+                return;
+            }
+            
+            const icon = addBtn.querySelector('i');
+            icon.className = 'fas fa-spinner fa-spin';
+            addBtn.disabled = true;
+            
+            try {
+                // ✅ CREAR OBJETO DE VIDEO COMPLETO
+                const videoData = {
+                    videoId: btnVideoId,
+                    title: title,
+                    thumbnail: thumbnail,
+                    duration: video.duration || 0,
+                    uploaderName: artist,
+                    author: artist,
+                    artist: artist
+                };
+                
+                await window.unifiedCore.addVideoToQueue(videoData);
+                
+                icon.className = 'fas fa-check';
+                addBtn.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    icon.className = 'fas fa-plus';
+                    addBtn.style.background = '';
+                    addBtn.disabled = false;
+                }, 1500);
+                
+            } catch (err) {
+                console.error('❌ Error añadiendo:', err);
+                icon.className = 'fas fa-times';
+                addBtn.style.background = '#f44336';
+                
+                setTimeout(() => {
+                    icon.className = 'fas fa-plus';
+                    addBtn.style.background = '';
+                    addBtn.disabled = false;
+                }, 1500);
+            }
+        });
+    }
 
-    // Evento: Botón reproducir a continuación
+    // ✅ EVENTO: Botón "Siguiente" MEJORADO
     const nextBtn = div.querySelector('.search-result-add-next-btn');
-    nextBtn?.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const icon = nextBtn.querySelector('i');
-        icon.className = 'fas fa-spinner fa-spin';
-        try {
-            await window.unifiedCore.addVideoToQueueAfterCurrent({
-                videoId, title, thumbnail, duration: video.duration, artist
-            });
-            icon.className = 'fas fa-check';
-            setTimeout(() => icon.className = 'fas fa-forward', 1500);
-        } catch (err) { icon.className = 'fas fa-times'; }
-    });
+    if (nextBtn) {
+        nextBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const btnVideoId = nextBtn.dataset.videoId;
+            if (!btnVideoId || btnVideoId === 'undefined') {
+                console.error('❌ ID inválido en botón siguiente');
+                return;
+            }
+            
+            const icon = nextBtn.querySelector('i');
+            icon.className = 'fas fa-spinner fa-spin';
+            nextBtn.disabled = true;
+            
+            try {
+                const videoData = {
+                    videoId: btnVideoId,
+                    title: nextBtn.dataset.title || title,
+                    thumbnail: nextBtn.dataset.thumbnail || thumbnail,
+                    duration: parseInt(nextBtn.dataset.duration) || 0,
+                    uploaderName: nextBtn.dataset.artist || artist,
+                    author: nextBtn.dataset.artist || artist,
+                    artist: nextBtn.dataset.artist || artist
+                };
+                
+                await window.unifiedCore.addVideoToQueueAfterCurrent(videoData);
+                
+                icon.className = 'fas fa-check';
+                nextBtn.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    icon.className = 'fas fa-forward';
+                    nextBtn.style.background = '';
+                    nextBtn.disabled = false;
+                }, 1500);
+                
+            } catch (err) {
+                console.error('❌ Error añadiendo siguiente:', err);
+                icon.className = 'fas fa-times';
+                nextBtn.style.background = '#f44336';
+                
+                setTimeout(() => {
+                    icon.className = 'fas fa-forward';
+                    nextBtn.style.background = '';
+                    nextBtn.disabled = false;
+                }, 1500);
+            }
+        });
+    }
 
     return div;
 }
