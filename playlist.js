@@ -1084,18 +1084,22 @@ renderLyricsUI(match, originalArtist, originalTitle) {
             </div>`;
     }
 cleanTrackTitle(title) {
-    if (!title) return '';
-    
-    let clean = title;
+    // ✅ VALIDACIÓN CRÍTICA
+    if (!title || typeof title !== 'string') {
+        console.warn('⚠️ Título inválido:', title);
+        return 'Sin título';
+    }
+
+    let clean = title.trim(); // ✅ Asegurar que sea string
 
     // 1. Eliminar Emojis
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 2. Eliminar colaboraciones y productores (ft., feat., prod.)
+    // 2. Eliminar colaboraciones
     clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with|prod\.|produced by)\s.*/i, '');
 
-    // 3. Eliminar contenido entre paréntesis/corchetes que sea "ruido"
+    // 3. Eliminar contenido entre paréntesis/corchetes
     const noiseKeywords = 'official|video|audio|lyrics|visualizer|hd|hq|4k|8k|live|vivo|version|remaster|extended|radio|original|cover|acoustic|instrumental|karaoke|bpm|remix|rmx|mix|edit|mashup|bootleg|dj|set|session|topic';
     
     clean = clean.replace(new RegExp(`\\s*[\\(\\[].*?(${noiseKeywords}).*?[\\)\\]]`, 'gi'), '');
@@ -1103,14 +1107,14 @@ cleanTrackTitle(title) {
     // 4. Eliminar palabras clave sueltas al final
     clean = clean.replace(new RegExp(`\\s*[-:]?\\s*(${noiseKeywords})$`, 'gi'), '');
 
-    // 5. CORRECCIÓN ESPECÍFICA: Eliminar letra "s" suelta al final
+    // 5. Eliminar letra "s" suelta al final
     clean = clean.replace(/\s+s$/i, '');
 
-    // 6. Limpieza final de caracteres y espacios
-    clean = clean.replace(/["“”]/g, ''); // Comillas
-    clean = clean.split('|')[0]; // Separadores de tubo
+    // 6. Limpieza final
+    clean = clean.replace(/["""]/g, '');
+    clean = clean.split('|')[0];
     
-    // Si el título es "Artista - Titulo", quedarse solo con el titulo
+    // Si es "Artista - Titulo", quedarse solo con titulo
     if (clean.includes(' - ')) {
         const parts = clean.split(' - ');
         if (parts.length > 1) clean = parts[1];
@@ -1118,8 +1122,12 @@ cleanTrackTitle(title) {
 
     const finalTitle = clean.replace(/\s+/g, ' ').trim();
     
-    // Fallback: Si la limpieza borró todo (ej: título era solo emojis), usar original
-    return finalTitle.length > 0 ? finalTitle : title;
+    // ✅ VALIDACIÓN FINAL
+    if (!finalTitle || finalTitle.length === 0) {
+        return title; // Fallback al original
+    }
+    
+    return finalTitle;
 }
 async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
@@ -3014,7 +3022,7 @@ class QueueDragDrop {
             mutations.forEach((mutation) => {
                 if (mutation.addedNodes.length > 0) {
                     mutation.addedNodes.forEach((node) => {
-                        if (node.classList && node.classList.contains('queue-popup-overlay')) {
+                        if (node.classList && node.classList.contains('queue-list-content')) {
                             setTimeout(() => {
                                 this.attachDragListeners();
                             }, 100);
@@ -3026,155 +3034,129 @@ class QueueDragDrop {
         
         observer.observe(document.body, { childList: true, subtree: true });
     }
- attachDragListeners() {
-    const queueItems = document.querySelectorAll('.queue-item');
-    
-    console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
-    
-    queueItems.forEach((item, index) => {
-        // ✅ CRÍTICO: Asegurar que el atributo draggable esté activo
-        item.setAttribute('draggable', 'true');
-        item.style.cursor = 'move';
+
+    attachDragListeners() {
+        // ✅ CRÍTICO: Solo items dentro de #queueContentList
+        const queueItems = document.querySelectorAll('#queueContentList .queue-item');
         
-        // ✅ Limpiar listeners anteriores clonando el nodo
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
+        console.log(`🎯 Configurando ${queueItems.length} items para drag & drop`);
         
-        // ✅ Configurar eventos en el nodo limpio
-        newItem.addEventListener('dragstart', (e) => {
-            this.draggedItem = newItem;
-            this.draggedIndex = parseInt(newItem.dataset.flatIndex);
+        queueItems.forEach((item) => {
+            // Limpiar listeners previos
+            const newItem = item.cloneNode(true);
+            item.parentNode.replaceChild(newItem, item);
             
-            newItem.style.opacity = '0.5';
-            newItem.classList.add('dragging');
+            // ✅ ASEGURAR DRAGGABLE
+            newItem.setAttribute('draggable', 'true');
+            newItem.style.cursor = 'move';
             
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', this.draggedIndex);
+            // Eventos
+            newItem.addEventListener('dragstart', (e) => {
+                this.draggedItem = newItem;
+                this.draggedIndex = parseInt(newItem.dataset.flatIndex);
+                
+                newItem.classList.add('dragging');
+                newItem.style.opacity = '0.5';
+                
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.draggedIndex);
+                
+                console.log(`🎯 Drag start: índice ${this.draggedIndex}`);
+            });
             
-            console.log(`🎯 Drag start: índice ${this.draggedIndex}`);
+            newItem.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            
+            newItem.addEventListener('dragenter', (e) => {
+                if (newItem !== this.draggedItem) {
+                    newItem.classList.add('drag-over');
+                }
+            });
+            
+            newItem.addEventListener('dragleave', () => {
+                newItem.classList.remove('drag-over');
+            });
+            
+            newItem.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleDrop(e, newItem, parseInt(newItem.dataset.flatIndex));
+            });
+            
+            newItem.addEventListener('dragend', () => {
+                this.handleDragEnd();
+            });
         });
-        
-        newItem.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
-        
-        newItem.addEventListener('dragenter', (e) => {
-            if (newItem !== this.draggedItem) {
-                newItem.classList.add('drag-over');
-            }
-        });
-        
-        newItem.addEventListener('dragleave', (e) => {
-            newItem.classList.remove('drag-over');
-        });
-        
-        newItem.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.handleDrop(e, newItem, parseInt(newItem.dataset.flatIndex));
-        });
-        
-        newItem.addEventListener('dragend', (e) => {
-            this.handleDragEnd(e);
-        });
-    });
-}
-    
-    handleDragStart(e, item, index) {
-        console.log(`🎯 Drag start: item ${index}`);
-        
-        this.draggedItem = item;
-        this.draggedIndex = index;
-        
-        item.style.opacity = '0.5';
-        item.classList.add('dragging');
-        
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/html', item.innerHTML);
-        e.dataTransfer.setData('application/json', JSON.stringify({
-            index: index,
-            videoId: item.dataset.videoId
-        }));
     }
-    
-    handleDragOver(e) {
+
+    handleDrop(e, targetItem, targetIndex) {
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+        e.stopPropagation();
+        
+        targetItem.classList.remove('drag-over');
+        
+        if (this.draggedItem === targetItem || this.draggedIndex === targetIndex) {
+            return false;
+        }
+        
+        console.log(`🎯 Drop: de ${this.draggedIndex} a ${targetIndex}`);
+        
+        const queuePlaylist = window.playlistManager?.core?.playlistsData?.find(p => p.id === 'queue');
+        if (!queuePlaylist) {
+            console.error('❌ No se encontró playlist de cola');
+            return false;
+        }
+        
+        // Mover video en el array
+        const [movedVideo] = queuePlaylist.videos.splice(this.draggedIndex, 1);
+        
+        let newIndex = targetIndex;
+        if (this.draggedIndex < targetIndex) {
+            newIndex--;
+        }
+        
+        queuePlaylist.videos.splice(newIndex, 0, movedVideo);
+        
+        // Ajustar índice de reproducción actual
+        if (window.currentPlayingInfo) {
+            const currentIdx = window.currentPlayingInfo.flattenedIndex;
+            
+            if (currentIdx === this.draggedIndex) {
+                window.currentPlayingInfo.flattenedIndex = newIndex;
+            } else if (this.draggedIndex < currentIdx && newIndex >= currentIdx) {
+                window.currentPlayingInfo.flattenedIndex--;
+            } else if (this.draggedIndex > currentIdx && newIndex <= currentIdx) {
+                window.currentPlayingInfo.flattenedIndex++;
+            }
+        }
+        
+        // Actualizar UI
+        if (window.playlistManager) {
+            window.playlistManager.updateQueueUI();
+            
+            // ✅ Reattach listeners después de actualizar
+            setTimeout(() => {
+                this.attachDragListeners();
+            }, 100);
+        }
+        
+        if (window.unifiedCore) {
+            window.unifiedCore.showMessage('Orden actualizado', 'success');
+        }
+        
+        // Guardar cambios
+        setTimeout(() => {
+            if (typeof window.saveAllData === 'function') {
+                window.saveAllData();
+            }
+        }, 100);
+        
         return false;
     }
     
-    handleDragEnter(e, item) {
-        if (item !== this.draggedItem) {
-            item.classList.add('drag-over');
-        }
-    }
-    
-    handleDragLeave(e, item) {
-        item.classList.remove('drag-over');
-    }
-    
-handleDrop(e, targetItem, targetIndex) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    targetItem.classList.remove('drag-over');
-    
-    if (this.draggedItem === targetItem) {
-        return false;
-    }
-    
-    console.log(`🎯 Drop: de ${this.draggedIndex} a ${targetIndex}`);
-    
-    // CORRECCIÓN: Usar playlistManager en lugar de playlistsData directamente
-    const queuePlaylist = window.playlistManager?.playlistsData?.find(p => p.id === 'queue' || p.isQueue);
-    if (!queuePlaylist) {
-        console.error('❌ No se encontró playlist de cola');
-        return false;
-    }
-    
-    const [movedVideo] = queuePlaylist.videos.splice(this.draggedIndex, 1);
-    
-    let newIndex = targetIndex;
-    if (this.draggedIndex < targetIndex) {
-        newIndex--;
-    }
-    
-    queuePlaylist.videos.splice(newIndex, 0, movedVideo);
-    
-    // Ajustar índice de reproducción actual
-    if (window.currentPlayingInfo) {
-        if (window.currentPlayingInfo.flattenedIndex === this.draggedIndex) {
-            window.currentPlayingInfo.flattenedIndex = newIndex;
-        } else if (this.draggedIndex < window.currentPlayingInfo.flattenedIndex && 
-                   newIndex >= window.currentPlayingInfo.flattenedIndex) {
-            window.currentPlayingInfo.flattenedIndex--;
-        } else if (this.draggedIndex > window.currentPlayingInfo.flattenedIndex && 
-                   newIndex <= window.currentPlayingInfo.flattenedIndex) {
-            window.currentPlayingInfo.flattenedIndex++;
-        }
-    }
-    
-    // Actualizar UI
-    if (window.playlistManager) {
-        window.playlistManager.updateQueuePopup();
-    }
-    
-    if (window.unifiedCore) {
-        window.unifiedCore.showMessage('Orden actualizado', 'success');
-    }
-    
-    // Guardar cambios
-    setTimeout(() => {
-        if (typeof window.saveAllData === 'function') {
-            window.saveAllData();
-        }
-    }, 100);
-    
-    return false;
-}
-    
-    handleDragEnd(e) {
+    handleDragEnd() {
         console.log('🎯 Drag end');
         
         if (this.draggedItem) {
@@ -3190,7 +3172,6 @@ handleDrop(e, targetItem, targetIndex) {
         this.draggedIndex = null;
     }
 }
-
 // =============================================
 // FUNCIONES GLOBALES Y DE COMPATIBILIDAD
 // =============================================
