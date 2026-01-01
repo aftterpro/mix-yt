@@ -327,14 +327,16 @@ body {
 }
 #persistent-player-layer {
     position: fixed;
-    z-index: 1000;
-    /* Los estilos de posición (top/left/width) los maneja JS, 
-       aquí solo aseguramos que flote sobre todo */
-    pointer-events: none; /* Por defecto no bloquea clicks hasta que tenga video */
+    z-index: 60 !important; 
+    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    background: transparent;
+    pointer-events: auto; 
 }
-
-/* Cuando el mini player tiene contenido activo */
 body.mini-player-active #persistent-player-layer {
+    z-index: 999998 !important; /* ✅ Alto pero MENOR que otros elementos críticos */
+}
+/* Cuando el mini player tiene contenido activo */
+body.mini-player-active  {
     pointer-events: auto;
 }
 /* =============================================
@@ -598,11 +600,12 @@ body.mini-player-active #persistent-player-layer {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-    z-index: 200 !important;
     pointer-events: auto !important;
     padding: 0 var(--spacing-lg) !important;
     gap: var(--spacing-lg) !important;
     align-items: center !important;
+    z-index: 999999 !important;
+
 }
 
 .player-info {
@@ -1405,7 +1408,7 @@ body.mini-player-active #persistent-player-layer {
     transform: none !important;
     transition: opacity 0.3s ease !important;
 }
-body.mini-player-active #persistent-player-layer {
+body.mini-player-active {
     z-index: 999997 !important; /* MENOR que miniPlayerFloat (999998) */
 }
 #miniPlayerFloat:hover::after {
@@ -1654,6 +1657,16 @@ body.mini-player-active #persistent-player-layer {
     width: 400px;
     height: 575px;
     margin: 8px;
+    position: relative !important;
+    z-index: 100 !important; /* ✅ MAYOR que persistent-player-layer */
+    pointer-events: auto !important;
+}
+.queue-tabs,
+.queue-tab-content,
+.queue-list-content {
+    position: relative !important;
+    z-index: 101 !important; /* ✅ Asegurar que estén encima */
+    pointer-events: auto !important;
 }
 
 .queue-header {
@@ -2183,10 +2196,6 @@ body.mini-player-active #persistent-player-layer {
 }
 
 /* =============================================
-   DRAG & DROP EN COLA
-   ============================================= */
-
-/* =============================================
    COLA - ITEMS CON DURACIÓN EN THUMBNAIL
    ============================================= */
 .queue-item {
@@ -2197,7 +2206,9 @@ body.mini-player-active #persistent-player-layer {
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: background var(--transition-fast);
-    position: relative; /* Para posicionar elementos absolutos */
+   position: relative !important;
+    z-index: 102 !important;
+    pointer-events: auto !important;
 }
 
 .queue-item:hover {
@@ -3280,11 +3291,6 @@ iframe[style*="opacity: 1"],
     z-index: 50 !important;
     visibility: visible !important;
 }
-/* Forzar que la capa del video esté encima */
-#persistent-player-layer {
-    background: transparent !important;
-    z-index: 60 !important; 
-}
 #miniPlayerFloat, #miniPlayerContainer {
     z-index: 999999 !important; /* Más de 9000 */
     display: block; /* Asegurar que no esté none */
@@ -3300,6 +3306,6 @@ iframe[style*="opacity: 1"],
 body.mini-player-active {
     z-index: 999999 !important;
 }
-body.mini-player-active #persistent-player-layer {
+body.mini-player-active {
     z-index: 1001 !important;
 }
