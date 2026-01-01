@@ -326,14 +326,18 @@ body {
     display: block !important;
 }
 #persistent-player-layer {
-    position: fixed;
-    z-index: 60 !important; 
+     position: fixed;
     transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     background: transparent;
-    pointer-events: auto; 
+}
+.full-player-view.active ~ #persistent-player-layer,
+#fullPlayerView.active ~ #persistent-player-layer {
+    z-index: 55 !important; /* MENOR que .persistent-queue-sidebar (100) */
+    pointer-events: none !important;
 }
 body.mini-player-active #persistent-player-layer {
-    z-index: 999998 !important; /* ✅ Alto pero MENOR que otros elementos críticos */
+    z-index: 999998 !important;
+    pointer-events: auto !important;
 }
 /* Cuando el mini player tiene contenido activo */
 body.mini-player-active  {
@@ -1650,25 +1654,27 @@ body.mini-player-active {
    COLA PERSISTENTE
    ============================================= */
 .persistent-queue-sidebar {
-    background: #181818;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    flex-direction: column;
-    width: 400px;
-    height: 575px;
-    margin: 8px;
     position: relative !important;
-    z-index: 100 !important; /* ✅ MAYOR que persistent-player-layer */
+    z-index: 100 !important;
     pointer-events: auto !important;
 }
 .queue-tabs,
 .queue-tab-content,
-.queue-list-content {
+.queue-list-content,
+.queue-item {
     position: relative !important;
-    z-index: 101 !important; /* ✅ Asegurar que estén encima */
+    z-index: 101 !important;
     pointer-events: auto !important;
 }
-
+#persistent-player-layer .video-player,
+#persistent-player-layer iframe {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: none !important; /* No interferir con clicks */
+}
 .queue-header {
     padding: 20px;
     border-bottom: 1px solid var(--yt-layer-10);
