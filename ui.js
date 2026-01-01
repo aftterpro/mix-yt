@@ -98,13 +98,23 @@ class UIManager {
     // MOVIMIENTO DE REPRODUCTORES (CORE LÓGICO)
     // ==========================================
 
-   movePlayersToFullView() {
+movePlayersToFullView() {
     const layer = document.getElementById('persistent-player-layer');
     if (!layer) return;
 
     console.log('🎬 Expandiendo a pantalla completa');
 
+    // ✅ ASEGURAR QUE LOS IFRAMES ESTÉN DENTRO
+    const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
+    const activePlayer = document.getElementById(activePlayerId);
+    
+    if (activePlayer && !layer.contains(activePlayer)) {
+        layer.appendChild(activePlayer);
+    }
+
+    // ✅ Bajar z-index para que la cola sea clickeable
     layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    layer.style.zIndex = '60'; // ✅ BAJO para que tabs queden encima
     
     requestAnimationFrame(() => {
         layer.style.top = '0';
@@ -115,41 +125,53 @@ class UIManager {
         layer.style.right = 'auto';
         layer.style.borderRadius = '0px';
         layer.style.boxShadow = 'none';
+        layer.style.opacity = '1';
+        layer.style.visibility = 'visible';
+        layer.style.pointerEvents = 'auto';
         
         document.body.classList.remove('mini-player-active');
     });
 }
 showMiniPlayerFloat() {
     const layer = document.getElementById('persistent-player-layer');
-    if (!layer) return;
+    if (!layer) {
+        console.error('❌ persistent-player-layer no encontrado');
+        return;
+    }
 
-    console.log('🔍 Aplicando efecto miniatura (zoom hacia esquina)');
+    console.log('🔍 Mostrando mini player flotante');
 
-    // Aseguramos que el contenedor tenga las propiedades base para la animación
+    // ✅ CRÍTICO: Asegurar que los iframes estén dentro antes de animar
+    const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
+    const activePlayer = document.getElementById(activePlayerId);
+    
+    if (activePlayer && !layer.contains(activePlayer)) {
+        layer.appendChild(activePlayer);
+    }
+
+    // Configuración base
     layer.style.display = 'block';
     layer.style.position = 'fixed';
-    layer.style.zIndex = '9999';
+    layer.style.zIndex = '999999'; // ✅ Z-index MUY ALTO
     layer.style.pointerEvents = 'auto';
     layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    layer.style.transformOrigin = 'bottom right'; // El zoom se dirige hacia la esquina inferior derecha
 
-    // Valores para el "estado miniatura"
-    const miniWidth = 300;
-    const miniHeight = 168; // Proporción 16:9
-    const offset = 20; // Espacio desde el borde
+    const miniWidth = 320;
+    const miniHeight = 180;
+    const bottomOffset = 110; // Altura del bottom-player + espacio
+    const rightOffset = 20;
 
     requestAnimationFrame(() => {
-        layer.style.bottom = `${offset}px`;
-        layer.style.right = `${offset}px`;
+        layer.style.top = 'auto';
+        layer.style.left = 'auto';
+        layer.style.bottom = `${bottomOffset}px`;
+        layer.style.right = `${rightOffset}px`;
         layer.style.width = `${miniWidth}px`;
         layer.style.height = `${miniHeight}px`;
         layer.style.borderRadius = '12px';
-        layer.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+        layer.style.boxShadow = '0 10px 40px rgba(0,0,0,0.8)';
         layer.style.opacity = '1';
         layer.style.visibility = 'visible';
-        
-        // Si quieres un efecto de escala real además del cambio de tamaño:
-        // layer.style.transform = 'scale(1)'; 
         
         document.body.classList.add('mini-player-active');
     });
