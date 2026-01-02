@@ -2,20 +2,21 @@ class YouTubeSimplifiedClient {
     constructor() {
         this.initialized = false;
         this.searchApiUrl = 'https://mix-yt.netlify.app/.netlify/functions/search';
+        
         this.requestCache = new Map();
+        this.searchCache = new Map(); 
         this.maxCacheSize = 50;
         this.cacheExpiry = 5 * 60 * 1000;
-        this.searchCache = new Map();
         this.isLoadingMore = false;
     }
     
     async init() {
         this.initialized = true;
-        console.log('✅ YouTube Client inicializado');
+        console.log(' YouTube Client inicializado');
         return true;
     }
     
-  async search(query, continuation = null) {
+    async search(query, continuation = null) {
         if (!query?.trim()) {
             console.error('❌ Query vacío');
             return { items: [], continuation: null };
@@ -23,19 +24,19 @@ class YouTubeSimplifiedClient {
 
         const cacheKey = `${query}_${continuation || 'first'}`;
         
-        // ✅ CORRECTO: Usar this.searchCache
+        // ✅ VERIFICAR CACHÉ
         if (this.searchCache.has(cacheKey)) {
             console.log(`💾 Resultado cacheado: ${cacheKey}`);
             return this.searchCache.get(cacheKey);
         }
 
-        // ✅ CORRECTO: Usar this.isLoadingMore
+        // ✅ BLOQUEO DE CARGA MÚLTIPLE
         if (this.isLoadingMore && continuation) {
             console.log('⏳ Ya hay una carga en progreso...');
             return { items: [], continuation: null };
         }
 
-        this.isLoadingMore = true; // ✅ Bloquear
+        this.isLoadingMore = true;
 
         console.log(`🔍 Buscando: "${query}"${continuation ? ' (Pág. siguiente)' : ''}`);
         
@@ -44,17 +45,15 @@ class YouTubeSimplifiedClient {
             params.append('nextpage', continuation);
         }
 
-        const url = `https://mix-yt.netlify.app/.netlify/functions/search?${params}`;
-        console.log(`📡 Llamando a: ${url}`);
+        const url = `${this.searchApiUrl}?${params}`;
 
         try {
-           
-            const response = await this.fetchWithRetry(url); 
+            const response = await this.fetchWithRetry(url, 3, 1000);
             const data = await response.json();
 
             if (!data?.items?.length) {
                 console.warn('⚠️ Sin resultados');
-                this.isLoadingMore = false; 
+                this.isLoadingMore = false;
                 return { items: [], continuation: null };
             }
 
@@ -65,24 +64,25 @@ class YouTubeSimplifiedClient {
                 continuation: data.continuation || null
             };
 
-           
+            // ✅ GUARDAR EN CACHÉ
             this.searchCache.set(cacheKey, result);
 
-          
+            // ✅ LIMITAR TAMAÑO DE CACHÉ
             if (this.searchCache.size > 50) {
                 const firstKey = this.searchCache.keys().next().value;
                 this.searchCache.delete(firstKey);
             }
 
-            this.isLoadingMore = false; 
+            this.isLoadingMore = false;
             return result;
 
         } catch (error) {
             console.error('❌ Error en búsqueda:', error);
-            this.isLoadingMore = false; 
+            this.isLoadingMore = false;
             return { items: [], continuation: null };
         }
     }
+    
     async fetchWithRetry(url, maxRetries = 3, delay = 1000) {
         let lastError;
         
@@ -91,13 +91,18 @@ class YouTubeSimplifiedClient {
                 console.log(`📡 Intento ${attempt}/${maxRetries}`);
                 
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
                 
                 const response = await fetch(url, {
                     signal: controller.signal
                 });
                 
                 clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
                 return response;
                 
             } catch (error) {
@@ -107,147 +112,12 @@ class YouTubeSimplifiedClient {
                 if (attempt < maxRetries) {
                     console.log(`🔄 Reintentando en ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // Exponential backoff
+                    delay *= 2;
                 }
             }
         }
         
         throw lastError;
-    }
-
-    getCachedResult(key) {
-        const cached = this.requestCache.get(key);
-        if (!cached) return null;
-        
-        // Verificar expiración
-        if (Date.now() - cached.timestamp > this.cacheExpiry) {
-            this.requestCache.delete(key);
-            return null;
-        }
-        
-        return cached.data;
-    }
-
-    cacheResult(key, data) {
-   
-    if (this.requestCache.size >= this.maxCacheSize) {
-        // Eliminar la entrada más antigua
-        const firstKey = this.requestCache.keys().next().value;
-        this.requestCache.delete(firstKey);
-        console.log(`🗑️ Caché llena, eliminando: ${firstKey}`);
-    }
-    
-    this.requestCache.set(key, {
-        data,
-        timestamp: Date.now()
-    });
-    
-    console.log(`💾 Resultado cacheado: ${key} (Total: ${this.requestCache.size}/${this.maxCacheSize})`);
-}
-
-    async getTrending(region = 'US') {
-        console.log(`🔥 Cargando trending (${region})...`);
-        
-        try {
-            const pipedInstances = [
-                'https://api.piped.private.coffee',
-                'https://pipedapi.kavin.rocks',
-                'https://piped-api.garudalinux.org'
-            ];
-            
-            // Intentar con cada instancia
-            for (const instance of pipedInstances) {
-                try {
-                    const response = await fetch(
-                        `${instance}/trending?region=${region}`,
-                        { signal: AbortSignal.timeout(5000) }
-                    );
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log(`✅ Trending cargado desde ${instance}`);
-                        return { items: data, region, source: instance };
-                    }
-                } catch (e) {
-                    console.warn(`⚠️ Instancia ${instance} falló`);
-                    continue;
-                }
-            }
-            
-            throw new Error('Todas las instancias fallaron');
-            
-        } catch (error) {
-            console.error('❌ Error en trending:', error);
-            return { items: [], error: error.message };
-        }
-    }
-
-    // ✅ CORRECCIÓN: Obtener info de video con fallback
-    async getVideoInfo(videoId) {
-        if (!videoId || videoId === 'undefined') {
-            console.error('❌ VideoId inválido');
-            return null;
-        }
-
-        try {
-            const pipedInstances = [
-                'https://api.piped.private.coffee'
-                //'https://pipedapi.kavin.rocks',
-               // 'https://piped-api.garudalinux.org'
-            ];
-            
-            // Intentar con cada instancia
-            for (const instance of pipedInstances) {
-                try {
-                    const response = await fetch(
-                        `${instance}/streams/${videoId}`,
-                        { signal: AbortSignal.timeout(5000) }
-                    );
-                    
-                    if (!response.ok) continue;
-                    
-                    const data = await response.json();
-                    
-                    return {
-                        videoId: videoId,
-                        title: data.title,
-                        description: data.description,
-                        duration: data.duration,
-                        uploader: data.uploader,
-                        thumbnail: data.thumbnailUrl,
-                        relatedStreams: data.relatedStreams || [],
-                        source: instance
-                    };
-                    
-                } catch (e) {
-                    console.warn(`⚠️ Instancia ${instance} falló para ${videoId}`);
-                    continue;
-                }
-            }
-            
-            console.warn(`❌ No se pudo obtener info de ${videoId}`);
-            return null;
-            
-        } catch (error) {
-            console.error(`❌ Error obteniendo info de ${videoId}:`, error);
-            return null;
-        }
-    }
-
-    // ✅ NUEVA FUNCIÓN: Limpiar caché manualmente
-    clearCache() {
-        this.requestCache.clear();
-        console.log('🧹 Caché limpiada');
-    }
-
-    // ✅ NUEVA FUNCIÓN: Obtener estadísticas
-    getStats() {
-        return {
-            initialized: this.initialized,
-            cacheSize: this.requestCache.size,
-            maxCacheSize: this.maxCacheSize,
-            apiUrl: this.searchApiUrl
-        };
     }
 }
 // =============================================
@@ -480,7 +350,6 @@ setInterval(() => {
 // =============================================
 
 window.youtubeClientUtils = {
-    // ✅ CORRECCIÓN: Formatear duración con validación
     formatDuration: (seconds) => {
         if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
         
@@ -494,7 +363,6 @@ window.youtubeClientUtils = {
         return `${m}:${s.toString().padStart(2,'0')}`;
     },
     
-    // ✅ CORRECCIÓN: Parsear duración con mejor validación
     parseDurationString: (durationStr) => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
         
