@@ -573,16 +573,18 @@ removeVideoFromQueue(videoId) {
 // GESTIÓN DE TABS EN LA COLA
 // =============================================
 switchQueueTab(tabName) {
-   console.log(`🔄 Cambiando a tab: ${tabName}`);
+    console.log(`🔄 Cambiando a tab: ${tabName}`);
+    
+    // ✅ DETENER SINCRONIZACIÓN DE LETRAS AL SALIR
     if (tabName !== 'lyrics') {
         if (this.lyricsSyncInterval) {
             clearInterval(this.lyricsSyncInterval);
             this.lyricsSyncInterval = null;
-            console.log('🛑 Sincronización detenida al cambiar de tab');
+            console.log('🛑 Sincronización detenida');
         }
     }
-      
-    // 2. Actualizar UI
+    
+    // ✅ ACTUALIZAR UI DE TABS
     document.querySelectorAll('.queue-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
@@ -591,7 +593,7 @@ switchQueueTab(tabName) {
         content.classList.toggle('active', content.dataset.tabContent === tabName);
     });
     
-    // 3. ✅ OBTENER VIDEO REAL DEL REPRODUCTOR
+    // ✅ OBTENER VIDEO ACTUAL (desde player, no desde find)
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
@@ -607,26 +609,40 @@ switchQueueTab(tabName) {
         return;
     }
     
-    // 4. ✅ Buscar video en cola
-    const flatList = this.core?.getFlattenedPlaylist() || [];
-    const currentVideo = flatList.find(v => v.videoId === currentVideoId);
+    // ✅ BUSCAR EN COLA (sin recursión)
+    const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
+    
+    if (!queuePlaylist?.videos) {
+        console.warn('⚠️ Cola no encontrada');
+        return;
+    }
+    
+    let currentVideo = null;
+    for (let i = 0; i < queuePlaylist.videos.length; i++) {
+        if (queuePlaylist.videos[i].videoId === currentVideoId) {
+            currentVideo = queuePlaylist.videos[i];
+            break;
+        }
+    }
     
     if (!currentVideo) {
         console.warn(`⚠️ Video ${currentVideoId} no encontrado`);
         return;
     }
     
-    // 5. ✅ Cargar contenido correcto
+    console.log(`🎵 Refrescando tab "${tabName}" para:`, currentVideo.title);
+    
+    // ✅ CARGAR CONTENIDO CORRECTO
     if (tabName === 'lyrics') {
         setTimeout(() => {
             this.loadLyricsForVideo(currentVideo);
         }, 100);
-    } else if (tabName === 'related' && !this.relatedLoaded) {
-        setTimeout(() => this.loadRelatedVideos(), 100);
-        this.relatedLoaded = true;
+    } else if (tabName === 'related') {
+        setTimeout(() => {
+            this.loadRelatedForVideo(currentVideo);
+        }, 100);
     }
 }
-
  /**
  * Cargar relacionados para un video específico
  */
@@ -2404,66 +2420,76 @@ renderQueueContent(flatList) {
  * Configurar event listeners para items de la cola
  */
 setupQueueItemListeners() {
-    const queueItems = document.querySelectorAll('.queue-item');
+    const queueList = document.getElementById('queueContentList');
+    if (!queueList) {
+        console.warn('⚠️ queueContentList no encontrado');
+        return;
+    }
+
+    // ✅ LIMPIAR LISTENERS: Clonar nodo completo
+    const newQueueList = queueList.cloneNode(true);
+    queueList.parentNode.replaceChild(newQueueList, queueList);
     
-    console.log(`🎵 Configurando listeners para ${queueItems.length} items de cola`);
+    // Obtener referencia actualizada
+    const freshList = document.getElementById('queueContentList');
     
-    // ✅ CORRECCIÓN: LIMPIAR LISTENERS PREVIOS clonando nodos
-    queueItems.forEach((item) => {
-        const newItem = item.cloneNode(true);
-        item.parentNode.replaceChild(newItem, item);
-    });
-    
-    // Ahora configurar listeners en los nodos limpios
-    const freshItems = document.querySelectorAll('.queue-item');
-    
-    freshItems.forEach((item) => {
-        const itemIndex = parseInt(item.dataset.flatIndex);
-        const videoId = item.dataset.videoId;
+    // ✅ EVENT DELEGATION (más eficiente que listeners individuales)
+    freshList.addEventListener('click', (e) => {
+        // IGNORAR: Botones de eliminar
+        if (e.target.closest('.queue-item-remove')) {
+            return;
+        }
         
-        // Click en el item para reproducir
-        item.addEventListener('click', (e) => {
-            // Ignorar click en botón de eliminar
-            if (e.target.closest('.queue-item-remove')) {
-                return;
-            }
+        // CLICK EN ITEM: Reproducir
+        const item = e.target.closest('.queue-item');
+        if (!item) return;
+        
+        const index = parseInt(item.dataset.flatIndex);
+        if (!isNaN(index) && index >= 0) {
+            console.log(`▶️ Reproduciendo desde cola: índice ${index}`);
             
-            if (!isNaN(itemIndex)) {
-                const flatList = this.core?.getFlattenedPlaylist() || [];
-                if (itemIndex >= 0 && itemIndex < flatList.length) {
-                    console.log(`▶️ Reproduciendo: ${flatList[itemIndex].title}`);
-                    this.core?.playNextVideo(itemIndex);
+            window.currentPlayingInfo.flattenedIndex = index - 1;
+            
+            if (!window.reproduccionIniciada) {
+                window.reproduccionIniciada = true;
+                if (typeof monitorPlayers === 'function' && !window.monitorInterval) {
+                    window.monitorInterval = setInterval(monitorPlayers, 500);
                 }
             }
-        });
+            
+            this.core.playNextVideo();
+        }
     });
     
-    // Configurar botones de eliminar (también limpiados)
-    const removeButtons = document.querySelectorAll('.queue-item-remove');
-    removeButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            const videoId = btn.dataset.videoId;
-            console.log(`🗑️ Eliminando video de cola: ${videoId}`);
-            
-            if (!videoId || videoId === 'undefined') {
-                console.error('❌ videoId inválido para eliminar');
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            
-            const success = this.removeVideoFromQueue(videoId);
-            
-            if (!success) {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            }
-        });
+    // ✅ BOTONES DE ELIMINAR (con delegation)
+    freshList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.queue-item-remove');
+        if (!btn) return;
+        
+        e.stopPropagation();
+        e.preventDefault();
+        
+        const videoId = btn.dataset.videoId;
+        console.log(`🗑️ Eliminando: ${videoId}`);
+        
+        if (!videoId || videoId === 'undefined') {
+            console.error('❌ videoId inválido');
+            return;
+        }
+        
+        // Deshabilitar temporalmente
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        
+        const success = this.removeVideoFromQueue(videoId);
+        
+        if (!success) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
     });
+    
+    console.log('✅ Listeners de cola configurados');
 }
     /**
      * Crear popup de playlist con detalles
