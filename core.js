@@ -1619,6 +1619,7 @@ async playNextVideo() {
     }
     this.lastPlayNextCall = now;
     
+    // ✅ VALIDAR PLAYERS
     if (!window.player1 || !window.player2) {
         console.error('❌ Players no inicializados');
         return;
@@ -1678,32 +1679,63 @@ async playNextVideo() {
     const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
     try {
-        // ✅ PASO 1: Cargar video en el nuevo player (sin reproducir)
+        // ✅ DETENER MONITOR DURANTE TRANSICIÓN
+        if (monitorInterval) {
+            clearInterval(monitorInterval);
+            monitorInterval = null;
+            console.log('🛑 Monitor detenido para transición');
+        }
+        
+        // ✅ PASO 1: Preparar nuevo player (SIN REPRODUCIR AÚN)
         console.log(`📥 Cargando video en player${nextPlayerNum}...`);
+        
+        // Usar cueVideoById para precargar sin reproducir
         nextPlayerInstance.cueVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
         
-        // ✅ PASO 2: Esperar a que esté listo
+        // ✅ PASO 2: Esperar a que esté listo (estado CUED = 5)
         await new Promise((resolve) => {
+            const maxWait = 3000; // 3 segundos máximo
+            const startTime = Date.now();
+            
             const checkReady = () => {
-                const state = nextPlayerInstance.getPlayerState();
-                if (state === 5) { // CUED (listo pero no reproduciendo)
-                    console.log(`✅ Player${nextPlayerNum} listo (CUED)`);
-                    resolve();
-                } else {
+                const elapsed = Date.now() - startTime;
+                
+                try {
+                    const state = nextPlayerInstance.getPlayerState();
+                    
+                    if (state === 5) { // CUED
+                        console.log(`✅ Player${nextPlayerNum} listo`);
+                        resolve();
+                        return;
+                    }
+                    
+                    if (elapsed < maxWait) {
+                        setTimeout(checkReady, 100);
+                    } else {
+                        console.warn('⏰ Timeout esperando player, continuando...');
+                        resolve();
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Error checking player state:', e);
                     setTimeout(checkReady, 100);
                 }
             };
-            checkReady();
             
-            // Timeout de seguridad
-            setTimeout(() => resolve(), 2000);
+            checkReady();
         });
         
         // ✅ PASO 3: Preparar elementos visuales
-        if (nextElement) {
+        if (nextElement && prevElement) {
+            // Asegurar que ambos están en el DOM y visibles
+            const container = prevElement.parentNode;
+            if (container && !container.contains(nextElement)) {
+                container.appendChild(nextElement);
+            }
+            
+            // Configurar estilos para crossfade
             nextElement.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -1715,11 +1747,9 @@ async playNextVideo() {
                 opacity: 0 !important;
                 z-index: 2 !important;
                 background: #000 !important;
-                transition: opacity ${CROSSFADE_DURATION}s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                transition: opacity ${CROSSFADE_DURATION}s ease !important;
             `;
-        }
-        
-        if (prevElement) {
+            
             prevElement.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -1731,34 +1761,28 @@ async playNextVideo() {
                 opacity: 1 !important;
                 z-index: 1 !important;
                 background: #000 !important;
-                transition: opacity ${CROSSFADE_DURATION}s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                transition: opacity ${CROSSFADE_DURATION}s ease !important;
             `;
         }
         
-        // ✅ PASO 4: Iniciar reproducción del nuevo player
+        // ✅ PASO 4: INICIAR REPRODUCCIÓN
         console.log(`▶️ Reproduciendo en player${nextPlayerNum}...`);
-        nextPlayerInstance.playVideo();
+        await nextPlayerInstance.playVideo();
         
-        // ✅ PASO 5: CROSSFADE VISUAL SUAVE (estilo Spotify)
-        await new Promise((resolve) => {
-            setTimeout(() => {
-                // Fade IN del nuevo
-                if (nextElement) {
-                    nextElement.style.opacity = '1';
-                    nextElement.style.zIndex = '3';
-                }
-                
-                // Fade OUT del anterior
-                if (prevElement) {
-                    prevElement.style.opacity = '0';
-                    prevElement.style.zIndex = '1';
-                }
-                
-                resolve();
-            }, 100); // Pequeño delay para que se aplique la transición
+        // ✅ PASO 5: CROSSFADE VISUAL
+        requestAnimationFrame(() => {
+            if (nextElement) {
+                nextElement.style.opacity = '1';
+                nextElement.style.zIndex = '3';
+            }
+            
+            if (prevElement) {
+                prevElement.style.opacity = '0';
+                prevElement.style.zIndex = '1';
+            }
         });
         
-        // ✅ PASO 6: Crossfade de AUDIO (gradual)
+        // ✅ PASO 6: CROSSFADE DE AUDIO
         const fadeSteps = 20;
         const fadeInterval = (CROSSFADE_DURATION * 1000) / fadeSteps;
         
@@ -1767,15 +1791,14 @@ async playNextVideo() {
             step++;
             const progress = step / fadeSteps;
             
-            // Curva de volumen suave (ease-in-out)
             const prevVolume = Math.round(100 * (1 - progress));
             const nextVolume = Math.round(100 * progress);
             
             try {
-                if (prevPlayerInstance && typeof prevPlayerInstance.setVolume === 'function') {
+                if (prevPlayerInstance?.setVolume) {
                     prevPlayerInstance.setVolume(prevVolume);
                 }
-                if (nextPlayerInstance && typeof nextPlayerInstance.setVolume === 'function') {
+                if (nextPlayerInstance?.setVolume) {
                     nextPlayerInstance.setVolume(nextVolume);
                 }
             } catch (e) {
@@ -1785,21 +1808,21 @@ async playNextVideo() {
             if (step >= fadeSteps) {
                 clearInterval(audioFade);
                 
-                // ✅ PASO 7: LIMPIEZA FINAL
+                // ✅ LIMPIEZA FINAL
                 try {
-                    if (prevPlayerInstance && typeof prevPlayerInstance.stopVideo === 'function') {
+                    if (prevPlayerInstance?.stopVideo) {
                         prevPlayerInstance.stopVideo();
                         prevPlayerInstance.setVolume(0);
                     }
                     
-                    if (nextPlayerInstance && typeof nextPlayerInstance.setVolume === 'function') {
+                    if (nextPlayerInstance?.setVolume) {
                         nextPlayerInstance.setVolume(100);
                     }
                 } catch (e) {
-                    console.warn('⚠️ Error en limpieza final:', e);
+                    console.warn('⚠️ Error en limpieza:', e);
                 }
                 
-                // Ocultar completamente el player anterior
+                // Ocultar player anterior
                 if (prevElement) {
                     setTimeout(() => {
                         prevElement.style.cssText = `
@@ -1810,8 +1833,14 @@ async playNextVideo() {
                     }, 500);
                 }
                 
-                // Cambiar player activo
+                // ✅ CAMBIAR PLAYER ACTIVO
                 window.currentPlayer = nextPlayerNum;
+                
+                // ✅ REINICIAR MONITOR
+                if (!monitorInterval && window.reproduccionIniciada) {
+                    monitorInterval = setInterval(monitorPlayers, 500);
+                    console.log('✅ Monitor reiniciado');
+                }
                 
                 console.log(`✅ Crossfade completado a player${nextPlayerNum}`);
             }
@@ -1821,13 +1850,18 @@ async playNextVideo() {
         console.error("❌ Error en playNextVideo:", error);
         this.showMessage('Error al cambiar de pista', 'error');
         
-        // Recuperación: intentar reproducir directamente
+        // ✅ RECUPERACIÓN
         try {
             nextPlayerInstance.loadVideoById({
                 videoId: nextVideo.videoId,
                 startSeconds: 0
             });
             window.currentPlayer = nextPlayerNum;
+            
+            // Reiniciar monitor
+            if (!monitorInterval && window.reproduccionIniciada) {
+                monitorInterval = setInterval(monitorPlayers, 500);
+            }
         } catch (e) {
             console.error('❌ Recuperación falló:', e);
         }
@@ -1837,10 +1871,10 @@ async playNextVideo() {
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
 async performSearch(searchQuery, continuation = null) {
-    console.log(`🔎 performSearch llamado con: "${searchQuery}", continuation: ${continuation ? 'SÍ' : 'NO'}`);
+    console.log(`🔎 performSearch: "${searchQuery}", paginación: ${!!continuation}`);
     
     if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
-        console.error('❌ Query inválido:', searchQuery);
+        console.error('❌ Query inválido');
         return;
     }
     
@@ -1848,20 +1882,19 @@ async performSearch(searchQuery, continuation = null) {
     let container = document.getElementById('searchResults');
     
     if (!container) {
-        console.error('❌ No se encontró contenedor de resultados');
-        this.showMessage('Error: Contenedor de búsqueda no disponible', 'error');
+        console.error('❌ searchResults no encontrado');
+        this.showMessage('Error: Contenedor no disponible', 'error');
         return;
     }
     
     // Guardar query actual
     window.currentSearchQuery = query;
     
-    // Si es búsqueda nueva, limpiar
+    // Loading state
     if (!continuation) {
         window.currentNextPageToken = null;
         container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
     } else {
-        // Mostrar loading al final para paginación
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'search-loading-more';
         loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
@@ -1869,8 +1902,8 @@ async performSearch(searchQuery, continuation = null) {
     }
 
     try {
-        console.log(`📡 Llamando a YouTube Client con: "${query}"`);
-        const results = await window.youtubeJSClient.search(query, continuation);        
+        console.log(`📡 Llamando a YouTube Client: "${query}"`);
+        const results = await window.youtubeJSClient.search(query, continuation);
         
         // Limpiar loading
         if (!continuation) {
@@ -1885,7 +1918,7 @@ async performSearch(searchQuery, continuation = null) {
                 container.innerHTML = `
                     <div class="search-placeholder">
                         <i class="fas fa-search"></i>
-                        <p>No se encontraron resultados para "${this.escapeHTML(query)}"</p>
+                        <p>No se encontraron resultados</p>
                     </div>
                 `;
             }
@@ -1895,39 +1928,34 @@ async performSearch(searchQuery, continuation = null) {
 
         console.log(`🎨 Renderizando ${results.items.length} resultados`);
         
-        // Crear fragmento para mejor rendimiento
+        // Crear fragmento para rendimiento
         const fragment = document.createDocumentFragment();
         
         results.items.forEach(video => {
             const card = this.ui.createSearchResultCard(video);
-            if (card) {
-                fragment.appendChild(card);
-            }
+            if (card) fragment.appendChild(card);
         });
         
         container.appendChild(fragment);
         
-        // Actualizar token de paginación
+        // Actualizar paginación
         window.currentNextPageToken = results.continuation || null;
         window.isLoadingMore = false;
         
-        // Configurar scroll infinito si hay más resultados
+        // Configurar scroll infinito
         if (window.currentNextPageToken) {
-            // Limpiar sentinel anterior
             const oldSentinel = document.getElementById('scrollSentinel');
             if (oldSentinel) oldSentinel.remove();
             
-            // Crear nuevo sentinel
             const sentinel = document.createElement('div');
             sentinel.id = 'scrollSentinel';
             sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
             container.appendChild(sentinel);
             
-            // Configurar observador
             this.setupInfiniteScroll(container);
         }
         
-        // Configurar event listeners de botones
+        // Configurar event listeners
         setTimeout(() => {
             this.setupSearchButtonListeners();
         }, 100);
@@ -1940,17 +1968,17 @@ async performSearch(searchQuery, continuation = null) {
             container.innerHTML = `
                 <div class="search-error">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Error: ${error.message}</p>
+                    <p>Error: ${error.message || 'Desconocido'}</p>
                     <button onclick="window.unifiedCore.performSearch('${query}')">
                         <i class="fas fa-redo"></i> Reintentar
                     </button>
                 </div>
             `;
+        } else {
+            this.showMessage('Error cargando más resultados', 'error');
         }
     }
-}
-
-            
+}           
 setupInfiniteScroll(container) {
     // Limpiar observador anterior
     if (this.searchScrollObserver) {
@@ -2704,22 +2732,37 @@ function preloadNextVideo() {    // Si no hay core o playlist, abortar
 function monitorPlayers() {
     if (!playersInitialized || !window.reproduccionIniciada) return;
 
-    // Bloquear si ya hay un crossfade o transición en curso
+    // ✅ NO MONITOREAR DURANTE TRANSICIONES
     if (crossfadeInProgress || isTransitioning || nextVideoScheduled) return;
 
     try {
         const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
-        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') return;
-
-        const playerState = activePlayer.getPlayerState();
         
-        // Si el video termina de forma natural sin disparar el monitor
-        if (playerState === YT.PlayerState.ENDED) {
-            console.log('🎬 Video terminado, saltando al siguiente...');
-            if (window.unifiedCore) window.unifiedCore.playNextVideo();
+        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') {
+            console.warn('⚠️ Player no disponible');
             return;
         }
 
+        const playerState = activePlayer.getPlayerState();
+        
+        // ✅ SI EL VIDEO TERMINÓ
+        if (playerState === YT.PlayerState.ENDED) {
+            console.log('🎬 Video terminado naturalmente');
+            
+            // Detener monitor para evitar llamadas duplicadas
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+            
+            // Reproducir siguiente
+            if (window.unifiedCore) {
+                window.unifiedCore.playNextVideo();
+            }
+            return;
+        }
+
+        // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO
         if (playerState !== YT.PlayerState.PLAYING) return;
 
         const currentTime = activePlayer.getCurrentTime();
@@ -2728,11 +2771,14 @@ function monitorPlayers() {
 
         if (!videoDuration || videoDuration <= 0) return;
 
-        // --- LÓGICA DE DISPARO DE CROSSFADE ---
-        // CROSSFADE_DURATION suele ser 10
+        // ✅ VERIFICAR SPONSORBLOCK
+        if (window.sponsorBlockManager && videoId) {
+            window.sponsorBlockManager.checkAndSkip(activePlayer);
+        }
+
+        // ✅ CALCULAR TRIGGER TIME
         let triggerTime = videoDuration - (window.CROSSFADE_DURATION || 10) - 0.5;
         
-        // Ajuste opcional por SponsorBlock
         if (videoId && window.sponsorBlockManager) {
             triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
                 videoDuration,
@@ -2741,20 +2787,24 @@ function monitorPlayers() {
             );
         }
 
-        // Si alcanzamos el punto de transición
+        // ✅ DISPARAR CROSSFADE
         if (currentTime >= triggerTime && !hasOutroCrossfadeStarted) {
-            console.log(`🎨 Monitor: Disparando crossfade. Restante: ${(videoDuration - currentTime).toFixed(2)}s`);
+            console.log(`🎨 Disparando crossfade en ${currentTime.toFixed(2)}s`);
             
-            // Marcar banderas para evitar llamadas dobles
+            // Marcar banderas
             hasOutroCrossfadeStarted = true;
             nextVideoScheduled = true;
             isTransitioning = true;
-
-            // ✅ LLAMADA CRÍTICA: Asegurar el uso de la instancia global
-            if (window.unifiedCore && typeof window.unifiedCore.playNextVideo === 'function') {
+            
+            // Detener monitor durante transición
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                monitorInterval = null;
+            }
+            
+            // Reproducir siguiente
+            if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
-            } else {
-                console.error("❌ Error: window.unifiedCore.playNextVideo no encontrada");
             }
         }
         
