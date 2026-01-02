@@ -177,36 +177,35 @@ extractArtistFromTitle(fullTitle) {
 }
 
 async addVideoToQueue(videoData, fromPlaylist = false) {
-    console.log('🎵 addVideoToQueue llamado:', videoData);
+    console.log('🎵 addVideoToQueue:', videoData);
     
-    // ✅ VALIDACIÓN MEJORADA
+    // ✅ VALIDACIÓN ESTRICTA
     if (!videoData || 
         !videoData.videoId || 
         videoData.videoId === 'undefined' || 
-        videoData.videoId === undefined ||
         typeof videoData.videoId !== 'string' ||
         videoData.videoId.trim() === '') {
-        console.error('❌ videoData inválido:', videoData);
+        console.error('❌ videoId inválido:', videoData);
         if (this.core) this.core.showMessage('Error: Video inválido', 'error');
-        return;
+        return false;
     }
 
-    // ✅ VALIDACIÓN ADICIONAL: Título debe existir
+    // ✅ VALIDAR TÍTULO
     if (!videoData.title || videoData.title.trim() === '') {
         console.warn('⚠️ Video sin título, usando fallback');
         videoData.title = 'Video sin título';
     }
 
-    // 2. SINCRONIZACIÓN CRÍTICA CON CORE
-    if (this.core && this.core.playlistsData) {
+    // ✅ SINCRONIZACIÓN CON CORE
+    if (this.core?.playlistsData) {
         this.core.playlistsData = this.core.playlistsData;
     }
 
-    // 3. OBTENCIÓN DE LA COLA
+    // ✅ OBTENER COLA
     let queue = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
 
     if (!queue) {
-        console.log('✨ Creando cola nueva...');
+        console.log('✨ Creando cola...');
         queue = {
             id: 'queue',
             name: 'Cola de Reproducción',
@@ -216,59 +215,62 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
             isQueue: true
         };
         this.core.playlistsData.unshift(queue);
-        if (this.core) this.core.playlistsData = this.core.playlistsData;
     }
 
-    // 4. NORMALIZAR DATOS
-   const videoToAdd = {
-    videoId: videoData.videoId.trim(),
-    title: videoData.title.trim(),
-    thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
-    duration: parseInt(videoData.duration) || 0,
+    // ✅ NORMALIZAR VIDEO
+    const videoToAdd = {
+        videoId: videoData.videoId.trim(),
+        title: videoData.title.trim(),
+        thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
+        duration: parseInt(videoData.duration) || 0,
+        uploaderName: this.cleanArtistName(videoData.uploaderName || videoData.artist || 'Desconocido'),
+        artist: this.cleanArtistName(videoData.artist || videoData.uploaderName || 'Desconocido'),
+        sourcePlaylistId: 'queue'
+    };
 
-    uploaderName: this.cleanArtistName(videoData.uploaderName || videoData.artist || 'Desconocido'),
-    artist: this.cleanArtistName(videoData.artist || videoData.uploaderName || 'Desconocido'),
-    
-    sourcePlaylistId: 'queue'
-};
-
-    // 5. VERIFICAR DUPLICADOS
+    // ✅ VERIFICAR DUPLICADOS
     const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
     if (isDuplicate) {
-        if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en la cola`, 'warning');
-        return;
+        if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
+        return false;
     }
 
-    // 6. AÑADIR A LA COLA
+    // ✅ AÑADIR (al final si es desde playlist, inteligente si es manual)
     if (fromPlaylist) {
         queue.videos.push(videoToAdd);
     } else {
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
-            if (this.core && typeof this.core.invalidateFlattenedCache === 'function') {
-            this.core.invalidateFlattenedCache();
-            }
         } else {
             queue.videos.splice(currentIndex + 1, 0, videoToAdd);
         }
     }
 
-    // 7. ACTUALIZACIÓN VISUAL Y DE ESTADO
+    // ✅ ACTUALIZAR UI
     this.updateQueueUI();
     
     if (this.core) {
         this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
         
         if (typeof this.core.enablePlayButton === 'function') {
-            this.core.enablePlayButton(); 
+            this.core.enablePlayButton();
+        }
+        
+        // Invalidar caché
+        if (typeof this.core.invalidateFlattenedCache === 'function') {
+            this.core.invalidateFlattenedCache();
         }
     }
 
-    // 8. GUARDAR
+    // ✅ GUARDAR
     setTimeout(() => {
-        if (typeof window.saveAllData === 'function') window.saveAllData();
+        if (typeof window.saveAllData === 'function') {
+            window.saveAllData();
+        }
     }, 100);
+    
+    return true;
 }
     cleanArtistName(name) {
     if (!name) return 'Desconocido';
