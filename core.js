@@ -1606,13 +1606,12 @@ toggleRepeat() {
             this.updatePlayButton('play');
         }
     }
-
 async playNextVideo() {
     const now = Date.now();
     
-    // ✅ PROTECCIÓN 1: Cooldown de 1 segundo
+    // ✅ PROTECCIÓN 1: Cooldown más estricto
     if (!this.lastPlayNextCall) this.lastPlayNextCall = 0;
-    if (now - this.lastPlayNextCall < 1000) {
+    if (now - this.lastPlayNextCall < 1500) { // 1.5 segundos
         console.log('⏸️ playNextVideo bloqueado (cooldown activo)');
         return;
     }
@@ -1635,6 +1634,10 @@ async playNextVideo() {
             console.log('🛑 Monitor detenido para transición');
         }
         
+        // ✅ RESETEAR BANDERAS DE CROSSFADE
+        hasOutroCrossfadeStarted = false;
+        nextVideoScheduled = false;
+        
         // ✅ VALIDAR PLAYERS
         if (!window.player1 || !window.player2) {
             throw new Error('Players no inicializados');
@@ -1655,6 +1658,7 @@ async playNextVideo() {
                 nextIndex = 0;
                 console.log('🔁 Repeat: volviendo al inicio');
             } else {
+                console.log('🏁 Fin de la cola');
                 this.handleEndOfPlaylist();
                 return;
             }
@@ -1679,7 +1683,6 @@ async playNextVideo() {
         if (window.playlistManager) {
             window.playlistManager.syncQueueIndicator();
             this.updatePersistentQueue();
-            window.playlistManager.refreshActiveQueueTab();
         }
 
         // ✅ DETERMINAR REPRODUCTORES
@@ -1692,15 +1695,15 @@ async playNextVideo() {
         const prevElement = document.getElementById(`player${prevPlayerNum}`);
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
-        // ✅ CARGAR VIDEO (sin reproducir)
+        // ✅ CARGAR VIDEO (sin reproducir aún)
         console.log(`📥 Cargando video en player${nextPlayerNum}...`);
         nextPlayerInstance.cueVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
         
-        // ✅ ESPERAR A QUE ESTÉ LISTO (estado CUED = 5)
-        await this.waitForPlayerReady(nextPlayerInstance, 3000);
+        // ✅ ESPERAR A QUE ESTÉ LISTO
+        await this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 3000);
         
         // ✅ PREPARAR ELEMENTOS VISUALES
         if (nextElement && prevElement) {
@@ -1784,12 +1787,12 @@ async playNextVideo() {
         window.currentPlayer = nextPlayerNum;
         
         // ✅ REINICIAR MONITOR (después de todo)
-        if (!monitorInterval && window.reproduccionIniciada) {
-            setTimeout(() => {
+        setTimeout(() => {
+            if (!monitorInterval && window.reproduccionIniciada) {
                 monitorInterval = setInterval(monitorPlayers, 500);
                 console.log('✅ Monitor reiniciado después de crossfade');
-            }, 1000);
-        }
+            }
+        }, 1000);
         
         console.log(`✅ Crossfade completado a player${nextPlayerNum}`);
 
@@ -1802,44 +1805,44 @@ async playNextVideo() {
             monitorInterval = setInterval(monitorPlayers, 500);
         }
     } finally {
-        // ✅ LIBERAR BANDERA
+        // ✅ LIBERAR BANDERA SIEMPRE
         this.isTransitioningToNext = false;
     }
 }
 
-// ✅ FUNCIÓN AUXILIAR: Esperar a que el player esté listo
-async waitForPlayerReady(playerInstance, maxWait = 3000) {
+// ✅ FUNCIÓN AUXILIAR: Esperar estado del player
+async waitForPlayerState(playerInstance, targetState, maxWait = 3000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
         
-        const checkReady = () => {
+        const checkState = () => {
             const elapsed = Date.now() - startTime;
             
             try {
                 const state = playerInstance.getPlayerState();
                 
-                if (state === 5) { // CUED
-                    console.log('✅ Player listo');
+                if (state === targetState) {
+                    console.log('✅ Player alcanzó estado objetivo');
                     resolve();
                     return;
                 }
                 
                 if (elapsed < maxWait) {
-                    setTimeout(checkReady, 100);
+                    setTimeout(checkState, 100);
                 } else {
-                    console.warn('⏰ Timeout esperando player');
+                    console.warn('⏰ Timeout esperando estado del player');
                     resolve();
                 }
             } catch (e) {
-                setTimeout(checkReady, 100);
+                setTimeout(checkState, 100);
             }
         };
         
-        checkReady();
+        checkState();
     });
 }
 
-// ✅ FUNCIÓN AUXILIAR: Crossfade de audio
+// Crossfade de audio
 async performAudioCrossfade(prevPlayer, nextPlayer) {
     return new Promise((resolve) => {
         const fadeSteps = 20;
