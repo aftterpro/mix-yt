@@ -655,14 +655,14 @@ async loadRelatedForVideo(video) {
         return;
     }
     
-    console.log(`🎵 Cargando relacionados EXPLÍCITOS para: ${video.title} (${video.videoId})`);
+    console.log(`🎵 Cargando relacionados para: ${video.title} (${video.videoId})`);
     
-    // ✅ CACHÉ: Si ya están cargados para ESTE video
+    // ✅ CACHÉ: Si ya están cargados para ESTE video específico
     if (this.lastLoadedRelatedId === video.videoId) {
         const existingItems = relatedList.querySelectorAll('.related-video-item');
         if (existingItems.length > 0) {
             console.log('✅ Relacionados ya cargados para este video');
-            return;
+            return; // ✅ SALIR AQUÍ, NO RECURSIÓN
         }
     }
     
@@ -671,22 +671,35 @@ async loadRelatedForVideo(video) {
     relatedList.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">Cargando...</p>`;
     
     try {
-        const { artist, title } = this.extractArtistFromTitle(video.title);
-        const searchQuery = artist !== 'Desconocido' ? artist : title;
+        // ✅ EXTRAER ARTISTA DEL TÍTULO
+        const artist = this.extractArtistFromTitle(video.title);
+        const searchQuery = artist !== 'Desconocido' ? artist : video.title;
         
         console.log(`🔍 Buscando relacionados: "${searchQuery}"`);
         
+        // ✅ USAR CLIENT EXTERNO, NO RECURSIÓN
         const searchResults = await window.youtubeJSClient.search(searchQuery);
         
         if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
             throw new Error('Sin resultados');
         }
         
-        // Filtrar el video actual
+        // ✅ FILTRAR EL VIDEO ACTUAL
         const relatedVideos = searchResults.items
             .filter(v => v.videoId !== video.videoId)
             .slice(0, 15);
         
+        if (relatedVideos.length === 0) {
+            relatedList.innerHTML = `
+                <div class="related-placeholder">
+                    <i class="fas fa-music-slash"></i>
+                    <p>No se encontraron videos relacionados</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // ✅ RENDERIZAR
         this.renderRelatedVideos(relatedVideos, relatedList);
         
     } catch (error) {
@@ -698,7 +711,7 @@ async loadRelatedForVideo(video) {
             </div>
         `;
     }
-}   
+} 
 /**
  * Fallback usando búsqueda
  */
