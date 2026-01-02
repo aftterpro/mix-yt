@@ -550,27 +550,53 @@ onPlayerReady(event) {
     }
 }
 
-onPlayerStateChange(playerNum, state) {
-    console.log(`🎬 Player${playerNum} cambió a estado: ${state}`);
-    
-    if (state === YT.PlayerState.PLAYING) {
-        
-        // ✅ NO iniciar monitor aquí, solo si no existe
-        if (playerNum === window.currentPlayer && !monitorInterval && window.reproduccionIniciada) {
-            console.log('✅ Reiniciando monitor desde onPlayerStateChange');
-            monitorInterval = setInterval(monitorPlayers, 500);
+onPlayerStateChange(event) {
+    try {
+        // ✅ VALIDAR QUE EL PLAYER ESTÉ EN EL DOM
+        const iframe = event.target.getIframe();
+        if (!iframe || !document.body.contains(iframe)) {
+            console.warn('⚠️ Player no está en el DOM, ignorando evento');
+            return;
         }
+        
+        const playerElement = iframe.closest('.video-player');
+        const playerNum = playerElement?.id === 'player1' ? 1 : 2;
+        const state = event.data;
+        
+        console.log(`🎬 Player${playerNum} cambió a estado: ${this.getStateName(state)}`);
+        
+        if (state === YT.PlayerState.PLAYING) {
+            // Solo iniciar monitor si es el player activo
+            if (playerNum === window.currentPlayer && !monitorInterval && window.reproduccionIniciada) {
+                console.log('✅ Reiniciando monitor desde onPlayerStateChange');
+                monitorInterval = setInterval(monitorPlayers, 500);
+            }
+        }
+        
+        if (state === YT.PlayerState.PAUSED) {
+            console.log(`⏸️ Player${playerNum} pausado`);
+        }
+        
+        if (state === YT.PlayerState.BUFFERING) {
+            console.log(`⏳ Player${playerNum} buffering...`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en onPlayerStateChange:', error);
     }
-    
-    if (state === YT.PlayerState.PAUSED) {
-        console.log(`⏸️ Player${playerNum} pausado`);
-    }
-    
-    if (state === YT.PlayerState.BUFFERING) {
-        console.log(`⏳ Player${playerNum} buffering...`);
-    }
-    
-    // ✅ ENDED se maneja dentro de monitorPlayers()
+}
+
+// Función helper para nombres de estados
+getStateName(state) {
+    const states = {
+        '-1': 'UNSTARTED',
+        '0': 'ENDED',
+        '1': 'PLAYING',
+        '2': 'PAUSED',
+        '3': 'BUFFERING',
+        '5': 'CUED'
+    };
+    return states[state] || 'UNKNOWN';
 }
 addToQueue(videoObject) {
         // Asegurar estructura del objeto
@@ -1204,39 +1230,7 @@ cleanupView(viewName) {
         }
     }
 }
-movePlayersToFullView() {
-    console.log('🎬 Expandiendo a vista completa...');
-    
-    const persistentLayer = document.getElementById('persistent-player-layer');
-    if (!persistentLayer) {
-        console.error('❌ persistent-player-layer no encontrado');
-        return;
-    }
-    
-    const fullPlayerView = document.getElementById('fullPlayerView');
-    const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
-    
-    if (!videoWrapper) {
-        console.error('❌ videoWrapper no encontrado');
-        return;
-    }
-    persistentLayer.style.zIndex = '55'; // MENOR que la cola (z-index: 100)
-    
-    const wrapperRect = videoWrapper.getBoundingClientRect();
-    
-    persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
-    persistentLayer.style.top = `${wrapperRect.top}px`;
-    persistentLayer.style.left = `${wrapperRect.left}px`;
-    persistentLayer.style.width = `${wrapperRect.width}px`;
-    persistentLayer.style.height = `${wrapperRect.height}px`;
-    persistentLayer.style.borderRadius = '0px';
-    persistentLayer.style.opacity = '1';
-    persistentLayer.style.pointerEvents = 'none'; // ✅ Desactivar clicks en la capa
-    
-    document.body.classList.remove('mini-player-active');
-    
-    console.log('✅ Player expandido con z-index:', persistentLayer.style.zIndex);
-}
+
 
     forceBottomPlayerVisible() {
         const bottomPlayer = document.querySelector('.bottom-player');
@@ -1277,14 +1271,23 @@ movePlayersToFullView() {
     console.log('🎬 Expandiendo a vista completa...');
     
     const persistentLayer = document.getElementById('persistent-player-layer');
-    if (!persistentLayer) return;
+    if (!persistentLayer) {
+        console.error('❌ persistent-player-layer no encontrado');
+        return;
+    }
     
     const fullPlayerView = document.getElementById('fullPlayerView');
     const videoWrapper = fullPlayerView?.querySelector('.video-wrapper') || document.getElementById('videoWrapper');
     
-    if (!videoWrapper) return;
+    if (!videoWrapper) {
+        console.error('❌ videoWrapper no encontrado');
+        return;
+    }
     
-    // ✅ ANIMAR LA CAPA PERSISTENTE hacia el contenedor grande
+    // ✅ CRÍTICO: Bajar z-index para que la cola quede encima
+    persistentLayer.style.zIndex = '55'; // MENOR que la cola (z-index: 100)
+    
+    // ✅ ANIMAR LA CAPA hacia el contenedor grande
     const wrapperRect = videoWrapper.getBoundingClientRect();
     
     persistentLayer.style.transition = 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)';
@@ -1294,9 +1297,11 @@ movePlayersToFullView() {
     persistentLayer.style.height = `${wrapperRect.height}px`;
     persistentLayer.style.borderRadius = '0px';
     persistentLayer.style.opacity = '1';
-    persistentLayer.style.pointerEvents = 'auto';
+    persistentLayer.style.pointerEvents = 'none'; // ✅ Desactivar clicks en la capa
     
     document.body.classList.remove('mini-player-active');
+    
+    console.log('✅ Player expandido con z-index:', persistentLayer.style.zIndex);
 }
     movePlayersToMini() {
         const player1 = document.getElementById('player1');
