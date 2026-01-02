@@ -326,7 +326,7 @@ body {
     display: block !important;
 }
 #persistent-player-layer {
-     position: fixed;
+    position: fixed;
     transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     background: transparent;
 }
