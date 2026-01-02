@@ -263,7 +263,6 @@ showMiniPlayerFloat() {
         console.warn('⚠️ searchResults no encontrado en clearSearchResults');
     }
 }
-
 createSearchResultCard(video) {
     // ✅ VALIDACIÓN ROBUSTA DEL VIDEO ID
     let videoId = video.videoId || video.id;
@@ -448,7 +447,6 @@ createSearchResultCard(video) {
 
     return div;
 }
-
     // ==========================================
     // NOTIFICACIONES Y ESTADÍSTICAS
     // ==========================================
