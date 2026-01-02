@@ -51,72 +51,53 @@ function getClientIdForDomain() {
 
 const AUTH_STORAGE_KEY = 'ytcm_auth_data';
 const EXPIRATION_DAYS = 7;
-
+const authState = {
+    token: null,
+    expiry: null,
+    timestamp: null
+};
 function saveAuthData(token) {
     if (!token || typeof token !== 'string') {
-        console.error('❌ Token inválido para guardar');
+        console.error('❌ Token inválido');
         return false;
     }
 
     const expirationDate = new Date();
-    expirationDate.setDate(expirationDate.getDate() + EXPIRATION_DAYS);
+    expirationDate.setDate(expirationDate.getDate() + 7);
     
-    const authData = {
-        token: token,
-        expiry: expirationDate.getTime(),
-        timestamp: Date.now(),
-        version: '1.0' // Para futuras migraciones
-    };
-
-    try {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
-        console.log('💾 Datos de autenticación guardados correctamente');
-        return true;
-    } catch (e) {
-        console.error('❌ Error guardando auth data:', e);
-        return false;
-    }
+    authState.token = token;
+    authState.expiry = expirationDate.getTime();
+    authState.timestamp = Date.now();
+    
+    console.log('💾 Token guardado en memoria (válido 7 días)');
+    return true;
 }
 
 function loadAuthData() {
-    try {
-        const data = localStorage.getItem(AUTH_STORAGE_KEY);
-        if (!data) {
-            console.log('📭 No hay datos de autenticación guardados');
-            return null;
-        }
-
-        const authData = JSON.parse(data);
-        
-        // Validar estructura
-        if (!authData.token || !authData.expiry) {
-            console.warn('⚠️ Datos de auth incompletos, limpiando...');
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-            return null;
-        }
-
-        // Validar expiración
-        const now = Date.now();
-        if (now >= authData.expiry) {
-            console.log('🗑️ Token expirado, eliminando...');
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-            return null;
-        }
-
-        // Calcular días restantes
-        const daysRemaining = Math.ceil((authData.expiry - now) / (24 * 60 * 60 * 1000));
-        console.log(`✅ Token válido cargado (${daysRemaining} días restantes)`);
-        
-        return authData.token;
-        
-    } catch (e) {
-        console.error('❌ Error parseando auth data:', e);
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+    if (!authState.token || !authState.expiry) {
+        console.log('📭 No hay datos de autenticación en memoria');
         return null;
     }
+
+    const now = Date.now();
+    if (now >= authState.expiry) {
+        console.log('🗑️ Token expirado, eliminando...');
+        authState.token = null;
+        authState.expiry = null;
+        return null;
+    }
+
+    const daysRemaining = Math.ceil((authState.expiry - now) / (24 * 60 * 60 * 1000));
+    console.log(`✅ Token válido (${daysRemaining} días restantes)`);
+    
+    return authState.token;
+} 
+
+function clearAuthData() {
+    authState.token = null;
+    authState.expiry = null;
+    authState.timestamp = null;
 }
-
-
 // =============================================
 // INICIALIZACIÓN DE APIS
 // =============================================
