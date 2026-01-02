@@ -189,26 +189,27 @@ window.onYouTubeIframeAPIReady = function() {
         console.log('🎵 YouTube IFrame API lista');
         window.ytCrossMixAPIs.youtube = true;
         
-        // ✅ CRÍTICO: Configurar origin global para todos los players
+        // ✅ CONFIGURAR ORIGIN CORRECTO
         if (window.YT && window.YT.Player) {
             const currentOrigin = window.location.origin;
             const originalPlayer = window.YT.Player;
             
-            // Wrapper para forzar origin correcto
+            // Wrapper para forzar origin
             window.YT.Player = function(elementId, config) {
                 config = config || {};
                 config.playerVars = config.playerVars || {};
                 
-                // ✅ FORZAR origin correcto
+                // ✅ FORZAR ORIGIN
                 config.playerVars.origin = currentOrigin;
                 config.playerVars.widget_referrer = currentOrigin;
+                config.playerVars.enablejsapi = 1;
                 
-                console.log(`🎮 Creando player con origin: ${currentOrigin}`);
+                console.log(`🎮 Creando player "${elementId}" con origin: ${currentOrigin}`);
                 
                 return new originalPlayer(elementId, config);
             };
             
-            // Preservar el prototipo
+            // Preservar prototipo
             window.YT.Player.prototype = originalPlayer.prototype;
             
             console.log('✅ YouTube API configurada con origin:', currentOrigin);
@@ -218,10 +219,10 @@ window.onYouTubeIframeAPIReady = function() {
         
     } catch (error) {
         console.error('❌ Error en onYouTubeIframeAPIReady:', error);
-        window.ytCrossMixAPIs.errors.push('YouTube API init error: ' + error.message);
+        window.ytCrossMixAPIs.errors.push('YouTube API error: ' + error.message);
         showInitError('Error inicializando YouTube API');
     }
-};
+}
 
 
 // ✅ ASEGURAR QUE SE LLAME A loadYouTubeAPI
