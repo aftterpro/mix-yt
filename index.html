@@ -24,56 +24,6 @@
   <!-- Google APIs -->
   <script src="https://apis.google.com/js/api.js" async defer onload="console.log('✅ GAPI script loaded')"></script>
   <script src="https://accounts.google.com/gsi/client" async defer onload="console.log('✅ GIS script loaded'); if(window.gisInitalize_auth) window.gisInitalize_auth();"></script>
-
-  <style>
-    /* ===== CORRECCIÓN CRÍTICA - VISIBILIDAD DE VIDEOS ===== */
-    #videoWrapper, .video-wrapper {
-      position: relative !important;
-      width: 100% !important;
-      height: 100% !important;
-      min-height: 400px !important;
-      background: #000 !important;
-      overflow: hidden !important;
-      display: block !important;
-      visibility: visible !important;
-    }
-    
-    #videoWrapper .video-player:not(.hidden),
-    .video-wrapper .video-player:not(.hidden) {
-      display: block !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      z-index: 10 !important;
-      pointer-events: auto !important;
-    }
-    
-    #videoWrapper .video-player.hidden {
-      display: none !important;
-    }
-    
-    #videoWrapper iframe, .video-wrapper iframe {
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      border: none !important;
-      display: block !important;
-    }
-    
-    #persistent-player-layer {
-      z-index: 60 !important;
-      pointer-events: auto !important;
-    }
-    
-    .persistent-queue-sidebar {
-      z-index: 50 !important;
-    }
-    
-    .video-container-full {
-      z-index: 55 !important;
-    }
-  </style>
   
 </head>
 
