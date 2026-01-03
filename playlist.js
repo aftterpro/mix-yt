@@ -2752,56 +2752,59 @@ setupPlaylistPopupEvents(popup, playlist) {
     // =============================================
 
 addYouTubeLibraryPlaylists(youtubePlaylists) {
-    console.log(`📥 addYouTubeLibraryPlaylists llamada con ${youtubePlaylists?.length || 0} playlists`);
+    console.log(`📥 addYouTubeLibraryPlaylists: ${youtubePlaylists?.length || 0} playlists`);
     
     if (!youtubePlaylists?.length) {
-        console.warn("❌ No se recibieron playlists válidas");
+        console.warn("❌ No hay playlists válidas");
         return;
     }
 
-    const currentYouTubeCount = this.core.playlistsData.filter(p => p.source === 'youtube_library').length;
-    
-    if (currentYouTubeCount >= youtubePlaylists.length) {
-        console.log(`✅ Ya hay ${currentYouTubeCount} playlists de YouTube cargadas`);
-        return;
-    }
-
-    if (currentYouTubeCount > 0) {
-        console.log(`🧹 Limpiando ${currentYouTubeCount} playlists duplicadas...`);
-        const filtered = this.core.playlistsData.filter(p => p.source !== 'youtube_library');
-        this.core.playlistsData = filtered;
-        if (this.core) this.core.playlistsData = filtered;
-    }
-
+    // ✅ FILTRAR PLAYLISTS SIN VIDEOS VÁLIDOS
     const validPlaylists = youtubePlaylists
         .filter(playlist => {
+            // Verificar que tenga videos
             const hasVideos = playlist.videos && Array.isArray(playlist.videos);
             const hasValidVideos = hasVideos && playlist.videos.length > 0;
             
-            if (!hasValidVideos) {
+            // Verificar que al menos 1 video tenga videoId válido
+            const hasValidIds = hasValidVideos && playlist.videos.some(v => 
+                v.videoId && 
+                typeof v.videoId === 'string' && 
+                v.videoId.length === 11
+            );
+            
+            if (!hasValidIds) {
                 console.warn(`⚠️ Playlist "${playlist.title || playlist.name}" sin videos válidos`);
+                return false;
             }
             
-            return hasValidVideos;
+            return true;
         })
         .map(playlist => {
-            // CORRECCIÓN: Extraer artista del primer video
+            // ✅ LIMPIAR VIDEOS INVÁLIDOS DENTRO DE CADA PLAYLIST
+            const cleanedVideos = playlist.videos.filter(video => {
+                const hasValidId = video.videoId && 
+                                   typeof video.videoId === 'string' && 
+                                   video.videoId.length === 11;
+                
+                const hasTitle = video.title && video.title.trim().length > 0;
+                
+                return hasValidId && hasTitle;
+            });
+            
+            // ✅ EXTRAER ARTISTA DEL PRIMER VIDEO
             let artist = 'YouTube';
             let thumbnailUrl = './electronic.ico';
             
-            if (playlist.videos && playlist.videos.length > 0) {
-                const firstVideo = playlist.videos[0];
+            if (cleanedVideos.length > 0) {
+                const firstVideo = cleanedVideos[0];
                 
-                // Intentar obtener el artista del video
                 artist = firstVideo.artist || 
                          firstVideo.uploaderName || 
                          firstVideo.author || 
                          'YouTube';
                 
-                // Limpiar " - Topic"
                 artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
-                
-                // Thumbnail del primer video
                 thumbnailUrl = firstVideo.thumbnail || './electronic.ico';
             }
             
@@ -2809,37 +2812,37 @@ addYouTubeLibraryPlaylists(youtubePlaylists) {
                 id: playlist.id,
                 name: playlist.title || playlist.name || 'Playlist Sin Nombre',
                 thumbnailUrl: thumbnailUrl,
-                videos: playlist.videos,
+                videos: cleanedVideos, // ✅ Videos limpios
                 isExpanded: false,
                 source: 'youtube_library',
                 isLoaded: true,
-                count: playlist.videos.length,
-                artist: artist  // NUEVO: Guardar artista
+                count: cleanedVideos.length,
+                artist: artist
             };
         });
 
     if (validPlaylists.length === 0) {
-        console.warn("❌ No hay playlists con videos válidos para añadir");
+        console.warn("❌ No hay playlists válidas después del filtrado");
         return;
     }
 
+    // Insertar después de la cola
     const queueIndex = this.core.playlistsData.findIndex(p => p.id === 'queue' || p.isQueue);
     const insertIndex = queueIndex !== -1 ? queueIndex + 1 : 0;
     
     this.core.playlistsData.splice(insertIndex, 0, ...validPlaylists);
     
-    if (this.core) {
-        this.core.playlistsData = this.core.playlistsData;
-        window.playlistsData = this.core.playlistsData;
-    }
-    
-    console.log(`✅ ${validPlaylists.length} playlists de YouTube añadidas correctamente`);
+    console.log(`✅ ${validPlaylists.length} playlists válidas añadidas`);
 
+    // Actualizar UI
     requestAnimationFrame(() => {
         this.updatePlaylistsUI();
         
         if (this.core?.showMessage) {
-            this.core.showMessage(`${validPlaylists.length} playlists sincronizadas`, 'success');
+            this.core.showMessage(
+                `${validPlaylists.length} playlists sincronizadas`, 
+                'success'
+            );
         }
     });
 }
