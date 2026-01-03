@@ -104,7 +104,6 @@ movePlayersToFullView() {
 
     console.log('🎬 Expandiendo a pantalla completa');
 
-    // ✅ ASEGURAR QUE LOS IFRAMES ESTÉN DENTRO
     const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
     const activePlayer = document.getElementById(activePlayerId);
     
@@ -112,9 +111,9 @@ movePlayersToFullView() {
         layer.appendChild(activePlayer);
     }
 
-    // ✅ Bajar z-index para que la cola sea clickeable
     layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    layer.style.zIndex = '60'; // ✅ BAJO para que tabs queden encima
+    layer.style.zIndex = '55'; 
+    layer.style.pointerEvents = 'none';
     
     requestAnimationFrame(() => {
         layer.style.top = '0';
@@ -127,9 +126,9 @@ movePlayersToFullView() {
         layer.style.boxShadow = 'none';
         layer.style.opacity = '1';
         layer.style.visibility = 'visible';
-        layer.style.pointerEvents = 'auto';
         
         document.body.classList.remove('mini-player-active');
+        document.body.classList.add('full-player-active'); 
     });
 }
 showMiniPlayerFloat() {
@@ -141,7 +140,6 @@ showMiniPlayerFloat() {
 
     console.log('🔍 Mostrando mini player flotante');
 
-    // ✅ CRÍTICO: Asegurar que los iframes estén dentro antes de animar
     const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
     const activePlayer = document.getElementById(activePlayerId);
     
@@ -149,10 +147,9 @@ showMiniPlayerFloat() {
         layer.appendChild(activePlayer);
     }
 
-    // Configuración base
     layer.style.display = 'block';
     layer.style.position = 'fixed';
-    layer.style.zIndex = '999999'; // ✅ Z-index MUY ALTO
+    layer.style.zIndex = '999999'; 
     layer.style.pointerEvents = 'auto';
     layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
 
