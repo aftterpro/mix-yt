@@ -3,6 +3,12 @@ console.log('Core cargando...');
 // =============================================
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // =============================================
+const CONFIG = {
+    CROSSFADE_DURATION: 10,
+    MONITOR_INTERVAL: 500,
+    DEBOUNCE_DELAY: 1500,
+    PRELOAD_THRESHOLD: 15
+};
 const playerConfig = {
     playerVars: { 
         'playsinline': 1,
@@ -441,72 +447,41 @@ cleanupView(viewName) {
 initializePlayers() {
     if (player1 && player2) return;
     console.log('🎮 Inicializando reproductores...');
+    
     const p1Container = document.getElementById('player1');
     const p2Container = document.getElementById('player2');
     
     if (!p1Container || !p2Container) {
-        console.error('❌ No se encontraron los contenedores de los reproductores');
+        console.error('❌ Contenedores no encontrados');
         return;
     }
     
-    // ✅ CRÍTICO: Origin correcto y explícito
     const currentOrigin = window.location.origin;
-    console.log('🔗 Origin configurado:', currentOrigin);
-
+    
     const playerConfig = {
         height: '100%',
         width: '100%',
         videoId: '',
         playerVars: { 
-            'playsinline': 1,
-            'origin': currentOrigin,
-            'enablejsapi': 1,
-            'widget_referrer': currentOrigin,
-            'controls': 1,
-            'rel': 0,
-            'showinfo': 0,
-            'fs': 1,
-            'modestbranding': 1
+            playsinline: 1,
+            origin: currentOrigin,
+            enablejsapi: 1,
+            controls: 1,
+            rel: 0,
+            modestbranding: 1
         },
         events: {
-            'onReady': (event) => this.onPlayerReady(event),
-            'onStateChange': (event) => this.onPlayerStateChange(event),
-            'onError': (event) => this.onPlayerError(event)
+            onReady: (e) => this.onPlayerReady(e),
+            onStateChange: (e) => this.onPlayerStateChange(e),
+            onError: (e) => this.onPlayerError(e)
         }
     };
     
-    // ✅ Aplicar estilos a los contenedores
-    p1Container.style.cssText = `
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 10 !important;
-        background: #000 !important;
-    `;
-    
-    p2Container.style.cssText = `
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        z-index: 0 !important;
-        background: #000 !important;
-    `;
-    
-    // Crear reproductores
     player1 = new YT.Player('player1', playerConfig);
     player2 = new YT.Player('player2', playerConfig);
     
-    console.log('✅ Reproductores creados correctamente');
+    window.player1 = player1;
+    window.player2 = player2;
 }
     
 onPlayerReady(event) {
@@ -1606,20 +1581,22 @@ toggleRepeat() {
             this.updatePlayButton('play');
         }
     }
+
+    
 async playNextVideo() {
     const now = Date.now();
     
-    // ✅ PROTECCIÓN 1: Cooldown más estricto
+    // CRÍTICO: Prevenir llamadas múltiples
     if (!this.lastPlayNextCall) this.lastPlayNextCall = 0;
-    if (now - this.lastPlayNextCall < 1500) { // 1.5 segundos
-        console.log('⏸️ playNextVideo bloqueado (cooldown activo)');
+    if (now - this.lastPlayNextCall < 1500) {
+        console.log('⏸️ Debounce activo');
         return;
     }
     this.lastPlayNextCall = now;
     
-    // ✅ PROTECCIÓN 2: Bandera de transición
+    // CRÍTICO: Prevenir transición simultánea
     if (this.isTransitioningToNext) {
-        console.log('⏸️ playNextVideo bloqueado (transición en curso)');
+        console.log('⏸️ Transición en curso');
         return;
     }
     this.isTransitioningToNext = true;
@@ -1627,36 +1604,34 @@ async playNextVideo() {
     console.log('🎬 playNextVideo iniciado');
     
     try {
-        // ✅ DETENER MONITOR INMEDIATAMENTE
+        // Detener monitor INMEDIATAMENTE
         if (monitorInterval) {
             clearInterval(monitorInterval);
             monitorInterval = null;
-            console.log('🛑 Monitor detenido para transición');
         }
         
-        // ✅ RESETEAR BANDERAS DE CROSSFADE
+        // Resetear banderas
         hasOutroCrossfadeStarted = false;
         nextVideoScheduled = false;
         
-        // ✅ VALIDAR PLAYERS
+        // Validar players
         if (!window.player1 || !window.player2) {
-            throw new Error('Players no inicializados');
+            throw new Error('Players no listos');
         }
 
-        const currentFlatIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         const flatList = this.getFlattenedPlaylist();
 
         if (flatList.length === 0) {
             throw new Error('Cola vacía');
         }
 
-        // ✅ CALCULAR SIGUIENTE ÍNDICE
-        let nextIndex = currentFlatIndex + 1;
+        // Calcular siguiente índice
+        let nextIndex = currentIndex + 1;
         
         if (nextIndex >= flatList.length) {
             if (this.state?.repeatEnabled) {
                 nextIndex = 0;
-                console.log('🔁 Repeat: volviendo al inicio');
             } else {
                 console.log('🏁 Fin de la cola');
                 this.handleEndOfPlaylist();
@@ -1666,12 +1641,12 @@ async playNextVideo() {
 
         const nextVideo = flatList[nextIndex];
         if (!nextVideo?.videoId) {
-            throw new Error('Video inválido en índice ' + nextIndex);
+            throw new Error('Video inválido');
         }
 
         console.log(`🎵 Siguiente: "${nextVideo.title}" (índice ${nextIndex})`);
         
-        // ✅ ACTUALIZAR INFO GLOBAL
+        // Actualizar info global
         window.currentPlayingInfo = {
             flattenedIndex: nextIndex,
             videoId: nextVideo.videoId,
@@ -1685,27 +1660,27 @@ async playNextVideo() {
             this.updatePersistentQueue();
         }
 
-        // ✅ DETERMINAR REPRODUCTORES
+        // Determinar reproductores
         const prevPlayerNum = window.currentPlayer;
         const nextPlayerNum = window.currentPlayer === 1 ? 2 : 1;
         
-        const prevPlayerInstance = prevPlayerNum === 1 ? window.player1 : window.player2;
-        const nextPlayerInstance = nextPlayerNum === 1 ? window.player1 : window.player2;
+        const prevPlayer = prevPlayerNum === 1 ? window.player1 : window.player2;
+        const nextPlayer = nextPlayerNum === 1 ? window.player1 : window.player2;
         
         const prevElement = document.getElementById(`player${prevPlayerNum}`);
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
-        // ✅ CARGAR VIDEO (sin reproducir aún)
-        console.log(`📥 Cargando video en player${nextPlayerNum}...`);
-        nextPlayerInstance.cueVideoById({
+        // Cargar video
+        console.log(`📥 Cargando en player${nextPlayerNum}...`);
+        nextPlayer.cueVideoById({
             videoId: nextVideo.videoId,
             startSeconds: 0
         });
         
-        // ✅ ESPERAR A QUE ESTÉ LISTO
-        await this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 3000);
+        // Esperar a que esté listo
+        await this.waitForPlayerCued(nextPlayer, 3000);
         
-        // ✅ PREPARAR ELEMENTOS VISUALES
+        // Preparar elementos visuales
         if (nextElement && prevElement) {
             const container = prevElement.parentNode;
             if (container && !container.contains(nextElement)) {
@@ -1714,38 +1689,27 @@ async playNextVideo() {
             
             nextElement.style.cssText = `
                 position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                display: block !important;
-                visibility: visible !important;
-                opacity: 0 !important;
-                z-index: 2 !important;
-                background: #000 !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
+                display: block !important; visibility: visible !important;
+                opacity: 0 !important; z-index: 2 !important;
                 transition: opacity ${CROSSFADE_DURATION}s ease !important;
             `;
             
             prevElement.style.cssText = `
                 position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                display: block !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                z-index: 1 !important;
-                background: #000 !important;
+                top: 0 !important; left: 0 !important;
+                width: 100% !important; height: 100% !important;
+                display: block !important; visibility: visible !important;
+                opacity: 1 !important; z-index: 1 !important;
                 transition: opacity ${CROSSFADE_DURATION}s ease !important;
             `;
         }
         
-        // ✅ INICIAR REPRODUCCIÓN
-        console.log(`▶️ Reproduciendo en player${nextPlayerNum}...`);
-        await nextPlayerInstance.playVideo();
+        // Iniciar reproducción
+        await nextPlayer.playVideo();
         
-        // ✅ CROSSFADE VISUAL
+        // Crossfade visual
         requestAnimationFrame(() => {
             if (nextElement) {
                 nextElement.style.opacity = '1';
@@ -1753,21 +1717,20 @@ async playNextVideo() {
             }
             if (prevElement) {
                 prevElement.style.opacity = '0';
-                prevElement.style.zIndex = '1';
             }
         });
         
-        // ✅ CROSSFADE DE AUDIO
-        await this.performAudioCrossfade(prevPlayerInstance, nextPlayerInstance);
+        // Crossfade de audio
+        await this.performAudioCrossfade(prevPlayer, nextPlayer);
         
-        // ✅ LIMPIEZA FINAL
+        // Limpieza
         try {
-            if (prevPlayerInstance?.stopVideo) {
-                prevPlayerInstance.stopVideo();
-                prevPlayerInstance.setVolume(0);
+            if (prevPlayer?.stopVideo) {
+                prevPlayer.stopVideo();
+                prevPlayer.setVolume(0);
             }
-            if (nextPlayerInstance?.setVolume) {
-                nextPlayerInstance.setVolume(100);
+            if (nextPlayer?.setVolume) {
+                nextPlayer.setVolume(100);
             }
         } catch (e) {
             console.warn('⚠️ Error en limpieza:', e);
@@ -1783,34 +1746,59 @@ async playNextVideo() {
             }, 500);
         }
         
-        // ✅ CAMBIAR PLAYER ACTIVO
+        // Cambiar player activo
         window.currentPlayer = nextPlayerNum;
         
-        // ✅ REINICIAR MONITOR (después de todo)
+        // Reiniciar monitor
         setTimeout(() => {
             if (!monitorInterval && window.reproduccionIniciada) {
                 monitorInterval = setInterval(monitorPlayers, 500);
-                console.log('✅ Monitor reiniciado después de crossfade');
+                console.log('✅ Monitor reiniciado');
             }
         }, 1000);
         
-        console.log(`✅ Crossfade completado a player${nextPlayerNum}`);
+        console.log(`✅ Crossfade completado`);
 
     } catch (error) {
         console.error("❌ Error en playNextVideo:", error);
-        this.showMessage('Error al cambiar de pista', 'error');
         
-        // ✅ RECUPERACIÓN: Reiniciar monitor
+        // Recuperación: reiniciar monitor
         if (!monitorInterval && window.reproduccionIniciada) {
             monitorInterval = setInterval(monitorPlayers, 500);
         }
     } finally {
-        // ✅ LIBERAR BANDERA SIEMPRE
         this.isTransitioningToNext = false;
     }
 }
-
-// ✅ FUNCIÓN AUXILIAR: Esperar estado del player
+async waitForPlayerCued(player, maxWait = 3000) {
+    return new Promise((resolve) => {
+        const startTime = Date.now();
+        
+        const checkState = () => {
+            const elapsed = Date.now() - startTime;
+            
+            try {
+                const state = player.getPlayerState();
+                
+                if (state === YT.PlayerState.CUED) {
+                    resolve();
+                    return;
+                }
+                
+                if (elapsed < maxWait) {
+                    setTimeout(checkState, 100);
+                } else {
+                    console.warn('⏰ Timeout esperando player');
+                    resolve();
+                }
+            } catch (e) {
+                setTimeout(checkState, 100);
+            }
+        };
+        
+        checkState();
+    });
+}
 async waitForPlayerState(playerInstance, targetState, maxWait = 3000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
@@ -2734,10 +2722,6 @@ function preloadNextVideo() {    // Si no hay core o playlist, abortar
 }
 
 function monitorPlayers() {
-    // ✅ NO MONITOREAR SI:
-    // 1. Players no listos
-    // 2. No hay reproducción iniciada
-    // 3. Hay transición en curso
     if (!playersInitialized || 
         !window.reproduccionIniciada || 
         window.unifiedCore?.isTransitioningToNext) {
@@ -2753,24 +2737,21 @@ function monitorPlayers() {
 
         const playerState = activePlayer.getPlayerState();
         
-        // ✅ SI EL VIDEO TERMINÓ
+        // Si terminó, reproducir siguiente
         if (playerState === YT.PlayerState.ENDED) {
-            console.log('🎬 Video terminado naturalmente');
+            console.log('🎬 Video terminado');
             
-            // Detener monitor
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
             
-            // Reproducir siguiente
             if (window.unifiedCore) {
                 window.unifiedCore.playNextVideo();
             }
             return;
         }
 
-        // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO
         if (playerState !== YT.PlayerState.PLAYING) return;
 
         const currentTime = activePlayer.getCurrentTime();
@@ -2779,42 +2760,40 @@ function monitorPlayers() {
 
         if (!videoDuration || videoDuration <= 0) return;
 
-        // ✅ SPONSORBLOCK
+        // SponsorBlock
         if (window.sponsorBlockManager && videoId) {
             window.sponsorBlockManager.checkAndSkip(activePlayer);
         }
 
-        // ✅ CALCULAR TRIGGER TIME
-        let triggerTime = videoDuration - (window.CROSSFADE_DURATION || 10) - 0.5;
+        // Calcular trigger time
+        let triggerTime = videoDuration - (CROSSFADE_DURATION || 10) - 0.5;
         
         if (videoId && window.sponsorBlockManager) {
             triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
                 videoDuration,
                 videoId,
-                window.CROSSFADE_DURATION || 10
+                CROSSFADE_DURATION || 10
             );
         }
 
-        // ✅ DISPARAR CROSSFADE (solo una vez)
+        // Disparar crossfade (solo una vez)
         if (currentTime >= triggerTime && !hasOutroCrossfadeStarted) {
-            console.log(`🎨 Disparando crossfade en ${currentTime.toFixed(2)}s`);
+            console.log(`🎨 Trigger crossfade en ${currentTime.toFixed(2)}s`);
             
             hasOutroCrossfadeStarted = true;
             
-            // Detener monitor
             if (monitorInterval) {
                 clearInterval(monitorInterval);
                 monitorInterval = null;
             }
             
-            // Reproducir siguiente
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
             }
         }
         
     } catch (error) {
-        console.error('❌ Error en monitorPlayers:', error);
+        console.error('❌ Error en monitor:', error);
     }
 }
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
