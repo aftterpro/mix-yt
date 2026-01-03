@@ -58,12 +58,13 @@
     --transition-slow: 300ms;
     
     /* === Z-INDEX === */
+   --z-video-base: 1;
     --z-sidebar: 50;
-    --z-player-full: 60;
+    --z-player-layer-mini: 999998;
+    --z-player-layer-full: 55; 
+    --z-queue: 100; 
     --z-header: 200;
     --z-bottom-player: 300;
-    --z-queue: 100;
-    --z-mini-player: 999998;
     --z-modal: 1000;
 }
 
@@ -932,9 +933,17 @@ body {
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    z-index: var(--z-queue);
+    z-index: var(--z-queue) !important; /* 100 - MÁS ALTO QUE PLAYER */
+    pointer-events: auto !important; /* ✅ SIEMPRE clickeable */
 }
-
+.queue-tabs,
+.queue-tab,
+.queue-list-content,
+.queue-item {
+    position: relative;
+    z-index: 101; 
+    pointer-events: auto !important;
+}
 .queue-header {
     padding: 20px;
     border-bottom: 1px solid var(--yt-layer-10);
@@ -1302,10 +1311,19 @@ color: white;
 MINI PLAYER
 ============================================= */
 #persistent-player-layer {
-position: fixed;
-transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-background: transparent;
-z-index: var(--z-mini-player);
+    position: fixed;
+    transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    background: transparent;
+    pointer-events: none; /* ✅ Por defecto NO bloquear clicks */
+}
+body.mini-player-active #persistent-player-layer {
+    z-index: var(--z-player-layer-mini);
+    pointer-events: auto; /* ✅ Solo en mini player permitir clicks */
+}
+body.full-player-active #persistent-player-layer,
+.full-player-view.active ~ #persistent-player-layer {
+    z-index: var(--z-player-layer-full) !important; /* 55 */
+    pointer-events: none !important; /* ✅ CRÍTICO: NO bloquear clicks */
 }
 .mini-player-expand {
 position: absolute;
