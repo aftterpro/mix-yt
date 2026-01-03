@@ -58,11 +58,11 @@
     --transition-slow: 300ms;
     
     /* === Z-INDEX === */
-   --z-video-base: 1;
+    --z-video-base: 1;
     --z-sidebar: 50;
     --z-player-layer-mini: 999998;
-    --z-player-layer-full: 55; 
-    --z-queue: 100; 
+    --z-player-layer-full: 55;  /* ✅ MENOR que la cola */
+    --z-queue: 100;              /* ✅ SIEMPRE encima */
     --z-header: 200;
     --z-bottom-player: 300;
     --z-modal: 1000;
@@ -933,15 +933,15 @@ body {
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    z-index: var(--z-queue) !important; /* 100 - MÁS ALTO QUE PLAYER */
-    pointer-events: auto !important; /* ✅ SIEMPRE clickeable */
+    z-index: var(--z-queue) !important; /* 100 - ALTO */
+    pointer-events: auto !important;
 }
 .queue-tabs,
 .queue-tab,
 .queue-list-content,
 .queue-item {
-    position: relative;
-    z-index: 101; 
+   position: relative;
+    z-index: 101; /* Más alto que la cola base */
     pointer-events: auto !important;
 }
 .queue-header {
@@ -1314,16 +1314,16 @@ MINI PLAYER
     position: fixed;
     transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
     background: transparent;
-    pointer-events: none; /* ✅ Por defecto NO bloquear clicks */
+    pointer-events: none; /* ✅ NO bloquear clicks por defecto */
 }
 body.mini-player-active #persistent-player-layer {
-    z-index: var(--z-player-layer-mini);
-    pointer-events: auto; /* ✅ Solo en mini player permitir clicks */
+    z-index: var(--z-player-layer-mini); /* 999998 */
+    pointer-events: auto;
 }
 body.full-player-active #persistent-player-layer,
 .full-player-view.active ~ #persistent-player-layer {
-    z-index: var(--z-player-layer-full) !important; /* 55 */
-    pointer-events: none !important; /* ✅ CRÍTICO: NO bloquear clicks */
+    z-index: var(--z-player-layer-full) !important; /* 55 - BAJO */
+    pointer-events: none !important; /* ✅ NO bloquear clicks */
 }
 .mini-player-expand {
 position: absolute;
@@ -1673,17 +1673,3 @@ animation-iteration-count: 1 !important;
 transition-duration: 0.01ms !important;
 }
 }
-/* =============================================
-   DEBUG VISUAL (Temporal)
-   ============================================= */
-body.full-player-active #persistent-player-layer {
-    outline: 3px solid red !important; /* ✅ Ver el layer */
-    outline-offset: -3px;
-}
-
-.persistent-queue-sidebar {
-    outline: 3px solid green !important; /* ✅ Ver la cola */
-    outline-offset: -3px;
-}
-
-/* Remover después de verificar que funciona */
