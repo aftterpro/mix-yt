@@ -28,12 +28,12 @@
 }
 
 .video-player.fade-out {
-  z-index: 2;
+ z-index: 2;
   pointer-events: none;
 }
 
 .video-player.hidden {
-  display: none !important;
+ display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
   z-index: -1;
@@ -44,7 +44,7 @@
    ============================================= */
 .video-wrapper,
 #videoWrapper {
-  position: relative !important;
+ position: relative !important;
   width: 100% !important;
   height: 100% !important;
   background: #000 !important;
@@ -55,7 +55,7 @@
    LETRAS SINCRONIZADAS
    ============================================= */
 .lyrics-text.synced {
-  max-height: 400px;
+    max-height: 400px;
   overflow-y: auto;
   scroll-behavior: smooth;
   padding: 20px;
