@@ -281,20 +281,66 @@ function ensureAPIsLoaded() {
 
 // Cuando el DOM esté listo
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('📄 DOM cargado, verificando APIs...');
+   document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM cargado, verificando APIs...');
+    
+    ensureAPIsLoaded();
+    loadYouTubeAPI();
+    
+    setTimeout(setupAudioControls, 1000);
+    
+    // ✅ TIMEOUT MEJORADO CON REINTENTOS
+    let checkAttempts = 0;
+    const MAX_ATTEMPTS = 30; // 30 segundos total
+    
+    const checkAPIsInterval = setInterval(() => {
+        checkAttempts++;
         
-        ensureAPIsLoaded();
+        const { gapi, gis, youtube } = window.ytCrossMixAPIs;
         
-        // Timeout de seguridad para APIs que no respondan
-        setTimeout(() => {
-            if (!window.ytCrossMixAPIs.ready) {
-                console.warn('⏰ Timeout de APIs, algunas pueden no estar disponibles');
-                // Continuar sin todas las APIs si es necesario
-                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout'));
+        // ✅ ÉXITO: Todas las APIs cargadas
+        if (gapi && gis && youtube) {
+            clearInterval(checkAPIsInterval);
+            console.log('✅ Todas las APIs verificadas correctamente');
+            
+            // Disparar evento de éxito
+            document.dispatchEvent(new CustomEvent('ytCrossMixAPIsVerified', {
+                detail: { success: true, attempts: checkAttempts }
+            }));
+            return;
+        }
+        
+        // ✅ TIMEOUT: Después de 30 segundos
+        if (checkAttempts >= MAX_ATTEMPTS) {
+            clearInterval(checkAPIsInterval);
+            
+            const missing = [];
+            if (!gapi) missing.push('GAPI');
+            if (!gis) missing.push('GIS');
+            if (!youtube) missing.push('YouTube');
+            
+            console.warn(`⏰ Timeout de APIs después de ${checkAttempts}s. Faltantes: ${missing.join(', ')}`);
+            console.log('Estado final:', window.ytCrossMixAPIs);
+            
+            // ✅ CONTINUAR CON LAS APIs DISPONIBLES
+            document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout', {
+                detail: { 
+                    missing: missing,
+                    available: { gapi, gis, youtube },
+                    attempts: checkAttempts
+                }
+            }));
+            
+            // ✅ MOSTRAR AVISO AL USUARIO (solo si falta YouTube)
+            if (!youtube && window.unifiedCore) {
+                window.unifiedCore.showMessage(
+                    'Algunos servicios tardaron en cargar. Funcionalidad limitada.',
+                    'warning'
+                );
             }
-        }, 10000); // 10 segundos
-    });
+        }
+    }, 1000); // Verificar cada segundo
+});
 } else {
     console.log('📄 DOM ya cargado, verificando APIs...');
     ensureAPIsLoaded();
@@ -515,3 +561,32 @@ if (document.readyState === 'loading') {
 }
 
 console.log('✅ Sistema de inicialización cargado');
+// =============================================
+// LISTENER PARA MANEJAR TIMEOUT
+// =============================================
+document.addEventListener('ytCrossMixAPIsTimeout', (e) => {
+    const { missing, available } = e.detail;
+    
+    console.log('🔄 Manejando timeout de APIs...');
+    
+    // Si YouTube está disponible, continuar
+    if (available.youtube) {
+        console.log('✅ YouTube API disponible, continuando...');
+        
+        if (window.unifiedCore && !window.unifiedCore.state.initialized) {
+            window.unifiedCore.init();
+        }
+    }
+    
+    // Si GAPI/GIS están disponibles, inicializar auth
+    if (available.gapi && available.gis) {
+        console.log('✅ Auth APIs disponibles');
+        
+        if (window.gapiInitialize_auth) {
+            window.gapiInitialize_auth();
+        }
+        if (window.gisInitalize_auth) {
+            window.gisInitalize_auth();
+        }
+    }
+});
