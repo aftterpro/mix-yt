@@ -1673,3 +1673,17 @@ animation-iteration-count: 1 !important;
 transition-duration: 0.01ms !important;
 }
 }
+/* =============================================
+   DEBUG VISUAL (Temporal)
+   ============================================= */
+body.full-player-active #persistent-player-layer {
+    outline: 3px solid red !important; /* ✅ Ver el layer */
+    outline-offset: -3px;
+}
+
+.persistent-queue-sidebar {
+    outline: 3px solid green !important; /* ✅ Ver la cola */
+    outline-offset: -3px;
+}
+
+/* Remover después de verificar que funciona */
