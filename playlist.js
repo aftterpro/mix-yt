@@ -1817,12 +1817,8 @@ updateQueueUI() {
 async loadRelatedVideos() {
     const relatedList = document.getElementById('relatedVideosList');
     
-    if (!relatedList) {
-        console.error('❌ Contenedor relatedVideosList no encontrado');
-        return;
-    }
+    if (!relatedList) return;
 
-    // ✅ CORRECCIÓN: Obtener video del PLAYER directamente
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
@@ -1838,12 +1834,9 @@ async loadRelatedVideos() {
         return;
     }
 
-    // ✅ CORRECCIÓN: Buscar video en cola de forma segura
-    const queuePlaylist = this.playlistsData.find(p => p.id === 'queue');
-    if (!queuePlaylist || !queuePlaylist.videos) {
-        console.warn('⚠️ Cola no encontrada');
-        return;
-    }
+    // Buscar video en cola
+    const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
+    if (!queuePlaylist?.videos) return;
     
     let currentVideo = null;
     for (let i = 0; i < queuePlaylist.videos.length; i++) {
@@ -1853,33 +1846,24 @@ async loadRelatedVideos() {
         }
     }
     
-    if (!currentVideo) {
-        console.warn(`⚠️ Video ${currentVideoId} no encontrado en cola`);
-        relatedList.innerHTML = `<p class="related-placeholder">Video no encontrado</p>`;
-        return;
-    }
+    if (!currentVideo) return;
 
-    // ✅ CACHÉ: Verificar si ya están cargados
+    // Verificar caché
     if (this.lastLoadedRelatedId === currentVideo.videoId) {
-        const existingItems = relatedList.querySelectorAll('.related-video-item');
-        if (existingItems.length > 0) {
-            console.log('✅ Relacionados ya cargados');
-            return;
-        }
+        const existing = relatedList.querySelectorAll('.related-video-item');
+        if (existing.length > 0) return;
     }
 
     this.lastLoadedRelatedId = currentVideo.videoId;
-    relatedList.innerHTML = `<div class="related-loading"><i class="fas fa-spinner fa-spin"></i><p>Cargando sugerencias...</p></div>`;
+    relatedList.innerHTML = `<div class="related-loading"><i class="fas fa-spinner fa-spin"></i><p>Cargando...</p></div>`;
 
     try {
         const artist = this.extractArtistFromTitle(currentVideo.title);
         const searchQuery = artist !== 'Desconocido' ? artist : currentVideo.title;
         
-        console.log(`🔍 Buscando relacionados: "${searchQuery}"`);
-        
         const searchResults = await window.youtubeJSClient.search(searchQuery);
         
-        if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
+        if (!searchResults?.items?.length) {
             throw new Error('Sin resultados');
         }
         
@@ -1888,15 +1872,15 @@ async loadRelatedVideos() {
             .slice(0, 15);
         
         if (relatedVideos.length === 0) {
-            relatedList.innerHTML = `<div class="related-placeholder"><i class="fas fa-music-slash"></i><p>No se encontraron videos relacionados</p></div>`;
+            relatedList.innerHTML = `<div class="related-placeholder"><i class="fas fa-music-slash"></i><p>No hay relacionados</p></div>`;
             return;
         }
         
         this.renderRelatedVideos(relatedVideos, relatedList);
 
     } catch (error) {
-        console.error('❌ Error cargando relacionados:', error);
-        relatedList.innerHTML = `<div class="related-error"><i class="fas fa-exclamation-triangle"></i><p>No se pudieron cargar sugerencias</p></div>`;
+        console.error('❌ Error:', error);
+        relatedList.innerHTML = `<div class="related-error"><i class="fas fa-exclamation-triangle"></i><p>Error cargando</p></div>`;
     }
 }
 renderRelatedVideos(videos, container) {
