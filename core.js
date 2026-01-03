@@ -2093,14 +2093,85 @@ displaySearchResults(videos, container) {
 }
 
 
-    async addVideoToQueue(videoData) {
-        if (!window.playlistManager) {
-            this.showMessage('Error: Gestor de playlists no disponible', 'error');
-            return;
-        }
-        invalidateFlattenedCache();
-        return await window.playlistManager.addVideoToQueue(videoData);
+async addVideoToQueue(videoData) {
+    console.log('🎵 addVideoToQueue:', videoData);
+    
+    // ✅ VALIDACIÓN ESTRICTA
+    if (!videoData || 
+        !videoData.videoId || 
+        videoData.videoId === 'undefined' || 
+        typeof videoData.videoId !== 'string' ||
+        videoData.videoId.trim() === '') {
+        console.error('❌ videoId inválido:', videoData);
+        this.showMessage('Error: Video inválido', 'error');
+        return false;
     }
+
+    // ✅ OBTENER COLA
+    let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
+
+    if (!queue) {
+        console.log('✨ Creando cola de reproducción');
+        queue = {
+            id: 'queue',
+            name: 'Cola de Reproducción',
+            thumbnailUrl: './electronic.ico',
+            videos: [],
+            isExpanded: true,
+            isQueue: true
+        };
+        this.playlistsData.unshift(queue);
+    }
+
+    // ✅ NORMALIZAR VIDEO
+    const videoToAdd = {
+        videoId: videoData.videoId.trim(),
+        title: videoData.title?.trim() || 'Sin título',
+        thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
+        duration: parseInt(videoData.duration) || 0,
+        uploaderName: videoData.uploaderName || videoData.artist || videoData.author || 'Desconocido',
+        artist: videoData.artist || videoData.uploaderName || videoData.author || 'Desconocido',
+        sourcePlaylistId: 'queue'
+    };
+
+    // ✅ VERIFICAR DUPLICADOS
+    const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
+    if (isDuplicate) {
+        this.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
+        return false;
+    }
+
+    // ✅ AÑADIR AL FINAL
+    queue.videos.push(videoToAdd);
+    console.log(`✅ Video añadido. Total en cola: ${queue.videos.length}`);
+
+    // ✅ INVALIDAR CACHÉ
+    if (typeof this.invalidateFlattenedCache === 'function') {
+        this.invalidateFlattenedCache();
+    }
+
+    // ✅ ACTUALIZAR UI
+    if (window.playlistManager) {
+        window.playlistManager.updateQueueUI();
+    }
+    
+    this.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
+    this.enablePlayButton();
+    
+    // ✅ ACTUALIZAR COLA VISIBLE
+    if (this.updatePersistentQueue) {
+        this.updatePersistentQueue();
+    }
+
+    // ✅ GUARDAR
+    setTimeout(() => {
+        if (typeof window.saveAllData === 'function') {
+            window.saveAllData();
+        }
+    }, 100);
+    
+    return true;
+}
 
     async addVideoToQueueAfterCurrent(videoData) {
         if (!window.playlistManager) {
