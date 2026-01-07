@@ -108,57 +108,52 @@
             </div>
 
             <div class="persistent-queue-sidebar">
-              <div class="queue-header">
-                <div class="queue-header-title">
-                  <h3>Cola de reproducción</h3>
-                  <span id="queueCount" class="queue-count-badge">0</span>
-                </div>
-                <button class="clear-queue-btn" onclick="if(window.playlistManager) window.playlistManager.clearQueue()" title="Limpiar cola">
-                  <i class="fas fa-trash"></i>
-                </button>
+            <div class="queue-header">
+              <div class="queue-header-title">
+              <h3>Cola de reproducción</h3>
+            <span id="queueCount" class="queue-count-badge">0</span>
+        </div>
+        <button class="clear-queue-btn" onclick="if(window.playlistManager) window.playlistManager.clearQueue()" title="Limpiar cola">
+            <i class="fas fa-trash"></i>
+        </button>
+    </div>
+
+    <div class="queue-tabs">
+        <button class="queue-tab active" data-tab="next" onclick="window.playlistManager?.switchQueueTab('next')">
+            <i class="fas fa-list"></i>
+            <span>Siguiente</span>
+        </button>
+        <button class="queue-tab" data-tab="lyrics" onclick="window.playlistManager?.switchQueueTab('lyrics')">
+            <i class="fas fa-music"></i>
+            <span>Letras</span>
+        </button>
+        <button class="queue-tab" data-tab="related" onclick="window.playlistManager?.switchQueueTab('related')">
+            <i class="fas fa-sparkles"></i>
+            <span>Relacionado</span>
+        </button>
+    </div>
+
+    <div class="queue-tab-content">
+        <div id="queueContentList" class="queue-list-content active" data-tab-content="next">
+            <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
+        </div>
+
+        <div id="lyricsContent" class="queue-list-content" data-tab-content="lyrics">
+            <!-- Letras -->
+        </div>
+
+        <div id="relatedContent" class="queue-list-content" data-tab-content="related">
+            <!-- Relacionados -->
               </div>
-
-              <div class="queue-tabs">
-                <button class="queue-tab active" data-tab="next" onclick="window.playlistManager?.switchQueueTab('next')">
-                  <i class="fas fa-list"></i>
-                  <span>Siguiente</span>
-                </button>
-                <button class="queue-tab" data-tab="lyrics" onclick="window.playlistManager?.switchQueueTab('lyrics')">
-                  <i class="fas fa-music"></i>
-                  <span>Letras</span>
-                </button>
-                <button class="queue-tab" data-tab="related" onclick="window.playlistManager?.switchQueueTab('related')">
-                  <i class="fas fa-sparkles"></i>
-                  <span>Relacionado</span>
-                </button>
-              </div>
-
-              <div class="queue-tab-content">
-                <div id="queueContentList" class="queue-list-content active" data-tab-content="next">
-                  <p class="queue-placeholder">La cola está vacía. Añade canciones para empezar.</p>
-                </div>
-
-                <div id="lyricsContent" class="queue-list-content" data-tab-content="lyrics">
-                  <div class="lyrics-container">
-                    <div class="lyrics-header">
-                      <i class="fas fa-music"></i>
-                      <p>Letras no disponibles</p>
-                    </div>
-                    <p class="lyrics-info">Las letras aparecerán aquí cuando estén disponibles</p>
-                  </div>
-                </div>
-
-                <div id="relatedContent" class="queue-list-content" data-tab-content="related">
-                  <div class="related-container">
-                    <div class="related-header">
-                      <i class="fas fa-sparkles"></i>
-                      <p>Videos relacionados</p>
-                    </div>
-                    <div id="relatedVideosList"></div>
-                  </div>
-                </div>
-              </div> </div> </div> </div> </div></main>
-  </div><div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
+            </div>
+          </div>
+            
+          </div> 
+        </div> 
+      </div>
+    </main>
+    
+   </div><div class="bottom-player" onclick="if(window.playlistManager) window.playlistManager.showQueuePopup()">
     <div class="player-info">
       <img src="./electronic.ico" alt="Track" class="player-thumbnail" id="playerThumbnail">
       <div class="player-text">
