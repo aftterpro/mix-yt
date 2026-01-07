@@ -1765,7 +1765,7 @@ async playNextVideo() {
                 container.appendChild(nextElement);
             }
             
-            // ✅ PASO 1: Preparar nextElement (invisible)
+            // ✅ PASO 1: Preparar nextElement (invisible pero presente)
             nextElement.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -1804,20 +1804,31 @@ async playNextVideo() {
         console.log(`▶️ Reproduciendo en player${nextPlayerNum}...`);
         await nextPlayerInstance.playVideo();
         
-        // ✅ ESPERAR UN FRAME para asegurar que el video está reproduciendo
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        // ✅ ESPERAR MÚLTIPLES FRAMES PARA ASEGURAR QUE ESTÁ REPRODUCIENDO
+        await new Promise(resolve => {
+            let attempts = 0;
+            const checkPlaying = setInterval(() => {
+                const state = nextPlayerInstance.getPlayerState();
+                attempts++;
+                
+                if (state === YT.PlayerState.PLAYING || attempts > 20) {
+                    clearInterval(checkPlaying);
+                    resolve();
+                }
+            }, 100);
+        });
         
         // =============================================
         // ✅ CROSSFADE VISUAL (Controlado por JS)
         // =============================================
         
         if (nextElement && prevElement) {
-            // Añadir transition CSS SOLO durante el crossfade
+            // Añadir transition CSS
             const transitionStyle = `opacity ${CROSSFADE_DURATION}s ease`;
             nextElement.style.transition = transitionStyle;
             prevElement.style.transition = transitionStyle;
             
-            // Forzar otro reflow
+            // Forzar reflow
             void nextElement.offsetHeight;
             
             // Ejecutar crossfade
@@ -1836,36 +1847,58 @@ async playNextVideo() {
         await this.performAudioCrossfade(prevPlayerInstance, nextPlayerInstance);
         
         // =============================================
-        // ✅ LIMPIEZA DESPUÉS DEL CROSSFADE
+        // ✅ LIMPIEZA MEJORADA - SIN OCULTAR PREMATURAMENTE
         // =============================================
         
         setTimeout(() => {
             try {
-                // Detener player anterior
+                // ✅ SOLO DETENER EL PLAYER ANTERIOR, NO OCULTAR ELEMENTOS
                 if (prevPlayerInstance?.stopVideo) {
                     prevPlayerInstance.stopVideo();
                     prevPlayerInstance.setVolume(0);
                 }
                 
-                // Asegurar volumen del player actual
+                // ✅ ASEGURAR VOLUMEN DEL PLAYER ACTUAL
                 if (nextPlayerInstance?.setVolume) {
                     nextPlayerInstance.setVolume(100);
                 }
                 
-                // Ocultar player anterior completamente
+                // ✅ OCULTAR PLAYER ANTERIOR (NO MOVER, SOLO OCULTAR)
                 if (prevElement) {
                     prevElement.style.cssText = `
-                        display: none !important;
-                        opacity: 0 !important;
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        display: block !important;
                         visibility: hidden !important;
+                        opacity: 0 !important;
                         z-index: -1 !important;
+                        background: #000 !important;
+                        pointer-events: none !important;
                     `;
                 }
                 
-                // Limpiar transiciones
+                // ✅ ASEGURAR QUE EL PLAYER ACTUAL SIGA VISIBLE
                 if (nextElement) {
                     nextElement.style.transition = '';
+                    nextElement.style.cssText = `
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        display: block !important;
+                        visibility: visible !important;
+                        opacity: 1 !important;
+                        z-index: 10 !important;
+                        background: #000 !important;
+                        pointer-events: auto !important;
+                    `;
                 }
+                
+                // ✅ LIMPIAR TRANSICIONES
                 if (prevElement) {
                     prevElement.style.transition = '';
                 }
@@ -1875,7 +1908,7 @@ async playNextVideo() {
             } catch (e) {
                 console.warn('⚠️ Error en limpieza:', e);
             }
-        }, CROSSFADE_DURATION * 1000 + 500); // Esperar crossfade + 500ms
+        }, CROSSFADE_DURATION * 1000 + 500);
         
         // ✅ CAMBIAR PLAYER ACTIVO
         window.currentPlayer = nextPlayerNum;
@@ -1903,7 +1936,6 @@ async playNextVideo() {
         this.isTransitioningToNext = false;
     }
 }
-
 async waitForPlayerState(playerInstance, targetState, maxWait = 3000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
@@ -1934,6 +1966,59 @@ async waitForPlayerState(playerInstance, targetState, maxWait = 3000) {
         checkState();
     });
 }
+
+async waitForPlayingState(playerInstance, maxWait = 5000) {
+    return new Promise((resolve) => {
+        const startTime = Date.now();
+        let attempts = 0;
+        
+        const checkState = () => {
+            const elapsed = Date.now() - startTime;
+            attempts++;
+            
+            try {
+                const state = playerInstance.getPlayerState();
+                
+                console.log(`🔍 Intento ${attempts}: Estado ${this.getStateName(state)}`);
+                
+                // ✅ ÉXITO: El player está reproduciendo
+                if (state === YT.PlayerState.PLAYING) {
+                    console.log('✅ Player comenzó a reproducir');
+                    resolve(true);
+                    return;
+                }
+                
+                // ✅ CONTINUAR SI ESTÁ BUFFERING (normal)
+                if (state === YT.PlayerState.BUFFERING) {
+                    if (elapsed < maxWait) {
+                        setTimeout(checkState, 200);
+                    } else {
+                        console.warn('⏰ Timeout esperando reproducción (buffering)');
+                        resolve(false);
+                    }
+                    return;
+                }
+                
+                // ✅ REINTENTAR SI ESTÁ EN OTROS ESTADOS
+                if (elapsed < maxWait) {
+                    setTimeout(checkState, 200);
+                } else {
+                    console.warn('⏰ Timeout esperando estado PLAYING');
+                    resolve(false);
+                }
+            } catch (e) {
+                if (elapsed < maxWait) {
+                    setTimeout(checkState, 200);
+                } else {
+                    console.error('❌ Error esperando estado PLAYING:', e);
+                    resolve(false);
+                }
+            }
+        };
+        
+        checkState();
+    });
+} 
 async waitForPlayerCued(player, maxWait = 3000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
