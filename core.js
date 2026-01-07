@@ -1064,23 +1064,28 @@ setupSearchButtonListeners() {
             title: nextBtn.dataset.title,
             thumbnail: nextBtn.dataset.thumbnail,
             duration: parseInt(nextBtn.dataset.duration) || 0,
-            uploaderName: nextBtn.dataset.author,
-            author: nextBtn.dataset.author,
-            artist: nextBtn.dataset.author
+            uploaderName: nextBtn.dataset.artist,
+            author: nextBtn.dataset.artist,
+            artist: nextBtn.dataset.artist
         };
         
         nextBtn.disabled = true;
         nextBtn.style.opacity = '0.5';
         
         try {
-            if (this.addVideoToQueueAfterCurrent) {
-                await this.addVideoToQueueAfterCurrent(videoData);
-            } else if (window.playlistManager?.addVideoToQueueAfterCurrent) {
-                await window.playlistManager.addVideoToQueueAfterCurrent(videoData);
-            }
+            // ✅ CORREGIDO: Usar el método correcto
+            await this.addVideoToQueueAfterCurrent(videoData);
             
             nextBtn.innerHTML = '<i class="fas fa-check"></i> Añadido';
             nextBtn.style.background = '#4caf50';
+            
+            // ✅ SINCRONIZAR COLA INMEDIATAMENTE
+            if (window.playlistManager) {
+                window.playlistManager.updateQueueUI();
+            }
+            if (this.updatePersistentQueue) {
+                this.updatePersistentQueue();
+            }
             
             setTimeout(() => {
                 nextBtn.innerHTML = '<i class="fas fa-forward"></i>';
@@ -1093,6 +1098,68 @@ setupSearchButtonListeners() {
             nextBtn.disabled = false;
             nextBtn.style.opacity = '1';
             this.showMessage('Error añadiendo video', 'error');
+        }
+    });
+    
+    // ✅ BOTÓN "AÑADIR A COLA"
+    freshSearchResults.addEventListener('click', async (e) => {
+        const addBtn = e.target.closest('.add-to-queue-btn');
+        if (!addBtn) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const videoId = addBtn.dataset.videoId;
+        if (!videoId || videoId === 'undefined') {
+            this.showMessage('Error: Video inválido', 'error');
+            return;
+        }
+        
+        // Obtener datos del video desde el DOM
+        const card = addBtn.closest('.search-result-card');
+        const videoData = {
+            videoId: videoId,
+            title: card.querySelector('.search-result-title')?.textContent || 'Sin título',
+            thumbnail: card.querySelector('.search-result-thumbnail img')?.src || './electronic.ico',
+            duration: parseInt(card.querySelector('.search-result-duration')?.textContent) || 0,
+            uploaderName: card.querySelector('.search-result-author')?.textContent || 'Desconocido',
+            author: card.querySelector('.search-result-author')?.textContent || 'Desconocido',
+            artist: card.querySelector('.search-result-author')?.textContent || 'Desconocido'
+        };
+        
+        addBtn.disabled = true;
+        const icon = addBtn.querySelector('i');
+        icon.className = 'fas fa-spinner fa-spin';
+        
+        try {
+            await this.addVideoToQueue(videoData);
+            
+            icon.className = 'fas fa-check';
+            addBtn.style.background = '#4caf50';
+            
+            // ✅ SINCRONIZAR COLA
+            if (window.playlistManager) {
+                window.playlistManager.updateQueueUI();
+            }
+            if (this.updatePersistentQueue) {
+                this.updatePersistentQueue();
+            }
+            
+            setTimeout(() => {
+                icon.className = 'fas fa-plus';
+                addBtn.style.background = '';
+                addBtn.disabled = false;
+            }, 1500);
+        } catch (error) {
+            console.error('❌ Error:', error);
+            icon.className = 'fas fa-times';
+            addBtn.style.background = '#f44336';
+            
+            setTimeout(() => {
+                icon.className = 'fas fa-plus';
+                addBtn.style.background = '';
+                addBtn.disabled = false;
+            }, 1500);
         }
     });
     
@@ -1927,6 +1994,7 @@ async performAudioCrossfade(prevPlayer, nextPlayer) {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
+
 async performSearch(searchQuery, continuation = null) {
     console.log(`🔎 performSearch: "${searchQuery}", paginación: ${!!continuation}`);
     
@@ -1999,17 +2067,22 @@ async performSearch(searchQuery, continuation = null) {
         window.currentNextPageToken = results.continuation || null;
         window.isLoadingMore = false;
         
-        // Configurar scroll infinito
+        // ✅ CONFIGURAR SCROLL INFINITO SOLO SI HAY MÁS PÁGINAS
         if (window.currentNextPageToken) {
+            // Remover sentinel anterior
             const oldSentinel = document.getElementById('scrollSentinel');
             if (oldSentinel) oldSentinel.remove();
             
+            // Crear nuevo sentinel
             const sentinel = document.createElement('div');
             sentinel.id = 'scrollSentinel';
             sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
             container.appendChild(sentinel);
             
+            // Configurar observador
             this.setupInfiniteScroll(container);
+        } else {
+            console.log('✅ No hay más resultados disponibles');
         }
         
         // Configurar event listeners
@@ -2035,7 +2108,7 @@ async performSearch(searchQuery, continuation = null) {
             this.showMessage('Error cargando más resultados', 'error');
         }
     }
-}           
+}    
 setupInfiniteScroll(container) {
     // ✅ LIMPIAR OBSERVADOR ANTERIOR
     if (this.searchScrollObserver) {
@@ -2060,7 +2133,12 @@ setupInfiniteScroll(container) {
     // ✅ CREAR NUEVO SENTINEL
     const sentinel = document.createElement('div');
     sentinel.id = 'scrollSentinel';
-    sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
+    sentinel.style.cssText = `
+        width: 100%; 
+        height: 20px; 
+        margin: 10px 0;
+        background: transparent;
+    `;
     container.appendChild(sentinel);
     
     // ✅ CREAR NUEVO OBSERVADOR
@@ -2086,7 +2164,7 @@ setupInfiniteScroll(container) {
             }
         }
     }, { 
-        root: null, 
+        root: document.getElementById('searchView'), // ✅ USAR EL CONTENEDOR CORRECTO
         rootMargin: '200px', 
         threshold: 0.1 
     });
