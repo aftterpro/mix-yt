@@ -21,12 +21,27 @@ class UIManager {
             overviewGrid: document.getElementById('overviewGrid'),
             queueCount: document.getElementById('queueCount')
         };
+            window.addEventListener('resize', () => this.handleResize());
     }
 
     // ==========================================
     // GESTIÓN DE VISTAS Y PANELES
     // ==========================================
+    handleResize() {
+    console.log('🔄 Ventana redimensionada');
     
+    // Solo reajustar si estamos en fullPlayer
+    const isFullPlayer = document.body.classList.contains('full-player-active');
+    
+    if (isFullPlayer) {
+        // Esperar a que el resize termine
+        clearTimeout(this.resizeTimeout);
+        this.resizeTimeout = setTimeout(() => {
+            console.log('📐 Reajustando player en fullscreen');
+            this.movePlayersToFullView();
+        }, 300);
+    }
+}
     switchView(viewName) {
         // 1. Construir el ID correcto (ej: 'home' -> 'homeView')
         const targetId = viewName.endsWith('View') ? viewName : viewName + 'View';
