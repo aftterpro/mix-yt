@@ -1226,54 +1226,28 @@ async loadLyrics() {
         return;
     }
 
-    // ✅ VALIDACIÓN ROBUSTA DE DATOS
-    if (!currentVideo.title || currentVideo.title.trim() === '') {
+    // ✅ EXTRAER Y LIMPIAR DATOS
+    const rawTitle = currentVideo.title?.trim() || '';
+    const rawArtist = (currentVideo.artist || currentVideo.uploaderName || '').trim();
+
+    // ✅ VALIDACIÓN MEJORADA
+    if (!rawTitle || rawTitle.length < 2) {
         console.error('❌ Video sin título válido:', currentVideo);
         lyricsContainer.innerHTML = `
             <div class="lyrics-error">
                 <i class="fas fa-exclamation-circle"></i>
                 <p>Error: Video sin título</p>
-                <small>No se pueden buscar letras sin título</small>
             </div>
         `;
-        if (providerBtn) providerBtn.style.display = 'none';
         return;
     }
 
-    // ✅ EXTRAER Y VALIDAR DATOS
-    const rawTitle = currentVideo.title.trim();
-    const rawArtist = (currentVideo.artist || currentVideo.uploaderName || 'Desconocido').trim();
-    const duration = currentVideo.duration || 0;
-
     console.log('📊 Datos del video:', {
-        title: rawTitle,
-        artist: rawArtist,
-        duration: duration,
+        rawTitle: rawTitle,
+        rawArtist: rawArtist,
         videoId: currentVideo.videoId
     });
 
-    // ===== VALIDAR CACHÉ =====
-    const cacheKey = `${currentVideo.videoId}_${this.lyricsProvider}`;
-    const cachedLyrics = sessionStorage.getItem(cacheKey);
-    
-    if (cachedLyrics && this.lastLoadedLyricsId === currentVideo.videoId) {
-        try {
-            const parsed = JSON.parse(cachedLyrics);
-            console.log('✅ Usando letras cacheadas');
-            this.renderLyrics(parsed);
-            if (providerBtn) providerBtn.style.display = 'inline-flex';
-            return;
-        } catch (e) {
-            console.warn('⚠️ Cache inválido, recargando...');
-            sessionStorage.removeItem(cacheKey);
-        }
-    }
-    
-    this.lastLoadedLyricsId = currentVideo.videoId;
-
-    // ===== CONFIGURACIÓN DE TIMEOUT =====
-    const LYRICS_TIMEOUT = 10000;
-    
     // ===== LOADING STATE =====
     lyricsContainer.innerHTML = `
         <div class="lyrics-loading">
@@ -1281,223 +1255,88 @@ async loadLyrics() {
             <p>Cargando letras...</p>
         </div>
     `;
-    
-    if (providerBtn) providerBtn.style.display = 'none';
 
     try {
-        console.log(`🔍 Buscando letras para: "${rawTitle}" - "${rawArtist}"`);
+        // ✅ PASAR DATOS SIN PROCESAR - fetchLyrics hará la limpieza
+        const data = await this.fetchLyrics(this.lyricsProvider, rawArtist, rawTitle, currentVideo.duration || 0);
 
-        let data = null;
-        let usedProvider = this.lyricsProvider;
-
-        // ===== INTENTO PRINCIPAL CON TIMEOUT =====
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), LYRICS_TIMEOUT);
-            
-            // ✅ PASAR DATOS SIN PROCESAR (fetchLyrics hará la limpieza)
-            data = await Promise.race([
-                this.fetchLyrics(this.lyricsProvider, rawArtist, rawTitle, duration),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), LYRICS_TIMEOUT)
-                )
-            ]);
-            
-            clearTimeout(timeoutId);
-            
-        } catch (e) {
-            console.warn(`⚠️ Falló proveedor principal (${this.lyricsProvider}):`, e.message);
-        }
-
-        // ===== FALLBACK AUTOMÁTICO CON TIMEOUT =====
-        if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
-            const fallbackProvider = (this.lyricsProvider === 'lrclib') ? 'lujjjh' : 'lrclib';
-            console.log(`🔄 Intentando fallback: ${fallbackProvider}`);
-            
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), LYRICS_TIMEOUT);
-                
-                data = await Promise.race([
-                    this.fetchLyrics(fallbackProvider, rawArtist, rawTitle, duration),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Timeout')), LYRICS_TIMEOUT)
-                    )
-                ]);
-                
-                clearTimeout(timeoutId);
-                
-                if (data && (data.syncedLyrics || data.plainLyrics)) {
-                    usedProvider = fallbackProvider;
-                    console.log(`✅ Fallback exitoso con ${fallbackProvider}`);
-                }
-            } catch (e) {
-                console.warn('❌ Fallback también falló:', e.message);
-            }
-        }
-
-        // ===== RENDERIZADO =====
         if (data && (data.syncedLyrics || data.plainLyrics)) {
-            // ✅ GUARDAR EN CACHÉ
-            try {
-                sessionStorage.setItem(cacheKey, JSON.stringify(data));
-            } catch (e) {
-                console.warn('⚠️ No se pudo cachear letras:', e);
-            }
-            
-            // ✅ RENDERIZAR
             this.renderLyrics(data);
-            
-            // ===== LÓGICA DEL BOTÓN =====
-            if (usedProvider !== this.lyricsProvider) {
-                if (providerBtn) providerBtn.style.display = 'none';
-                console.log('✅ Letra encontrada con fallback. Botón oculto.');
-            } else {
-                if (providerBtn) {
-                    providerBtn.style.display = 'inline-flex';
-                    providerBtn.innerHTML = `<i class="fas fa-sync-alt"></i> ${usedProvider === 'lrclib' ? 'LRCLIB' : 'Lujjjh'}`;
-                }
-            }
-        } else {
-            // ===== NO SE ENCONTRARON LETRAS =====
-            lyricsContainer.innerHTML = `
-                <div class="lyrics-container">
-                    <div class="lyrics-header">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>No encontradas</p>
-                    </div>
-                    <p class="lyrics-info">"${this.escapeHTML(rawTitle)}"</p>
-                    <p class="lyrics-info" style="font-size:11px; opacity:0.5">
-                        Intenta cambiar de proveedor o añade las letras manualmente
-                    </p>
-                </div>
-            `;
             if (providerBtn) providerBtn.style.display = 'inline-flex';
+        } else {
+            throw new Error('Sin datos de letra');
         }
 
     } catch (error) {
-        console.error('❌ Error general cargando letras:', error);
-        
-        // ===== MANEJO DE ERRORES ESPECÍFICOS =====
-        let errorMessage = 'Error cargando letra';
-        let errorDetails = error.message;
-        
-        if (error.message === 'Timeout') {
-            errorMessage = 'Tiempo de espera agotado';
-            errorDetails = 'El servidor tardó demasiado en responder';
-        } else if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'Error de conexión';
-            errorDetails = 'Verifica tu conexión a internet';
-        } else if (error.message.includes('NetworkError')) {
-            errorMessage = 'Error de red';
-            errorDetails = 'No se pudo conectar al servidor';
-        }
-        
+        console.error('❌ Error:', error);
         lyricsContainer.innerHTML = `
             <div class="lyrics-error">
                 <i class="fas fa-times-circle"></i>
-                <p>${errorMessage}</p>
-                <small>${errorDetails}</small>
-                <button class="retry-lyrics-btn" 
-                        onclick="window.playlistManager?.loadLyrics()"
-                        style="margin-top: 12px; padding: 8px 16px; background: var(--primary-color); 
-                               border: none; border-radius: 20px; color: white; cursor: pointer;">
-                    <i class="fas fa-redo"></i> Reintentar
-                </button>
+                <p>No se encontraron letras</p>
             </div>
         `;
-        if (providerBtn) providerBtn.style.display = 'none';
     }
-}    
+} 
 
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
-    // ✅ VALIDACIÓN INICIAL MEJORADA
-    if (!rawTitle || typeof rawTitle !== 'string') {
-        throw new Error('Título inválido o vacío');
+    // ✅ VALIDACIÓN ESTRICTA
+    if (!rawTitle || typeof rawTitle !== 'string' || rawTitle.trim() === '') {
+        throw new Error('Título inválido');
     }
     
-    if (!rawArtist || typeof rawArtist !== 'string') {
-        throw new Error('Artista inválido o vacío');
+    if (!rawArtist || typeof rawArtist !== 'string' || rawArtist.trim() === '') {
+        throw new Error('Artista inválido');
     }
 
     // ✅ LIMPIAR TÍTULO Y ARTISTA
     const title = this.cleanTrackTitle(rawTitle);
     let artist = rawArtist.replace(/\s*-\s*Topic$/i, '').trim();
 
-    // ✅ VALIDAR DESPUÉS DE LIMPIEZA
-    if (!title || title === 'Sin título') {
-        console.error('❌ Título inválido después de limpieza:', rawTitle);
-        throw new Error(`Título no válido: "${rawTitle}"`);
-    }
-
-    if (!artist || artist.toLowerCase() === 'youtube' || artist.toLowerCase() === 'desconocido') {
-        // Intentar extraer del título si es "Artista - Canción"
-        if (rawTitle.includes(' - ')) {
-            artist = rawTitle.split(' - ')[0].trim();
-            console.log(`🎵 Artista extraído del título: "${artist}"`);
-        } else {
-            artist = 'Desconocido';
-        }
-    }
-
     console.log(`📡 Buscando [${provider}]: "${title}" - "${artist}"`);
-
-    // ===== VALIDACIÓN DE CONEXIÓN =====
-    if (!navigator.onLine) {
-        throw new Error('Sin conexión a internet');
-    }
 
     try {
         if (provider === 'lrclib') {
-            // ===== LRCLIB API =====
-            
-            // Intento 1: Búsqueda exacta
-            const urlExact = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${Math.round(duration)}`;
-            
-            let response = await fetch(urlExact, {
-                signal: AbortSignal.timeout(8000)
+            // ✅ URL CORREGIDA PARA LRCLIB
+            const params = new URLSearchParams({
+                artist_name: artist,
+                track_name: title,
+                duration: Math.round(duration)
             });
             
-            // Intento 2: Búsqueda flexible
-            if (!response.ok) {
-                console.log('⚠️ LRCLIB exacto falló, búsqueda flexible...');
-                const query = `${artist} ${title}`;
-                const urlSearch = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
-                
-                response = await fetch(urlSearch, {
-                    signal: AbortSignal.timeout(8000)
-                });
-            }
+            const url = `https://lrclib.net/api/get?${params}`;
+            console.log('🔗 URL LRCLIB:', url);
+
+            const response = await fetch(url, {
+                signal: AbortSignal.timeout(8000)
+            });
 
             if (!response.ok) {
                 throw new Error(`LRCLIB HTTP ${response.status}`);
             }
 
             const data = await response.json();
-            
-            // ✅ MANEJAR RESPUESTA (array o objeto)
-            const track = Array.isArray(data) ? data[0] : data;
 
-            if (!track || (!track.syncedLyrics && !track.plainLyrics)) {
+            if (!data || (!data.syncedLyrics && !data.plainLyrics)) {
                 throw new Error('Sin letras en respuesta');
             }
 
             return {
-                syncedLyrics: track.syncedLyrics, 
-                plainLyrics: track.plainLyrics,
-                instrumental: track.instrumental || false,
+                syncedLyrics: data.syncedLyrics, 
+                plainLyrics: data.plainLyrics,
+                instrumental: data.instrumental || false,
                 source: 'LRCLIB',
                 provider: 'lrclib',
-                trackName: track.trackName || title,
-                artistName: track.artistName || artist,
-                albumName: track.albumName || null
+                trackName: data.trackName || title,
+                artistName: data.artistName || artist,
+                albumName: data.albumName || null
             };
 
         } else if (provider === 'lujjjh') {
-            // ===== LUJJJH API (via proxy) =====
-            
+            // ✅ URL CORREGIDA PARA LUJJJH VIA PROXY
             const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
-            const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
+            const proxyUrl = `https://yt-mix.netlify.app/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
+            
+            console.log('🔗 URL PROXY:', proxyUrl);
 
             const response = await fetch(proxyUrl, {
                 signal: AbortSignal.timeout(8000)
@@ -1509,17 +1348,10 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
             const textData = await response.text();
             
-            // ✅ VALIDAR RESPUESTA
             if (!textData || textData.length < 10) {
                 throw new Error('Respuesta vacía');
             }
-            
-            if (textData.toLowerCase().includes('not found') || 
-                textData.toLowerCase().includes('error')) {
-                throw new Error('Sin letras disponibles');
-            }
 
-            // ✅ GENERAR PLAIN LYRICS
             const plain = textData.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
 
             return {
@@ -1535,12 +1367,6 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
     } catch (error) {
         console.warn(`❌ Error en fetchLyrics (${provider}):`, error.message);
-        
-        // ✅ ENRIQUECER ERROR
-        if (error.name === 'AbortError') {
-            throw new Error('Timeout');
-        }
-        
         throw error;
     }
 
