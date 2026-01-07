@@ -1147,6 +1147,12 @@ LETRAS Y RELACIONADOS
 .related-container {
 padding: 20px;
 }
+.related-videos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}   
 .lyrics-header,
 .related-header {
 display: flex;
@@ -1228,15 +1234,15 @@ font-style: italic;
 text-align: center;
 }
 .related-video-item {
-display: flex;
-align-items: center;
-gap: 12px;
-padding: 8px 12px;
-background: var(--yt-layer-5);
-border-radius: var(--border-radius);
-cursor: pointer;
-transition: background var(--transition-fast);
-position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--yt-layer-5);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    position: relative;
 }
 .related-video-item:hover {
 background: var(--yt-layer-10);
