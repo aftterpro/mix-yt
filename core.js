@@ -2212,12 +2212,12 @@ setupInfiniteScroll(container) {
     }
     
     // ✅ LIMPIAR SENTINEL ANTERIOR
-    const oldSentinel = document.getElementById('scrollSentinel');
+    const oldSentinel = document.getElementById('search-sentinel');
     if (oldSentinel) oldSentinel.remove();
     
     // ✅ CREAR NUEVO SENTINEL
     const sentinel = document.createElement('div');
-    sentinel.id = 'scrollSentinel';
+    sentinel.id = 'search-sentinel';
     sentinel.style.cssText = `
         width: 100%; 
         height: 20px; 
@@ -2226,7 +2226,7 @@ setupInfiniteScroll(container) {
     `;
     container.appendChild(sentinel);
     
-    // ✅ CREAR NUEVO OBSERVADOR
+    // ✅ CREAR NUEVO OBSERVADOR CON ROOT CORRECTO
     this.searchScrollObserver = new IntersectionObserver(async (entries) => {
         const entry = entries[0];
         
@@ -2249,7 +2249,7 @@ setupInfiniteScroll(container) {
             }
         }
     }, { 
-        root: document.getElementById('searchView'), // ✅ USAR EL CONTENEDOR CORRECTO
+        root: document.querySelector('.search-results-wrapper'), // ✅ ROOT CORRECTO
         rootMargin: '200px', 
         threshold: 0.1 
     });
