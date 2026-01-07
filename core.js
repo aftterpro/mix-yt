@@ -1728,6 +1728,7 @@ async playNextVideo() {
             playlistId: nextVideo.sourcePlaylistId
         };
         
+        // ✅ ACTUALIZAR UI INMEDIATAMENTE
         this.updateNowPlaying();
         
         if (window.playlistManager) {
@@ -1745,27 +1746,36 @@ async playNextVideo() {
         const prevElement = document.getElementById(`player${prevPlayerNum}`);
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
-        // ✅ CARGAR VIDEO
+        // ✅ CARGAR VIDEO CON TIMEOUT
         console.log(`📥 Cargando video en player${nextPlayerNum}...`);
-        nextPlayerInstance.cueVideoById({
-            videoId: nextVideo.videoId,
-            startSeconds: 0
-        });
         
-        // ✅ ESPERAR A QUE ESTÉ LISTO
-        await this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 3000);
+        try {
+            nextPlayerInstance.cueVideoById({
+                videoId: nextVideo.videoId,
+                startSeconds: 0
+            });
+            
+            // ✅ ESPERAR A QUE ESTÉ LISTO (máximo 5 segundos)
+            await Promise.race([
+                this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 5000),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            ]);
+            
+        } catch (error) {
+            console.error('❌ Error cargando video:', error);
+            // Intentar forzar carga
+            nextPlayerInstance.loadVideoById(nextVideo.videoId);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
         
-        // =============================================
-        // ✅ CROSSFADE VISUAL MEJORADO
-        // =============================================
-        
+        // ✅ PREPARAR ELEMENTOS VISUALES
         if (nextElement && prevElement) {
             const container = prevElement.parentNode;
             if (container && !container.contains(nextElement)) {
                 container.appendChild(nextElement);
             }
             
-            // ✅ PASO 1: Preparar nextElement (invisible pero presente)
+            // Preparar nextElement (invisible)
             nextElement.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -1780,7 +1790,7 @@ async playNextVideo() {
                 pointer-events: auto !important;
             `;
             
-            // ✅ PASO 2: Preparar prevElement (visible)
+            // Preparar prevElement (visible)
             prevElement.style.cssText = `
                 position: absolute !important;
                 top: 0 !important;
@@ -1795,7 +1805,6 @@ async playNextVideo() {
                 pointer-events: auto !important;
             `;
             
-            // ✅ Forzar reflow
             void nextElement.offsetHeight;
             void prevElement.offsetHeight;
         }
@@ -1804,34 +1813,17 @@ async playNextVideo() {
         console.log(`▶️ Reproduciendo en player${nextPlayerNum}...`);
         await nextPlayerInstance.playVideo();
         
-        // ✅ ESPERAR MÚLTIPLES FRAMES PARA ASEGURAR QUE ESTÁ REPRODUCIENDO
-        await new Promise(resolve => {
-            let attempts = 0;
-            const checkPlaying = setInterval(() => {
-                const state = nextPlayerInstance.getPlayerState();
-                attempts++;
-                
-                if (state === YT.PlayerState.PLAYING || attempts > 20) {
-                    clearInterval(checkPlaying);
-                    resolve();
-                }
-            }, 100);
-        });
+        // ✅ ESPERAR A QUE COMIENCE (máximo 5 segundos)
+        await this.waitForPlayingState(nextPlayerInstance, 5000);
         
-        // =============================================
-        // ✅ CROSSFADE VISUAL (Controlado por JS)
-        // =============================================
-        
+        // ✅ CROSSFADE VISUAL
         if (nextElement && prevElement) {
-            // Añadir transition CSS
             const transitionStyle = `opacity ${CROSSFADE_DURATION}s ease`;
             nextElement.style.transition = transitionStyle;
             prevElement.style.transition = transitionStyle;
             
-            // Forzar reflow
             void nextElement.offsetHeight;
             
-            // Ejecutar crossfade
             requestAnimationFrame(() => {
                 nextElement.style.opacity = '1';
                 nextElement.style.zIndex = '10';
@@ -1846,24 +1838,18 @@ async playNextVideo() {
         // ✅ CROSSFADE DE AUDIO (en paralelo)
         await this.performAudioCrossfade(prevPlayerInstance, nextPlayerInstance);
         
-        // =============================================
-        // ✅ LIMPIEZA MEJORADA - SIN OCULTAR PREMATURAMENTE
-        // =============================================
-        
+        // ✅ LIMPIEZA POST-CROSSFADE
         setTimeout(() => {
             try {
-                // ✅ SOLO DETENER EL PLAYER ANTERIOR, NO OCULTAR ELEMENTOS
                 if (prevPlayerInstance?.stopVideo) {
                     prevPlayerInstance.stopVideo();
                     prevPlayerInstance.setVolume(0);
                 }
                 
-                // ✅ ASEGURAR VOLUMEN DEL PLAYER ACTUAL
                 if (nextPlayerInstance?.setVolume) {
                     nextPlayerInstance.setVolume(100);
                 }
                 
-                // ✅ OCULTAR PLAYER ANTERIOR (NO MOVER, SOLO OCULTAR)
                 if (prevElement) {
                     prevElement.style.cssText = `
                         position: absolute !important;
@@ -1880,7 +1866,6 @@ async playNextVideo() {
                     `;
                 }
                 
-                // ✅ ASEGURAR QUE EL PLAYER ACTUAL SIGA VISIBLE
                 if (nextElement) {
                     nextElement.style.transition = '';
                     nextElement.style.cssText = `
@@ -1898,7 +1883,6 @@ async playNextVideo() {
                     `;
                 }
                 
-                // ✅ LIMPIAR TRANSICIONES
                 if (prevElement) {
                     prevElement.style.transition = '';
                 }
@@ -1927,7 +1911,7 @@ async playNextVideo() {
         console.error("❌ Error en playNextVideo:", error);
         this.showMessage('Error al cambiar de pista', 'error');
         
-        // Recuperación: Reiniciar monitor
+        // ✅ RECUPERACIÓN: Reiniciar monitor
         if (!monitorInterval && window.reproduccionIniciada) {
             monitorInterval = setInterval(monitorPlayers, 500);
         }
