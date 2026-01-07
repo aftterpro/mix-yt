@@ -1171,7 +1171,7 @@ cleanTrackTitle(title) {
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 2. Eliminar colaboraciones
+    // 2. Eliminar colaboraciones (ft., feat., etc.)
     clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with|prod\.|produced by)\s.*/i, '');
 
     // 3. Eliminar contenido entre paréntesis/corchetes con palabras clave
@@ -1182,10 +1182,10 @@ cleanTrackTitle(title) {
     // 4. Eliminar palabras clave sueltas al final
     clean = clean.replace(new RegExp(`\\s*[-:]?\\s*(${noiseKeywords})$`, 'gi'), '');
 
-    // 5. Eliminar letra "s" suelta al final
+    // 5. Eliminar letra "s" suelta al final (común en metadata mal procesada)
     clean = clean.replace(/\s+s$/i, '');
 
-    // 6. Limpieza final
+    // 6. Limpieza final de comillas y pipes
     clean = clean.replace(/["""]/g, '');
     clean = clean.split('|')[0];
     
@@ -1197,7 +1197,7 @@ cleanTrackTitle(title) {
         }
     }
 
-    // 8. Normalizar espacios múltiples
+    // 8. Normalizar espacios múltiples y trim final
     const finalTitle = clean.replace(/\s+/g, ' ').trim();
     
     // ✅ VALIDACIÓN FINAL
@@ -1209,7 +1209,6 @@ cleanTrackTitle(title) {
     console.log(`✅ Título limpio: "${finalTitle}"`);
     return finalTitle;
 }
-
 async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
     const providerBtn = document.getElementById('lyricsProviderToggle');
@@ -1277,7 +1276,6 @@ async loadLyrics() {
         `;
     }
 } 
-
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
     // ✅ VALIDACIÓN ESTRICTA
     if (!rawTitle || typeof rawTitle !== 'string' || rawTitle.trim() === '') {
@@ -1332,10 +1330,15 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
             };
 
         } else if (provider === 'lujjjh') {
-            // ✅ URL CORREGIDA PARA LUJJJH VIA PROXY
-            const targetUrl = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
-            const proxyUrl = `https://yt-mix.netlify.app/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
+            const params = new URLSearchParams({
+                name: title,
+                artist: artist
+            });
             
+            const targetUrl = `https://lyrics-api.lujjjh.com/?${params.toString()}`;
+            const proxyUrl = `https://mix-yt.netlify.app/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
+            
+            console.log('🔗 URL LUJJJH:', targetUrl);
             console.log('🔗 URL PROXY:', proxyUrl);
 
             const response = await fetch(proxyUrl, {
