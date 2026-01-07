@@ -927,17 +927,18 @@ body {
    ============================================= */
 .persistent-queue-sidebar {
     width: 400px;
-    min-width: 400px; 
-    max-width: 400px;  
+    min-width: 400px;
+    max-width: 400px;
     background: var(--yt-bg-elevated);
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    z-index: var(--z-queue) !important;
+    z-index: 100 !important;
     pointer-events: auto !important;
-    flex-shrink: 0;  
+    flex-shrink: 0;
+   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);  
 }
 .queue-tabs,
 .queue-tab,
@@ -954,6 +955,7 @@ body {
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    background: var(--yt-bg-elevated); /* ✅ Fondo explícito */
 }
 
 .queue-header-title {
@@ -966,10 +968,11 @@ body {
     font-size: 18px;
     font-weight: 400;
     margin: 0;
+    color: var(--yt-text-primary); /* ✅ Color explícito */
 }
 
 .queue-count-badge {
-    background: var(--yt-layer-20);
+   background: var(--yt-layer-20);
     color: var(--yt-text-primary);
     padding: 2px 8px;
     border-radius: 12px;
@@ -978,7 +981,7 @@ body {
 }
 
 .clear-queue-btn {
-    background: transparent;
+   background: transparent;
     border: 1px solid var(--yt-layer-20);
     border-radius: var(--border-radius-pill);
     color: var(--yt-text-secondary);
@@ -994,13 +997,13 @@ body {
 }
 
 .queue-tabs {
-    display: flex;
+     display: flex;
     border-bottom: 1px solid var(--yt-layer-10);
     flex-shrink: 0;
+    background: var(--yt-bg-elevated); /* ✅ Fondo explícito */
 }
-
 .queue-tab {
-    flex: 1;
+ flex: 1;
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -1027,13 +1030,14 @@ body {
 }
 
 .queue-tab-content {
-    flex: 1;
+     flex: 1;
     overflow: hidden;
     position: relative;
+    background: var(--yt-bg-elevated); /* ✅ Fondo explícito */
 }
 
 .queue-list-content {
-    position: absolute;
+       position: absolute;
     top: 0;
     left: 0;
     width: 100%;
@@ -1043,6 +1047,7 @@ body {
     display: none;
     opacity: 0;
     transition: opacity 0.3s ease;
+    background: transparent; /* ✅ Transparente para heredar */
 }
 
 .queue-list-content.active {
@@ -1051,7 +1056,7 @@ body {
 }
 
 .queue-item {
-    display: flex;
+     display: flex;
     align-items: center;
     gap: 12px;
     padding: 8px 12px;
@@ -1059,10 +1064,11 @@ body {
     cursor: pointer;
     transition: background var(--transition-fast);
     position: relative;
+    background: transparent; /* ✅ Transparente por defecto */
 }
 
 .queue-item:hover {
-    background: var(--yt-layer-10);
+    background: var(--yt-layer-10) !important; /* ✅ Importante para override */
 }
 
 .queue-item.playing {
