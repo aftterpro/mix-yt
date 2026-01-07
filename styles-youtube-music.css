@@ -859,7 +859,7 @@ body {
     right: 0;
     bottom: var(--player-height);
     background: var(--yt-bg-base);
-    z-index: var(--z-player-full);
+    z-index: 50;
     overflow: hidden;
 }
 
@@ -876,6 +876,7 @@ body {
 }
 
 .video-container-full {
+    flex: 1; /* ✅ Tomar el espacio restante */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -883,16 +884,17 @@ body {
     border-radius: 12px;
     overflow: hidden;
     position: relative;
+    min-width: 0; /* ✅ Permitir shrink */
 }
 
 .video-wrapper {
-    width: 500px !important;
-    height: 450px !important;
+    width: 100% !important; /* ✅ Ocupar todo el espacio disponible */
+    height: 100% !important;
+    max-width: 800px; /* ✅ Límite máximo */
     position: relative;
     background: #000;
     border-radius: 12px;
-    overflow: hidden;
-}
+ 
 
 .video-player {
     position: absolute;
@@ -925,15 +927,17 @@ body {
    ============================================= */
 .persistent-queue-sidebar {
     width: 400px;
-    min-width: 400px;
+    min-width: 400px; 
+    max-width: 400px;  
     background: var(--yt-bg-elevated);
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
-    z-index: var(--z-queue) !important; /* 100 - ALTO */
+    z-index: var(--z-queue) !important;
     pointer-events: auto !important;
+    flex-shrink: 0;  
 }
 .queue-tabs,
 .queue-tab,
@@ -1586,12 +1590,6 @@ display: none;
 .top-bar {
     display: none;
 }
-
-.full-player-view {
-    top: 0;
-    left: 0;
-}
-
 .player-queue-layout {
     flex-direction: column-reverse;
 }
