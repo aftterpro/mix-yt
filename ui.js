@@ -100,35 +100,80 @@ class UIManager {
 
 movePlayersToFullView() {
     const layer = document.getElementById('persistent-player-layer');
-    if (!layer) return;
+    if (!layer) {
+        console.error('❌ persistent-player-layer no encontrado');
+        return;
+    }
 
     console.log('🎬 Expandiendo a pantalla completa');
 
     const activePlayerId = window.currentPlayer === 1 ? 'player1' : 'player2';
     const activePlayer = document.getElementById(activePlayerId);
     
-    if (activePlayer && !layer.contains(activePlayer)) {
+    if (!activePlayer) {
+        console.error('❌ Player activo no encontrado');
+        return;
+    }
+    
+    // ✅ MOVER PLAYER A LA CAPA PERSISTENTE
+    if (!layer.contains(activePlayer)) {
         layer.appendChild(activePlayer);
     }
 
-    layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    layer.style.zIndex = '55'; 
-    layer.style.pointerEvents = 'none';
+    // ✅ OBTENER EL CONTENEDOR CORRECTO (dentro de .video-container-full)
+    const fullPlayerView = document.getElementById('fullPlayerView');
+    const videoContainer = fullPlayerView?.querySelector('.video-container-full');
     
+    if (!videoContainer) {
+        console.error('❌ video-container-full no encontrado');
+        return;
+    }
+
+    // ✅ CALCULAR DIMENSIONES DEL CONTENEDOR
+    const containerRect = videoContainer.getBoundingClientRect();
+    
+    console.log('📐 Contenedor:', {
+        width: containerRect.width,
+        height: containerRect.height,
+        top: containerRect.top,
+        left: containerRect.left
+    });
+
+    // ✅ CONFIGURAR LA CAPA PERSISTENTE
+    layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    layer.style.zIndex = '55'; // ✅ Debajo de la cola (100)
+    layer.style.pointerEvents = 'none'; // ✅ No bloquear clicks
+    
+    // ✅ ANIMAR A LAS DIMENSIONES DEL CONTENEDOR
     requestAnimationFrame(() => {
-        layer.style.top = '0';
-        layer.style.left = '0';
-        layer.style.width = '100vw';
-        layer.style.height = '100vh';
-        layer.style.bottom = 'auto';
-        layer.style.right = 'auto';
-        layer.style.borderRadius = '0px';
+        layer.style.position = 'fixed';
+        layer.style.top = `${containerRect.top}px`;
+        layer.style.left = `${containerRect.left}px`;
+        layer.style.width = `${containerRect.width}px`;
+        layer.style.height = `${containerRect.height}px`;
+        layer.style.borderRadius = '12px'; // ✅ Mantener bordes redondeados
         layer.style.boxShadow = 'none';
         layer.style.opacity = '1';
         layer.style.visibility = 'visible';
         
+        // ✅ ASEGURAR QUE EL PLAYER INTERNO OCUPE TODO EL ESPACIO
+        activePlayer.style.cssText = `
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 10 !important;
+            background: #000 !important;
+        `;
+        
         document.body.classList.remove('mini-player-active');
-        document.body.classList.add('full-player-active'); 
+        document.body.classList.add('full-player-active');
+        
+        console.log('✅ Player expandido correctamente');
     });
 }
 showMiniPlayerFloat() {
