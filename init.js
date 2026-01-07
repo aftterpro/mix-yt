@@ -565,7 +565,10 @@ console.log('✅ Sistema de inicialización cargado');
 // LISTENER PARA MANEJAR TIMEOUT
 // =============================================
 document.addEventListener('ytCrossMixAPIsTimeout', (e) => {
-    const { missing, available } = e.detail;
+    // Validación robusta de e.detail
+    const detail = e?.detail || {};
+    const missing = detail.missing || [];
+    const available = detail.available || {};
     
     console.log('🔄 Manejando timeout de APIs...');
     
