@@ -649,6 +649,12 @@ switchQueueTab(tabName) {
 async loadRelatedForVideo(video) {
     const relatedList = document.getElementById('relatedVideosList');
     
+    // ✅ VALIDACIÓN CRÍTICA
+    if (!relatedList) {
+        console.error('❌ relatedVideosList no encontrado en el DOM');
+        return;
+    }
+    
     if (!video || !video.videoId) {
         relatedList.innerHTML = `<p class="related-placeholder">Video no válido</p>`;
         this.lastLoadedRelatedId = null;
@@ -657,18 +663,24 @@ async loadRelatedForVideo(video) {
     
     console.log(`🎵 Cargando relacionados para: ${video.title} (${video.videoId})`);
     
-    // ✅ CACHÉ: Si ya están cargados para ESTE video específico
+    // ✅ CACHÉ: Evitar recargas innecesarias
     if (this.lastLoadedRelatedId === video.videoId) {
         const existingItems = relatedList.querySelectorAll('.related-video-item');
         if (existingItems.length > 0) {
-            console.log('✅ Relacionados ya cargados para este video');
-            return; // ✅ SALIR AQUÍ, NO RECURSIÓN
+            console.log('✅ Relacionados ya cargados');
+            return;
         }
     }
     
     this.lastLoadedRelatedId = video.videoId;
     
-    relatedList.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">Cargando...</p>`;
+    // ✅ LOADING STATE
+    relatedList.innerHTML = `
+        <div class="related-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Cargando relacionados...</p>
+        </div>
+    `;
     
     try {
         // ✅ EXTRAER ARTISTA DEL TÍTULO
@@ -677,7 +689,11 @@ async loadRelatedForVideo(video) {
         
         console.log(`🔍 Buscando relacionados: "${searchQuery}"`);
         
-        // ✅ USAR CLIENT EXTERNO, NO RECURSIÓN
+        // ✅ VALIDAR QUE youtubeJSClient EXISTA
+        if (!window.youtubeJSClient) {
+            throw new Error('YouTube Client no disponible');
+        }
+        
         const searchResults = await window.youtubeJSClient.search(searchQuery);
         
         if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
@@ -704,14 +720,24 @@ async loadRelatedForVideo(video) {
         
     } catch (error) {
         console.error('❌ Error cargando relacionados:', error);
-        relatedList.innerHTML = `
-            <div class="related-error">
-                <i class="fas fa-exclamation-triangle"></i>
-                <p>No se pudieron cargar sugerencias</p>
-            </div>
-        `;
+        
+        // ✅ VALIDAR QUE relatedList SIGA EXISTIENDO
+        const currentList = document.getElementById('relatedVideosList');
+        if (currentList) {
+            currentList.innerHTML = `
+                <div class="related-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Error: ${error.message || 'No se pudieron cargar sugerencias'}</p>
+                    <button onclick="window.playlistManager?.loadRelatedForVideo(${JSON.stringify(video).replace(/"/g, '&quot;')})" 
+                            style="margin-top: 12px; padding: 8px 16px; background: var(--primary-color); 
+                                   border: none; border-radius: 20px; color: white; cursor: pointer;">
+                        <i class="fas fa-redo"></i> Reintentar
+                    </button>
+                </div>
+            `;
+        }
     }
-} 
+}
 /**
  * Fallback usando búsqueda
  */
