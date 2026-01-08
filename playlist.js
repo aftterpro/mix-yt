@@ -1384,11 +1384,10 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
     try {
         if (provider === 'lrclib') {
-            // ✅ URL CORREGIDA PARA LRCLIB
+            // ✅ URL SIN DURACIÓN (más rápido y más resultados)
             const params = new URLSearchParams({
                 artist_name: artist,
-                track_name: title,
-                duration: Math.round(duration)
+                track_name: title
             });
             
             const url = `https://lrclib.net/api/get?${params}`;
@@ -2617,34 +2616,53 @@ formatDuration(duration) {
     const seconds = Math.floor(duration % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
-    /**
-     * Configurar eventos del popup de playlist
-     */
+/**
+ * Configurar eventos del popup de playlist
+ */
 setupPlaylistPopupEvents(popup, playlist) {
+    console.log('🎯 Configurando eventos del popup');
+    
     // Botón cerrar
-    popup.querySelector('.playlist-popup-close')?.addEventListener('click', () => {
-        popup.classList.remove('show');
-        setTimeout(() => popup.remove(), 300);
-    });
+    const closeBtn = popup.querySelector('.playlist-popup-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log('❌ Cerrando popup');
+            popup.classList.remove('show');
+            setTimeout(() => popup.remove(), 300);
+        });
+    }
 
     // Click fuera del popup
     popup.addEventListener('click', (e) => {
         if (e.target === popup) {
+            console.log('❌ Click fuera del popup');
             popup.classList.remove('show');
             setTimeout(() => popup.remove(), 300);
         }
     });
 
-    // Botones de acción de videos
-    popup.querySelectorAll('.popup-video-action-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
+    // ✅ EVENT DELEGATION para botones de acción
+    const popupContent = popup.querySelector('.playlist-popup-content');
+    if (popupContent) {
+        popupContent.addEventListener('click', async (e) => {
+            const actionBtn = e.target.closest('.popup-video-action-btn');
+            if (!actionBtn) return;
             
-            const action = btn.dataset.action;
-            const videoId = btn.dataset.videoId;
+            e.stopPropagation();
+            e.preventDefault();
+            
+            const action = actionBtn.dataset.action;
+            const videoId = actionBtn.dataset.videoId;
+            
+            console.log(`🎬 Acción: ${action} para video: ${videoId}`);
+            
             const video = playlist.videos.find(v => v.videoId === videoId);
             
-            if (!video) return;
+            if (!video) {
+                console.error('❌ Video no encontrado');
+                return;
+            }
             
             const videoData = {
                 videoId: video.videoId,
@@ -2655,21 +2673,51 @@ setupPlaylistPopupEvents(popup, playlist) {
                 author: video.author || video.uploaderName || 'YouTube'
             };
             
-            if (action === 'queue') {
-                await this.addVideoToQueue(videoData);
-            } else if (action === 'play') {
-                await this.addVideoToQueue(videoData, true); // true = desde playlist
+            // Deshabilitar botón temporalmente
+            actionBtn.disabled = true;
+            const icon = actionBtn.querySelector('i');
+            const originalIcon = icon.className;
+            icon.className = 'fas fa-spinner fa-spin';
+            
+            try {
+                if (action === 'queue') {
+                    await this.addVideoToQueue(videoData);
+                    icon.className = 'fas fa-check';
+                    actionBtn.style.background = '#4caf50';
+                } else if (action === 'play') {
+                    await this.addVideoToQueue(videoData, true);
+                    setTimeout(() => {
+                        const flatList = this.core?.getFlattenedPlaylist();
+                        const index = flatList?.findIndex(v => v.videoId === video.videoId);
+                        if (index !== -1 && this.core) {
+                            this.core.playNextVideo(index);
+                            this.core.switchView('fullPlayer');
+                        }
+                    }, 100);
+                    icon.className = 'fas fa-check';
+                    actionBtn.style.background = '#4caf50';
+                }
+                
+                // Restaurar botón después de 1.5s
                 setTimeout(() => {
-                    const flatList = this.core?.getFlattenedPlaylist();
-                    const index = flatList?.findIndex(v => v.videoId === video.videoId);
-                    if (index !== -1 && this.core) {
-                        this.core.playNextVideo(index);
-                        this.core.switchView('fullPlayer');
-                    }
-                }, 100);
+                    icon.className = originalIcon;
+                    actionBtn.style.background = '';
+                    actionBtn.disabled = false;
+                }, 1500);
+                
+            } catch (error) {
+                console.error('❌ Error en acción:', error);
+                icon.className = 'fas fa-times';
+                actionBtn.style.background = '#f44336';
+                
+                setTimeout(() => {
+                    icon.className = originalIcon;
+                    actionBtn.style.background = '';
+                    actionBtn.disabled = false;
+                }, 1500);
             }
         });
-    });
+    }
 }
     /**
      * Añadir playlist completa a la cola
