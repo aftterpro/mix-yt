@@ -1977,32 +1977,42 @@ async waitForPlayingState(playerInstance, maxWait = 5000) {
                     if (elapsed < maxWait) {
                         setTimeout(checkState, 200);
                     } else {
-                        console.warn('⏰ Timeout esperando reproducción (buffering)');
-                        resolve(false);
+                        console.warn('⏰ Timeout buffering - Forzando continuación');
+                        resolve(true); // ✅ Resolver como éxito si está buffering
                     }
                     return;
+                }
+                
+                // ✅ SI ESTÁ CUED, INTENTAR FORZAR PLAY
+                if (state === YT.PlayerState.CUED && attempts > 5) {
+                    console.log('🔄 Player en CUED, intentando forzar reproducción...');
+                    try {
+                        playerInstance.playVideo();
+                    } catch (e) {
+                        console.warn('⚠️ Error forzando play:', e);
+                    }
                 }
                 
                 // ✅ REINTENTAR SI ESTÁ EN OTROS ESTADOS
                 if (elapsed < maxWait) {
                     setTimeout(checkState, 200);
                 } else {
-                    console.warn('⏰ Timeout esperando estado PLAYING');
-                    resolve(false);
+                    console.warn('⏰ Timeout - Continuando de todas formas');
+                    resolve(true); // ✅ Continuar en vez de fallar
                 }
             } catch (e) {
                 if (elapsed < maxWait) {
                     setTimeout(checkState, 200);
                 } else {
                     console.error('❌ Error esperando estado PLAYING:', e);
-                    resolve(false);
+                    resolve(true); // ✅ Continuar a pesar del error
                 }
             }
         };
         
         checkState();
     });
-} 
+}
 async waitForPlayerCued(player, maxWait = 3000) {
     return new Promise((resolve) => {
         const startTime = Date.now();
