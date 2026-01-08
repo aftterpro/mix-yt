@@ -593,11 +593,12 @@ switchQueueTab(tabName) {
         content.classList.toggle('active', content.dataset.tabContent === tabName);
     });
     
-    // ✅ OBTENER VIDEO ACTUAL (desde player, no desde find)
+    // ✅ OBTENER VIDEO ACTUAL desde el player activo
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
         console.warn('⚠️ No hay reproductor activo');
+        this.showEmptyTabMessage(tabName);
         return;
     }
     
@@ -606,14 +607,16 @@ switchQueueTab(tabName) {
     
     if (!currentVideoId) {
         console.warn('⚠️ No hay video reproduciéndose');
+        this.showEmptyTabMessage(tabName);
         return;
     }
     
-    // ✅ BUSCAR EN COLA (sin recursión)
+    // ✅ BUSCAR VIDEO EN COLA
     const queuePlaylist = this.core.playlistsData.find(p => p.id === 'queue');
     
     if (!queuePlaylist?.videos) {
         console.warn('⚠️ Cola no encontrada');
+        this.showEmptyTabMessage(tabName);
         return;
     }
     
@@ -627,22 +630,113 @@ switchQueueTab(tabName) {
     
     if (!currentVideo) {
         console.warn(`⚠️ Video ${currentVideoId} no encontrado`);
+        this.showEmptyTabMessage(tabName);
         return;
     }
     
-    console.log(`🎵 Refrescando tab "${tabName}" para:`, currentVideo.title);
+    console.log(`🎵 Cargando tab "${tabName}" para:`, currentVideo.title);
     
-    // ✅ CARGAR CONTENIDO CORRECTO
+    // ✅ CARGAR CONTENIDO SEGÚN EL TAB
     if (tabName === 'lyrics') {
-        setTimeout(() => {
-            this.loadLyricsForVideo(currentVideo);
-        }, 100);
+        this.loadLyricsForCurrentVideo(currentVideo);
     } else if (tabName === 'related') {
-        setTimeout(() => {
-            this.loadRelatedForVideo(currentVideo);
-        }, 100);
+        this.loadRelatedForVideo(currentVideo);
     }
 }
+ /**
+ * Mostrar mensaje cuando no hay contenido
+ */
+showEmptyTabMessage(tabName) {
+    let container;
+    let message;
+    
+    if (tabName === 'lyrics') {
+        container = document.getElementById('lyricsContent');
+        message = '<div class="lyrics-placeholder"><i class="fas fa-music"></i><p>Reproduce una canción para ver las letras</p></div>';
+    } else if (tabName === 'related') {
+        container = document.getElementById('relatedVideosList');
+        message = '<div class="related-placeholder"><i class="fas fa-sparkles"></i><p>Reproduce una canción para ver relacionados</p></div>';
+    }
+    
+    if (container) {
+        container.innerHTML = message;
+    }
+}   
+ /**
+ * Cargar letras para el video actual
+ */
+async loadLyricsForCurrentVideo(video) {
+    const lyricsContainer = document.getElementById('lyricsContent');
+    
+    if (!lyricsContainer) {
+        console.error('❌ lyricsContent no encontrado');
+        return;
+    }
+    
+    // ✅ VALIDAR DATOS DEL VIDEO
+    if (!video || !video.title) {
+        console.error('❌ Video sin datos válidos:', video);
+        lyricsContainer.innerHTML = `
+            <div class="lyrics-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>No se puede cargar letras: video inválido</p>
+            </div>
+        `;
+        return;
+    }
+    
+    console.log(`📡 Buscando letras para: "${video.title}"`);
+    
+    // ✅ LOADING STATE
+    lyricsContainer.innerHTML = `
+        <div class="lyrics-loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Buscando letras...</p>
+        </div>
+    `;
+    
+    try {
+        // ✅ EXTRAER ARTISTA (puede venir de diferentes campos)
+        let artist = video.artist || video.uploaderName || video.author || '';
+        artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+        
+        if (!artist || artist.toLowerCase() === 'youtube') {
+            // Intentar extraer del título
+            if (video.title.includes(' - ')) {
+                artist = video.title.split(' - ')[0].trim();
+            } else {
+                artist = 'Desconocido';
+            }
+        }
+        
+        const title = this.cleanTrackTitle(video.title);
+        const duration = video.duration || 0;
+        
+        console.log(`📊 Datos para búsqueda de letras:`, { title, artist, duration });
+        
+        // Buscar letras
+        const lyricsData = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
+        
+        if (lyricsData && (lyricsData.syncedLyrics || lyricsData.plainLyrics)) {
+            this.renderLyricsUI(lyricsData, artist, title);
+        } else {
+            throw new Error('No se encontraron letras');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error cargando letras:', error);
+        lyricsContainer.innerHTML = `
+            <div class="lyrics-error">
+                <i class="fas fa-times-circle"></i>
+                <p>No se encontraron letras para esta canción</p>
+                <button onclick="window.playlistManager.switchQueueTab('lyrics')" 
+                        style="margin-top: 12px; padding: 8px 16px;">
+                    <i class="fas fa-redo"></i> Reintentar
+                </button>
+            </div>
+        `;
+    }
+}   
  /**
  * Cargar relacionados para un video específico
  */
@@ -1157,10 +1251,10 @@ cleanTrackTitle(title) {
         return 'Sin título';
     }
     
-    // ✅ VALIDAR QUE NO SEA SOLO NÚMEROS (caso extraño)
+    // ✅ VALIDAR QUE NO SEA SOLO NÚMEROS
     if (/^\d+$/.test(titleStr)) {
         console.warn('⚠️ Título solo contiene números:', titleStr);
-        return titleStr; // Devolver como está, mejor que "Sin título"
+        return titleStr;
     }
 
     console.log(`🧹 Limpiando título: "${titleStr}"`);
@@ -1171,43 +1265,39 @@ cleanTrackTitle(title) {
     const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g;
     clean = clean.replace(emojiRegex, '');
 
-    // 2. Eliminar colaboraciones (ft., feat., etc.)
-    clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with|prod\.|produced by)\s.*/i, '');
-
-    // 3. Eliminar contenido entre paréntesis/corchetes con palabras clave
-    const noiseKeywords = 'official|video|audio|lyrics|visualizer|hd|hq|4k|8k|live|vivo|version|remaster|extended|radio|original|cover|acoustic|instrumental|karaoke|bpm|remix|rmx|mix|edit|mashup|bootleg|dj|set|session|topic';
+    // 2. Eliminar "(Official Video)" y similares
+    clean = clean.replace(/\s*\(official.*video\)/gi, '');
+    clean = clean.replace(/\s*\[official.*video\]/gi, '');
     
+    // 3. Eliminar colaboraciones
+    clean = clean.replace(/\s(ft\.|feat\.|featuring|vs\.|x|with)\s.*/i, '');
+
+    // 4. Eliminar ruido entre paréntesis
+    const noiseKeywords = 'official|video|audio|lyrics|visualizer|hd|hq|4k|8k|live|version|remaster|extended|radio|cover|acoustic|instrumental|remix|rmx|mix|edit|topic';
     clean = clean.replace(new RegExp(`\\s*[\\(\\[].*?(${noiseKeywords}).*?[\\)\\]]`, 'gi'), '');
-    
-    // 4. Eliminar palabras clave sueltas al final
-    clean = clean.replace(new RegExp(`\\s*[-:]?\\s*(${noiseKeywords})$`, 'gi'), '');
 
-    // 5. Eliminar letra "s" suelta al final (común en metadata mal procesada)
-    clean = clean.replace(/\s+s$/i, '');
-
-    // 6. Limpieza final de comillas y pipes
-    clean = clean.replace(/["""]/g, '');
-    clean = clean.split('|')[0];
-    
-    // 7. Si es "Artista - Titulo", quedarse solo con titulo
+    // 5. Si tiene " - ", tomar solo la parte del título (después del guión)
     if (clean.includes(' - ')) {
         const parts = clean.split(' - ');
+        // Si hay más de 1 parte y la segunda no está vacía
         if (parts.length > 1 && parts[1].trim().length > 0) {
-            clean = parts[1];
+            clean = parts[1].trim();
         }
     }
 
-    // 8. Normalizar espacios múltiples y trim final
-    const finalTitle = clean.replace(/\s+/g, ' ').trim();
+    // 6. Limpieza final
+    clean = clean.replace(/["""]/g, '');
+    clean = clean.split('|')[0];
+    clean = clean.replace(/\s+/g, ' ').trim();
     
     // ✅ VALIDACIÓN FINAL
-    if (!finalTitle || finalTitle.length === 0) {
+    if (!clean || clean.length === 0) {
         console.warn('⚠️ Título quedó vacío después de limpieza, usando original');
-        return titleStr; // Devolver el original sin limpiar
+        return titleStr;
     }
     
-    console.log(`✅ Título limpio: "${finalTitle}"`);
-    return finalTitle;
+    console.log(`✅ Título limpio: "${clean}"`);
+    return clean;
 }
 async loadLyrics() {
     const lyricsContainer = document.getElementById('lyricsContent');
