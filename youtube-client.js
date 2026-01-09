@@ -162,52 +162,63 @@ class SponsorBlockManager {
     }
 
     async cargarSegmentos(videoId) {
-        // Verificar caché
-        const cached = this.segmentosCache[videoId];
-        if (cached && typeof cached === 'object' && cached.segments) {
-            const cacheAge = Date.now() - (cached.timestamp || 0);
-            if (cacheAge < 10 * 60 * 1000) { // 10 minutos
-                console.log(`✅ SB: Usando caché para ${videoId}`);
-                return cached.segments;
-            }
-        }
+    // ✅ CORRECCIÓN: Validar videoId
+    if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
+        console.warn('⚠️ SB: videoId inválido');
+        return [];
+    }
 
-        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-        
-        this.segmentosCache[videoId] = 'fetching';
-
-        try {
-            const response = await fetch(apiUrl, { 
-                headers: { 'X-UserID': userId } 
-            });
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const data = await response.json();
-            
-            const segments = Array.isArray(data) 
-                ? data.filter(s => s.startTime < s.endTime)
-                : [];
-            
-            this.segmentosCache[videoId] = {
-                segments: segments,
-                timestamp: Date.now()
-            };
-            
-            this.saveCache();
-            console.log(`✅ SB: ${segments.length} segmentos para ${videoId}`);
-            return segments;
-            
-        } catch (e) {
-            console.warn(`⚠️ SB Error ${videoId}:`, e.message);
-            this.segmentosCache[videoId] = { 
-                segments: [], 
-                timestamp: Date.now() 
-            };
-            return [];
+    // Verificar caché
+    const cached = this.segmentosCache[videoId];
+    if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
+        const cacheAge = Date.now() - (cached.timestamp || 0);
+        if (cacheAge < 10 * 60 * 1000) { // 10 minutos
+            console.log(`✅ SB: Usando caché para ${videoId} (${cached.segments.length} segmentos)`);
+            return cached.segments;
         }
     }
+
+    const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
+    const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
+    
+    console.log(`📡 SB: Solicitando segmentos para ${videoId}`);
+
+    try {
+        const response = await fetch(apiUrl, { 
+            headers: { 'X-UserID': userId },
+            signal: AbortSignal.timeout(8000)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // ✅ CORRECCIÓN: Validar formato de respuesta
+        const segments = Array.isArray(data) 
+            ? data.filter(s => s && typeof s.startTime === 'number' && typeof s.endTime === 'number' && s.startTime < s.endTime)
+            : [];
+        
+        this.segmentosCache[videoId] = {
+            segments: segments,
+            timestamp: Date.now()
+        };
+        
+        this.saveCache();
+        console.log(`✅ SB: ${segments.length} segmentos cargados para ${videoId}`);
+        return segments;
+        
+    } catch (e) {
+        console.warn(`⚠️ SB Error ${videoId}:`, e.message);
+        this.segmentosCache[videoId] = { 
+            segments: [], 
+            timestamp: Date.now() 
+        };
+        this.saveCache();
+        return [];
+    }
+}
 
     checkAndSkip(player) {
         const videoId = player.getVideoData()?.video_id;
