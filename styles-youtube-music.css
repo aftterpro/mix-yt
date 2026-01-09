@@ -889,13 +889,13 @@ body {
 }
 
 .video-wrapper {
-    width: 100% !important; /* ✅ Ocupar todo el espacio disponible */
+    width: 100% !important;
     height: 100% !important;
-    max-width: 800px; /* ✅ Límite máximo */
+    max-width: 800px;
     position: relative;
     background: #000;
     border-radius: 12px;
- 
+}
 
 .video-player {
        position: absolute !important;
