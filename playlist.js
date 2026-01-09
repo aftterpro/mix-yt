@@ -757,6 +757,16 @@ async loadRelatedForVideo(video) {
     
     console.log(`🎵 Cargando relacionados para: ${video.title} (${video.videoId})`);
     
+    // ✅ CANCELAR CARGA ANTERIOR
+    if (this.relatedLoadAbortController) {
+        this.relatedLoadAbortController.abort();
+        console.log('🛑 Carga anterior cancelada');
+    }
+    
+    // ✅ CREAR NUEVO ABORT CONTROLLER
+    this.relatedLoadAbortController = new AbortController();
+    const currentAbortController = this.relatedLoadAbortController;
+    
     // ✅ CACHÉ: Evitar recargas innecesarias
     if (this.lastLoadedRelatedId === video.videoId) {
         const existingItems = relatedList.querySelectorAll('.related-video-item');
@@ -790,6 +800,12 @@ async loadRelatedForVideo(video) {
         
         const searchResults = await window.youtubeJSClient.search(searchQuery);
         
+        // ✅ VERIFICAR SI FUE CANCELADO
+        if (currentAbortController.signal.aborted) {
+            console.log('🛑 Carga cancelada por el usuario');
+            return;
+        }
+        
         if (!searchResults || !searchResults.items || searchResults.items.length === 0) {
             throw new Error('Sin resultados');
         }
@@ -800,24 +816,41 @@ async loadRelatedForVideo(video) {
             .slice(0, 15);
         
         if (relatedVideos.length === 0) {
-            relatedList.innerHTML = `
-                <div class="related-placeholder">
-                    <i class="fas fa-music-slash"></i>
-                    <p>No se encontraron videos relacionados</p>
-                </div>
-            `;
+            // ✅ VERIFICAR NUEVAMENTE SI FUE CANCELADO
+            if (currentAbortController.signal.aborted) return;
+            
+            const currentList = document.getElementById('relatedVideosList');
+            if (currentList) {
+                currentList.innerHTML = `
+                    <div class="related-placeholder">
+                        <i class="fas fa-music-slash"></i>
+                        <p>No se encontraron videos relacionados</p>
+                    </div>
+                `;
+            }
             return;
         }
         
-        // ✅ RENDERIZAR
-        this.renderRelatedVideos(relatedVideos, relatedList);
+        // ✅ RENDERIZAR (solo si no fue cancelado)
+        if (!currentAbortController.signal.aborted) {
+            const currentList = document.getElementById('relatedVideosList');
+            if (currentList) {
+                this.renderRelatedVideos(relatedVideos, currentList);
+            }
+        }
         
     } catch (error) {
+        // ✅ IGNORAR ERRORES DE CANCELACIÓN
+        if (error.name === 'AbortError' || currentAbortController.signal.aborted) {
+            console.log('🛑 Carga cancelada');
+            return;
+        }
+        
         console.error('❌ Error cargando relacionados:', error);
         
         // ✅ VALIDAR QUE relatedList SIGA EXISTIENDO
         const currentList = document.getElementById('relatedVideosList');
-        if (currentList) {
+        if (currentList && !currentAbortController.signal.aborted) {
             currentList.innerHTML = `
                 <div class="related-error">
                     <i class="fas fa-exclamation-triangle"></i>
@@ -829,6 +862,11 @@ async loadRelatedForVideo(video) {
                     </button>
                 </div>
             `;
+        }
+    } finally {
+        // ✅ LIMPIAR ABORT CONTROLLER
+        if (this.relatedLoadAbortController === currentAbortController) {
+            this.relatedLoadAbortController = null;
         }
     }
 }
@@ -881,7 +919,7 @@ refreshActiveQueueTab() {
         content.classList.toggle('active', content.dataset.tabContent === tabName);
     });
     
-    // ✅ CORRECCIÓN: Obtener video del PLAYER directamente (sin find recursivo)
+    // ✅ OBTENER VIDEO DEL PLAYER DIRECTAMENTE (sin usar getFlattenedPlaylist)
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     
     if (!activePlayer || typeof activePlayer.getVideoData !== 'function') {
@@ -924,7 +962,7 @@ refreshActiveQueueTab() {
     // Cargar contenido según el tab activo
     if (tabName === 'lyrics') {
         setTimeout(() => {
-            this.loadLyricsForVideo(currentVideo);
+            this.loadLyricsForCurrentVideo(currentVideo);
         }, 100);
     } else if (tabName === 'related') {
         setTimeout(() => {
@@ -932,7 +970,6 @@ refreshActiveQueueTab() {
         }, 100);
     }
 }
-    
 parseLRC(lrcText) {
     if (!lrcText || typeof lrcText !== 'string') {
         console.warn('⚠️ Texto LRC inválido');
@@ -1572,7 +1609,7 @@ async translateLyrics() {
     const btn = document.getElementById('translateLyricsBtn');
     const container = document.getElementById('lyricsContent');
     
-    // --- (Lógica de toggle existente se mantiene igual) ---
+    // --- Lógica de toggle existente ---
     if (btn.classList.contains('translated')) {
         container.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
         btn.classList.remove('translated');
@@ -1586,7 +1623,7 @@ async translateLyrics() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     btn.disabled = true;
 
-    // --- (Obtención del texto se mantiene igual) ---
+    // --- Obtención del texto ---
     const syncedLines = container.querySelectorAll('.lyrics-text.synced p');
     const plainContainer = container.querySelector('.lyrics-text.plain');
     
@@ -1601,51 +1638,63 @@ async translateLyrics() {
     }
 
     if (!textToTranslate) {
-        // ... manejo de error vacío ...
         btn.innerHTML = originalIcon;
         btn.disabled = false;
+        this.core?.showMessage('No hay letras para traducir', 'warning');
         return;
     }
 
     try {
         console.log('🌐 Traduciendo letras (vía POST)...');
         
-        // 1. URL base de Google (SIN el texto 'q')
         const googleBaseUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t";
-        
-        // 2. URL del Proxy apuntando a la base de Google
         const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(googleBaseUrl)}`;
 
-        // 3. Preparar los datos para enviar por POST (Body)
-        // Usamos URLSearchParams para formato 'application/x-www-form-urlencoded' que Google espera
         const postData = new URLSearchParams();
         postData.append('q', textToTranslate);
 
-        // 4. Petición Fetch con método POST
+        // ✅ AÑADIR TIMEOUT Y ABORT CONTROLLER
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos
+
         const response = await fetch(proxyUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: postData
+            body: postData,
+            signal: controller.signal
         });
 
-        if (!response.ok) throw new Error(`Error en traducción: ${response.status}`);
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const data = await response.json();
         
         // Procesar respuesta de Google
         let fullTranslation = "";
-        if (data && data[0]) {
-            fullTranslation = data[0].map(item => item[0]).join('');
+        if (data && Array.isArray(data[0])) {
+            fullTranslation = data[0]
+                .filter(item => item && item[0])
+                .map(item => item[0])
+                .join('');
+        }
+        
+        if (!fullTranslation || fullTranslation.trim() === '') {
+            throw new Error('Traducción vacía');
         }
 
-        // Limpieza opcional por seguridad
+        // Limpieza opcional
         try {
             fullTranslation = decodeURIComponent(fullTranslation);
-        } catch (e) {}
+        } catch (e) {
+            // Ignorar si ya está decodificado
+        }
 
-        // --- (Inyección en el DOM - Se mantiene igual) ---
+        // --- Inyección en el DOM ---
         if (isSynced) {
             const translatedLines = fullTranslation.split(' ||| ');
             syncedLines.forEach((line, index) => {
@@ -1672,7 +1721,16 @@ async translateLyrics() {
 
     } catch (error) {
         console.error('❌ Error traduciendo:', error);
-        this.core?.showMessage('Error al traducir (Intenta de nuevo)', 'error');
+        
+        let errorMessage = 'Error al traducir';
+        
+        if (error.name === 'AbortError') {
+            errorMessage = 'Traducción cancelada (timeout)';
+        } else if (error.message) {
+            errorMessage = `Error: ${error.message}`;
+        }
+        
+        this.core?.showMessage(errorMessage, 'error');
         btn.innerHTML = originalIcon;
     } finally {
         btn.disabled = false;
@@ -2436,14 +2494,24 @@ setupQueueItemListeners() {
         return;
     }
 
-    // ✅ LIMPIAR LISTENERS: Clonar nodo completo
+    // ✅ LIMPIAR LISTENERS ANTERIORES
+    // Clonar y reemplazar para eliminar todos los event listeners
     const newQueueList = queueList.cloneNode(true);
-    queueList.parentNode.replaceChild(newQueueList, queueList);
+    if (queueList.parentNode) {
+        queueList.parentNode.replaceChild(newQueueList, queueList);
+    } else {
+        console.error('❌ queueList no tiene parentNode');
+        return;
+    }
     
-    // Obtener referencia actualizada
+    // ✅ OBTENER NUEVA REFERENCIA DESPUÉS DEL REEMPLAZO
     const freshList = document.getElementById('queueContentList');
+    if (!freshList) {
+        console.error('❌ No se pudo obtener freshList después del reemplazo');
+        return;
+    }
     
-    // ✅ EVENT DELEGATION (más eficiente que listeners individuales)
+    // ✅ EVENT DELEGATION (más eficiente)
     freshList.addEventListener('click', (e) => {
         // IGNORAR: Botones de eliminar
         if (e.target.closest('.queue-item-remove')) {
@@ -2467,7 +2535,9 @@ setupQueueItemListeners() {
                 }
             }
             
-            this.core.playNextVideo();
+            if (this.core && this.core.playNextVideo) {
+                this.core.playNextVideo();
+            }
         }
     });
     
@@ -2499,7 +2569,7 @@ setupQueueItemListeners() {
         }
     });
     
-    console.log('✅ Listeners de cola configurados');
+    console.log('✅ Listeners de cola configurados correctamente');
 }
     /**
      * Crear popup de playlist con detalles
