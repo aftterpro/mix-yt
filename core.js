@@ -190,6 +190,13 @@ class UnifiedCore {
         window.addEventListener('resize', this.boundResizeHandler);
         window.addEventListener('beforeunload', this.boundBeforeUnload);   
 }
+ cleanArtistName(name) {
+    if (!name) return 'Desconocido'; 
+    let cleaned = name.replace(/\s*-\s*Topic$/i, '').trim();
+    
+    // Si quedó vacío, devolver original
+    return cleaned.length > 0 ? cleaned : name;
+}
 handleResize() {
         clearTimeout(this.resizeTimeout);
         this.resizeTimeout = setTimeout(() => {
@@ -2429,7 +2436,6 @@ displaySearchResults(videos, container) {
 
     console.log(`✅ ${videos.length} tarjetas agregadas al DOM`);
 }
-
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue:', videoData);
     
@@ -2448,11 +2454,6 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     if (!videoData.title || videoData.title.trim() === '') {
         console.warn('⚠️ Video sin título, usando fallback');
         videoData.title = 'Video sin título';
-    }
-
-    // ✅ SINCRONIZACIÓN CON CORE
-    if (this.core?.playlistsData) {
-        this.core.playlistsData = this.core.playlistsData;
     }
 
     // ✅ OBTENER COLA
@@ -2477,14 +2478,22 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         queue.videos = [];
     }
 
-    // ✅ NORMALIZAR VIDEO
+    // ✅ NORMALIZAR VIDEO (SIN LLAMAR A cleanArtistName)
+    let artistName = videoData.uploaderName || videoData.artist || 'Desconocido';
+    
+    // Limpiar " - Topic" inline
+    artistName = artistName.replace(/\s*-\s*Topic$/i, '').trim();
+    if (!artistName || artistName.toLowerCase() === 'youtube') {
+        artistName = 'Desconocido';
+    }
+
     const videoToAdd = {
         videoId: videoData.videoId.trim(),
         title: videoData.title.trim(),
         thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
         duration: parseInt(videoData.duration) || 0,
-        uploaderName: this.cleanArtistName(videoData.uploaderName || videoData.artist || 'Desconocido'),
-        artist: this.cleanArtistName(videoData.artist || videoData.uploaderName || 'Desconocido'),
+        uploaderName: artistName,
+        artist: artistName,
         sourcePlaylistId: 'queue'
     };
 
@@ -2532,7 +2541,6 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     
     return true;
 }
-
     async addVideoToQueueAfterCurrent(videoData) {
         if (!window.playlistManager) {
             this.showMessage('Error: Gestor de playlists no disponible', 'error');
