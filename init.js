@@ -279,86 +279,66 @@ function ensureAPIsLoaded() {
 // INICIALIZACIÓN AUTOMÁTICA
 // =============================================
 
-// Cuando el DOM esté listo
+//  ASEGURAR QUE SE LLAME A loadYouTubeAPI
 if (document.readyState === 'loading') {
-   document.addEventListener('DOMContentLoaded', () => {
-    console.log('📄 DOM cargado, verificando APIs...');
-    
-    ensureAPIsLoaded();
-    loadYouTubeAPI();
-    
-    setTimeout(setupAudioControls, 1000);
-    
-    // ✅ TIMEOUT MEJORADO CON REINTENTOS
-    let checkAttempts = 0;
-    const MAX_ATTEMPTS = 30; // 30 segundos total
-    
-    const checkAPIsInterval = setInterval(() => {
-        checkAttempts++;
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📄 DOM cargado, verificando APIs...');
+        ensureAPIsLoaded();
+        loadYouTubeAPI();
         
-        const { gapi, gis, youtube } = window.ytCrossMixAPIs;
+        setTimeout(setupAudioControls, 1000);
         
-        // ✅ ÉXITO: Todas las APIs cargadas
-        if (gapi && gis && youtube) {
-            clearInterval(checkAPIsInterval);
-            console.log('✅ Todas las APIs verificadas correctamente');
-            
-            // Disparar evento de éxito
-            document.dispatchEvent(new CustomEvent('ytCrossMixAPIsVerified', {
-                detail: { success: true, attempts: checkAttempts }
-            }));
-            return;
-        }
+        // ✅ TIMEOUT MEJORADO CON REINTENTOS
+        let checkAttempts = 0;
+        const MAX_ATTEMPTS = 30;
         
-        // ✅ TIMEOUT: Después de 30 segundos
-        if (checkAttempts >= MAX_ATTEMPTS) {
-            clearInterval(checkAPIsInterval);
+        const checkAPIsInterval = setInterval(() => {
+            checkAttempts++;
             
-            const missing = [];
-            if (!gapi) missing.push('GAPI');
-            if (!gis) missing.push('GIS');
-            if (!youtube) missing.push('YouTube');
+            const { gapi, gis, youtube } = window.ytCrossMixAPIs;
             
-            console.warn(`⏰ Timeout de APIs después de ${checkAttempts}s. Faltantes: ${missing.join(', ')}`);
-            console.log('Estado final:', window.ytCrossMixAPIs);
-            
-            // ✅ CONTINUAR CON LAS APIs DISPONIBLES
-            document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout', {
-                detail: { 
-                    missing: missing,
-                    available: { gapi, gis, youtube },
-                    attempts: checkAttempts
-                }
-            }));
-            
-            // ✅ MOSTRAR AVISO AL USUARIO (solo si falta YouTube)
-            if (!youtube && window.unifiedCore) {
-                window.unifiedCore.showMessage(
-                    'Algunos servicios tardaron en cargar. Funcionalidad limitada.',
-                    'warning'
-                );
+            if (gapi && gis && youtube) {
+                clearInterval(checkAPIsInterval);
+                console.log('✅ Todas las APIs verificadas correctamente');
+                
+                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsVerified', {
+                    detail: { success: true, attempts: checkAttempts }
+                }));
+                return;
             }
-        }
-    }, 1000); // Verificar cada segundo
-});
+            
+            if (checkAttempts >= MAX_ATTEMPTS) {
+                clearInterval(checkAPIsInterval);
+                
+                const missing = [];
+                if (!gapi) missing.push('GAPI');
+                if (!gis) missing.push('GIS');
+                if (!youtube) missing.push('YouTube');
+                
+                console.warn(`⏰ Timeout de APIs después de ${checkAttempts}s. Faltantes: ${missing.join(', ')}`);
+                
+                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout', {
+                    detail: { 
+                        missing: missing,
+                        available: { gapi, gis, youtube },
+                        attempts: checkAttempts
+                    }
+                }));
+                
+                if (!youtube && window.unifiedCore) {
+                    window.unifiedCore.showMessage(
+                        'Algunos servicios tardaron en cargar. Funcionalidad limitada.',
+                        'warning'
+                    );
+                }
+            }
+        }, 1000);
+    });
 } else {
     console.log('📄 DOM ya cargado, verificando APIs...');
     ensureAPIsLoaded();
-    // Detectar scroll en el contenedor correcto
-const searchContainer = document.getElementById('searchView'); // O '.content-area'
-
-if (searchContainer) {
-    searchContainer.addEventListener('scroll', () => {
-        // Verificar si llegamos al final
-        if (searchContainer.scrollTop + searchContainer.clientHeight >= searchContainer.scrollHeight - 100) {
-            console.log('📜 Final del scroll detectado, cargando más...');
-            // Llamar a tu función de búsqueda con el token de paginación
-            if (window.unifiedCore && window.unifiedCore.searchNextPage) {
-                window.unifiedCore.searchNextPage();
-            }
-        }
-    });
-}
+    loadYouTubeAPI();
+    setTimeout(setupAudioControls, 1000);
 }
 // =============================================
 // CONFIGURACIÓN DE CONTROLES DE AUDIO
