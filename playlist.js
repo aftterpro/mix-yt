@@ -1609,7 +1609,7 @@ async translateLyrics() {
     const btn = document.getElementById('translateLyricsBtn');
     const container = document.getElementById('lyricsContent');
     
-    // --- Lógica de toggle existente ---
+    // --- Toggle existente ---
     if (btn.classList.contains('translated')) {
         container.querySelectorAll('.lyrics-translation').forEach(el => el.remove());
         btn.classList.remove('translated');
@@ -1618,7 +1618,6 @@ async translateLyrics() {
         return;
     }
 
-    // Feedback de carga
     const originalIcon = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     btn.disabled = true;
@@ -1632,7 +1631,7 @@ async translateLyrics() {
 
     if (syncedLines.length > 0) {
         isSynced = true;
-        textToTranslate = Array.from(syncedLines).map(p => p.textContent).join(' ||| ');
+        textToTranslate = Array.from(syncedLines).map(p => p.textContent).join('\n');
     } else if (plainContainer) {
         textToTranslate = plainContainer.innerText;
     }
@@ -1645,36 +1644,36 @@ async translateLyrics() {
     }
 
     try {
-        console.log('🌐 Traduciendo letras (vía POST)...');
+        console.log('🌐 Traduciendo letras...');
         
-        const googleBaseUrl = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t";
-        const proxyUrl = `/.netlify/functions/cors-proxy?url=${encodeURIComponent(googleBaseUrl)}`;
+        // ✅ CORRECCIÓN: Usar API directa de Google Translate
+        const apiUrl = `https://translate.googleapis.com/translate_a/single`;
+        
+        const params = new URLSearchParams({
+            client: 'gtx',
+            sl: 'auto',
+            tl: 'es',
+            dt: 't',
+            q: textToTranslate
+        });
 
-        const postData = new URLSearchParams();
-        postData.append('q', textToTranslate);
-
-        // ✅ AÑADIR TIMEOUT Y ABORT CONTROLLER
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        const response = await fetch(proxyUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: postData,
+        const response = await fetch(`${apiUrl}?${params.toString()}`, {
+            method: 'GET', // ✅ CAMBIO A GET
             signal: controller.signal
         });
 
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
         }
         
         const data = await response.json();
         
-        // Procesar respuesta de Google
+        // Procesar respuesta
         let fullTranslation = "";
         if (data && Array.isArray(data[0])) {
             fullTranslation = data[0]
@@ -1687,16 +1686,9 @@ async translateLyrics() {
             throw new Error('Traducción vacía');
         }
 
-        // Limpieza opcional
-        try {
-            fullTranslation = decodeURIComponent(fullTranslation);
-        } catch (e) {
-            // Ignorar si ya está decodificado
-        }
-
         // --- Inyección en el DOM ---
         if (isSynced) {
-            const translatedLines = fullTranslation.split(' ||| ');
+            const translatedLines = fullTranslation.split('\n');
             syncedLines.forEach((line, index) => {
                 if (translatedLines[index]) {
                     const transEl = document.createElement('span');
@@ -1737,9 +1729,8 @@ async translateLyrics() {
     }
 }
    /**
-     * ✅ NUEVA FUNCIÓN
      * Asigna el evento click al botón de cambio de proveedor
-     */
+    */
     setupLyricsProviderButton() {
         const toggleBtn = document.getElementById('lyricsProviderToggle');
         if (toggleBtn) {
