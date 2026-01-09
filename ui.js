@@ -135,60 +135,70 @@ movePlayersToFullView() {
         layer.appendChild(activePlayer);
     }
 
-    // ✅ OBTENER EL CONTENEDOR CORRECTO (dentro de .video-container-full)
-    const fullPlayerView = document.getElementById('fullPlayerView');
-    const videoContainer = fullPlayerView?.querySelector('.video-container-full');
-    
-    if (!videoContainer) {
-        console.error('❌ video-container-full no encontrado');
-        return;
-    }
-
-    // ✅ CALCULAR DIMENSIONES DEL CONTENEDOR
-    const containerRect = videoContainer.getBoundingClientRect();
-    
-    console.log('📐 Contenedor:', {
-        width: containerRect.width,
-        height: containerRect.height,
-        top: containerRect.top,
-        left: containerRect.left
-    });
-
-    // ✅ CONFIGURAR LA CAPA PERSISTENTE
-    layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    layer.style.zIndex = '55'; // ✅ Debajo de la cola (100)
-    layer.style.pointerEvents = 'none'; // ✅ No bloquear clicks
-    
-    // ✅ ANIMAR A LAS DIMENSIONES DEL CONTENEDOR
+    // ✅ CORRECCIÓN: Esperar a que el DOM esté listo
     requestAnimationFrame(() => {
-        layer.style.position = 'fixed';
-        layer.style.top = `${containerRect.top}px`;
-        layer.style.left = `${containerRect.left}px`;
-        layer.style.width = `${containerRect.width}px`;
-        layer.style.height = `${containerRect.height}px`;
-        layer.style.borderRadius = '12px'; // ✅ Mantener bordes redondeados
-        layer.style.boxShadow = 'none';
-        layer.style.opacity = '1';
-        layer.style.visibility = 'visible';
+        const fullPlayerView = document.getElementById('fullPlayerView');
+        const videoContainer = fullPlayerView?.querySelector('.video-container-full');
         
-        // ✅ ASEGURAR QUE EL PLAYER INTERNO OCUPE TODO EL ESPACIO
-        activePlayer.style.cssText = `
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            z-index: 10 !important;
-            background: #000 !important;
-        `;
+        if (!videoContainer) {
+            console.error('❌ video-container-full no encontrado');
+            return;
+        }
+
+        // ✅ CORRECCIÓN: Verificar que el contenedor tenga dimensiones
+        const containerRect = videoContainer.getBoundingClientRect();
         
-        document.body.classList.remove('mini-player-active');
-        document.body.classList.add('full-player-active');
+        if (containerRect.width === 0 || containerRect.height === 0) {
+            console.warn('⚠️ Contenedor sin dimensiones, esperando...');
+            
+            // Reintentar después de 100ms
+            setTimeout(() => this.movePlayersToFullView(), 100);
+            return;
+        }
         
-        console.log('✅ Player expandido correctamente');
+        console.log('📐 Contenedor válido:', {
+            width: containerRect.width,
+            height: containerRect.height,
+            top: containerRect.top,
+            left: containerRect.left
+        });
+
+        // ✅ CONFIGURAR LA CAPA PERSISTENTE
+        layer.style.transition = 'all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        layer.style.zIndex = '55';
+        layer.style.pointerEvents = 'none';
+        
+        // ✅ ANIMAR A LAS DIMENSIONES DEL CONTENEDOR
+        requestAnimationFrame(() => {
+            layer.style.position = 'fixed';
+            layer.style.top = `${containerRect.top}px`;
+            layer.style.left = `${containerRect.left}px`;
+            layer.style.width = `${containerRect.width}px`;
+            layer.style.height = `${containerRect.height}px`;
+            layer.style.borderRadius = '12px';
+            layer.style.boxShadow = 'none';
+            layer.style.opacity = '1';
+            layer.style.visibility = 'visible';
+            
+            // ✅ ASEGURAR QUE EL PLAYER INTERNO OCUPE TODO EL ESPACIO
+            activePlayer.style.cssText = `
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                z-index: 10 !important;
+                background: #000 !important;
+            `;
+            
+            document.body.classList.remove('mini-player-active');
+            document.body.classList.add('full-player-active');
+            
+            console.log('✅ Player expandido correctamente');
+        });
     });
 }
 showMiniPlayerFloat() {
