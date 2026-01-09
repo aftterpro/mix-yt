@@ -165,7 +165,7 @@ function loadPlaylistsDataPersistent() {
 }
 
 class UnifiedCore {
-    constructor(config) {
+  constructor(config) {
     this.state = {
         ...unifiedState,
         shuffleEnabled: false,    
@@ -175,20 +175,26 @@ class UnifiedCore {
     this.currentView = 'home';
     this.debugMode = localStorage.getItem('ytcm_debug') === 'true';
     this.playlistsData = [];
-    window.playlistsData = this.playlistsData; // Exponer globalmente
+    window.playlistsData = this.playlistsData;
     
     this.scrollObserver = null;
     this.ui = window.uiManager;
+    
+    // ✅ CORRECCIÓN: Bindear funciones solo una vez
+    this.boundResizeHandler = this.handleResize.bind(this);
+    this.boundBeforeUnload = this.handleBeforeUnload.bind(this);
+    
+    // ✅ CORRECCIÓN: Remover listeners existentes antes de añadir nuevos
+    window.removeEventListener('resize', this.boundResizeHandler);
+    window.removeEventListener('beforeunload', this.boundBeforeUnload);
+    
+    window.addEventListener('resize', this.boundResizeHandler);
+    window.addEventListener('beforeunload', this.boundBeforeUnload);
+    
     this.init();
     this.setupAutomaticSaving();
     this.setupPlayerContainerHandlers();
     this.lastPlayNextCall = 0;
-     this.boundResizeHandler = this.handleResize.bind(this);
-        this.boundBeforeUnload = this.handleBeforeUnload.bind(this);
-        
-        // Añadir listeners
-        window.addEventListener('resize', this.boundResizeHandler);
-        window.addEventListener('beforeunload', this.boundBeforeUnload);   
 }
  cleanArtistName(name) {
     if (!name) return 'Desconocido'; 
@@ -198,17 +204,21 @@ class UnifiedCore {
     return cleaned.length > 0 ? cleaned : name;
 }
 handleResize() {
-        clearTimeout(this.resizeTimeout);
-        this.resizeTimeout = setTimeout(() => {
-            if (window.unifiedCore) {
-                if (window.unifiedCore.currentView === 'fullPlayer') {
-                    window.unifiedCore.updatePlayerPosition('videoWrapper');
-                } else if (window.reproduccionIniciada) {
-                    window.unifiedCore.updatePlayerPosition('miniPlayerFloat');
-                }
+    clearTimeout(this.resizeTimeout);
+    this.resizeTimeout = setTimeout(() => {
+        // ✅ CORRECCIÓN: Solo actuar si el reproductor está visible
+        if (!window.reproduccionIniciada) return;
+        
+        if (window.unifiedCore) {
+            if (window.unifiedCore.currentView === 'fullPlayer') {
+                window.unifiedCore.updatePlayerPosition('videoWrapper');
+            } else if (window.reproduccionIniciada) {
+                // ✅ NO hacer nada - el mini player se maneja automáticamente con CSS
+                console.log('🔄 Resize detectado (mini player)');
             }
-        }, 300);
-    }
+        }
+    }, 300);
+}
     handleBeforeUnload() {
         console.log('🚪 Cerrando aplicación, limpiando recursos...');
         
@@ -1493,7 +1503,7 @@ movePlayersToFullView() {
         }
     }
 
-   handlePlayPause() {
+  handlePlayPause() {
     console.log('🎮 handlePlayPause ejecutado');
     
     const activePlayer = (window.currentPlayer === 1) ? player1 : player2;
@@ -1510,8 +1520,6 @@ movePlayersToFullView() {
         if (!window.reproduccionIniciada) {
             console.log('🚀 Iniciando reproducción por primera vez');
             
-            window.reproduccionIniciada = true;
-            
             const flatList = this.getFlattenedPlaylist();
             
             if (flatList.length === 0) {
@@ -1520,20 +1528,17 @@ movePlayersToFullView() {
                 return;
             }
             
-            // Iniciar desde el primer video
+            // ✅ CORRECCIÓN: NO iniciar monitor aquí, dejarlo para playNextVideo
             window.currentPlayingInfo = {
                 flattenedIndex: -1,
                 videoId: null,
                 playlistId: null
             };
             
-            // ✅ INICIAR MONITOR
-            if (!monitorInterval) {
-                monitorInterval = setInterval(monitorPlayers, 500);
-                console.log('✅ Monitor iniciado');
-            }
+            // ✅ MARCAR COMO INICIADO ANTES DE REPRODUCIR
+            window.reproduccionIniciada = true;
             
-            // Reproducir primer video
+            // Reproducir primer video (el monitor se iniciará después de que empiece a reproducir)
             this.playNextVideo();
             
             return;
@@ -1899,7 +1904,13 @@ async playNextVideo() {
         
         // ✅ ESPERAR A QUE COMIENCE (máximo 5 segundos)
         await this.waitForPlayingState(nextPlayerInstance, 5000);
-        
+        // ✅ INICIAR MONITOR SOLO DESPUÉS DE QUE EL VIDEO COMIENCE
+        if (!monitorInterval && window.reproduccionIniciada) {
+            setTimeout(() => {
+            monitorInterval = setInterval(monitorPlayers, 500);
+            console.log('✅ Monitor iniciado después de primer video');
+            }, 1000);
+        }
         // ✅ CROSSFADE VISUAL
         if (nextElement && prevElement) {
             const transitionStyle = `opacity ${CROSSFADE_DURATION}s ease`;
@@ -2292,20 +2303,12 @@ async performSearch(searchQuery, continuation = null) {
         
         // ✅ CONFIGURAR SCROLL INFINITO SOLO SI HAY MÁS PÁGINAS
         if (window.currentNextPageToken) {
-            // Remover sentinel anterior
-            const oldSentinel = document.getElementById('scrollSentinel');
-            if (oldSentinel) oldSentinel.remove();
-            
-            // Crear nuevo sentinel
-            const sentinel = document.createElement('div');
-            sentinel.id = 'scrollSentinel';
-            sentinel.style.cssText = 'width: 100%; height: 20px; margin: 10px 0;';
-            container.appendChild(sentinel);
-            
-            // Configurar observador
-            this.setupInfiniteScroll(container);
+        // ✅ CORRECCIÓN: Esperar un frame antes de configurar
+        requestAnimationFrame(() => {
+        this.setupInfiniteScroll(container);
+            });
         } else {
-            console.log('✅ No hay más resultados disponibles');
+        console.log('✅ No hay más resultados disponibles');
         }
         
         // Configurar event listeners
@@ -2364,6 +2367,13 @@ setupInfiniteScroll(container) {
     `;
     container.appendChild(sentinel);
     
+    // ✅ CORRECCIÓN: ROOT debe ser el contenedor scrolleable
+    const scrollContainer = document.querySelector('.search-results-wrapper') || 
+                           document.querySelector('#searchView') || 
+                           container.parentElement;
+    
+    console.log('📜 Configurando scroll infinito, root:', scrollContainer?.id || 'default');
+    
     // ✅ CREAR NUEVO OBSERVADOR CON ROOT CORRECTO
     this.searchScrollObserver = new IntersectionObserver(async (entries) => {
         const entry = entries[0];
@@ -2372,7 +2382,7 @@ setupInfiniteScroll(container) {
             !window.isLoadingMore && 
             window.currentNextPageToken) {
             
-            console.log('📜 Cargando más resultados...');
+            console.log('📜 Sentinel visible - Cargando más resultados...');
             window.isLoadingMore = true;
             
             try {
@@ -2382,18 +2392,19 @@ setupInfiniteScroll(container) {
                 );
             } catch (error) {
                 console.error('❌ Error cargando más:', error);
+                this.showMessage('Error cargando más resultados', 'error');
             } finally {
                 window.isLoadingMore = false;
             }
         }
     }, { 
-        root: document.querySelector('.search-results-wrapper'), // ✅ ROOT CORRECTO
-        rootMargin: '200px', 
+        root: scrollContainer, // ✅ Usar contenedor scrolleable
+        rootMargin: '200px', // ✅ Cargar antes de llegar al final
         threshold: 0.1 
     });
     
     this.searchScrollObserver.observe(sentinel);
-    console.log('✅ Scroll infinito configurado');
+    console.log('✅ Scroll infinito configurado correctamente');
 }
 displaySearchResults(videos, container) {
     if (!container) {
@@ -2819,9 +2830,13 @@ updatePersistentQueue() {
         queueItem.dataset.videoId = video.videoId;
         queueItem.dataset.flatIndex = index;
         
-        const duration = video.duration && video.duration > 0 
-            ? this.formatDuration(video.duration) 
-            : '--:--';
+        // ✅ CORRECCIÓN: Formatear duración correctamente
+        let duration = '--:--';
+        if (video.duration && typeof video.duration === 'number' && video.duration > 0) {
+            const minutes = Math.floor(video.duration / 60);
+            const seconds = Math.floor(video.duration % 60);
+            duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
         
         queueItem.innerHTML = `
             <div class="queue-item-number">
@@ -2855,12 +2870,11 @@ updatePersistentQueue() {
     
     this.updateQueueCount(flatList.length);
     
-    // ===== EVENT DELEGATION MEJORADO =====
-    // ✅ NO clonar nodo, solo añadir listeners una vez
+    // ===== EVENT DELEGATION (ya configurado) =====
     if (!queueContentList.dataset.listenersAttached) {
         queueContentList.dataset.listenersAttached = 'true';
         
-        // Click en items
+        // Click en items (código existente)
         queueContentList.addEventListener('click', (e) => {
             if (e.target.closest('.queue-item-remove')) {
                 return;
@@ -2895,6 +2909,7 @@ updatePersistentQueue() {
             e.preventDefault();
             
             const videoId = btn.dataset.videoId;
+            console.log(`🗑️ Eliminando: ${videoId}`);
             
             if (!videoId || videoId === 'undefined') {
                 console.error('❌ videoId inválido');
@@ -3253,13 +3268,11 @@ function monitorPlayers() {
         if (playerState === YT.PlayerState.ENDED) {
             console.log('🎬 Video terminado naturalmente');
             
-            // Detener monitor
             if (window.monitorInterval) {
                 clearInterval(window.monitorInterval);
                 window.monitorInterval = null;
             }
             
-            // Reproducir siguiente
             if (window.unifiedCore) {
                 window.unifiedCore.playNextVideo();
             }
@@ -3273,17 +3286,28 @@ function monitorPlayers() {
         const videoDuration = activePlayer.getDuration();
         const videoId = activePlayer.getVideoData()?.video_id;
 
-        if (!videoDuration || videoDuration <= 0) return;
+        if (!videoDuration || videoDuration <= 0 || !videoId) return;
 
-        // ✅ SPONSORBLOCK
-        if (window.sponsorBlockManager && videoId) {
-            window.sponsorBlockManager.checkAndSkip(activePlayer);
+        // ✅ SPONSORBLOCK - CORRECCIÓN: Cargar segmentos si no existen
+        if (window.sponsorBlockManager) {
+            // ✅ Verificar si ya existen segmentos cargados
+            const cached = window.sponsorBlockManager.segmentosCache[videoId];
+            
+            if (!cached || cached === 'fetching') {
+                // Cargar segmentos en segundo plano (no bloquear monitor)
+                window.sponsorBlockManager.cargarSegmentos(videoId).catch(e => {
+                    console.warn('⚠️ Error cargando segmentos:', e);
+                });
+            } else {
+                // Verificar y saltar si aplica
+                window.sponsorBlockManager.checkAndSkip(activePlayer);
+            }
         }
 
         // ✅ CALCULAR TRIGGER TIME
         let triggerTime = videoDuration - (window.CROSSFADE_DURATION || 10) - 0.5;
         
-        if (videoId && window.sponsorBlockManager) {
+        if (window.sponsorBlockManager) {
             triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
                 videoDuration,
                 videoId,
@@ -3293,17 +3317,15 @@ function monitorPlayers() {
 
         // ✅ DISPARAR CROSSFADE (solo una vez)
         if (currentTime >= triggerTime && !hasOutroCrossfadeStarted) {
-            console.log(`🎨 Disparando crossfade en ${currentTime.toFixed(2)}s`);
+            console.log(`🎨 Disparando crossfade en ${currentTime.toFixed(2)}s (trigger: ${triggerTime.toFixed(2)}s)`);
             
             hasOutroCrossfadeStarted = true;
             
-            // Detener monitor
             if (window.monitorInterval) {
                 clearInterval(window.monitorInterval);
                 window.monitorInterval = null;
             }
             
-            // Reproducir siguiente
             if (window.unifiedCore?.playNextVideo) {
                 window.unifiedCore.playNextVideo();
             }
