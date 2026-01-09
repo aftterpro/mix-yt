@@ -240,21 +240,44 @@ function checkAndUpdateUI() {
 // =============================================
 
 function handleAuthResult(accessToken) {
-    // 1. Validación mejorada
-    if (!accessToken || typeof accessToken !== 'string' || accessToken.trim() === '') {
+    // ✅ VALIDACIÓN MEJORADA
+    if (!accessToken) {
         isAuthorized = false;
-        console.log('❌ Token inválido o vacío');
+        console.log('❌ Token no proporcionado');
+        updateAuthUI();
+        return;
+    }
+    
+    if (typeof accessToken !== 'string') {
+        console.error('❌ Token no es string:', typeof accessToken);
+        isAuthorized = false;
+        updateAuthUI();
+        return;
+    }
+    
+    const trimmedToken = accessToken.trim();
+    if (trimmedToken === '') {
+        console.error('❌ Token vacío después de trim');
+        isAuthorized = false;
+        updateAuthUI();
+        return;
+    }
+    
+    // ✅ VALIDAR FORMATO BÁSICO (debe ser un JWT o token válido)
+    if (trimmedToken.length < 20) {
+        console.error('❌ Token demasiado corto:', trimmedToken.length);
+        isAuthorized = false;
         updateAuthUI();
         return;
     }
 
     try {
         // 2. Establecer credenciales
-        gapi.client.setToken({ access_token: accessToken });
+        gapi.client.setToken({ access_token: trimmedToken });
         isAuthorized = true;
         
         // 3. Guardar token
-        const saved = saveAuthData(accessToken);
+        const saved = saveAuthData(trimmedToken);
         if (!saved) {
             console.warn('⚠️ Token no se pudo guardar, pero sesión activa');
         }
