@@ -873,6 +873,7 @@ body {
     height: 100%;
     gap: 16px;
     padding: 16px;
+    overflow: hidden; /* ✅ CORRECCIÓN: Prevenir overflow */
 }
 
 .video-container-full {
@@ -929,13 +930,14 @@ body {
     width: 400px;
     min-width: 400px;
     max-width: 400px;
+    height: 100%; /* ✅ CORRECCIÓN: Altura fija */
     background: var(--yt-bg-elevated);
     border-radius: 12px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    position: relative;
-    z-index: 100 !important; /* ✅ SIEMPRE ENCIMA */
+    position: relative; /* ✅ CORRECCIÓN: Relativo, no fixed */
+    z-index: 100 !important;
     pointer-events: auto !important;
     flex-shrink: 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
