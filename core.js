@@ -2229,116 +2229,81 @@ async performSearch(searchQuery, continuation = null) {
     }
 }
 setupInfiniteScroll(container) {
-    console.log('📜 Configurando scroll infinito');
-    
-    // ✅ LIMPIAR OBSERVADOR ANTERIOR
-    if (this.searchScrollObserver) {
-        try {
-            this.searchScrollObserver.disconnect();
-        } catch (e) {
-            console.warn('⚠️ Error desconectando observador:', e);
-        }
-        this.searchScrollObserver = null;
-    }
-    
-    // ✅ VALIDAR QUE HAY MÁS CONTENIDO
-    if (!window.currentNextPageToken) {
-        console.log('✅ No hay más páginas disponibles');
+        console.log('📜 Configurando scroll infinito (Modo Robusto)');
         
-        // Remover sentinel si existe
+        // 1. Limpiar observador anterior
+        if (this.searchScrollObserver) {
+            try {
+                this.searchScrollObserver.disconnect();
+            } catch (e) {
+                console.warn('⚠️ Error desconectando observador:', e);
+            }
+            this.searchScrollObserver = null;
+        }
+        
+        // 2. Validar si hay más contenido
+        if (!window.currentNextPageToken) {
+            const oldSentinel = document.getElementById('search-sentinel');
+            if (oldSentinel) oldSentinel.remove();
+            this.showEndOfResultsMessage(container);
+            return;
+        }
+        
+        // 3. Preparar el elemento "Centinela"
         const oldSentinel = document.getElementById('search-sentinel');
         if (oldSentinel) oldSentinel.remove();
         
-        // Mostrar mensaje de fin
-        this.showEndOfResultsMessage(container);
-        return;
+        const sentinel = document.createElement('div');
+        sentinel.id = 'search-sentinel';
+        sentinel.style.cssText = `
+            width: 100%;
+            height: 50px;       /* Altura mayor para facilitar detección */
+            margin-bottom: 20px;
+            background: transparent;
+            pointer-events: none;
+        `;
+        
+        container.appendChild(sentinel);
+        
+        // 4. Configurar el IntersectionObserver
+        // USAREMOS 'root: null' (Viewport) para asegurar que funcione siempre
+        this.searchScrollObserver = new IntersectionObserver(
+            async (entries) => {
+                const entry = entries[0];
+                
+                // Si no es visible o ya está cargando, salir
+                if (!entry.isIntersecting) return;
+                if (window.isLoadingMore) return;
+                if (!window.currentNextPageToken) return;
+                
+                console.log('📜 Sentinel detectado - Cargando página siguiente...');
+                
+                window.isLoadingMore = true;
+                this.showLoadingIndicator(container);
+                
+                try {
+                    await this.performSearch(
+                        window.currentSearchQuery,
+                        window.currentNextPageToken
+                    );
+                } catch (error) {
+                    console.error('❌ Error en scroll infinito:', error);
+                    // Permitir reintentar en caso de error
+                    window.isLoadingMore = false;
+                } finally {
+                    this.removeLoadingIndicator();
+                }
+            },
+            {
+                root: null,         // ✅ CORRECCIÓN: Usar viewport global (más fiable)
+                rootMargin: '400px', // ✅ Cargar 400px ANTES de llegar al final
+                threshold: 0.1
+            }
+        );
+        
+        this.searchScrollObserver.observe(sentinel);
     }
-    
-    // ✅ LIMPIAR SENTINEL ANTERIOR
-    const oldSentinel = document.getElementById('search-sentinel');
-    if (oldSentinel) oldSentinel.remove();
-    
-    // ✅ CREAR NUEVO SENTINEL
-    const sentinel = document.createElement('div');
-    sentinel.id = 'search-sentinel';
-    sentinel.style.cssText = `
-        width: 100%;
-        height: 20px;
-        margin: 20px 0;
-        background: transparent;
-    `;
-    
-    container.appendChild(sentinel);
-    
-    // ✅ ENCONTRAR CONTENEDOR SCROLLEABLE
-    const scrollContainer = this.findScrollContainer(container);
-    
-    if (!scrollContainer) {
-        console.error('❌ No se encontró contenedor scrolleable');
-        return;
-    }
-    
-    console.log('📜 Contenedor scrolleable:', scrollContainer.id || scrollContainer.className);
-    
-    // ✅ CREAR NUEVO OBSERVADOR CON CONFIGURACIÓN CORRECTA
-    this.searchScrollObserver = new IntersectionObserver(
-        async (entries) => {
-            const entry = entries[0];
-            
-            // ✅ VALIDACIONES CRÍTICAS
-            if (!entry.isIntersecting) return;
-            if (window.isLoadingMore) {
-                console.log('⏳ Ya hay una carga en progreso...');
-                return;
-            }
-            if (!window.currentNextPageToken) {
-                console.log('✅ No hay más resultados');
-                this.searchScrollObserver?.disconnect();
-                return;
-            }
-            
-            console.log('📜 Sentinel visible - Cargando más resultados...');
-            
-            // ✅ MARCAR COMO CARGANDO
-            window.isLoadingMore = true;
-            
-            // ✅ MOSTRAR INDICADOR DE CARGA
-            this.showLoadingIndicator(container);
-            
-            try {
-                // ✅ CARGAR MÁS RESULTADOS
-                await this.performSearch(
-                    window.currentSearchQuery,
-                    window.currentNextPageToken
-                );
-                
-                console.log('✅ Más resultados cargados');
-                
-            } catch (error) {
-                console.error('❌ Error cargando más resultados:', error);
-                this.showMessage('Error cargando más resultados', 'error');
-                
-                // ✅ LIBERAR BANDERA PARA PERMITIR REINTENTO
-                window.isLoadingMore = false;
-                
-            } finally {
-                // ✅ REMOVER INDICADOR
-                this.removeLoadingIndicator();
-            }
-        },
-        {
-            root: scrollContainer === document.querySelector('.search-results-wrapper') 
-                ? null // Usar viewport si es el wrapper
-                : scrollContainer,
-            rootMargin: '100px', // Cargar antes de llegar al final
-            threshold: 0.1
-        }
-    );
-    
-    this.searchScrollObserver.observe(sentinel);
-    console.log('✅ Scroll infinito configurado correctamente');
-}
-    // =============================================
+// =============================================
 // HELPERS PARA SCROLL INFINITO
 // =============================================
 
