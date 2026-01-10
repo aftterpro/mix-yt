@@ -168,84 +168,39 @@ class SponsorBlockManager {
         } catch (e) {}
     }
 
-    // ✅ FUNCIÓN CORREGIDA: Carga segmentos con timeout para no frenar la música
     async cargarSegmentos(videoId) {
         if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) return [];
-
         const cached = this.segmentosCache[videoId];
         if (cached && cached.segments) return cached.segments;
 
-        const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
+        const apiUrl = `mix-yt.netlify.app{videoId}`;
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
 
         try {
-            // Timeout de 2.5s para no bloquear la transición si la API falla
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2500);
-
             const response = await fetch(apiUrl, { 
                 headers: { 'X-UserID': userId },
                 signal: controller.signal
             });
-            
             clearTimeout(timeoutId);
-
             if (!response.ok) throw new Error('API Error');
-
             const data = await response.json();
             const segments = Array.isArray(data) ? data : [];
-
-            this.segmentosCache[videoId] = {
-                segments: segments,
-                timestamp: Date.now()
-            };
+            this.segmentosCache[videoId] = { segments, timestamp: Date.now() };
             this.saveCache();
             return segments;
         } catch (e) {
-            console.warn(`⚠️ SB: No se pudieron cargar segmentos para ${videoId} (o no existen)`);
             return [];
         }
     }
 
-    // ✅ FUNCIÓN CORREGIDA: Calcula cuándo empezar el crossfade considerando outros
-    calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
-        const SAFETY_MARGIN = 1.0; // Margen de seguridad
-        
-        // Si no hay datos, usar duración total
-        if (!videoId || !this.segmentosCache[videoId]?.segments) {
-            return videoDuration - crossfadeDuration - SAFETY_MARGIN;
-        }
-
-        let effectiveEndTime = videoDuration;
-        const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic'];
-        
-        // Buscar el segmento de finalización más temprano que esté cerca del final real
-        this.segmentosCache[videoId].segments.forEach(seg => {
-            if (endCategories.includes(seg.category)) {
-                // Si el segmento termina muy cerca del final del video (menos de 5s)
-                if (Math.abs(videoDuration - seg.endTime) < 5) {
-                    // El "final efectivo" es donde empieza ese segmento de basura
-                    if (seg.startTime < effectiveEndTime) {
-                        effectiveEndTime = seg.startTime;
-                    }
-                }
-            }
-        });
-
-        // Asegurar que no sea negativo ni demasiado corto
-        const triggerTime = effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
-        return Math.max(0, triggerTime);
-    }
-    
     checkAndSkip(player) {
         const videoId = player.getVideoData()?.video_id;
         if (!videoId) return false;
         
         const cached = this.segmentosCache[videoId];
-        
-        if (!cached || cached === 'fetching' || typeof cached !== 'object') {
-            return false;
-        }
+        if (!cached || cached === 'fetching' || typeof cached !== 'object') return false;
         
         const segments = cached.segments || [];
         if (segments.length === 0) return false;
@@ -253,7 +208,6 @@ class SponsorBlockManager {
         const currentTime = player.getCurrentTime();
         const duration = player.getDuration();
 
-        // Evitar saltos repetitivos
         if (Math.abs(currentTime - this.lastSkipTime) < 1.5) return false;
 
         for (const seg of segments) {
@@ -274,41 +228,25 @@ class SponsorBlockManager {
                 return true;
             }
         }
-        
         return false;
     }
 
     mostrarAviso(mensaje, container) {
-        // Limpiar avisos anteriores
         const oldToasts = document.querySelectorAll('.sb-toast');
         oldToasts.forEach(toast => toast.remove());
         
         let toast = document.createElement('div');
         toast.className = 'sb-toast';
         toast.textContent = mensaje;
-        
         toast.style.cssText = `
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 100;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9); color: white; padding: 8px 16px;
+            border-radius: 20px; font-size: 12px; z-index: 100; pointer-events: none;
+            opacity: 0; transition: opacity 0.3s ease;
         `;
         
         (container || document.body).appendChild(toast);
-        
-        requestAnimationFrame(() => {
-            toast.style.opacity = '1';
-        });
-        
+        requestAnimationFrame(() => toast.style.opacity = '1');
         setTimeout(() => {
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 300);
@@ -317,30 +255,22 @@ class SponsorBlockManager {
 
     calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
         const SAFETY_MARGIN = 0.5;
-        
-        if (!videoId || !this.segmentosCache[videoId] || 
-            !Array.isArray(this.segmentosCache[videoId].segments)) {
+        if (!videoId || !this.segmentosCache[videoId] || !Array.isArray(this.segmentosCache[videoId].segments)) {
             return videoDuration - crossfadeDuration - SAFETY_MARGIN;
         }
 
         let effectiveEndTime = videoDuration;
-        
         const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
         
         this.segmentosCache[videoId].segments.forEach(segment => {
             if (endCategories.includes(segment.category)) {
                 const start = segment.segment?.[0] ?? segment.startTime;
                 const end = segment.segment?.[1] ?? segment.endTime;
-                
                 if (Math.abs(videoDuration - end) < 5) {
-                    if (start < effectiveEndTime) {
-                        effectiveEndTime = start;
-                    }
+                    if (start < effectiveEndTime) effectiveEndTime = start;
                 }
             }
         });
-
-        console.log(`⏱️ Video: ${videoDuration}s | Final Efectivo: ${effectiveEndTime}s | Trigger: ${effectiveEndTime - crossfadeDuration}s`);
 
         return effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
     }
@@ -349,22 +279,17 @@ class SponsorBlockManager {
         const MAX_AGE = 10 * 60 * 1000;
         const MAX_ENTRIES = 100;
         const now = Date.now();
-        
         const entries = Object.entries(this.segmentosCache);
-        const validEntries = entries.filter(([videoId, data]) => {
-            if (!data.timestamp) return false;
-            return (now - data.timestamp) < MAX_AGE;
-        });
-        
+        const validEntries = entries.filter(([_, data]) => (now - data.timestamp) < MAX_AGE);
         if (validEntries.length > MAX_ENTRIES) {
             validEntries.sort((a, b) => b[1].timestamp - a[1].timestamp);
             validEntries.splice(MAX_ENTRIES);
         }
-        
         this.segmentosCache = Object.fromEntries(validEntries);
         this.saveCache();
     }
 }
+
 
 // Instancia global
 window.sponsorBlockManager = new SponsorBlockManager();
