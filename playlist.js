@@ -179,7 +179,7 @@ extractArtistFromTitle(fullTitle) {
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue:', videoData);
     
-    // ✅ VALIDACIÓN ESTRICTA
+    // ✅ VALIDACIÓN ESTRICTA DEL VIDEO ID
     if (!videoData || 
         !videoData.videoId || 
         videoData.videoId === 'undefined' || 
@@ -187,6 +187,13 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         videoData.videoId.trim() === '') {
         console.error('❌ videoId inválido:', videoData);
         if (this.core) this.core.showMessage('Error: Video inválido', 'error');
+        return false;
+    }
+
+    // ✅ VALIDAR LONGITUD DE VIDEO ID (YouTube IDs son 11 caracteres)
+    if (videoData.videoId.length !== 11) {
+        console.error('❌ videoId con longitud incorrecta:', videoData.videoId);
+        if (this.core) this.core.showMessage('Error: ID de video inválido', 'error');
         return false;
     }
 
@@ -216,29 +223,54 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         };
         this.core.playlistsData.unshift(queue);
     }
+    
+    // ✅ VALIDAR QUE queue.videos ES UN ARRAY
+    if (!Array.isArray(queue.videos)) {
+        console.error('❌ queue.videos no es un array:', queue.videos);
+        queue.videos = [];
+    }
 
     // ✅ NORMALIZAR VIDEO
+    let artistName = videoData.uploaderName || videoData.artist || videoData.author || '';
+    
+    // Limpiar " - Topic" y variantes
+    artistName = artistName.replace(/\s*-\s*Topic$/i, '').trim();
+    
+    if (!artistName || 
+        artistName.toLowerCase() === 'youtube' || 
+        artistName.toLowerCase() === 'youtube music') {
+        // Intentar extraer del título
+        if (videoData.title.includes(' - ')) {
+            artistName = videoData.title.split(' - ')[0].trim();
+        } else {
+            artistName = 'Desconocido';
+        }
+    }
+
     const videoToAdd = {
         videoId: videoData.videoId.trim(),
         title: videoData.title.trim(),
         thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
         duration: parseInt(videoData.duration) || 0,
-        uploaderName: this.cleanArtistName(videoData.uploaderName || videoData.artist || 'Desconocido'),
-        artist: this.cleanArtistName(videoData.artist || videoData.uploaderName || 'Desconocido'),
+        uploaderName: artistName,
+        artist: artistName,
+        author: artistName,
         sourcePlaylistId: 'queue'
     };
 
     // ✅ VERIFICAR DUPLICADOS
-    const isDuplicate = queue.videos.some(v => v.videoId === videoToAdd.videoId);
+    const isDuplicate = queue.videos.some(v => v && v.videoId === videoToAdd.videoId);
     if (isDuplicate) {
         if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
         return false;
     }
 
-    // ✅ AÑADIR (al final si es desde playlist, inteligente si es manual)
+    // ✅ AÑADIR
     if (fromPlaylist) {
+        // Desde playlist: siempre al final
         queue.videos.push(videoToAdd);
     } else {
+        // Manual: después del actual o al final
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
@@ -269,6 +301,8 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
             window.saveAllData();
         }
     }, 100);
+    
+    console.log(`✅ Video añadido a cola: ${videoToAdd.title} (ID: ${videoToAdd.videoId})`);
     
     return true;
 }
