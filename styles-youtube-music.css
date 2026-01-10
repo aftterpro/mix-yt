@@ -869,30 +869,27 @@ body {
 
 .player-queue-layout {
     display: flex;
+    flex-direction: row; /* Alinear horizontalmente */
     width: 100%;
-    height: 100%;
-    gap: 16px;
-    padding: 16px;
-    overflow: hidden; /* ✅ CORRECCIÓN: Prevenir overflow */
+    height: calc(100vh - 80px); /* Restar altura de la barra inferior si es necesario */
+    overflow: hidden; /* Evitar scroll en la página principal */
 }
 
 .video-container-full {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #000;
-    border-radius: 12px;
-    overflow: hidden;
+   flex: 1;           /* Crecer para llenar espacio */
+    min-width: 0;      /* CRÍTICO: Permite que se encoja si la cola aparece */
+    height: 100%;
     position: relative;
-    min-width: 0; /* ✅ Permitir shrink */
-    max-width: 100%; /* ✅ No desbordarse */
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .video-wrapper {
     width: 100% !important;
     height: 100% !important;
-    max-width: 800px;
+    max-width: 500px;
     position: relative;
     background: #000;
     border-radius: 12px;
@@ -927,20 +924,15 @@ body {
    PERSISTENT QUEUE SIDEBAR
    ============================================= */
 .persistent-queue-sidebar {
-    width: 400px;
-    min-width: 400px;
-    max-width: 400px;
-    height: 100%; /* ✅ CORRECCIÓN: Altura fija */
-    background: var(--yt-bg-elevated);
-    border-radius: 12px;
+   width: 350px;      /* Ancho fijo para la cola */
+    min-width: 350px;  /* No permitir que se haga más pequeña */
+    height: 100%;
+    background: var(--bg-secondary, #1a1a1a); /* Color de fondo por si acaso */
+    border-left: 1px solid rgba(255,255,255,0.1);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    position: relative; /* ✅ CORRECCIÓN: Relativo, no fixed */
-    z-index: 100 !important;
-    pointer-events: auto !important;
-    flex-shrink: 0;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    z-index: 20;       /* Asegurar que esté encima si hay solapamiento */
+    flex-shrink: 0;    /* CRÍTICO: Evita que el video la aplaste */
 }
 .queue-tabs,
 .queue-tab,
@@ -1589,28 +1581,22 @@ grid-template-columns: repeat(3, 1fr);
 }
 }
 @media (max-width: 768px) {
-.desktop-sidebar {
-display: none;
-}
-.top-bar {
-    display: none;
-}
-.player-queue-layout {
-    flex-direction: column-reverse;
-}
+    .player-queue-layout {
+        flex-direction: column; /* En móvil, poner uno debajo del otro */
+        height: auto;
+        overflow-y: auto;
+    }
 
-.persistent-queue-sidebar {
-    width: 100%;
-    height: 40%;
-    border-left: none;
-    border-bottom: 1px solid var(--yt-layer-10);
-}
-
-.search-results-grid,
-.playlists-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-}
+    .persistent-queue-sidebar {
+        width: 100%;
+        min-width: 100%;
+        height: auto;
+        min-height: 400px;
+    }
+    
+    .video-container-full {
+        height: 56.25vw; /* Proporción 16:9 en móvil */
+    }
 }
 @media (max-width: 480px) {
 :root {
