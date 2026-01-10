@@ -707,7 +707,6 @@ async loadLyricsForCurrentVideo(video) {
         return;
     }
     
-    // ✅ VALIDAR DATOS DEL VIDEO
     if (!video || !video.title) {
         console.error('❌ Video sin datos válidos:', video);
         lyricsContainer.innerHTML = `
@@ -721,7 +720,6 @@ async loadLyricsForCurrentVideo(video) {
     
     console.log(`📡 Buscando letras para: "${video.title}"`);
     
-    // ✅ LOADING STATE
     lyricsContainer.innerHTML = `
         <div class="lyrics-loading">
             <i class="fas fa-spinner fa-spin"></i>
@@ -730,12 +728,10 @@ async loadLyricsForCurrentVideo(video) {
     `;
     
     try {
-        // ✅ EXTRAER ARTISTA (puede venir de diferentes campos)
         let artist = video.artist || video.uploaderName || video.author || '';
         artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
         
         if (!artist || artist.toLowerCase() === 'youtube') {
-            // Intentar extraer del título
             if (video.title.includes(' - ')) {
                 artist = video.title.split(' - ')[0].trim();
             } else {
@@ -748,7 +744,7 @@ async loadLyricsForCurrentVideo(video) {
         
         console.log(`📊 Datos para búsqueda de letras:`, { title, artist, duration });
         
-        // Buscar letras
+        // ✅ SOLO llamar a la API actual (sin fallbacks automáticos)
         const lyricsData = await this.fetchLyrics(this.lyricsProvider, artist, title, duration);
         
         if (lyricsData && (lyricsData.syncedLyrics || lyricsData.plainLyrics)) {
@@ -770,7 +766,7 @@ async loadLyricsForCurrentVideo(video) {
             </div>
         `;
     }
-}   
+} 
  /**
  * Cargar relacionados para un video específico
  */
@@ -1438,7 +1434,6 @@ async loadLyrics() {
     }
 } 
 async fetchLyrics(provider, rawArtist, rawTitle, duration) {
-    // ✅ VALIDACIÓN ESTRICTA
     if (!rawTitle || typeof rawTitle !== 'string' || rawTitle.trim() === '') {
         throw new Error('Título inválido');
     }
@@ -1447,7 +1442,6 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
         throw new Error('Artista inválido');
     }
 
-    // ✅ LIMPIAR TÍTULO Y ARTISTA
     const title = this.cleanTrackTitle(rawTitle);
     let artist = rawArtist.replace(/\s*-\s*Topic$/i, '').trim();
 
@@ -1455,7 +1449,6 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
 
     try {
         if (provider === 'lrclib') {
-            // ✅ URL SIN DURACIÓN (más rápido y más resultados)
             const params = new URLSearchParams({
                 artist_name: artist,
                 track_name: title
@@ -1490,24 +1483,29 @@ async fetchLyrics(provider, rawArtist, rawTitle, duration) {
             };
 
         } else if (provider === 'lujjjh') {
+            // ✅ CORRECCIÓN: Solo hacer la llamada cuando se necesite
             const params = new URLSearchParams({
                 name: title,
                 artist: artist
             });
             
             const targetUrl = `https://lyrics-api.lujjjh.com/?${params.toString()}`;
+            
+            // ✅ ESPERAR a que el proxy resuelva antes de continuar
             const proxyUrl = `https://mix-yt.netlify.app/.netlify/functions/cors-proxy?url=${encodeURIComponent(targetUrl)}`;
             
             console.log('🔗 URL LUJJJH:', targetUrl);
-            console.log('🔗 URL PROXY:', proxyUrl);
+            console.log('📡 Esperando respuesta del proxy...');
 
             const response = await fetch(proxyUrl, {
-                signal: AbortSignal.timeout(8000)
+                signal: AbortSignal.timeout(15000) // ✅ Aumentado a 15s
             });
             
             if (!response.ok) {
                 throw new Error(`Lujjjh HTTP ${response.status}`);
             }
+
+            console.log('✅ Respuesta recibida del proxy');
 
             const textData = await response.text();
             
