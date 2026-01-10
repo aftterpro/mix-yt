@@ -339,17 +339,21 @@ createSearchResultCard(video) {
         videoId = videoId.videoId || null;
     }
     
-    // Validación estricta
-    if (!videoId || videoId === 'undefined' || typeof videoId !== 'string' || videoId.trim() === '') {
-        console.error('❌ Video ID inválido:', video);
-        return null; // No crear tarjeta si no hay ID válido
+    // ✅ VALIDACIÓN ESTRICTA
+    if (!videoId || 
+        videoId === 'undefined' || 
+        typeof videoId !== 'string' || 
+        videoId.trim() === '' ||
+        videoId.length !== 11) { // YouTube IDs son exactamente 11 caracteres
+        console.warn('⚠️ Video ignorado por ID inválido:', video);
+        return null;
     }
 
     const title = video.title || 'Título desconocido';
     const artist = video.uploaderName || video.artist || 'Artista desconocido';
     const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
     
-    // ✅ VALIDACIÓN MEJORADA DE DURACIÓN
+    // ✅ VALIDACIÓN DE DURACIÓN
     let durationDisplay = '';
     if (video.duration) {
         if (typeof video.duration === 'number') {
@@ -361,15 +365,20 @@ createSearchResultCard(video) {
 
     const div = document.createElement('div');
     div.className = 'track-item card-track search-result-card';
-    div.dataset.videoId = videoId; // ✅ Guardar ID validado
+    div.dataset.videoId = videoId;
 
     div.innerHTML = `
         <div class="search-result-thumbnail">
-            <img src="${thumbnail}" alt="${this.escapeHTML(title)}" loading="lazy" onerror="this.src='./electronic.ico';">
+            <img src="${thumbnail}" 
+                 alt="${this.escapeHTML(title)}" 
+                 loading="lazy" 
+                 onerror="this.src='./electronic.ico';">
             ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
         </div>
         <div class="search-result-info">
-            <h3 class="search-result-title" title="${this.escapeHTML(title)}">${this.escapeHTML(title)}</h3>
+            <h3 class="search-result-title" title="${this.escapeHTML(title)}">
+                ${this.escapeHTML(title)}
+            </h3>
             <p class="search-result-author">${this.escapeHTML(artist)}</p>
         </div>
         <div class="search-result-actions">
@@ -390,9 +399,9 @@ createSearchResultCard(video) {
         </div>
     `;
 
-    // ✅ EVENTO: Click en tarjeta para reproducir
+    // ✅ EVENTO: Click en tarjeta
     div.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return; // Ignorar clicks en botones
+        if (e.target.closest('button')) return;
         
         if (window.unifiedCore && window.unifiedCore.playVideoFromSearch) {
             window.unifiedCore.playVideoFromSearch({
@@ -405,7 +414,7 @@ createSearchResultCard(video) {
         }
     });
 
-    // ✅ EVENTO: Botón "Añadir a cola" MEJORADO
+    // ✅ EVENTO: Botón "Añadir a cola"
     const addBtn = div.querySelector('.add-to-queue-btn');
     if (addBtn) {
         addBtn.addEventListener('click', async (e) => {
@@ -413,17 +422,19 @@ createSearchResultCard(video) {
             e.preventDefault();
             
             const btnVideoId = addBtn.dataset.videoId;
-            if (!btnVideoId || btnVideoId === 'undefined') {
+            
+            // ✅ VALIDACIÓN EXTRA
+            if (!btnVideoId || btnVideoId === 'undefined' || btnVideoId.length !== 11) {
                 console.error('❌ ID inválido en botón');
                 return;
             }
             
             const icon = addBtn.querySelector('i');
+            const originalIcon = icon.className;
             icon.className = 'fas fa-spinner fa-spin';
             addBtn.disabled = true;
             
             try {
-                // ✅ CREAR OBJETO DE VIDEO COMPLETO
                 const videoData = {
                     videoId: btnVideoId,
                     title: title,
@@ -440,7 +451,7 @@ createSearchResultCard(video) {
                 addBtn.style.background = '#4caf50';
                 
                 setTimeout(() => {
-                    icon.className = 'fas fa-plus';
+                    icon.className = originalIcon;
                     addBtn.style.background = '';
                     addBtn.disabled = false;
                 }, 1500);
@@ -451,7 +462,7 @@ createSearchResultCard(video) {
                 addBtn.style.background = '#f44336';
                 
                 setTimeout(() => {
-                    icon.className = 'fas fa-plus';
+                    icon.className = originalIcon;
                     addBtn.style.background = '';
                     addBtn.disabled = false;
                 }, 1500);
@@ -459,7 +470,7 @@ createSearchResultCard(video) {
         });
     }
 
-    // ✅ EVENTO: Botón "Siguiente" MEJORADO
+    // ✅ EVENTO: Botón "Siguiente"
     const nextBtn = div.querySelector('.search-result-add-next-btn');
     if (nextBtn) {
         nextBtn.addEventListener('click', async (e) => {
@@ -467,12 +478,15 @@ createSearchResultCard(video) {
             e.preventDefault();
             
             const btnVideoId = nextBtn.dataset.videoId;
-            if (!btnVideoId || btnVideoId === 'undefined') {
+            
+            // ✅ VALIDACIÓN EXTRA
+            if (!btnVideoId || btnVideoId === 'undefined' || btnVideoId.length !== 11) {
                 console.error('❌ ID inválido en botón siguiente');
                 return;
             }
             
             const icon = nextBtn.querySelector('i');
+            const originalIcon = icon.className;
             icon.className = 'fas fa-spinner fa-spin';
             nextBtn.disabled = true;
             
@@ -493,7 +507,7 @@ createSearchResultCard(video) {
                 nextBtn.style.background = '#4caf50';
                 
                 setTimeout(() => {
-                    icon.className = 'fas fa-forward';
+                    icon.className = originalIcon;
                     nextBtn.style.background = '';
                     nextBtn.disabled = false;
                 }, 1500);
@@ -504,7 +518,7 @@ createSearchResultCard(video) {
                 nextBtn.style.background = '#f44336';
                 
                 setTimeout(() => {
-                    icon.className = 'fas fa-forward';
+                    icon.className = originalIcon;
                     nextBtn.style.background = '';
                     nextBtn.disabled = false;
                 }, 1500);
