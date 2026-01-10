@@ -15,21 +15,20 @@ exports.handler = async function(event, context) {
     try {
         const q = event.queryStringParameters?.q;
         
-        // --- 🛡️ FIX 1: VALIDACIÓN DE INPUT ---
-        // Si el query es 'undefined' (texto), nulo o vacío, devolvemos vacío y salimos.
+        // ✅ VALIDACIÓN DE INPUT
         if (!q || q === 'undefined' || q.trim() === '') {
-            console.log("⚠️ [NETLIFY] Petición cancelada: Query vacío o inválido.");
+            console.log("⚠️ [NETLIFY] Query vacío o inválido.");
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify({ items: [], nextpage: null })
+                body: JSON.stringify({ items: [], continuation: null })
             };
         }
 
         let nextPageData = event.queryStringParameters?.nextpage;
         let result;
 
-        console.log(`🚀 [NETLIFY] Nueva petición. Query: "${q}"`);
+        console.log(`🚀 [NETLIFY] Query: "${q}"`);
 
         if (nextPageData) {
             console.log("📄 [NETLIFY] Paginación solicitada");
@@ -40,82 +39,90 @@ exports.handler = async function(event, context) {
                 const tokenObject = JSON.parse(nextPageData);
                 result = await youtubesearchapi.NextPage(tokenObject, true);
             } catch (e) {
-                console.warn("⚠️ Error parseando token, usando raw:", e.message);
+                console.warn("⚠️ Error parseando token:", e.message);
                 result = await youtubesearchapi.NextPage(nextPageData, true);
             }
         } else {
             console.log("🔍 [NETLIFY] Búsqueda inicial");
-            result = await youtubesearchapi.GetListByKeyword(q, false, 25);
+            // ✅ BÚSQUEDA EXACTA: Envolver en comillas dobles para música
+            const exactQuery = `"${q}"`;
+            console.log(`🎵 [NETLIFY] Búsqueda exacta: ${exactQuery}`);
+            result = await youtubesearchapi.GetListByKeyword(exactQuery, false, 25);
         }
 
-        // --- 🔍 DEBUG: IMPRIMIR EL PRIMER ITEM CRUDO ---
-        if (result && result.items && result.items.length > 0) {
-            console.log("📦 [ITEM_CRUDO_0]:", JSON.stringify(result.items[0], null, 2));
-        } else {
-            console.log("⚠️ [NETLIFY] La librería devolvió 0 items.");
+        // ✅ VALIDAR RESPUESTA
+        if (!result || !result.items || result.items.length === 0) {
+            console.log("⚠️ [NETLIFY] 0 items devueltos por la librería.");
             return {
                 statusCode: 200,
                 headers,
-                body: JSON.stringify({ items: [], nextpage: null })
+                body: JSON.stringify({ items: [], continuation: null })
             };
         }
 
-        // Procesamiento de datos
+        // ✅ DEBUG: Imprimir primer item crudo
+        console.log("📦 [ITEM_CRUDO_0]:", JSON.stringify(result.items[0], null, 2));
+
+        // ✅ PROCESAMIENTO DE DATOS
         const items = result.items
-            // --- 🛡️ FIX 2: FILTRAR SOLO VIDEOS ---
-            // Esto elimina canales (que causan el error de 'Desconocido') y playlists.
-            .filter(item => item.type === 'video') 
-            .map((item, index) => {
-                
-                // 1. EXTRACTOR DE IMAGEN (Inteligente)
+            .filter(item => item.type === 'video') // Solo videos (no canales ni playlists)
+            .map((item) => {
+                // 1. Extractor de Thumbnail
                 let thumb = './electronic.ico';
                 if (item.thumbnail) {
                     if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
-                        thumb = item.thumbnail[0].url; 
+                        thumb = item.thumbnail[0].url;
                     } else if (item.thumbnail.thumbnails && Array.isArray(item.thumbnail.thumbnails)) {
-                        thumb = item.thumbnail.thumbnails[0].url; 
+                        thumb = item.thumbnail.thumbnails[0].url;
                     } else if (typeof item.thumbnail === 'string') {
-                        thumb = item.thumbnail; 
+                        thumb = item.thumbnail;
                     }
                 }
 
-                // 2. EXTRACTOR DE DURACIÓN
+                // 2. Extractor de Duración
                 let dur = "0:00";
                 if (item.length) {
-                    if (item.length.simpleText) dur = item.length.simpleText; 
-                    else if (typeof item.length === 'string') dur = item.length;
+                    if (item.length.simpleText) {
+                        dur = item.length.simpleText;
+                    } else if (typeof item.length === 'string') {
+                        dur = item.length;
+                    }
                 }
 
                 return {
                     videoId: item.id,
                     title: item.title || "Sin título",
                     thumbnail: thumb,
-                    // channelTitle suele ser más fiable que author en esta librería
-                    artist: item.channelTitle || item.author || "Artista Desconocido", 
+                    artist: item.channelTitle || item.author || "Artista Desconocido",
                     uploaderName: item.channelTitle || "Desconocido",
                     duration: dur,
                     isLive: item.isLive || false
                 };
             })
-            .filter(i => i.videoId); // Filtro de seguridad final por si falta ID
+            .filter(i => i.videoId); // Filtro de seguridad: solo items con videoId válido
 
-        console.log(`✅ [NETLIFY] Respondiendo con ${items.length} videos procesados.`);
+        console.log(`✅ [NETLIFY] ${items.length} videos procesados.`);
 
+        // ✅ RESPUESTA FINAL
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 items: items,
-                nextpage: result.nextPage ? JSON.stringify(result.nextPage) : null
+                continuation: result.nextPage ? JSON.stringify(result.nextPage) : null
             })
         };
 
     } catch (error) {
         console.error("❌ [ERROR FATAL]:", error);
         return {
-            statusCode: 200, 
+            statusCode: 200,
             headers,
-            body: JSON.stringify({ items: [], nextpage: null, error: error.message })
+            body: JSON.stringify({ 
+                items: [], 
+                continuation: null, 
+                error: error.message 
+            })
         };
     }
 };
