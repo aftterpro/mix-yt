@@ -1502,7 +1502,6 @@ movePlayersToFullView() {
             window.playlistManager.updateQueuePopup();
         }
     }
-
 handlePlayPause() {
     console.log('🎮 handlePlayPause ejecutado');
     
@@ -1516,60 +1515,58 @@ handlePlayPause() {
     try {
         const state = activePlayer.getPlayerState();
         
-        // ✅ SI NO HAY REPRODUCCIÓN INICIADA, INICIAR
+        // ✅ PRIMERA REPRODUCCIÓN
         if (!window.reproduccionIniciada) {
-            console.log('🚀 Iniciando reproducción por primera vez');
+            console.log('🚀 Iniciando reproducción');
             
             const flatList = this.getFlattenedPlaylist();
             
             if (flatList.length === 0) {
-                console.warn('📭 No hay videos en la cola');
-                this.showMessage('Agrega videos a la cola para reproducir', 'info');
+                console.warn('📭 Cola vacía');
+                this.showMessage('Agrega videos a la cola', 'info');
                 return;
             }
             
-            // ✅ MARCAR COMO INICIADO ANTES DE REPRODUCIR
             window.reproduccionIniciada = true;
             
-            // ✅ RESETEAR INFO
             window.currentPlayingInfo = {
                 flattenedIndex: -1,
                 videoId: null,
                 playlistId: null
             };
             
-            // Reproducir primer video
+            // ✅ ACTUALIZAR BOTÓN ANTES de reproducir
+            this.updatePlayButton('pause');
+            
             this.playNextVideo();
             
             return;
         }
         
-        // ✅ SI YA ESTÁ REPRODUCIENDO, ALTERNAR PLAY/PAUSE
+        // ✅ ALTERNAR PLAY/PAUSE
         if (state === YT.PlayerState.PLAYING) {
-            console.log('⏸️ Pausando reproducción');
+            console.log('⏸️ Pausando');
             activePlayer.pauseVideo();
             
-            // Detener monitor mientras está pausado
+            // Detener monitor
             if (window.monitorInterval) {
                 clearInterval(window.monitorInterval);
                 window.monitorInterval = null;
-                console.log('🛑 Monitor detenido (pausado)');
+                console.log('🛑 Monitor detenido');
             }
             
-            // Actualizar iconos
             this.updatePlayButton('play');
             
         } else {
-            console.log('▶️ Reanudando reproducción');
+            console.log('▶️ Reanudando');
             activePlayer.playVideo();
             
             // Reiniciar monitor
             if (!window.monitorInterval) {
                 window.monitorInterval = setInterval(monitorPlayers, 500);
-                console.log('✅ Monitor reiniciado (play)');
+                console.log('✅ Monitor reiniciado');
             }
             
-            // Actualizar iconos
             this.updatePlayButton('pause');
         }
         
@@ -1743,17 +1740,17 @@ toggleRepeat() {
 async playNextVideo() {
     const now = Date.now();
     
-    // ✅ CRÍTICO: Prevenir llamadas múltiples con cooldown
+    // ✅ COOLDOWN mejorado
     if (!this.lastPlayNextCall) this.lastPlayNextCall = 0;
-    if (now - this.lastPlayNextCall < 2000) { // 2 segundos de cooldown
-        console.log('⏸️ playNextVideo bloqueado (cooldown activo)');
+    if (now - this.lastPlayNextCall < 1500) {
+        console.log('⏸️ playNextVideo bloqueado (cooldown)');
         return;
     }
     this.lastPlayNextCall = now;
     
-    // ✅ CRÍTICO: Bandera de transición
+    // ✅ BANDERA de transición
     if (this.isTransitioningToNext) {
-        console.log('⏸️ playNextVideo bloqueado (transición en curso)');
+        console.log('⏸️ Transición en curso');
         return;
     }
     this.isTransitioningToNext = true;
@@ -1761,14 +1758,14 @@ async playNextVideo() {
     console.log('🎬 playNextVideo iniciado');
     
     try {
-        // ✅ DETENER MONITOR INMEDIATAMENTE
+        // ✅ DETENER MONITOR
         if (window.monitorInterval) {
             clearInterval(window.monitorInterval);
             window.monitorInterval = null;
-            console.log('🛑 Monitor detenido para transición');
+            console.log('🛑 Monitor detenido');
         }
         
-        // ✅ RESETEAR BANDERAS CRÍTICAS
+        // ✅ RESETEAR banderas
         window.hasOutroCrossfadeStarted = false;
         window.nextVideoScheduled = false;
         window.isTransitioning = false;
@@ -1786,36 +1783,36 @@ async playNextVideo() {
             throw new Error('Cola vacía');
         }
 
-        // ✅ CALCULAR SIGUIENTE ÍNDICE
+        // ✅ CALCULAR SIGUIENTE
         let nextIndex = currentFlatIndex + 1;
         
         if (nextIndex >= flatList.length) {
             if (this.state?.repeatEnabled) {
                 nextIndex = 0;
-                console.log('🔁 Repeat: volviendo al inicio');
+                console.log('🔁 Repeat: reiniciando');
             } else {
-                console.log('🏁 Fin de la cola');
+                console.log('🏁 Fin de cola');
                 this.handleEndOfPlaylist();
-                this.isTransitioningToNext = false; // ✅ Liberar bandera
+                this.isTransitioningToNext = false;
                 return;
             }
         }
 
         const nextVideo = flatList[nextIndex];
         if (!nextVideo?.videoId) {
-            throw new Error('Video inválido en índice ' + nextIndex);
+            throw new Error('Video inválido');
         }
 
         console.log(`🎵 Siguiente: "${nextVideo.title}" (índice ${nextIndex})`);
         
-        // ✅ ACTUALIZAR INFO GLOBAL ANTES DE TODO
+        // ✅ ACTUALIZAR INFO GLOBAL
         window.currentPlayingInfo = {
             flattenedIndex: nextIndex,
             videoId: nextVideo.videoId,
             playlistId: nextVideo.sourcePlaylistId
         };
         
-        // ✅ ACTUALIZAR UI INMEDIATAMENTE
+        // ✅ ACTUALIZAR UI
         this.updateNowPlaying();
         
         if (window.playlistManager) {
@@ -1823,7 +1820,7 @@ async playNextVideo() {
             this.updatePersistentQueue();
         }
 
-        // ✅ DETERMINAR REPRODUCTORES
+        // ✅ DETERMINAR PLAYERS
         const prevPlayerNum = window.currentPlayer;
         const nextPlayerNum = window.currentPlayer === 1 ? 2 : 1;
         
@@ -1833,26 +1830,16 @@ async playNextVideo() {
         const prevElement = document.getElementById(`player${prevPlayerNum}`);
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
-        // ✅ CARGAR VIDEO CON TIMEOUT
-        console.log(`📥 Cargando video en player${nextPlayerNum}...`);
+        console.log(`📥 Cargando en player${nextPlayerNum}...`);
         
-        try {
-            nextPlayerInstance.cueVideoById({
-                videoId: nextVideo.videoId,
-                startSeconds: 0
-            });
-            
-            // ✅ ESPERAR A QUE ESTÉ LISTO (máximo 5 segundos)
-            await Promise.race([
-                this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 5000),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-            ]);
-            
-        } catch (error) {
-            console.error('❌ Error cargando video:', error);
-            nextPlayerInstance.loadVideoById(nextVideo.videoId);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+        // ✅ CARGAR VIDEO (sin autoplay)
+        nextPlayerInstance.cueVideoById({
+            videoId: nextVideo.videoId,
+            startSeconds: 0
+        });
+        
+        // ✅ ESPERAR CUED (máx 3s)
+        await this.waitForPlayerState(nextPlayerInstance, YT.PlayerState.CUED, 3000);
         
         // ✅ PREPARAR ELEMENTOS VISUALES
         if (nextElement && prevElement) {
@@ -1872,7 +1859,6 @@ async playNextVideo() {
                 opacity: 0 !important;
                 z-index: 3 !important;
                 background: #000 !important;
-                pointer-events: auto !important;
             `;
             
             prevElement.style.cssText = `
@@ -1886,23 +1872,32 @@ async playNextVideo() {
                 opacity: 1 !important;
                 z-index: 2 !important;
                 background: #000 !important;
-                pointer-events: auto !important;
             `;
             
-            void nextElement.offsetHeight;
-            void prevElement.offsetHeight;
+            void nextElement.offsetHeight; // Force reflow
         }
         
-        // ✅ INICIAR REPRODUCCIÓN
-        console.log(`▶️ Reproduciendo en player${nextPlayerNum}...`);
-        await nextPlayerInstance.playVideo();
+        // ✅ REPRODUCIR (1 SOLA VEZ)
+        console.log(`▶️ Reproduciendo player${nextPlayerNum}...`);
+        nextPlayerInstance.playVideo();
         
-        // ✅ ESPERAR A QUE COMIENCE
-        await this.waitForPlayingState(nextPlayerInstance, 5000);
+        // ✅ ESPERAR PLAYING (máx 8s)
+        const playing = await Promise.race([
+            this.waitForPlayingState(nextPlayerInstance, 8000),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout playing')), 8000))
+        ]);
+        
+        if (!playing) {
+            console.warn('⏰ Timeout esperando PLAYING, forzando...');
+            nextPlayerInstance.playVideo(); // Retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
         
         // ✅ CROSSFADE VISUAL
         if (nextElement && prevElement) {
-            const transitionStyle = `opacity ${window.CROSSFADE_DURATION || 10}s ease`;
+            const duration = window.CROSSFADE_DURATION || 10;
+            const transitionStyle = `opacity ${duration}s ease`;
+            
             nextElement.style.transition = transitionStyle;
             prevElement.style.transition = transitionStyle;
             
@@ -1915,14 +1910,14 @@ async playNextVideo() {
                 prevElement.style.opacity = '0';
                 prevElement.style.zIndex = '1';
                 
-                console.log(`🎨 Crossfade visual iniciado (${window.CROSSFADE_DURATION || 10}s)`);
+                console.log(`🎨 Crossfade visual ${duration}s`);
             });
         }
         
-        // ✅ CROSSFADE DE AUDIO
+        // ✅ CROSSFADE AUDIO
         await this.performAudioCrossfade(prevPlayerInstance, nextPlayerInstance);
         
-        // ✅ LIMPIEZA POST-CROSSFADE
+        // ✅ LIMPIEZA POST-FADE
         setTimeout(() => {
             try {
                 if (prevPlayerInstance?.stopVideo) {
@@ -1951,7 +1946,7 @@ async playNextVideo() {
                     prevElement.style.transition = '';
                 }
                 
-                console.log('🧹 Limpieza post-crossfade completada');
+                console.log('🧹 Limpieza completada');
                 
             } catch (e) {
                 console.warn('⚠️ Error en limpieza:', e);
@@ -1961,13 +1956,16 @@ async playNextVideo() {
         // ✅ CAMBIAR PLAYER ACTIVO
         window.currentPlayer = nextPlayerNum;
         
-        // ✅ REINICIAR MONITOR DESPUÉS DE UN DELAY
+        // ✅ ACTUALIZAR BOTÓN A PAUSA
+        this.updatePlayButton('pause');
+        
+        // ✅ REINICIAR MONITOR
         setTimeout(() => {
             if (!window.monitorInterval && window.reproduccionIniciada) {
                 window.monitorInterval = setInterval(monitorPlayers, 500);
-                console.log('✅ Monitor reiniciado después de crossfade');
+                console.log('✅ Monitor reiniciado');
             }
-        }, 1500); // Esperar 1.5 segundos
+        }, 1500);
         
         console.log(`✅ Crossfade completado a player${nextPlayerNum}`);
 
@@ -1975,12 +1973,14 @@ async playNextVideo() {
         console.error("❌ Error en playNextVideo:", error);
         this.showMessage('Error al cambiar de pista', 'error');
         
-        // ✅ RECUPERACIÓN: Reiniciar monitor
+        // ✅ RECUPERACIÓN
         if (!window.monitorInterval && window.reproduccionIniciada) {
             window.monitorInterval = setInterval(monitorPlayers, 500);
         }
+        
+        this.updatePlayButton('play'); // Reset botón
+        
     } finally {
-        // ✅ LIBERAR BANDERA SIEMPRE
         this.isTransitioningToNext = false;
     }
 }
@@ -2236,7 +2236,7 @@ async performSearch(searchQuery, continuation = null) {
     }
     
     if (!continuation) {
-        window.currentNextPageToken = null; // ✅ CORRECCIÓN
+        window.currentNextPageToken = null;
         window.isLoadingMore = false;
         
         container.innerHTML = `
@@ -2280,7 +2280,7 @@ async performSearch(searchQuery, continuation = null) {
             }
             
             window.isLoadingMore = false;
-            window.currentNextPageToken = null; // ✅ CORRECCIÓN
+            window.currentNextPageToken = null;
             return;
         }
 
@@ -2295,15 +2295,19 @@ async performSearch(searchQuery, continuation = null) {
         
         container.appendChild(fragment);
         
-        // ✅ CORRECCIÓN CRÍTICA: Validar que continuation no sea string "null"
+        // ✅ CORRECCIÓN CRÍTICA: Validar continuation
         const nextToken = results.continuation;
-        window.currentNextPageToken = (nextToken && nextToken !== 'null' && nextToken !== '') 
-            ? nextToken 
-            : null;
+        const isValidToken = nextToken && 
+                            typeof nextToken === 'string' && 
+                            nextToken !== 'null' && 
+                            nextToken !== 'undefined' && 
+                            nextToken.trim() !== '';
         
-        console.log('📊 Estado paginación:', {
+        window.currentNextPageToken = isValidToken ? nextToken : null;
+        
+        console.log('📊 Paginación:', {
             hasMore: !!window.currentNextPageToken,
-            token: window.currentNextPageToken || 'null'
+            token: window.currentNextPageToken ? window.currentNextPageToken.substring(0, 20) + '...' : 'null'
         });
         
         window.isLoadingMore = false;
@@ -2313,7 +2317,7 @@ async performSearch(searchQuery, continuation = null) {
                 this.setupInfiniteScroll(container);
             });
         } else {
-            console.log('✅ No hay más resultados disponibles');
+            console.log('✅ No hay más resultados');
             this.showEndOfResultsMessage(container);
         }
         
