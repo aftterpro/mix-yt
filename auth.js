@@ -42,7 +42,7 @@ function getClientIdForDomain() {
     }
     
     CLIENT_ID = clientId;
-    console.log(`🔑 CLIENT_ID detectado para ${hostname}:`, CLIENT_ID);
+   // console.log(`🔑 CLIENT_ID detectado para ${hostname}:`, CLIENT_ID);
 }
 
 // =============================================
@@ -69,13 +69,13 @@ function saveAuthData(token) {
     authState.expiry = expirationDate.getTime();
     authState.timestamp = Date.now();
     
-    console.log('💾 Token guardado en memoria (válido 7 días)');
+ //   console.log('💾 Token guardado en memoria (válido 7 días)');
     return true;
 }
 
 function loadAuthData() {
     if (!authState.token || !authState.expiry) {
-        console.log('📭 No hay datos de autenticación en memoria');
+      //  console.log('📭 No hay datos de autenticación en memoria');
         return null;
     }
 
@@ -88,7 +88,7 @@ function loadAuthData() {
     }
 
     const daysRemaining = Math.ceil((authState.expiry - now) / (24 * 60 * 60 * 1000));
-    console.log(`✅ Token válido (${daysRemaining} días restantes)`);
+  //  console.log(`✅ Token válido (${daysRemaining} días restantes)`);
     
     return authState.token;
 } 
@@ -154,7 +154,7 @@ function initializeGoogleAPIs() {
  * Inicializa gapi.client (YouTube API)
  */
 window.gapiInitialize_auth = function() {
-    console.log('📡 Inicializando GAPI...');
+ //   console.log('📡 Inicializando GAPI...');
     
     gapi.client.init({
         apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4',
@@ -309,7 +309,7 @@ async function loadPlaylistsInBackground() {
         // Esperar a que el sistema esté listo
         await waitForSystemReady();
         
-        console.log('📡 Cargando playlists de YouTube en segundo plano...');
+      //  console.log('📡 Cargando playlists de YouTube en segundo plano...');
         
         const playlists = await window.loadUserPlaylistsAndStore();
         
@@ -384,7 +384,7 @@ function signIn() {
         return;
     }
 
-    console.log('🚀 Solicitando token de acceso...');
+   // console.log('🚀 Solicitando token de acceso...');
     
     // Mostrar mensaje al usuario
     if (window.unifiedCore) {
