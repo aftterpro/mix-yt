@@ -9,16 +9,6 @@ const CONFIG = {
     DEBOUNCE_DELAY: 1500,
     PRELOAD_THRESHOLD: 15
 };
-const playerConfig = {
-    playerVars: { 
-        'playsinline': 1,
-        'origin': window.location.origin, 
-        'enablejsapi': 1 
-    },
-    host: 'https://www.youtube.com'
-};
-const CROSSFADE_DURATION = 10;
-
 let lastLogTime = -1;
 window.currentPlayingInfo = {
     playlistId: null,
@@ -41,11 +31,6 @@ let nextVideoScheduled = false;
 let lastCrossfadeTime = 0;
 const CROSSFADE_DEBOUNCE = 500;
 const CROSSFADE_TRIGGER_TIME = 10;
-let currentPlayingInfo = {
-    playlistId: null,
-    videoId: null,
-    flattenedIndex: -1
-};
 
 // Variables para búsqueda y scroll infinito
 let isLoadingMore = false;
@@ -196,13 +181,7 @@ class UnifiedCore {
     this.setupPlayerContainerHandlers();
     this.lastPlayNextCall = 0;
 }
- cleanArtistName(name) {
-    if (!name) return 'Desconocido'; 
-    let cleaned = name.replace(/\s*-\s*Topic$/i, '').trim();
-    
-    // Si quedó vacío, devolver original
-    return cleaned.length > 0 ? cleaned : name;
-}
+
 handleResize() {
     clearTimeout(this.resizeTimeout);
     this.resizeTimeout = setTimeout(() => {
@@ -1115,14 +1094,6 @@ setupPlayerContainerHandlers() {
     }
 }
 
-    showFullPlayer() {
-        console.log('🎬 Mostrando reproductor completo');
-        this.switchView('fullPlayer');
-        this.movePlayer('full');
-        this.hideMiniPlayer();
-        this.updatePersistentQueue();
-    }
-
   // Fuerza la visibilidad si algo falla
 forceMiniPlayerVisibility() {
     this.ui.forceMiniPlayerVisibility();
@@ -1352,29 +1323,6 @@ switchView(viewName) {
     
     console.log(`🔄 Vista cambiada: ${previousView} → ${viewName}`);
 }
-
-cleanupView(viewName) {
-    console.log(`🧹 Limpiando recursos: ${viewName}`);
-    
-    if (viewName !== 'search') {
-        // Limpiar sentinel
-        const sentinel = document.getElementById('search-sentinel');
-        if (sentinel) sentinel.remove();
-        
-        // Desconectar observador de forma segura
-        if (this.searchScrollObserver) {
-            try {
-                this.searchScrollObserver.disconnect();
-            } catch (e) {
-                console.warn('⚠️ Error en cleanup:', e);
-            } finally {
-                this.searchScrollObserver = null;
-            }
-        }
-    }
-}
-
-
     forceBottomPlayerVisible() {
         const bottomPlayer = document.querySelector('.bottom-player');
         if (!bottomPlayer) return;
@@ -1405,11 +1353,6 @@ cleanupView(viewName) {
                           document.getElementById('searchInput');
         if (searchInput) setTimeout(() => searchInput.focus(), 100);
     }
-
-// Muestra el mini reproductor flotante
-showMiniPlayerFloat() {
-    this.ui.showMiniPlayerFloat();
-}
 movePlayersToFullView() {
     console.log('🎬 Expandiendo a vista completa...');
     
@@ -1446,61 +1389,9 @@ movePlayersToFullView() {
     
     console.log('✅ Player expandido con z-index:', persistentLayer.style.zIndex);
 }
-    movePlayersToMini() {
-        const player1 = document.getElementById('player1');
-        const player2 = document.getElementById('player2');
-        const miniFloat = document.getElementById('miniPlayerFloat');
-        const miniContainer1 = document.getElementById('miniPlayer1Container');
-        const miniContainer2 = document.getElementById('miniPlayer2Container');
-        
-        if (!miniFloat || !miniContainer1 || !miniContainer2 || !player1 || !player2) return;
-        
-        miniFloat.classList.remove('hidden');
-        miniFloat.style.display = 'block';
-        
-        if (!miniContainer1.contains(player1)) miniContainer1.appendChild(player1);
-        if (!miniContainer2.contains(player2)) miniContainer2.appendChild(player2);
-        
-        const activePlayerNum = window.currentPlayer;
-        [player1, player2].forEach((player, index) => {
-            const isPlayer1 = index === 0;
-            const isActive = (activePlayerNum === 1 && isPlayer1) || (activePlayerNum === 2 && !isPlayer1);
-            player.className = 'video-player'; 
-            player.classList.remove('hidden', 'fade-out', 'crossfade-exit');
-            
-            if (isActive) {
-                player.style.cssText = `
-                    width: 100% !important;
-                    height: 100% !important;
-                    position: absolute !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    display: block !important;
-                    visibility: visible !important;
-                    opacity: 1 !important;
-                    z-index: 10 !important;
-                    background: #000 !important;
-                    pointer-events: auto !important;
-                `;
-            } else {
-                player.style.cssText = `
-                    display: none !important;
-                    opacity: 0 !important;
-                    z-index: 0 !important;
-                `;
-            }
-        });
-    }
-
+    
     movePlayerToFullView() {
         this.movePlayersToFullView(); // Usar la versión corregida arriba
-    }
-
-    refreshPlayingView() {
-        this.updateNowPlaying();
-        if (window.playlistManager?.updateQueuePopup) {
-            window.playlistManager.updateQueuePopup();
-        }
     }
 handlePlayPause() {
     console.log('🎮 handlePlayPause ejecutado');
@@ -1831,11 +1722,40 @@ async playNextVideo() {
         const nextElement = document.getElementById(`player${nextPlayerNum}`);
 
         console.log(`📥 Cargando en player${nextPlayerNum}...`);
+
+        // ============================================================
+        // 🚀 MEJORA: Calcular tiempo de inicio (Saltar Intro)
+        // ============================================================
+        let startSeconds = 0;
         
-        // ✅ CARGAR VIDEO (sin autoplay)
+        if (window.sponsorBlockManager) {
+            // Intentamos obtener segmentos (con timeout interno en youtube-client.js)
+            const segments = await window.sponsorBlockManager.cargarSegmentos(nextVideo.videoId);
+            
+            // Buscar segmento molesto al inicio (0-5 seg)
+            const introSegment = segments.find(s => 
+                s.startTime <= 5 && 
+                ['intro', 'music_offtopic', 'interaction', 'selfpromo'].includes(s.category)
+            );
+
+            if (introSegment) {
+                startSeconds = introSegment.endTime;
+                console.log(`⏩ SB: Intro detectada. Iniciando en ${startSeconds}s`);
+                
+                // Aviso visual discreto
+                if (window.sponsorBlockManager.mostrarAviso) {
+                    window.sponsorBlockManager.mostrarAviso(
+                        `⏩ Intro saltada (${startSeconds.toFixed(1)}s)`,
+                        document.querySelector('.bottom-player')
+                    );
+                }
+            }
+        }
+        
+        // ✅ CARGAR VIDEO (usando el startSeconds calculado)
         nextPlayerInstance.cueVideoById({
             videoId: nextVideo.videoId,
-            startSeconds: 0
+            startSeconds: startSeconds 
         });
         
         // ✅ ESPERAR CUED (máx 3s)
@@ -1877,7 +1797,7 @@ async playNextVideo() {
             void nextElement.offsetHeight; // Force reflow
         }
         
-        // ✅ REPRODUCIR (1 SOLA VEZ)
+        // ✅ REPRODUCIR
         console.log(`▶️ Reproduciendo player${nextPlayerNum}...`);
         nextPlayerInstance.playVideo();
         
@@ -1889,7 +1809,7 @@ async playNextVideo() {
         
         if (!playing) {
             console.warn('⏰ Timeout esperando PLAYING, forzando...');
-            nextPlayerInstance.playVideo(); // Retry
+            nextPlayerInstance.playVideo(); 
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
@@ -1909,8 +1829,6 @@ async playNextVideo() {
                 
                 prevElement.style.opacity = '0';
                 prevElement.style.zIndex = '1';
-                
-                console.log(`🎨 Crossfade visual ${duration}s`);
             });
         }
         
@@ -1929,24 +1847,14 @@ async playNextVideo() {
                     nextPlayerInstance.setVolume(100);
                 }
                 
+                // Restaurar estilos
                 if (prevElement) {
-                    prevElement.style.cssText = `
-                        display: block !important;
-                        visibility: hidden !important;
-                        opacity: 0 !important;
-                        z-index: -1 !important;
-                    `;
+                    prevElement.style.cssText = `display: block !important; visibility: hidden !important; opacity: 0 !important; z-index: -1 !important;`;
+                    prevElement.style.transition = '';
                 }
-                
                 if (nextElement) {
                     nextElement.style.transition = '';
                 }
-                
-                if (prevElement) {
-                    prevElement.style.transition = '';
-                }
-                
-                console.log('🧹 Limpieza completada');
                 
             } catch (e) {
                 console.warn('⚠️ Error en limpieza:', e);
@@ -1973,12 +1881,11 @@ async playNextVideo() {
         console.error("❌ Error en playNextVideo:", error);
         this.showMessage('Error al cambiar de pista', 'error');
         
-        // ✅ RECUPERACIÓN
         if (!window.monitorInterval && window.reproduccionIniciada) {
             window.monitorInterval = setInterval(monitorPlayers, 500);
         }
         
-        this.updatePlayButton('play'); // Reset botón
+        this.updatePlayButton('play'); 
         
     } finally {
         this.isTransitioningToNext = false;
@@ -2078,35 +1985,6 @@ async waitForPlayingState(playerInstance, maxWait = 5000) {
                     hasResolved = true;
                     resolve(true);
                 }
-            }
-        };
-        
-        checkState();
-    });
-}
-async waitForPlayerCued(player, maxWait = 3000) {
-    return new Promise((resolve) => {
-        const startTime = Date.now();
-        
-        const checkState = () => {
-            const elapsed = Date.now() - startTime;
-            
-            try {
-                const state = player.getPlayerState();
-                
-                if (state === YT.PlayerState.CUED) {
-                    resolve();
-                    return;
-                }
-                
-                if (elapsed < maxWait) {
-                    setTimeout(checkState, 100);
-                } else {
-                    console.warn('⏰ Timeout esperando player');
-                    resolve();
-                }
-            } catch (e) {
-                setTimeout(checkState, 100);
             }
         };
         
@@ -2539,47 +2417,6 @@ showEndOfResultsMessage(container) {
     
     container.appendChild(message);
 }
-displaySearchResults(videos, container) {
-    if (!container) {
-        console.error('❌ Contenedor searchResults no encontrado');
-        return;
-    }
-
-    // SI NO HAY VIDEOS, MOSTRAR MENSAJE
-    if (!videos || videos.length === 0) {
-        if (!container.querySelector('.video-card')) {
-            container.innerHTML = '<p style="color: white; text-align: center; padding: 20px;">No se encontraron resultados</p>';
-        }
-        return;
-    }
-
-    console.log(`🎨 Renderizando ${videos.length} resultados en DOM`);
-
-    // AGREGAR VIDEOS AL CONTENEDOR (NO REEMPLAZAR)
-    videos.forEach(video => {
-        if (!video || !video.id) return;
-
-        const card = document.createElement('div');
-        card.className = 'video-card';
-        card.innerHTML = `
-            <img src="${video.thumbnail || 'placeholder.jpg'}" alt="${video.title || 'Video'}" loading="lazy" />
-            <div class="video-info">
-                <h3>${video.title || 'Sin título'}</h3>
-                <p>${video.channel || 'Canal desconocido'}</p>
-            </div>
-        `;
-        
-        card.addEventListener('click', () => {
-            console.log(`▶️ Video seleccionado: ${video.title}`);
-            addToQueue(video);
-            playVideo(video.id);
-        });
-
-        container.appendChild(card);
-    });
-
-    console.log(`✅ ${videos.length} tarjetas agregadas al DOM`);
-}
 async addVideoToQueue(videoData, fromPlaylist = false) {
     console.log('🎵 addVideoToQueue:', videoData);
     
@@ -2846,17 +2683,16 @@ getFlattenedPlaylist() {
                 }
             }
 
-            return {
-                videoId: video.videoId,
-                title: video.title || 'Sin título',
-                artist: artist, // Usado para letras (LRCLIB)
-                uploaderName: artist,
-                thumbnail: video.thumbnail || video.thumbnailUrl || './electronic.ico',
-                duration: typeof video.duration === 'number' 
-                    ? video.duration 
-                    : this.parseDuration(video.duration || "0"),
-                index: index,
-                sourcePlaylistId: 'queue'
+           return {
+        videoId: video.videoId,
+        title: video.title || 'Sin título',
+        artist: artist,
+        uploaderName: artist,
+        thumbnail: video.thumbnail || video.thumbnailUrl || './electronic.ico',
+        // CORRECCIÓN: Asegurar que siempre pase por parseDuration
+        duration: this.parseDuration(video.duration), 
+        index: index,
+        sourcePlaylistId: 'queue'
             };
         });
 
@@ -2955,45 +2791,40 @@ updatePersistentQueue() {
     const fragment = document.createDocumentFragment();
 
     flatList.forEach((video, index) => {
-        if (!video || !video.videoId) return;
-        
-        const isPlaying = currentIndex === index;
-        const queueItem = document.createElement('div');
-        queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
-        queueItem.dataset.videoId = video.videoId;
-        queueItem.dataset.flatIndex = index;
-        
-        // ✅ CORRECCIÓN: Formatear duración correctamente
-        let duration = '--:--';
-        if (video.duration && typeof video.duration === 'number' && video.duration > 0) {
-            const minutes = Math.floor(video.duration / 60);
-            const seconds = Math.floor(video.duration % 60);
-            duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    if (!video || !video.videoId) return;
+    
+    const isPlaying = currentIndex === index;
+    const queueItem = document.createElement('div');
+    queueItem.className = `queue-item${isPlaying ? ' playing' : ''}`;
+    
+    // CORRECCIÓN: Formateo de duración garantizado
+    let durationDisplay = '--:--';
+    const rawDuration = video.duration;
+    
+    if (rawDuration) {
+        // Si es un número (segundos), convertir a MM:SS
+        if (typeof rawDuration === 'number' && rawDuration > 0) {
+            const mins = Math.floor(rawDuration / 60);
+            const secs = Math.floor(rawDuration % 60);
+            durationDisplay = `${mins}:${secs.toString().padStart(2, '0')}`;
+        } 
+        // Si ya viene como string formateado desde la búsqueda
+        else if (typeof rawDuration === 'string' && rawDuration.includes(':')) {
+            durationDisplay = rawDuration;
         }
-        
-        queueItem.innerHTML = `
-            <div class="queue-item-number">
-                ${isPlaying ? '<i class="fas fa-play-circle"></i>' : (index + 1)}
-            </div>
-            <div class="queue-item-thumbnail-wrapper">
-                <img src="${video.thumbnail || './electronic.ico'}" 
-                     alt="${this.escapeHTML(video.title)}" 
-                     onerror="this.src='./electronic.ico';">
-                <span class="queue-item-duration">${duration}</span>
-            </div>
-            <div class="queue-item-info">
-                <div class="queue-item-title">${this.escapeHTML(video.title || 'Sin título')}</div>
-                <div class="queue-item-meta">
-                    <span class="queue-item-author">${this.escapeHTML(video.uploaderName || 'Desconocido')}</span>
-                </div>
-            </div>
-            <button class="queue-item-remove" 
-                    data-video-id="${video.videoId}" 
-                    title="Eliminar de la cola">
-                <i class="fas fa-times"></i>
-            </button>
+    }
+
+    queueItem.innerHTML = `
+        <div class="queue-item-number">
+            ${isPlaying ? '<i class="fas fa-play-circle"></i>' : (index + 1)}
+        </div>
+        <div class="queue-item-thumbnail-wrapper">
+            <img src="${video.thumbnail || './electronic.ico'}" 
+                 alt="${this.escapeHTML(video.title)}" 
+                 onerror="this.src='./electronic.ico';">
+            <span class="queue-item-duration">${durationDisplay}</span>
+        </div>
         `;
-        
         fragment.appendChild(queueItem);
     });
 
@@ -3159,17 +2990,6 @@ updatePersistentQueue() {
         };
     }
 
-    updateCurrentPlayingIndex() {
-        if (crossfadeInProgress || isTransitioning) return;
-        try {
-            let playingVideoId = null;
-            if (player1 && player1.getPlayerState() === YT.PlayerState.PLAYING) playingVideoId = player1.getVideoData()?.video_id;
-            else if (player2 && player2.getPlayerState() === YT.PlayerState.PLAYING) playingVideoId = player2.getVideoData()?.video_id;
-            
-            if (playingVideoId && currentPlayingInfo.videoId && currentPlayingInfo.videoId !== playingVideoId) return;
-        } catch (e) {}
-    }
-
 // Actualiza Título, Artista y Carátula
 updateNowPlaying() {
     // 1. Obtener la info actual (Lógica de negocio se queda en Core)
@@ -3224,15 +3044,6 @@ updateOverviewStats() {
     updatePlayersStatus(status) {
         const statusElement = document.getElementById('unifiedPlayersStatus');
         if (statusElement) statusElement.textContent = `Reproductores: ${status}`;
-    }
-
-    handleEmptyPlaylist() {
-        
-        reproduccionIniciada = false;
-        this.updatePlayButton('play');
-        this.enablePlayButton();
-        currentPlayingInfo = { flattenedIndex: -1, videoId: null, playlistId: null };
-        this.updatePlaylistsUI();
     }
 
     handleEndOfPlaylist() {
@@ -3346,40 +3157,9 @@ ensureQueueExists() {
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
 
-function preloadNextVideo() {    // Si no hay core o playlist, abortar
-    if (!window.unifiedCore) return;
-
-    const flatList = window.unifiedCore.getFlattenedPlaylist();
-    // Validar que info actual existe
-    if (!window.currentPlayingInfo || window.currentPlayingInfo.flattenedIndex === -1) return;
-
-    const nextIndex = window.currentPlayingInfo.flattenedIndex + 1;
-
-    // Solo precargar si existe un siguiente video en la lista
-    if (nextIndex < flatList.length) {
-        const nextVideo = flatList[nextIndex];
-        // Seleccionar el reproductor que NO está sonando actualmente
-        const nextPlayer = (window.currentPlayer === 1) ? window.player2 : window.player1;
-        
-        if (nextPlayer && typeof nextPlayer.cueVideoById === 'function') {
-            console.log(`📥 Precargando siguiente pista: "${nextVideo.title}"`);
-            
-            // cueVideoById descarga metadatos y buffer inicial sin reproducir
-            nextPlayer.cueVideoById({
-                videoId: nextVideo.videoId,
-                startSeconds: 0
-            });
-        
-        }
-    }
-}
-
 function monitorPlayers() {
     // ✅ VALIDACIONES ROBUSTAS
-    if (!window.player1 || !window.player2) {
-        console.warn('⚠️ Players no inicializados');
-        return;
-    }
+    if (!window.player1 || !window.player2) return;
     
     if (!window.playersInitialized || 
         !window.reproduccionIniciada || 
@@ -3390,10 +3170,7 @@ function monitorPlayers() {
     try {
         const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
         
-        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') {
-            console.warn('⚠️ Player activo no válido');
-            return;
-        }
+        if (!activePlayer || typeof activePlayer.getPlayerState !== 'function') return;
 
         const playerState = activePlayer.getPlayerState();
         
@@ -3401,15 +3178,13 @@ function monitorPlayers() {
         if (playerState === YT.PlayerState.ENDED) {
             console.log('🎬 Video terminado naturalmente');
             
-            // Detener monitor ANTES de cambiar
             if (window.monitorInterval) {
                 clearInterval(window.monitorInterval);
                 window.monitorInterval = null;
             }
             
-            // Resetear banderas
+            // Reset de seguridad
             window.hasOutroCrossfadeStarted = false;
-            window.nextVideoScheduled = false;
             
             if (window.unifiedCore) {
                 window.unifiedCore.playNextVideo();
@@ -3417,13 +3192,11 @@ function monitorPlayers() {
             return;
         }
 
-        // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO
         if (playerState !== YT.PlayerState.PLAYING) return;
 
         const currentTime = activePlayer.getCurrentTime();
         const videoDuration = activePlayer.getDuration();
-        const videoData = activePlayer.getVideoData();
-        const videoId = videoData?.video_id;
+        const videoId = activePlayer.getVideoData()?.video_id;
 
         if (!videoDuration || videoDuration <= 0 || !videoId) return;
 
@@ -3432,28 +3205,25 @@ function monitorPlayers() {
             window.unifiedCore.ui.updateProgressBar(currentTime, videoDuration);
         }
 
-        // ✅ SPONSORBLOCK
+        // ✅ SPONSORBLOCK (Saltos intermedios)
         if (window.sponsorBlockManager) {
             const cached = window.sponsorBlockManager.segmentosCache[videoId];
             
-            if (!cached || cached === 'fetching') {
-                // Cargar en segundo plano (no bloquear)
-                window.sponsorBlockManager.cargarSegmentos(videoId).catch(e => {
-                    console.warn('⚠️ Error cargando segmentos:', e);
-                });
-            } else {
-                // Verificar y saltar si aplica
+            if (!cached) {
+                // Cargar silenciosamente
+                window.sponsorBlockManager.cargarSegmentos(videoId).catch(() => {});
+            } else if (cached !== 'fetching') {
+                // Verificar salto
                 const skipped = window.sponsorBlockManager.checkAndSkip(activePlayer);
-                
-                // Si saltó, no hacer nada más en este ciclo
                 if (skipped) return;
             }
         }
 
-        // ✅ CALCULAR TRIGGER TIME
+        // ✅ CALCULAR TRIGGER TIME (Detectando Outros)
         let triggerTime = videoDuration - (window.CROSSFADE_DURATION || 10) - 0.5;
         
         if (window.sponsorBlockManager) {
+            // Esta función ajusta el tiempo si hay créditos finales
             triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
                 videoDuration,
                 videoId,
@@ -3461,13 +3231,13 @@ function monitorPlayers() {
             );
         }
 
-        // ✅ DISPARAR CROSSFADE (solo una vez)
+        // ✅ DISPARAR CROSSFADE
         if (currentTime >= triggerTime && !window.hasOutroCrossfadeStarted) {
             console.log(`🎨 Disparando crossfade en ${currentTime.toFixed(2)}s (trigger: ${triggerTime.toFixed(2)}s)`);
             
             window.hasOutroCrossfadeStarted = true;
             
-            // Detener monitor
+            // Detener monitor inmediatamente
             if (window.monitorInterval) {
                 clearInterval(window.monitorInterval);
                 window.monitorInterval = null;
@@ -3717,7 +3487,7 @@ window.addEventListener('beforeunload', () => {
         monitorInterval = null;
     }
     
-    // 4. ✅ CRÍTICO: Limpiar interval de letras
+
     if (window.playlistManager?.lyricsSyncInterval) {
         clearInterval(window.playlistManager.lyricsSyncInterval);
         window.playlistManager.lyricsSyncInterval = null;
