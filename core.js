@@ -2212,11 +2212,9 @@ async performAudioCrossfade(prevPlayer, nextPlayer) {
     // ==========================================
     // FUNCIONES DE BÚSQUEDA Y SCROLL INFINITO
     // ==========================================
-
 async performSearch(searchQuery, continuation = null) {
     console.log(`🔎 performSearch: "${searchQuery}", paginación: ${!!continuation}`);
     
-    // ✅ VALIDACIÓN
     if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
         console.error('❌ Query inválido');
         return;
@@ -2231,18 +2229,14 @@ async performSearch(searchQuery, continuation = null) {
         return;
     }
     
-    // ✅ GUARDAR QUERY ACTUAL
     window.currentSearchQuery = query;
     
-    // ✅ LOGGING DE PERFORMANCE
     if (window.performanceLogger) {
         window.performanceLogger.startTimer('search');
     }
     
-    // ✅ LOADING STATE
     if (!continuation) {
-        // Nueva búsqueda
-        window.currentNextPageToken = null;
+        window.currentNextPageToken = null; // ✅ CORRECCIÓN
         window.isLoadingMore = false;
         
         container.innerHTML = `
@@ -2252,7 +2246,6 @@ async performSearch(searchQuery, continuation = null) {
             </div>
         `;
         
-        // ✅ DESCONECTAR SCROLL OBSERVER ANTERIOR
         if (this.searchScrollObserver) {
             this.searchScrollObserver.disconnect();
             this.searchScrollObserver = null;
@@ -2263,20 +2256,17 @@ async performSearch(searchQuery, continuation = null) {
         console.log(`📡 Llamando a YouTube Client: "${query}"`);
         const results = await window.youtubeJSClient.search(query, continuation);
         
-        // ✅ LOGGING DE PERFORMANCE
         if (window.performanceLogger) {
             const duration = window.performanceLogger.endTimer('search');
             window.performanceLogger.recordMetric('apiCalls', duration, 'search');
         }
         
-        // ✅ LIMPIAR LOADING
         if (!continuation) {
             container.innerHTML = '';
         } else {
             this.removeLoadingIndicator();
         }
 
-        // ✅ VALIDAR RESULTADOS
         if (!results || !results.items || results.items.length === 0) {
             if (!continuation) {
                 container.innerHTML = `
@@ -2286,18 +2276,16 @@ async performSearch(searchQuery, continuation = null) {
                     </div>
                 `;
             } else {
-                // Fin de resultados en paginación
                 this.showEndOfResultsMessage(container);
             }
             
             window.isLoadingMore = false;
-            window.currentNextPageToken = null;
+            window.currentNextPageToken = null; // ✅ CORRECCIÓN
             return;
         }
 
         console.log(`🎨 Renderizando ${results.items.length} resultados`);
         
-        // ✅ CREAR FRAGMENTO PARA RENDIMIENTO
         const fragment = document.createDocumentFragment();
         
         results.items.forEach(video => {
@@ -2307,20 +2295,20 @@ async performSearch(searchQuery, continuation = null) {
         
         container.appendChild(fragment);
         
-        // ✅ ACTUALIZAR TOKEN DE PAGINACIÓN
-        window.currentNextPageToken = results.continuation || null;
+        // ✅ CORRECCIÓN CRÍTICA: Validar que continuation no sea string "null"
+        const nextToken = results.continuation;
+        window.currentNextPageToken = (nextToken && nextToken !== 'null' && nextToken !== '') 
+            ? nextToken 
+            : null;
         
         console.log('📊 Estado paginación:', {
             hasMore: !!window.currentNextPageToken,
-            token: window.currentNextPageToken ? 'presente' : 'null'
+            token: window.currentNextPageToken || 'null'
         });
         
-        // ✅ LIBERAR BANDERA
         window.isLoadingMore = false;
         
-        // ✅ CONFIGURAR/RECONFIGURAR SCROLL INFINITO
         if (window.currentNextPageToken) {
-            // Esperar un frame para que el DOM se actualice
             requestAnimationFrame(() => {
                 this.setupInfiniteScroll(container);
             });
@@ -2329,7 +2317,6 @@ async performSearch(searchQuery, continuation = null) {
             this.showEndOfResultsMessage(container);
         }
         
-        // ✅ CONFIGURAR EVENT LISTENERS
         setTimeout(() => {
             this.setupSearchButtonListeners();
         }, 100);
@@ -2358,7 +2345,7 @@ async performSearch(searchQuery, continuation = null) {
             this.showMessage('Error cargando más resultados', 'error');
         }
     }
-} 
+}
 setupInfiniteScroll(container) {
     console.log('📜 Configurando scroll infinito');
     
