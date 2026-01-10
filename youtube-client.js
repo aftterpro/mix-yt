@@ -16,7 +16,7 @@ class YouTubeSimplifiedClient {
         return true;
     }
     
-    async search(query, continuation = null) {
+   async search(query, continuation = null) {
         if (!query?.trim()) {
             console.error('❌ Query vacío');
             return { items: [], continuation: null };
@@ -59,9 +59,24 @@ class YouTubeSimplifiedClient {
 
             console.log(`✅ ${data.items.length} resultados encontrados`);
 
+            let cleanToken = data.continuation || null;
+
+            if (cleanToken && typeof cleanToken === 'string' && cleanToken.trim().startsWith('{')) {
+                try {
+                    const parsedToken = JSON.parse(cleanToken);
+                    // Si el objeto parseado tiene nextPageToken, usamos ese
+                    if (parsedToken.nextPageToken) {
+                        cleanToken = parsedToken.nextPageToken;
+                        console.log('✨ Token de paginación extraído y limpiado');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Error parseando token de continuación, usando original:', e);
+                }
+            }
+
             const result = {
                 items: data.items,
-                continuation: data.continuation || null
+                continuation: cleanToken // Usamos el token limpio
             };
 
             // ✅ GUARDAR EN CACHÉ
