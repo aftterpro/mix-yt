@@ -2216,6 +2216,7 @@ async performAudioCrossfade(prevPlayer, nextPlayer) {
 async performSearch(searchQuery, continuation = null) {
     console.log(`🔎 performSearch: "${searchQuery}", paginación: ${!!continuation}`);
     
+    // ✅ VALIDACIÓN
     if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
         console.error('❌ Query inválido');
         return;
@@ -2230,48 +2231,73 @@ async performSearch(searchQuery, continuation = null) {
         return;
     }
     
-    // Guardar query actual
+    // ✅ GUARDAR QUERY ACTUAL
     window.currentSearchQuery = query;
     
-    // Loading state
+    // ✅ LOGGING DE PERFORMANCE
+    if (window.performanceLogger) {
+        window.performanceLogger.startTimer('search');
+    }
+    
+    // ✅ LOADING STATE
     if (!continuation) {
+        // Nueva búsqueda
         window.currentNextPageToken = null;
-        container.innerHTML = '<div class="search-loading"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
-    } else {
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'search-loading-more';
-        loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando más...';
-        container.appendChild(loadingDiv);
+        window.isLoadingMore = false;
+        
+        container.innerHTML = `
+            <div class="search-loading">
+                <i class="fas fa-spinner fa-spin"></i> 
+                Buscando...
+            </div>
+        `;
+        
+        // ✅ DESCONECTAR SCROLL OBSERVER ANTERIOR
+        if (this.searchScrollObserver) {
+            this.searchScrollObserver.disconnect();
+            this.searchScrollObserver = null;
+        }
     }
 
     try {
         console.log(`📡 Llamando a YouTube Client: "${query}"`);
         const results = await window.youtubeJSClient.search(query, continuation);
         
-        // Limpiar loading
+        // ✅ LOGGING DE PERFORMANCE
+        if (window.performanceLogger) {
+            const duration = window.performanceLogger.endTimer('search');
+            window.performanceLogger.recordMetric('apiCalls', duration, 'search');
+        }
+        
+        // ✅ LIMPIAR LOADING
         if (!continuation) {
             container.innerHTML = '';
         } else {
-            const loader = container.querySelector('.search-loading-more');
-            if (loader) loader.remove();
+            this.removeLoadingIndicator();
         }
 
+        // ✅ VALIDAR RESULTADOS
         if (!results || !results.items || results.items.length === 0) {
             if (!continuation) {
                 container.innerHTML = `
                     <div class="search-placeholder">
                         <i class="fas fa-search"></i>
-                        <p>No se encontraron resultados</p>
+                        <p>No se encontraron resultados para "${query}"</p>
                     </div>
                 `;
+            } else {
+                // Fin de resultados en paginación
+                this.showEndOfResultsMessage(container);
             }
+            
             window.isLoadingMore = false;
+            window.currentNextPageToken = null;
             return;
         }
 
         console.log(`🎨 Renderizando ${results.items.length} resultados`);
         
-        // Crear fragmento para rendimiento
+        // ✅ CREAR FRAGMENTO PARA RENDIMIENTO
         const fragment = document.createDocumentFragment();
         
         results.items.forEach(video => {
@@ -2281,27 +2307,41 @@ async performSearch(searchQuery, continuation = null) {
         
         container.appendChild(fragment);
         
-        // Actualizar paginación
+        // ✅ ACTUALIZAR TOKEN DE PAGINACIÓN
         window.currentNextPageToken = results.continuation || null;
+        
+        console.log('📊 Estado paginación:', {
+            hasMore: !!window.currentNextPageToken,
+            token: window.currentNextPageToken ? 'presente' : 'null'
+        });
+        
+        // ✅ LIBERAR BANDERA
         window.isLoadingMore = false;
         
-        // ✅ CONFIGURAR SCROLL INFINITO SOLO SI HAY MÁS PÁGINAS
+        // ✅ CONFIGURAR/RECONFIGURAR SCROLL INFINITO
         if (window.currentNextPageToken) {
-        // ✅ CORRECCIÓN: Esperar un frame antes de configurar
-        requestAnimationFrame(() => {
-        this.setupInfiniteScroll(container);
+            // Esperar un frame para que el DOM se actualice
+            requestAnimationFrame(() => {
+                this.setupInfiniteScroll(container);
             });
         } else {
-        console.log('✅ No hay más resultados disponibles');
+            console.log('✅ No hay más resultados disponibles');
+            this.showEndOfResultsMessage(container);
         }
         
-        // Configurar event listeners
+        // ✅ CONFIGURAR EVENT LISTENERS
         setTimeout(() => {
             this.setupSearchButtonListeners();
         }, 100);
 
     } catch (error) {
         console.error('❌ Error en performSearch:', error);
+        
+        if (window.performanceLogger) {
+            window.performanceLogger.endTimer('search');
+            window.performanceLogger.recordError(error, 'performSearch');
+        }
+        
         window.isLoadingMore = false;
         
         if (!continuation) {
@@ -2309,7 +2349,7 @@ async performSearch(searchQuery, continuation = null) {
                 <div class="search-error">
                     <i class="fas fa-exclamation-triangle"></i>
                     <p>Error: ${error.message || 'Desconocido'}</p>
-                    <button onclick="window.unifiedCore.performSearch('${query}')">
+                    <button onclick="window.unifiedCore.performSearch('${query.replace(/'/g, "\\'")}')">
                         <i class="fas fa-redo"></i> Reintentar
                     </button>
                 </div>
@@ -2318,21 +2358,30 @@ async performSearch(searchQuery, continuation = null) {
             this.showMessage('Error cargando más resultados', 'error');
         }
     }
-}    
+} 
 setupInfiniteScroll(container) {
+    console.log('📜 Configurando scroll infinito');
+    
     // ✅ LIMPIAR OBSERVADOR ANTERIOR
     if (this.searchScrollObserver) {
         try {
             this.searchScrollObserver.disconnect();
         } catch (e) {
-            console.warn('⚠️ Error desconectando observador');
+            console.warn('⚠️ Error desconectando observador:', e);
         }
         this.searchScrollObserver = null;
     }
     
     // ✅ VALIDAR QUE HAY MÁS CONTENIDO
     if (!window.currentNextPageToken) {
-        console.log('✅ No hay más páginas');
+        console.log('✅ No hay más páginas disponibles');
+        
+        // Remover sentinel si existe
+        const oldSentinel = document.getElementById('search-sentinel');
+        if (oldSentinel) oldSentinel.remove();
+        
+        // Mostrar mensaje de fin
+        this.showEndOfResultsMessage(container);
         return;
     }
     
@@ -2344,51 +2393,160 @@ setupInfiniteScroll(container) {
     const sentinel = document.createElement('div');
     sentinel.id = 'search-sentinel';
     sentinel.style.cssText = `
-        width: 100%; 
-        height: 20px; 
-        margin: 10px 0;
+        width: 100%;
+        height: 20px;
+        margin: 20px 0;
         background: transparent;
     `;
+    
     container.appendChild(sentinel);
     
-    // ✅ CORRECCIÓN: ROOT debe ser el contenedor scrolleable
-    const scrollContainer = document.querySelector('.search-results-wrapper') || 
-                           document.querySelector('#searchView') || 
-                           container.parentElement;
+    // ✅ ENCONTRAR CONTENEDOR SCROLLEABLE
+    const scrollContainer = this.findScrollContainer(container);
     
-    console.log('📜 Configurando scroll infinito, root:', scrollContainer?.id || 'default');
+    if (!scrollContainer) {
+        console.error('❌ No se encontró contenedor scrolleable');
+        return;
+    }
     
-    // ✅ CREAR NUEVO OBSERVADOR CON ROOT CORRECTO
-    this.searchScrollObserver = new IntersectionObserver(async (entries) => {
-        const entry = entries[0];
-        
-        if (entry.isIntersecting && 
-            !window.isLoadingMore && 
-            window.currentNextPageToken) {
+    console.log('📜 Contenedor scrolleable:', scrollContainer.id || scrollContainer.className);
+    
+    // ✅ CREAR NUEVO OBSERVADOR CON CONFIGURACIÓN CORRECTA
+    this.searchScrollObserver = new IntersectionObserver(
+        async (entries) => {
+            const entry = entries[0];
+            
+            // ✅ VALIDACIONES CRÍTICAS
+            if (!entry.isIntersecting) return;
+            if (window.isLoadingMore) {
+                console.log('⏳ Ya hay una carga en progreso...');
+                return;
+            }
+            if (!window.currentNextPageToken) {
+                console.log('✅ No hay más resultados');
+                this.searchScrollObserver?.disconnect();
+                return;
+            }
             
             console.log('📜 Sentinel visible - Cargando más resultados...');
+            
+            // ✅ MARCAR COMO CARGANDO
             window.isLoadingMore = true;
             
+            // ✅ MOSTRAR INDICADOR DE CARGA
+            this.showLoadingIndicator(container);
+            
             try {
+                // ✅ CARGAR MÁS RESULTADOS
                 await this.performSearch(
-                    window.currentSearchQuery, 
+                    window.currentSearchQuery,
                     window.currentNextPageToken
                 );
+                
+                console.log('✅ Más resultados cargados');
+                
             } catch (error) {
-                console.error('❌ Error cargando más:', error);
+                console.error('❌ Error cargando más resultados:', error);
                 this.showMessage('Error cargando más resultados', 'error');
-            } finally {
+                
+                // ✅ LIBERAR BANDERA PARA PERMITIR REINTENTO
                 window.isLoadingMore = false;
+                
+            } finally {
+                // ✅ REMOVER INDICADOR
+                this.removeLoadingIndicator();
             }
+        },
+        {
+            root: scrollContainer === document.querySelector('.search-results-wrapper') 
+                ? null // Usar viewport si es el wrapper
+                : scrollContainer,
+            rootMargin: '100px', // Cargar antes de llegar al final
+            threshold: 0.1
         }
-    }, { 
-        root: scrollContainer, // ✅ Usar contenedor scrolleable
-        rootMargin: '200px', // ✅ Cargar antes de llegar al final
-        threshold: 0.1 
-    });
+    );
     
     this.searchScrollObserver.observe(sentinel);
     console.log('✅ Scroll infinito configurado correctamente');
+}
+    // =============================================
+// HELPERS PARA SCROLL INFINITO
+// =============================================
+
+findScrollContainer(element) {
+    // Intentar encontrar el contenedor scrolleable
+    const candidates = [
+        document.querySelector('.search-results-wrapper'),
+        document.querySelector('#searchView'),
+        document.querySelector('.content-view.active'),
+        element.parentElement,
+        document.documentElement
+    ];
+    
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        
+        const style = window.getComputedStyle(candidate);
+        const isScrollable = style.overflowY === 'auto' || 
+                           style.overflowY === 'scroll' ||
+                           candidate === document.documentElement;
+        
+        if (isScrollable) {
+            return candidate;
+        }
+    }
+    
+    // Fallback al wrapper o viewport
+    return document.querySelector('.search-results-wrapper') || null;
+}
+
+showLoadingIndicator(container) {
+    // Remover indicador anterior si existe
+    this.removeLoadingIndicator();
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'infinite-scroll-loader';
+    indicator.className = 'search-loading-more';
+    indicator.style.cssText = `
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        width: 100%;
+    `;
+    indicator.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; color: var(--yt-text-secondary);">
+            <i class="fas fa-spinner fa-spin" style="font-size: 20px;"></i>
+            <span>Cargando más resultados...</span>
+        </div>
+    `;
+    
+    container.appendChild(indicator);
+}
+
+removeLoadingIndicator() {
+    const indicator = document.getElementById('infinite-scroll-loader');
+    if (indicator) indicator.remove();
+}
+
+showEndOfResultsMessage(container) {
+    // Solo mostrar si no existe ya
+    if (document.getElementById('end-of-results')) return;
+    
+    const message = document.createElement('div');
+    message.id = 'end-of-results';
+    message.style.cssText = `
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--yt-text-tertiary);
+        font-size: 14px;
+    `;
+    message.innerHTML = `
+        <i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.5;"></i>
+        <p>Has llegado al final de los resultados</p>
+    `;
+    
+    container.appendChild(message);
 }
 displaySearchResults(videos, container) {
     if (!container) {
