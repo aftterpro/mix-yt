@@ -62,14 +62,21 @@ function saveAuthData(token) {
         return false;
     }
 
+    // ✅ VALIDAR LONGITUD MÍNIMA
+    const trimmedToken = token.trim();
+    if (trimmedToken.length < 20) {
+        console.error('❌ Token demasiado corto');
+        return false;
+    }
+
     const expirationDate = new Date();
     expirationDate.setDate(expirationDate.getDate() + 7);
     
-    authState.token = token;
+    authState.token = trimmedToken;
     authState.expiry = expirationDate.getTime();
     authState.timestamp = Date.now();
     
- //   console.log('💾 Token guardado en memoria (válido 7 días)');
+    console.log('💾 Token guardado (válido 7 días)');
     return true;
 }
 
@@ -554,16 +561,59 @@ function updateAuthUI() {
 
 function startTokenValidation() {
     // Validar token cada 5 minutos
-    setInterval(() => {
-        if (isAuthorized) {
-            const savedToken = loadAuthData();
-            if (!savedToken) {
-                console.warn('⚠️ Token expirado detectado, cerrando sesión...');
-                signOut();
-            }
+    const validationInterval = setInterval(() => {
+        if (!isAuthorized) {
+            clearInterval(validationInterval);
+            return;
         }
-    }, 5 * 60 * 1000);
+        
+        const savedToken = loadAuthData();
+        
+        if (!savedToken) {
+            console.warn('⚠️ Token expirado detectado');
+            
+            // Limpiar estado
+            isAuthorized = false;
+            
+            // Limpiar UI
+            updateAuthUI();
+            
+            // Limpiar biblioteca
+            if (window.unifiedCore) {
+                window.unifiedCore.clearYouTubeLibrary();
+            }
+            
+            // Disparar evento
+            document.dispatchEvent(new CustomEvent('tokenExpired'));
+            
+            // Mostrar mensaje al usuario
+            if (window.unifiedCore) {
+                window.unifiedCore.showMessage(
+                    'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
+                    'warning'
+                );
+            }
+            
+            clearInterval(validationInterval);
+        }
+    }, 5 * 60 * 1000); // 5 minutos
+    
+    console.log('✅ Validación automática de token iniciada');
 }
+//  LISTENER PARA TOKEN EXPIRADO
+document.addEventListener('tokenExpired', () => {
+    console.log('🔒 Token expirado - Limpiando datos de usuario');
+    
+    // Limpiar playlists de YouTube Library
+    if (window.playlistManager && window.playlistManager.clearYouTubeLibraryPlaylists) {
+        window.playlistManager.clearYouTubeLibraryPlaylists();
+    }
+    
+    // Actualizar UI
+    if (window.unifiedCore) {
+        window.unifiedCore.updatePlaylistsUI();
+    }
+});
 /**
  * Mostrar error
  */
