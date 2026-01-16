@@ -7,7 +7,6 @@ exports.handler = async function(event, context) {
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     };
 
-    // Manejo de preflight request (CORS)
     if (event.httpMethod === 'OPTIONS') {
         return { statusCode: 200, headers, body: '' };
     }
@@ -15,44 +14,54 @@ exports.handler = async function(event, context) {
     try {
         const q = event.queryStringParameters?.q;
         
-        // ✅ VALIDACIÓN DE INPUT
+        // ✅ VALIDACIÓN MEJORADA
         if (!q || q === 'undefined' || q.trim() === '') {
-            console.log("⚠️ [NETLIFY] Query vacío o inválido.");
             return {
-                statusCode: 200,
+                statusCode: 400,
                 headers,
-                body: JSON.stringify({ items: [], continuation: null })
+                body: JSON.stringify({ 
+                    error: 'Query vacío',
+                    items: [], 
+                    continuation: null 
+                })
             };
         }
 
+        // ✅ SANITIZAR QUERY
+        const sanitizedQuery = q.trim().substring(0, 200); // Limitar longitud
+        
         let nextPageData = event.queryStringParameters?.nextpage;
         let result;
 
-        console.log(`🚀 [NETLIFY] Query: "${q}"`);
+        console.log(`🔍 Query: "${sanitizedQuery}"${nextPageData ? ' (paginación)' : ''}`);
 
         if (nextPageData) {
-            console.log("📄 [NETLIFY] Paginación solicitada");
             try {
+                // ✅ DECODIFICAR SI ES NECESARIO
                 if (typeof nextPageData === 'string' && nextPageData.startsWith('%')) {
                     nextPageData = decodeURIComponent(nextPageData);
                 }
-                const tokenObject = JSON.parse(nextPageData);
-                result = await youtubesearchapi.NextPage(tokenObject, true);
+                
+                // ✅ PARSEAR SI ES JSON
+                if (nextPageData.startsWith('{')) {
+                    const parsed = JSON.parse(nextPageData);
+                    result = await youtubesearchapi.NextPage(parsed, true);
+                } else {
+                    result = await youtubesearchapi.NextPage(nextPageData, true);
+                }
             } catch (e) {
-                console.warn("⚠️ Error parseando token:", e.message);
+                console.warn('⚠️ Error en paginación:', e.message);
+                // Reintentar sin parsear
                 result = await youtubesearchapi.NextPage(nextPageData, true);
             }
         } else {
-            console.log("🔍 [NETLIFY] Búsqueda inicial");
-            // ✅ BÚSQUEDA EXACTA: Envolver en comillas dobles para música
-            const exactQuery = `"${q}"`;
-            console.log(`🎵 [NETLIFY] Búsqueda exacta: ${exactQuery}`);
+            // ✅ BÚSQUEDA EXACTA PARA MÚSICA
+            const exactQuery = `"${sanitizedQuery}"`;
             result = await youtubesearchapi.GetListByKeyword(exactQuery, false, 25);
         }
 
         // ✅ VALIDAR RESPUESTA
         if (!result || !result.items || result.items.length === 0) {
-            console.log("⚠️ [NETLIFY] 0 items devueltos por la librería.");
             return {
                 statusCode: 200,
                 headers,
@@ -60,14 +69,18 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // ✅ DEBUG: Imprimir primer item crudo
-        console.log("📦 [ITEM_CRUDO_0]:", JSON.stringify(result.items[0], null, 2));
-
-        // ✅ PROCESAMIENTO DE DATOS
+        // ✅ PROCESAR ITEMS CON VALIDACIÓN ROBUSTA
         const items = result.items
-            .filter(item => item.type === 'video') // Solo videos (no canales ni playlists)
+            .filter(item => {
+                // Solo videos válidos
+                return item && 
+                       item.type === 'video' && 
+                       item.id && 
+                       item.id.length === 11 && // YouTube IDs son 11 caracteres
+                       item.title;
+            })
             .map((item) => {
-                // 1. Extractor de Thumbnail
+                // Thumbnail con fallback
                 let thumb = './electronic.ico';
                 if (item.thumbnail) {
                     if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
@@ -79,7 +92,7 @@ exports.handler = async function(event, context) {
                     }
                 }
 
-                // 2. Extractor de Duración
+                // Duración con fallback
                 let dur = "0:00";
                 if (item.length) {
                     if (item.length.simpleText) {
@@ -91,32 +104,41 @@ exports.handler = async function(event, context) {
 
                 return {
                     videoId: item.id,
-                    title: item.title || "Sin título",
+                    title: item.title.substring(0, 200), // Limitar longitud
                     thumbnail: thumb,
-                    artist: item.channelTitle || item.author || "Artista Desconocido",
-                    uploaderName: item.channelTitle || "Desconocido",
+                    artist: (item.channelTitle || item.author || "Artista Desconocido").substring(0, 100),
+                    uploaderName: (item.channelTitle || "Desconocido").substring(0, 100),
                     duration: dur,
                     isLive: item.isLive || false
                 };
-            })
-            .filter(i => i.videoId); // Filtro de seguridad: solo items con videoId válido
+            });
 
-        console.log(`✅ [NETLIFY] ${items.length} videos procesados.`);
+        console.log(`✅ ${items.length} videos procesados`);
 
-        // ✅ RESPUESTA FINAL
+        // ✅ LIMPIAR CONTINUATION TOKEN
+        let cleanToken = null;
+        if (result.nextPage) {
+            try {
+                cleanToken = JSON.stringify(result.nextPage);
+            } catch (e) {
+                console.warn('⚠️ Error serializando nextPage');
+            }
+        }
+
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({
                 items: items,
-                continuation: result.nextPage ? JSON.stringify(result.nextPage) : null
+                continuation: cleanToken
             })
         };
 
     } catch (error) {
-        console.error("❌ [ERROR FATAL]:", error);
+        console.error("❌ Error en búsqueda:", error);
+        
         return {
-            statusCode: 200,
+            statusCode: 200, // ✅ NO devolver 500, mejor respuesta vacía
             headers,
             body: JSON.stringify({ 
                 items: [], 
