@@ -168,54 +168,53 @@ class SponsorBlockManager {
         } catch (e) {}
     }
 
-  async cargarSegmentos(videoId) {
-        // ✅ 1. Validación robusta del ID
+async cargarSegmentos(videoId) {
         if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
-            // Evitar logs ruidosos para videos inválidos o nulos
             return [];
         }
 
-        // ✅ 2. Verificar Caché
+        // Verificar caché
         const cached = this.segmentosCache[videoId];
         if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
-            // Verificar expiración (10 minutos)
             const cacheAge = Date.now() - (cached.timestamp || 0);
             if (cacheAge < 10 * 60 * 1000) {
-                console.log(`✅ SB: Usando caché para ${videoId}`);
                 return cached.segments;
             }
         }
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        
-        // ✅ 3. URL CORREGIDA (Usa comillas invertidas ` ` y ${variable})
         const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-        
-        // Debug para verificar que la URL se construye bien
-        // console.log('📡 SB URL:', apiUrl); 
 
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout 5s
-
-            const response = await fetch(apiUrl, { 
-                headers: { 'X-UserID': userId },
-                signal: controller.signal
+            // ✅ PROMESA CON TIMEOUT DE 1 SEGUNDO
+            const fetchWithTimeout = new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Timeout'));
+                }, 1000); // ✅ 1 segundo máximo
+                
+                fetch(apiUrl, { 
+                    headers: { 'X-UserID': userId }
+                })
+                .then(response => {
+                    clearTimeout(timeout);
+                    resolve(response);
+                })
+                .catch(error => {
+                    clearTimeout(timeout);
+                    reject(error);
+                });
             });
             
-            clearTimeout(timeoutId);
+            const response = await fetchWithTimeout;
             
             if (!response.ok) {
-                // Si es 404 es normal (no tiene segmentos), no tratar como error grave
                 if (response.status === 404) throw new Error('No segments found');
                 throw new Error(`HTTP ${response.status}`);
             }
             
             const data = await response.json();
-            
-            // ✅ 4. Validar que data sea un array antes de filtrar
             const segments = Array.isArray(data) 
-                ? data.filter(s => s && typeof s.startTime === 'number' && typeof s.endTime === 'number' && s.startTime < s.endTime)
+                ? data.filter(s => s && typeof s.startTime === 'number')
                 : [];
             
             this.segmentosCache[videoId] = {
@@ -224,18 +223,15 @@ class SponsorBlockManager {
             };
             
             this.saveCache();
-            if (segments.length > 0) {
-                console.log(`✅ SB: ${segments.length} segmentos cargados`);
-            }
             return segments;
             
         } catch (e) {
-            // Silenciar errores comunes para no ensuciar el log
-            if (e.message !== 'No segments found' && e.name !== 'AbortError') {
-                console.warn(`⚠️ SB: No se cargaron segmentos (${e.message})`);
+            // ✅ NO BLOQUEAR REPRODUCCIÓN
+            if (e.message !== 'No segments found') {
+                console.log(`⚠️ SB timeout/error (ignorado): ${e.message}`);
             }
             
-            // Guardar caché vacía para no reintentar inmediatamente
+            // Guardar caché vacía
             this.segmentosCache[videoId] = { 
                 segments: [], 
                 timestamp: Date.now() 
@@ -243,8 +239,8 @@ class SponsorBlockManager {
             this.saveCache();
             return [];
         }
-    }
-
+}
+    
     checkAndSkip(player) {
         const videoId = player.getVideoData()?.video_id;
         if (!videoId) return false;
