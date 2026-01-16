@@ -3293,9 +3293,7 @@ startMonitoring() {
 // =============================================
 // FUNCIONES GLOBALES Y UTILIDADES
 // =============================================
-
-// ✅ EXPORTAR GLOBALMENTE
-window.monitorPlayers = monitorPlayers;
+window.monitorPlayers = () => window.unifiedCore?.monitorPlayers();
 window.savePlaylistsDataPersistent = savePlaylistsDataPersistent;
 window.loadPlaylistsDataPersistent = loadPlaylistsDataPersistent;
 window.debugUnified = function() {
