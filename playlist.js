@@ -304,7 +304,6 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
             }
         }, 500); // Esperar 500ms después de la última modificación
     }
-}
 
 handleLibraryItemClick(item, isPlaylist) {
     if (isPlaylist) {
@@ -511,43 +510,6 @@ async loadPlaylistVideos(playlistId) {
         return false;
     }
 }
- extractArtistFromTitle(title) {
-    if (!title) return 'Desconocido';
-    
-    // Limpiar título
-    let cleanTitle = title
-        .replace(/\(official.*?video\)/gi, '')
-        .replace(/\(lyric.*?video\)/gi, '')
-        .replace(/\(visualizer\)/gi, '')
-        .replace(/\(audio\)/gi, '')
-        .replace(/\[official.*?\]/gi, '')
-        .trim();
-    
-    // Patrones de separación
-    const separators = [
-        /^(.+?)\s*[-–—]\s*(.+?)$/,  // Artista - Título
-        /^(.+?)\s*:\s*(.+?)$/,      // Artista: Título
-        /^(.+?)\s*\|\s*(.+?)$/,     // Artista | Título
-    ];
-    
-    for (const pattern of separators) {
-        const match = cleanTitle.match(pattern);
-        if (match && match[1]) {
-            let artist = match[1].trim();
-            
-            // ✅ Validaciones
-            if (artist.length < 50 && 
-                artist !== 'YouTube' &&
-                artist !== 'Topic' &&
-                !artist.endsWith(' - Topic')) {
-                return artist;
-            }
-        }
-    }
-    
-    return 'Desconocido';
-}   
-
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ removeVideoFromQueue: ${videoId}`);
     
@@ -898,8 +860,6 @@ async loadRelatedForVideo(video) {
  */
 async loadRelatedVideosFallback(currentVideo, relatedList) {
     console.log('🔄 Usando fallback para videos relacionados...');
-    
-    // CORRECCIÓN: Agregar 'this.' antes de extractArtistFromTitle
 const artist = this.extractArtistFromTitle(currentVideo.title);
 const searchQuery = artist !== 'Desconocido' ? artist : currentVideo.title.split('-')[0].trim();
     
