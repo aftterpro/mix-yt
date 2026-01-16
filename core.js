@@ -668,36 +668,34 @@ cleanupView(viewName) {
     }
 
 initializePlayers() {
-        const playerConfig = {
-            height: '100%',
-            width: '100%',
-            videoId: '',
-            playerVars: { 
-                playsinline: 1,
-                origin: window.location.origin,
-                enablejsapi: 1,
-                controls: 1,
-                rel: 0,
-                modestbranding: 1
-            },
-            events: {
-                onReady: (e) => this.onPlayerReady(e),
-                onStateChange: (e) => this.onPlayerStateChange(e),
-                onError: (e) => this.onPlayerError(e)
-            }
-        };
-        
-        // ✅ Guardar en instancia, no en window
-        this.players.player1 = new YT.Player('player1', playerConfig);
-        this.players.player2 = new YT.Player('player2', playerConfig);
-        
-        // ✅ Solo para compatibilidad (temporal)
-        window.player1 = this.players.player1;
-        window.player2 = this.players.player2;
-    }
-}
+    const playerConfig = {
+        height: '100%',
+        width: '100%',
+        videoId: '',
+        playerVars: { 
+            playsinline: 1,
+            origin: window.location.origin,
+            enablejsapi: 1,
+            controls: 1,
+            rel: 0,
+            modestbranding: 1
+        },
+        events: {
+            onReady: (e) => this.onPlayerReady(e),
+            onStateChange: (e) => this.onPlayerStateChange(e),
+            onError: (e) => this.onPlayerError(e)
+        }
+    };
     
-onPlayerReady(event) {
+    // ✅ Guardar en instancia, no en window
+    this.players.player1 = new YT.Player('player1', playerConfig);
+    this.players.player2 = new YT.Player('player2', playerConfig);
+    
+    // ✅ Solo para compatibilidad (temporal)
+    window.player1 = this.players.player1;
+    window.player2 = this.players.player2;
+}
+    onPlayerReady(event) {
     console.log('✅ Reproductor listo');
     
     const playerId = event.target.getIframe().id;
@@ -724,13 +722,13 @@ onPlayerReady(event) {
                 visibility: visible !important;
             `;
         }
-        }
-    if (player1 && player2) {
-        playersInitialized = true;
+    }
+    
+    // Verificar si ambos players están listos
+    if (window.player1 && window.player2) {
+        window.playersInitialized = true;
         this.state.playersReady = true;
-        window.player1 = player1;
-        window.player2 = player2;
-        window.currentPlayer = currentPlayer;
+        window.currentPlayer = window.currentPlayer || 1;
         this.updatePlayersStatus('Reproductores listos');
         this.enablePlayButton();
         
