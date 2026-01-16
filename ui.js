@@ -330,204 +330,187 @@ showMiniPlayerFloat() {
         console.warn('⚠️ searchResults no encontrado en clearSearchResults');
     }
 }
-createSearchResultCard(video) {
-    // ✅ VALIDACIÓN ROBUSTA DEL VIDEO ID
-    let videoId = video.videoId || video.id;
-    
-    // Si el ID es un objeto, extraer el videoId interno
-    if (videoId && typeof videoId === 'object') {
-        videoId = videoId.videoId || null;
-    }
-    
-    // ✅ VALIDACIÓN ESTRICTA
-    if (!videoId || 
-        videoId === 'undefined' || 
-        typeof videoId !== 'string' || 
-        videoId.trim() === '' ||
-        videoId.length !== 11) { // YouTube IDs son exactamente 11 caracteres
-        console.warn('⚠️ Video ignorado por ID inválido:', video);
-        return null;
-    }
-
-    const title = video.title || 'Título desconocido';
-    const artist = video.uploaderName || video.artist || 'Artista desconocido';
-    const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
-    
-    // ✅ VALIDACIÓN DE DURACIÓN
-    let durationDisplay = '';
-    if (video.duration) {
-        if (typeof video.duration === 'number') {
-            durationDisplay = this.formatDuration(video.duration);
-        } else if (typeof video.duration === 'string') {
-            durationDisplay = video.duration;
-        }
-    }
-
-    const div = document.createElement('div');
-    div.className = 'track-item card-track search-result-card';
-    div.dataset.videoId = videoId;
-
-    div.innerHTML = `
-        <div class="search-result-thumbnail">
-            <img src="${thumbnail}" 
-                 alt="${this.escapeHTML(title)}" 
-                 loading="lazy" 
-                 onerror="this.src='./electronic.ico';">
-            ${durationDisplay ? `<span class="search-result-duration">${durationDisplay}</span>` : ''}
-        </div>
-        <div class="search-result-info">
-            <h3 class="search-result-title" title="${this.escapeHTML(title)}">
-                ${this.escapeHTML(title)}
-            </h3>
-            <p class="search-result-author">${this.escapeHTML(artist)}</p>
-        </div>
-        <div class="search-result-actions">
-            <button class="search-result-add-next-btn" 
-                    data-video-id="${videoId}"
-                    data-title="${this.escapeHTML(title)}"
-                    data-thumbnail="${thumbnail}"
-                    data-duration="${video.duration || 0}"
-                    data-artist="${this.escapeHTML(artist)}"
-                    title="Reproducir siguiente">
-                <i class="fas fa-forward"></i>
-            </button>
-            <button class="add-to-queue-btn" 
-                    data-video-id="${videoId}"
-                    title="Añadir a la cola">
-                <i class="fas fa-plus"></i>
-            </button>
-        </div>
-    `;
-
-    // ✅ EVENTO: Click en tarjeta
-    div.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
+ createSearchResultCard(video) {
+        // ✅ VALIDACIÓN ROBUSTA DE VIDEO ID
+        let videoId = this._extractVideoId(video);
         
-        if (window.unifiedCore && window.unifiedCore.playVideoFromSearch) {
-            window.unifiedCore.playVideoFromSearch({
-                id: videoId,
-                title: title,
-                thumbnail: thumbnail,
-                channel: artist,
-                duration: video.duration || 0
-            });
+        if (!this._isValidVideoId(videoId)) {
+            console.warn('⚠️ Video ignorado por ID inválido:', video);
+            return null;
         }
-    });
 
-    // ✅ EVENTO: Botón "Añadir a cola"
-    const addBtn = div.querySelector('.add-to-queue-btn');
-    if (addBtn) {
-        addBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            
-            const btnVideoId = addBtn.dataset.videoId;
-            
-            // ✅ VALIDACIÓN EXTRA
-            if (!btnVideoId || btnVideoId === 'undefined' || btnVideoId.length !== 11) {
-                console.error('❌ ID inválido en botón');
-                return;
+        // ✅ EXTRAER DATOS CON FALLBACKS
+        const data = this._extractVideoData(video, videoId);
+        
+        // ✅ CREAR ELEMENTO (usando template para mejor rendimiento)
+        const template = document.createElement('template');
+        template.innerHTML = this._getCardTemplate(data);
+        const card = template.content.firstElementChild;
+        
+        // ✅ AÑADIR EVENT LISTENERS (con delegation cuando sea posible)
+        this._attachCardListeners(card, data);
+        
+        return card;
+    }
+     _extractVideoId(video) {
+        let videoId = video.videoId || video.id;
+        
+        // Si es objeto, extraer el ID interno
+        if (videoId && typeof videoId === 'object') {
+            videoId = videoId.videoId || null;
+        }
+        
+        return videoId;
+    }
+    
+    // ✅ HELPER: Validar videoId
+    _isValidVideoId(videoId) {
+        return videoId && 
+               typeof videoId === 'string' && 
+               videoId !== 'undefined' &&
+               videoId.trim() !== '' &&
+               /^[a-zA-Z0-9_-]{11}$/.test(videoId); // Regex exacto
+    }
+    
+    // ✅ HELPER: Extraer datos del video
+    _extractVideoData(video, videoId) {
+        const title = (video.title || 'Título desconocido').substring(0, 200);
+        const artist = (video.uploaderName || video.artist || 'Artista desconocido').substring(0, 100);
+        const thumbnail = video.thumbnail || video.thumbnailUrl || './electronic.ico';
+        
+        // Formatear duración
+        let durationDisplay = '';
+        if (video.duration) {
+            if (typeof video.duration === 'number') {
+                durationDisplay = this.formatDuration(video.duration);
+            } else if (typeof video.duration === 'string') {
+                durationDisplay = video.duration;
             }
+        }
+        
+        return {
+            videoId,
+            title,
+            artist,
+            thumbnail,
+            durationDisplay,
+            duration: video.duration || 0
+        };
+    }
+    
+    // ✅ HELPER: Template HTML
+    _getCardTemplate(data) {
+        return `
+            <div class="track-item card-track search-result-card" data-video-id="${data.videoId}">
+                <div class="search-result-thumbnail">
+                    <img src="${data.thumbnail}" 
+                         alt="${this.escapeHTML(data.title)}" 
+                         loading="lazy" 
+                         onerror="this.src='./electronic.ico';">
+                    ${data.durationDisplay ? `<span class="search-result-duration">${data.durationDisplay}</span>` : ''}
+                </div>
+                <div class="search-result-info">
+                    <h3 class="search-result-title" title="${this.escapeHTML(data.title)}">
+                        ${this.escapeHTML(data.title)}
+                    </h3>
+                    <p class="search-result-author">${this.escapeHTML(data.artist)}</p>
+                </div>
+                <div class="search-result-actions">
+                    <button class="search-result-add-next-btn" 
+                            data-action="add-next"
+                            title="Reproducir siguiente">
+                        <i class="fas fa-forward"></i>
+                    </button>
+                    <button class="add-to-queue-btn" 
+                            data-action="add-queue"
+                            title="Añadir a la cola">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+        `.trim();
+    }
+    
+    // ✅ HELPER: Attachar listeners
+    _attachCardListeners(card, data) {
+        // Click en tarjeta (reproducir)
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
             
-            const icon = addBtn.querySelector('i');
-            const originalIcon = icon.className;
-            icon.className = 'fas fa-spinner fa-spin';
-            addBtn.disabled = true;
-            
-            try {
-                const videoData = {
-                    videoId: btnVideoId,
-                    title: title,
-                    thumbnail: thumbnail,
-                    duration: video.duration || 0,
-                    uploaderName: artist,
-                    author: artist,
-                    artist: artist
-                };
-                
-                await window.unifiedCore.addVideoToQueue(videoData);
-                
-                icon.className = 'fas fa-check';
-                addBtn.style.background = '#4caf50';
-                
-                setTimeout(() => {
-                    icon.className = originalIcon;
-                    addBtn.style.background = '';
-                    addBtn.disabled = false;
-                }, 1500);
-                
-            } catch (err) {
-                console.error('❌ Error añadiendo:', err);
-                icon.className = 'fas fa-times';
-                addBtn.style.background = '#f44336';
-                
-                setTimeout(() => {
-                    icon.className = originalIcon;
-                    addBtn.style.background = '';
-                    addBtn.disabled = false;
-                }, 1500);
+            if (window.unifiedCore && window.unifiedCore.playVideoFromSearch) {
+                window.unifiedCore.playVideoFromSearch({
+                    id: data.videoId,
+                    title: data.title,
+                    thumbnail: data.thumbnail,
+                    channel: data.artist,
+                    duration: data.duration
+                });
             }
         });
-    }
 
-    // ✅ EVENTO: Botón "Siguiente"
-    const nextBtn = div.querySelector('.search-result-add-next-btn');
-    if (nextBtn) {
-        nextBtn.addEventListener('click', async (e) => {
+        // ✅ EVENT DELEGATION para botones (mejor rendimiento)
+        card.addEventListener('click', async (e) => {
+            const button = e.target.closest('button[data-action]');
+            if (!button) return;
+            
             e.stopPropagation();
             e.preventDefault();
             
-            const btnVideoId = nextBtn.dataset.videoId;
+            const action = button.dataset.action;
+            await this._handleButtonAction(action, data, button);
+        });
+    }
+    
+    // ✅ HELPER: Manejar acción de botón
+    async _handleButtonAction(action, data, button) {
+        const icon = button.querySelector('i');
+        const originalIcon = icon.className;
+        
+        // UI feedback
+        icon.className = 'fas fa-spinner fa-spin';
+        button.disabled = true;
+        
+        try {
+            const videoData = {
+                videoId: data.videoId,
+                title: data.title,
+                thumbnail: data.thumbnail,
+                duration: data.duration,
+                uploaderName: data.artist,
+                author: data.artist,
+                artist: data.artist
+            };
             
-            // ✅ VALIDACIÓN EXTRA
-            if (!btnVideoId || btnVideoId === 'undefined' || btnVideoId.length !== 11) {
-                console.error('❌ ID inválido en botón siguiente');
-                return;
-            }
-            
-            const icon = nextBtn.querySelector('i');
-            const originalIcon = icon.className;
-            icon.className = 'fas fa-spinner fa-spin';
-            nextBtn.disabled = true;
-            
-            try {
-                const videoData = {
-                    videoId: btnVideoId,
-                    title: nextBtn.dataset.title || title,
-                    thumbnail: nextBtn.dataset.thumbnail || thumbnail,
-                    duration: parseInt(nextBtn.dataset.duration) || 0,
-                    uploaderName: nextBtn.dataset.artist || artist,
-                    author: nextBtn.dataset.artist || artist,
-                    artist: nextBtn.dataset.artist || artist
-                };
-                
+            if (action === 'add-next') {
                 await window.unifiedCore.addVideoToQueueAfterCurrent(videoData);
-                
-                icon.className = 'fas fa-check';
-                nextBtn.style.background = '#4caf50';
-                
-                setTimeout(() => {
-                    icon.className = originalIcon;
-                    nextBtn.style.background = '';
-                    nextBtn.disabled = false;
-                }, 1500);
-                
-            } catch (err) {
-                console.error('❌ Error añadiendo siguiente:', err);
-                icon.className = 'fas fa-times';
-                nextBtn.style.background = '#f44336';
-                
-                setTimeout(() => {
-                    icon.className = originalIcon;
-                    nextBtn.style.background = '';
-                    nextBtn.disabled = false;
-                }, 1500);
+            } else if (action === 'add-queue') {
+                await window.unifiedCore.addVideoToQueue(videoData);
             }
-        });
+            
+            // Success feedback
+            icon.className = 'fas fa-check';
+            button.style.background = '#4caf50';
+            
+            setTimeout(() => {
+                icon.className = originalIcon;
+                button.style.background = '';
+                button.disabled = false;
+            }, 1500);
+            
+        } catch (err) {
+            console.error('❌ Error:', err);
+            
+            // Error feedback
+            icon.className = 'fas fa-times';
+            button.style.background = '#f44336';
+            
+            setTimeout(() => {
+                icon.className = originalIcon;
+                button.style.background = '';
+                button.disabled = false;
+            }, 1500);
+        }
     }
-
-    return div;
-}
     // ==========================================
     // NOTIFICACIONES Y ESTADÍSTICAS
     // ==========================================
