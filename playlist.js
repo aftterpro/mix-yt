@@ -177,134 +177,133 @@ extractArtistFromTitle(fullTitle) {
 }
 
 async addVideoToQueue(videoData, fromPlaylist = false) {
-    console.log('🎵 addVideoToQueue:', videoData);
-    
-    // ✅ VALIDACIÓN ESTRICTA DEL VIDEO ID
-    if (!videoData || 
-        !videoData.videoId || 
-        videoData.videoId === 'undefined' || 
-        typeof videoData.videoId !== 'string' ||
-        videoData.videoId.trim() === '') {
-        console.error('❌ videoId inválido:', videoData);
-        if (this.core) this.core.showMessage('Error: Video inválido', 'error');
-        return false;
-    }
-
-    // ✅ VALIDAR LONGITUD DE VIDEO ID (YouTube IDs son 11 caracteres)
-    if (videoData.videoId.length !== 11) {
-        console.error('❌ videoId con longitud incorrecta:', videoData.videoId);
-        if (this.core) this.core.showMessage('Error: ID de video inválido', 'error');
-        return false;
-    }
-
-    // ✅ VALIDAR TÍTULO
-    if (!videoData.title || videoData.title.trim() === '') {
-        console.warn('⚠️ Video sin título, usando fallback');
-        videoData.title = 'Video sin título';
-    }
-
-    // ✅ SINCRONIZACIÓN CON CORE
-    if (this.core?.playlistsData) {
-        this.core.playlistsData = this.core.playlistsData;
-    }
-
-    // ✅ OBTENER COLA
-    let queue = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-
-    if (!queue) {
-        console.log('✨ Creando cola...');
-        queue = {
-            id: 'queue',
-            name: 'Cola de Reproducción',
-            thumbnailUrl: './electronic.ico',
-            videos: [],
-            isExpanded: true,
-            isQueue: true
-        };
-        this.core.playlistsData.unshift(queue);
-    }
-    
-    // ✅ VALIDAR QUE queue.videos ES UN ARRAY
-    if (!Array.isArray(queue.videos)) {
-        console.error('❌ queue.videos no es un array:', queue.videos);
-        queue.videos = [];
-    }
-
-    // ✅ NORMALIZAR VIDEO
-    let artistName = videoData.uploaderName || videoData.artist || videoData.author || '';
-    
-    // Limpiar " - Topic" y variantes
-    artistName = artistName.replace(/\s*-\s*Topic$/i, '').trim();
-    
-    if (!artistName || 
-        artistName.toLowerCase() === 'youtube' || 
-        artistName.toLowerCase() === 'youtube music') {
-        // Intentar extraer del título
-        if (videoData.title.includes(' - ')) {
-            artistName = videoData.title.split(' - ')[0].trim();
-        } else {
-            artistName = 'Desconocido';
+        // ✅ VALIDACIÓN EXHAUSTIVA
+        if (!videoData || 
+            !videoData.videoId || 
+            videoData.videoId === 'undefined' || 
+            typeof videoData.videoId !== 'string' ||
+            videoData.videoId.trim() === '' ||
+            videoData.videoId.length !== 11) {
+            
+            console.error('❌ videoId inválido:', videoData);
+            if (this.core) this.core.showMessage('Error: Video inválido', 'error');
+            return false;
         }
-    }
 
-    const videoToAdd = {
-        videoId: videoData.videoId.trim(),
-        title: videoData.title.trim(),
-        thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
-        duration: parseInt(videoData.duration) || 0,
-        uploaderName: artistName,
-        artist: artistName,
-        author: artistName,
-        sourcePlaylistId: 'queue'
-    };
+        // ✅ VALIDAR TÍTULO
+        if (!videoData.title || videoData.title.trim() === '') {
+            console.warn('⚠️ Video sin título, usando fallback');
+            videoData.title = 'Video sin título';
+        }
 
-    // ✅ VERIFICAR DUPLICADOS
-    const isDuplicate = queue.videos.some(v => v && v.videoId === videoToAdd.videoId);
-    if (isDuplicate) {
-        if (this.core) this.core.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
-        return false;
-    }
+        // ✅ OBTENER COLA CON VALIDACIÓN
+        let queue = this.core.playlistsData.find(p => p.id === 'queue' || p.isQueue);
 
-    // ✅ AÑADIR
-    if (fromPlaylist) {
-        // Desde playlist: siempre al final
-        queue.videos.push(videoToAdd);
-    } else {
-        // Manual: después del actual o al final
-        const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
-        if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
+        if (!queue) {
+            console.log('✨ Creando cola...');
+            queue = {
+                id: 'queue',
+                name: 'Cola de Reproducción',
+                thumbnailUrl: './electronic.ico',
+                videos: [],
+                isExpanded: true,
+                isQueue: true
+            };
+            this.core.playlistsData.unshift(queue);
+        }
+        
+        // ✅ VALIDAR ARRAY DE VIDEOS
+        if (!Array.isArray(queue.videos)) {
+            console.error('❌ queue.videos no es array, reparando...');
+            queue.videos = [];
+        }
+
+        // ✅ NORMALIZAR ARTISTA
+        let artistName = videoData.uploaderName || videoData.artist || videoData.author || '';
+        artistName = artistName.replace(/\s*-\s*Topic$/i, '').trim();
+        
+        if (!artistName || 
+            artistName.toLowerCase() === 'youtube' || 
+            artistName.toLowerCase() === 'youtube music') {
+            
+            if (videoData.title.includes(' - ')) {
+                artistName = videoData.title.split(' - ')[0].trim();
+            } else {
+                artistName = 'Desconocido';
+            }
+        }
+
+        // ✅ CREAR OBJETO LIMPIO
+        const videoToAdd = {
+            videoId: videoData.videoId.trim(),
+            title: videoData.title.trim().substring(0, 200), // Limitar longitud
+            thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
+            duration: parseInt(videoData.duration) || 0,
+            uploaderName: artistName.substring(0, 100),
+            artist: artistName.substring(0, 100),
+            author: artistName.substring(0, 100),
+            sourcePlaylistId: 'queue'
+        };
+
+        // ✅ VERIFICAR DUPLICADOS (con Set para mejor rendimiento)
+        const existingIds = new Set(queue.videos.map(v => v?.videoId).filter(Boolean));
+        
+        if (existingIds.has(videoToAdd.videoId)) {
+            if (this.core) {
+                this.core.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
+            }
+            return false;
+        }
+
+        // ✅ AÑADIR SEGÚN ORIGEN
+        if (fromPlaylist) {
             queue.videos.push(videoToAdd);
         } else {
-            queue.videos.splice(currentIndex + 1, 0, videoToAdd);
+            const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
+            if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
+                queue.videos.push(videoToAdd);
+            } else {
+                queue.videos.splice(currentIndex + 1, 0, videoToAdd);
+            }
         }
-    }
 
-    // ✅ ACTUALIZAR UI
-    this.updateQueueUI();
-    
-    if (this.core) {
-        this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
-        
-        if (typeof this.core.enablePlayButton === 'function') {
-            this.core.enablePlayButton();
-        }
-        
-        // Invalidar caché
-        if (typeof this.core.invalidateFlattenedCache === 'function') {
-            this.core.invalidateFlattenedCache();
-        }
-    }
+        // ✅ ACTUALIZAR UI (batch updates)
+        requestAnimationFrame(() => {
+            this.updateQueueUI();
+            
+            if (this.core) {
+                this.core.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
+                
+                if (typeof this.core.enablePlayButton === 'function') {
+                    this.core.enablePlayButton();
+                }
+                
+                // Invalidar caché
+                if (typeof this.core.invalidateFlattenedCache === 'function') {
+                    this.core.invalidateFlattenedCache();
+                }
+            }
+        });
 
-    // ✅ GUARDAR
-    setTimeout(() => {
-        if (typeof window.saveAllData === 'function') {
-            window.saveAllData();
+        // ✅ GUARDAR (debounced)
+        this._scheduleSave();
+        
+        console.log(`✅ Video añadido: ${videoToAdd.title} (ID: ${videoToAdd.videoId})`);
+        return true;
+    }
+    
+    // ✅ DEBOUNCE DE GUARDADO
+    _scheduleSave() {
+        if (this._saveTimeout) {
+            clearTimeout(this._saveTimeout);
         }
-    }, 100);
-    
-    console.log(`✅ Video añadido a cola: ${videoToAdd.title} (ID: ${videoToAdd.videoId})`);
-    
-    return true;
+        
+        this._saveTimeout = setTimeout(() => {
+            if (typeof window.saveAllData === 'function') {
+                window.saveAllData();
+            }
+        }, 500); // Esperar 500ms después de la última modificación
+    }
 }
     cleanArtistName(name) {
     if (!name) return 'Desconocido';
