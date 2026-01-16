@@ -511,27 +511,24 @@ resetCrossfadeFlags() {
     if (this.pendingCrossfade) {
         this.pendingCrossfade.active = false;
         this.pendingCrossfade = null;  
-    }
-
+      }
+} 
 /**
  * Manejar error de reproducción con recuperación
  */
 handlePlaybackError(error, context = 'unknown') {
     console.error(`❌ Error de reproducción (${context}):`, error);
     
-    // Resetear banderas
     this.resetCrossfadeFlags();
     
-    // Reiniciar monitor si estaba activo
     if (reproduccionIniciada && !monitorInterval) {
         playNextVideo();
     }
     
-    // Mostrar error
     this.showMessage(`Error de reproducción: ${error.message || 'desconocido'}`, 'error');
     
     return false;
-}  
+}
 cleanupView(viewName) {
     console.log(`🧹 Limpiando recursos: ${viewName}`);
     
