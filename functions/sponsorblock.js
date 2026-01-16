@@ -3,7 +3,7 @@ const { SponsorBlock } = require('sponsorblock-api');
 exports.handler = async function(event, context) {
     const headers = {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, X-UserID', // Permitir X-UserID
+        'Access-Control-Allow-Headers': 'Content-Type, X-UserID',
         'Access-Control-Allow-Methods': 'GET, OPTIONS'
     };
 
@@ -11,51 +11,90 @@ exports.handler = async function(event, context) {
         return { statusCode: 200, headers, body: '' };
     }
 
-    // 1. Obtener parámetros y encabezados
     const videoId = event.queryStringParameters?.videoId;
     const userId = event.headers['x-userid']; // Netlify convierte a minúsculas
 
-    // 2. Validación (Clave para evitar el 400 Bad Request)
-    if (!videoId || !userId) {
-        console.error('❌ Validación fallida: Faltan videoId o X-UserID');
+    // ✅ VALIDACIÓN MEJORADA
+    if (!videoId) {
         return { 
             statusCode: 400, 
             headers, 
-            body: JSON.stringify({ 
-                error: 'Faltan parámetros de consulta (videoId) o encabezado (X-UserID)' 
-            })
+            body: JSON.stringify({ error: 'Falta parámetro videoId' })
+        };
+    }
+    
+    // ✅ VALIDAR FORMATO DE VIDEO ID
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: 'videoId inválido' })
+        };
+    }
+
+    if (!userId) {
+        return { 
+            statusCode: 400, 
+            headers, 
+            body: JSON.stringify({ error: 'Falta encabezado X-UserID' })
         };
     }
 
     try {
-        // 3. Llamar a la API de SponsorBlock
         const sponsorBlock = new SponsorBlock(userId);
         
-        const segments = await sponsorBlock.getSegments(videoId, [
+        // ✅ TIMEOUT DE 3 SEGUNDOS
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout')), 3000);
+        });
+        
+        const segmentsPromise = sponsorBlock.getSegments(videoId, [
             "sponsor", 
             "intro", 
             "outro", 
             "selfpromo",
-            "music_offtopic", // Importante para tu caso de uso
+            "music_offtopic",
         ]);
         
-        console.log(`✅ Segmentos obtenidos para ${videoId}: ${segments.length}`);
+        const segments = await Promise.race([segmentsPromise, timeoutPromise]);
+        
+        // ✅ VALIDAR RESPUESTA
+        if (!Array.isArray(segments)) {
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify([])
+            };
+        }
+        
+        // ✅ FILTRAR SEGMENTOS VÁLIDOS
+        const validSegments = segments.filter(s => 
+            s && 
+            typeof s.startTime === 'number' && 
+            typeof s.endTime === 'number' &&
+            s.startTime < s.endTime &&
+            s.category
+        );
+        
+        console.log(`✅ ${validSegments.length} segmentos válidos para ${videoId}`);
 
-        // 4. Devolver un array
         return {
             statusCode: 200,
             headers,
-            body: JSON.stringify(segments || []) 
+            body: JSON.stringify(validSegments)
         };
         
     } catch (error) {
-        console.error(`❌ Error al llamar a SponsorBlock para ${videoId}:`, error.message);
+        // ✅ NO LOGEAR ERRORES 404 (es normal)
+        if (error.message !== 'HTTP 404' && error.message !== 'Timeout') {
+            console.error(`❌ Error SponsorBlock para ${videoId}:`, error.message);
+        }
         
-        // Devolver array vacío y 200 OK para no romper el cliente
+        // ✅ DEVOLVER ARRAY VACÍO EN VEZ DE ERROR
         return { 
             statusCode: 200, 
             headers,
-            body: JSON.stringify([]) 
+            body: JSON.stringify([])
         };
     }
 };
