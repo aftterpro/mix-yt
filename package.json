@@ -3,20 +3,16 @@
   "version": "1.0.0",
   "scripts": {
     "build": "echo 'No build needed'", 
-    "dev": "serve -s ." 
+    "dev": "serve -s ."
   },
   "dependencies": {
-    "cheerio": "^1.0.0",
-    "node-fetch": "^2.6.7",
     "express": "^4.21.2", 
     "serverless-http": "^3.2.0",
     "sponsorblock-api": "^0.2.4",
-    "googleapis": "^144.0.0", 
     "crypto-js": "^4.2.0",
     "youtube-search-api": "^1.2.1"
   },
   "devDependencies": {
-    "serve": "^14.2.1",
-    "cors-anywhere": "^0.4.4"
+    "serve": "^14.2.1"
   }
 }
