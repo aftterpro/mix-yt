@@ -306,14 +306,20 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
     }
 }
 
-// Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
     if (isPlaylist) {
         // Si es playlist, cargar sus videos y añadir al FINAL
         console.log('📂 Añadiendo playlist entera al final de la cola...');
         this.loadPlaylistVideos(item.id).then(videos => {
             videos.forEach(v => this.addVideoToQueue(v, true)); // true = al final
-            this.core.showMessage(`${videos.length} videos añadidos al final`, 'success');
+            if (this.core) {
+                this.core.showMessage(`${videos.length} videos añadidos al final`, 'success');
+            }
+        }).catch(error => {
+            console.error('❌ Error cargando playlist:', error);
+            if (this.core) {
+                this.core.showMessage('Error al cargar la playlist', 'error');
+            }
         });
     } else {
         // Si es video suelto, añadir DESPUÉS DEL ACTUAL
