@@ -1,7 +1,8 @@
-// init.js - Script de Inicialización Unificada
 console.log('🚀 Iniciando YT CrossMix - Carga de APIs...');
 
-// Estado global mejorado
+// =============================================
+// ESTADO GLOBAL MEJORADO
+// =============================================
 window.ytCrossMixAPIs = {
     gapi: false,
     gis: false,
@@ -13,132 +14,207 @@ window.ytCrossMixAPIs = {
 };
 
 // =============================================
-// INICIALIZACIÓN DE GOOGLE APIS
+// PROMESAS PARA CADA API
 // =============================================
 
 /**
- * Función llamada automáticamente cuando gapi se carga
+ * Promesa para YouTube IFrame API
  */
-window.gapiInitialize = async function() {
-    console.log('📡 [INIT] Iniciando coordinación con auth.js...');
-    
-    // NO inicializar aquí, dejar que auth.js lo haga
-    // Solo marcar como disponible
-    if (typeof gapi !== 'undefined') {
-        setTimeout(() => {
-            if (window.gapiInitialize_auth) {
-                console.log('🔄 [INIT] Delegando a auth.js...');
-                window.gapiInitialize_auth();
-            }
-        }, 1000);
+const youtubePromise = new Promise((resolve) => {
+    if (window.YT && window.YT.Player) {
+        console.log('✅ YouTube API ya disponible');
+        resolve();
+    } else {
+        window.onYouTubeIframeAPIReady = () => {
+            console.log('✅ YouTube IFrame API cargada');
+            window.ytCrossMixAPIs.youtube = true;
+            resolve();
+        };
     }
-};
+});
 
 /**
- * Función llamada automáticamente cuando GIS se carga
+ * Promesa para Google API Client (gapi)
  */
-window.gisInitalize = function() {
-    console.log('🔑 [INIT] GIS disponible, delegando a auth.js...');
-    
-    // Solo actualizar estado, no inicializar
-    if (typeof google !== 'undefined' && google.accounts) {
-        window.ytCrossMixAPIs.gis = true;
+const gapiPromise = new Promise((resolve) => {
+    if (typeof gapi !== 'undefined' && gapi.client) {
+        console.log('✅ GAPI ya disponible');
+        resolve();
+    } else {
+        const checkGapi = setInterval(() => {
+            if (typeof gapi !== 'undefined') {
+                clearInterval(checkGapi);
+                console.log('📡 GAPI detectado, cargando client...');
+                
+                gapi.load('client', () => {
+                    console.log('✅ GAPI client cargado');
+                    window.ytCrossMixAPIs.gapi = true;
+                    resolve();
+                });
+            }
+        }, 100);
         
-        if (window.gisInitalize_auth) {
+        // Timeout de seguridad (10 segundos)
+        setTimeout(() => {
+            clearInterval(checkGapi);
+            console.warn('⏰ Timeout esperando GAPI');
+            resolve(); // Resolver de todas formas para no bloquear
+        }, 10000);
+    }
+});
+
+/**
+ * Promesa para Google Identity Services (GIS)
+ */
+const gisPromise = new Promise((resolve) => {
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+        console.log('✅ GIS ya disponible');
+        resolve();
+    } else {
+        const checkGIS = setInterval(() => {
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                clearInterval(checkGIS);
+                console.log('✅ GIS detectado');
+                window.ytCrossMixAPIs.gis = true;
+                resolve();
+            }
+        }, 100);
+        
+        // Timeout de seguridad (15 segundos)
+        setTimeout(() => {
+            clearInterval(checkGIS);
+            console.warn('⏰ Timeout esperando GIS');
+            resolve(); // Resolver de todas formas
+        }, 15000);
+    }
+});
+
+// =============================================
+// FUNCIÓN PRINCIPAL DE INICIALIZACIÓN
+// =============================================
+
+async function initializeAPIs() {
+    console.log('🚀 Esperando a que todas las APIs estén listas...');
+    
+    try {
+        // ✅ ESPERAR A QUE TODAS LAS PROMESAS SE RESUELVAN
+        await Promise.all([youtubePromise, gapiPromise, gisPromise]);
+        
+        console.log('🎉 Todas las APIs cargadas correctamente');
+        
+        // Marcar como listo
+        window.ytCrossMixAPIs.ready = true;
+        
+        // ✅ INICIALIZAR GAPI CLIENT
+        if (window.ytCrossMixAPIs.gapi && typeof gapi !== 'undefined') {
+            await initializeGapiClient();
+        }
+        
+        // ✅ INICIALIZAR GIS TOKEN CLIENT
+        if (window.ytCrossMixAPIs.gis && window.gisInitalize_auth) {
             setTimeout(() => {
                 window.gisInitalize_auth();
             }, 500);
         }
-    }
-};
-/**
- * Función llamada automáticamente cuando YouTube IFrame API se carga
- */
-window.onYouTubeIframeAPIReady = function() {
-    try {
-        console.log('🎵 YouTube IFrame API cargada');
-        window.ytCrossMixAPIs.youtube = true;
-        checkAllAPIsReady();
-    } catch (error) {
-        console.error('❌ Error con YouTube API:', error);
-        showInitError('Error cargando YouTube API');
-    }
-};
-
-/**
- * Verificar si todas las APIs están listas
- */
-function checkAllAPIsReady() {
-    const { gapi, gis, youtube } = window.ytCrossMixAPIs;
-    
-    console.log('📊 Estado de APIs:', { gapi, gis, youtube });
-    
-    if (gapi && gis && youtube) {
-        window.ytCrossMixAPIs.ready = true;
-        console.log('🎉 ¡Todas las APIs están listas!');
         
-        // Notificar al sistema unificado
-        if (window.unifiedCore) {
-            window.unifiedCore.state.authReady = true;
-            window.unifiedCore.updateStatusIndicator('APIs listas', 'success');
+        // ✅ CONFIGURAR YOUTUBE API CON ORIGIN CORRECTO
+        if (window.ytCrossMixAPIs.youtube) {
+            configureYouTubeAPI();
         }
         
         // Disparar evento global
         document.dispatchEvent(new CustomEvent('ytCrossMixAPIsReady', {
-            detail: { gapi, gis, youtube, timestamp: Date.now() }
+            detail: { 
+                gapi: window.ytCrossMixAPIs.gapi,
+                gis: window.ytCrossMixAPIs.gis,
+                youtube: window.ytCrossMixAPIs.youtube,
+                timestamp: Date.now() 
+            }
         }));
         
         console.log('✅ Evento ytCrossMixAPIsReady disparado');
         
-    } else {
-        const missing = [];
-        if (!gapi) missing.push('GAPI');
-        if (!gis) missing.push('GIS');
-        if (!youtube) missing.push('YouTube');
+    } catch (error) {
+        console.error('❌ Error cargando APIs:', error);
+        window.ytCrossMixAPIs.errors.push(error.message);
         
-        console.log(`⏳ Esperando APIs: ${missing.join(', ')}`);
+        // Disparar evento de error
+        document.dispatchEvent(new CustomEvent('ytCrossMixAPIsError', {
+            detail: { error: error.message }
+        }));
     }
-}
-
-
-/**
- * Mostrar error de inicialización
- */
-function showInitError(message) {
-    console.error('🔴', message);
-    
-    // Mostrar en la UI si está disponible
-    const statusIndicator = document.getElementById('unifiedStatusIndicator');
-    if (statusIndicator) {
-        statusIndicator.textContent = message;
-        statusIndicator.className = 'unified-status-indicator show error';
-    }
-    
-    // Fallback visual
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #f44336;
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    `;
-    errorDiv.textContent = message;
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => errorDiv.remove(), 5000);
 }
 
 // =============================================
-// CARGA AUTOMÁTICA DE SCRIPTS
+// INICIALIZAR GAPI CLIENT
+// =============================================
+
+async function initializeGapiClient() {
+    console.log('📡 Inicializando GAPI client...');
+    
+    try {
+        await gapi.client.init({
+            apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4',
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+        });
+        
+        await gapi.client.load('youtube', 'v3');
+        
+        console.log('✅ GAPI y YouTube v3 cargados');
+        
+        // Llamar a auth.js si está disponible
+        if (window.gapiInitialize_auth) {
+            window.gapiInitialize_auth();
+        }
+        
+    } catch (err) {
+        console.error('❌ Error inicializando GAPI:', err);
+        window.ytCrossMixAPIs.errors.push('GAPI init failed: ' + err.message);
+    }
+}
+
+// =============================================
+// CONFIGURAR YOUTUBE API CON ORIGIN
+// =============================================
+
+function configureYouTubeAPI() {
+    console.log('🎮 Configurando YouTube API con origin correcto...');
+    
+    if (!window.YT || !window.YT.Player) {
+        console.warn('⚠️ YT.Player no disponible');
+        return;
+    }
+    
+    const currentOrigin = window.location.origin;
+    const originalPlayer = window.YT.Player;
+    
+    // Wrapper para forzar origin
+    window.YT.Player = function(elementId, config) {
+        config = config || {};
+        config.playerVars = config.playerVars || {};
+        
+        // ✅ FORZAR ORIGIN Y CONFIGURACIONES
+        config.playerVars.origin = currentOrigin;
+        config.playerVars.widget_referrer = currentOrigin;
+        config.playerVars.enablejsapi = 1;
+        
+        console.log(`🎮 Creando player "${elementId}" con origin: ${currentOrigin}`);
+        
+        return new originalPlayer(elementId, config);
+    };
+    
+    // Preservar prototipo
+    window.YT.Player.prototype = originalPlayer.prototype;
+    
+    console.log('✅ YouTube API configurada correctamente');
+}
+
+// =============================================
+// CARGA AUTOMÁTICA DE YOUTUBE API
 // =============================================
 
 function loadYouTubeAPI() {
+    // Verificar si ya está cargándose
     if (document.querySelector('script[src*="iframe_api"]')) {
         console.log('📺 YouTube API ya está cargándose...');
         return;
@@ -148,13 +224,13 @@ function loadYouTubeAPI() {
     
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
-    
-    // ✅ CRÍTICO: Configurar origin correctamente
-    const currentOrigin = window.location.origin;
-    script.setAttribute('data-origin', currentOrigin);
     script.async = true;
     
-    // ✅ CORRECCIÓN: Manejo de errores de carga
+    // Configurar origin
+    const currentOrigin = window.location.origin;
+    script.setAttribute('data-origin', currentOrigin);
+    
+    // ✅ MANEJO DE ERRORES DE CARGA
     script.onerror = () => {
         console.error('❌ Error cargando YouTube IFrame API');
         window.ytCrossMixAPIs.errors.push('YouTube API load failed');
@@ -165,12 +241,18 @@ function loadYouTubeAPI() {
             console.log(`🔄 Reintentando carga de YouTube API (${window.ytCrossMixAPIs.retryCount}/${window.ytCrossMixAPIs.maxRetries})...`);
             
             setTimeout(() => {
-                // Remover script fallido
                 script.remove();
                 loadYouTubeAPI();
             }, 2000);
         } else {
-            showInitError('Error cargando YouTube API después de múltiples intentos');
+            console.error('❌ Error cargando YouTube API después de múltiples intentos');
+            
+            if (window.unifiedCore) {
+                window.unifiedCore.showMessage(
+                    'Error cargando YouTube. Recarga la página.',
+                    'error'
+                );
+            }
         }
     };
     
@@ -181,170 +263,10 @@ function loadYouTubeAPI() {
     document.head.appendChild(script);
 }
 
-/**
- * Configurar players con origin correcto
- */
-window.onYouTubeIframeAPIReady = function() {
-    try {
-        console.log('🎵 YouTube IFrame API lista');
-        window.ytCrossMixAPIs.youtube = true;
-        
-        // ✅ CONFIGURAR ORIGIN CORRECTO
-        if (window.YT && window.YT.Player) {
-            const currentOrigin = window.location.origin;
-            const originalPlayer = window.YT.Player;
-            
-            // Wrapper para forzar origin
-            window.YT.Player = function(elementId, config) {
-                config = config || {};
-                config.playerVars = config.playerVars || {};
-                
-                // ✅ FORZAR ORIGIN
-                config.playerVars.origin = currentOrigin;
-                config.playerVars.widget_referrer = currentOrigin;
-                config.playerVars.enablejsapi = 1;
-                
-                console.log(`🎮 Creando player "${elementId}" con origin: ${currentOrigin}`);
-                
-                return new originalPlayer(elementId, config);
-            };
-            
-            // Preservar prototipo
-            window.YT.Player.prototype = originalPlayer.prototype;
-            
-            console.log('✅ YouTube API configurada con origin:', currentOrigin);
-        }
-        
-        checkAllAPIsReady();
-        
-    } catch (error) {
-        console.error('❌ Error en onYouTubeIframeAPIReady:', error);
-        window.ytCrossMixAPIs.errors.push('YouTube API error: ' + error.message);
-        showInitError('Error inicializando YouTube API');
-    }
-}
-
-
-// ✅ ASEGURAR QUE SE LLAME A loadYouTubeAPI
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('📄 DOM cargado, verificando APIs...');
-        ensureAPIsLoaded();
-        loadYouTubeAPI(); // ✅ Llamar explícitamente
-    });
-} else {
-    console.log('📄 DOM ya cargado, verificando APIs...');
-    ensureAPIsLoaded();
-    loadYouTubeAPI(); // ✅ Llamar explícitamente
-}
-/**
- * Verificar y cargar APIs faltantes
- */
-function ensureAPIsLoaded() {
-    console.log('🔍 Verificando disponibilidad de APIs...');
-    
-    // YouTube API
-    if (!window.YT && !document.querySelector('script[src*="iframe_api"]')) {
-        console.log('📺 Cargando YouTube API...');
-        loadYouTubeAPI();
-    } else if (window.YT) {
-        console.log('✅ YouTube API ya disponible');
-        window.ytCrossMixAPIs.youtube = true;
-    }
-    
-    // Google APIs (gapi)
-    if (!window.gapi) {
-        if (!document.querySelector('script[src*="apis.google.com/js/api.js"]')) {
-            console.warn('⚠️ Google API script no encontrado en HTML');
-        } else {
-            console.log('⏳ Esperando carga de GAPI...');
-        }
-    } else {
-        console.log('✅ GAPI ya disponible');
-    }
-    
-    // Google Identity Services (GIS)
-    if (!window.google || !window.google.accounts) {
-        if (!document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
-            console.warn('⚠️ Google Identity script no encontrado en HTML');
-        } else {
-            console.log('⏳ Esperando carga de GIS...');
-        }
-    } else {
-        console.log('✅ GIS ya disponible');
-    }
-}
-
-// =============================================
-// INICIALIZACIÓN AUTOMÁTICA
-// =============================================
-
-//  ASEGURAR QUE SE LLAME A loadYouTubeAPI
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('📄 DOM cargado, verificando APIs...');
-        ensureAPIsLoaded();
-        loadYouTubeAPI();
-        
-        setTimeout(setupAudioControls, 1000);
-        
-        // ✅ TIMEOUT MEJORADO CON REINTENTOS
-        let checkAttempts = 0;
-        const MAX_ATTEMPTS = 30;
-        
-        const checkAPIsInterval = setInterval(() => {
-            checkAttempts++;
-            
-            const { gapi, gis, youtube } = window.ytCrossMixAPIs;
-            
-            if (gapi && gis && youtube) {
-                clearInterval(checkAPIsInterval);
-                console.log('✅ Todas las APIs verificadas correctamente');
-                
-                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsVerified', {
-                    detail: { success: true, attempts: checkAttempts }
-                }));
-                return;
-            }
-            
-            if (checkAttempts >= MAX_ATTEMPTS) {
-                clearInterval(checkAPIsInterval);
-                
-                const missing = [];
-                if (!gapi) missing.push('GAPI');
-                if (!gis) missing.push('GIS');
-                if (!youtube) missing.push('YouTube');
-                
-                console.warn(`⏰ Timeout de APIs después de ${checkAttempts}s. Faltantes: ${missing.join(', ')}`);
-                
-                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout', {
-                    detail: { 
-                        missing: missing,
-                        available: { gapi, gis, youtube },
-                        attempts: checkAttempts
-                    }
-                }));
-                
-                if (!youtube && window.unifiedCore) {
-                    window.unifiedCore.showMessage(
-                        'Algunos servicios tardaron en cargar. Funcionalidad limitada.',
-                        'warning'
-                    );
-                }
-            }
-        }, 1000);
-    });
-} else {
-    console.log('📄 DOM ya cargado, verificando APIs...');
-    ensureAPIsLoaded();
-    loadYouTubeAPI();
-    setTimeout(setupAudioControls, 1000);
-}
 // =============================================
 // CONFIGURACIÓN DE CONTROLES DE AUDIO
 // =============================================
 
-// ✅ CORRECCIÓN: setupAudioControls con mejor manejo
 function setupAudioControls() {
     console.log('🔊 Configurando controles de audio...');
     
@@ -362,7 +284,7 @@ function setupAudioControls() {
     let isMuted = false;
     let previousVolume = 100;
     
-    // ✅ CORRECCIÓN: Cargar volumen guardado con validación
+    // ✅ CARGAR VOLUMEN GUARDADO
     try {
         const savedVolume = localStorage.getItem('ytcm_volume');
         if (savedVolume !== null) {
@@ -514,43 +436,18 @@ function setupAudioControls() {
     console.log('✅ Controles de audio configurados');
 }
 
-
-// Inicializar controles cuando el DOM esté listo
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('📄 DOM cargado, verificando APIs...');
-        ensureAPIsLoaded();
-        loadYouTubeAPI();
-        
-        setTimeout(setupAudioControls, 1000);
-        
-        // Timeout de seguridad
-        setTimeout(() => {
-            if (!window.ytCrossMixAPIs.ready) {
-                console.warn('⏰ Timeout de APIs (10s), algunas pueden no estar disponibles');
-                console.log('Estado final:', window.ytCrossMixAPIs);
-                document.dispatchEvent(new CustomEvent('ytCrossMixAPIsTimeout'));
-            }
-        }, 10000);
-    });
-} else {
-    console.log('📄 DOM ya cargado, verificando APIs...');
-    ensureAPIsLoaded();
-    loadYouTubeAPI();
-    setTimeout(setupAudioControls, 1000);
-}
-
-console.log('✅ Sistema de inicialización cargado');
 // =============================================
-// LISTENER PARA MANEJAR TIMEOUT
+// LISTENER PARA TIMEOUT DE APIS
 // =============================================
+
 document.addEventListener('ytCrossMixAPIsTimeout', (e) => {
-    // Validación robusta de e.detail
     const detail = e?.detail || {};
     const missing = detail.missing || [];
     const available = detail.available || {};
     
     console.log('🔄 Manejando timeout de APIs...');
+    console.log('APIs disponibles:', available);
+    console.log('APIs faltantes:', missing);
     
     // Si YouTube está disponible, continuar
     if (available.youtube) {
@@ -572,4 +469,87 @@ document.addEventListener('ytCrossMixAPIsTimeout', (e) => {
             window.gisInitalize_auth();
         }
     }
+    
+    // Mostrar advertencia si falta algo crítico
+    if (missing.length > 0 && window.unifiedCore) {
+        window.unifiedCore.showMessage(
+            `Algunas funciones pueden estar limitadas (${missing.join(', ')})`,
+            'warning'
+        );
+    }
 });
+
+// =============================================
+// LISTENER PARA APIS LISTAS
+// =============================================
+
+document.addEventListener('ytCrossMixAPIsReady', (e) => {
+    console.log('🎉 Todas las APIs listas:', e.detail);
+    
+    // Inicializar sistema si está disponible
+    if (window.unifiedCore && !window.unifiedCore.state.initialized) {
+        console.log('🚀 Inicializando UnifiedCore...');
+        // El core se inicializa automáticamente en su constructor
+    }
+});
+
+// =============================================
+// INICIALIZACIÓN AUTOMÁTICA AL CARGAR DOM
+// =============================================
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📄 DOM cargado, iniciando APIs...');
+        
+        // Cargar YouTube API
+        loadYouTubeAPI();
+        
+        // Inicializar todas las APIs
+        initializeAPIs();
+        
+        // Configurar controles de audio
+        setTimeout(setupAudioControls, 1000);
+    });
+} else {
+    console.log('📄 DOM ya cargado, iniciando APIs...');
+    
+    // Cargar YouTube API
+    loadYouTubeAPI();
+    
+    // Inicializar todas las APIs
+    initializeAPIs();
+    
+    // Configurar controles de audio
+    setTimeout(setupAudioControls, 1000);
+}
+
+// =============================================
+// FUNCIONES GLOBALES DE DEBUG
+// =============================================
+
+window.debugAPIs = function() {
+    console.group('🐛 Estado de APIs');
+    console.log('Estado:', window.ytCrossMixAPIs);
+    console.log('GAPI disponible:', typeof gapi !== 'undefined');
+    console.log('GIS disponible:', typeof google !== 'undefined' && google.accounts);
+    console.log('YouTube disponible:', typeof YT !== 'undefined' && YT.Player);
+    console.groupEnd();
+};
+
+window.forceReloadAPIs = async function() {
+    console.log('🔄 Forzando recarga de APIs...');
+    
+    window.ytCrossMixAPIs = {
+        gapi: false,
+        gis: false,
+        youtube: false,
+        ready: false,
+        errors: [],
+        retryCount: 0,
+        maxRetries: 3
+    };
+    
+    await initializeAPIs();
+};
+
+console.log('✅ Sistema de inicialización cargado con promesas');
