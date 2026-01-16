@@ -305,15 +305,7 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         }, 500); // Esperar 500ms después de la última modificación
     }
 }
-    cleanArtistName(name) {
-    if (!name) return 'Desconocido';
-    
-    // Eliminar " - Topic" de YouTube
-    let cleaned = name.replace(/\s*-\s*Topic$/i, '').trim();
-    
-    // Si quedó vacío, devolver original
-    return cleaned.length > 0 ? cleaned : name;
-}
+
 // Asegúrate de tener esta función auxiliar para clicks en la biblioteca
 handleLibraryItemClick(item, isPlaylist) {
     if (isPlaylist) {
@@ -549,11 +541,7 @@ async loadPlaylistVideos(playlistId) {
     
     return 'Desconocido';
 }   
-    /**
-     * Eliminar video de la cola
-     */
 
-// Reemplazar línea 250-350 en playlist.js
 removeVideoFromQueue(videoId) {
     console.log(`🗑️ removeVideoFromQueue: ${videoId}`);
     
