@@ -2764,13 +2764,7 @@ clearSearchResults() {
         };
         console.log('🗑️ Caché de playlist invalidado');
     }
-}
 
-invalidateFlattenedCache() {
-    this._flattenedCache = null;
-    this._flattenedCacheKey = null;
-    console.log('🗑️ Caché de playlist aplanada invalidada');
-}
 parseDuration(durationInput) {
     // Validación inicial
     if (!durationInput) return 0;
