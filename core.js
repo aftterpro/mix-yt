@@ -1244,130 +1244,80 @@ setupSearchButtonListeners() {
     const searchResults = document.getElementById('searchResults');
     if (!searchResults) return;
     
-    // ✅ LIMPIAR LISTENER ANTERIOR con cloneNode
+    // Limpiamos listeners previos para evitar ejecuciones duplicadas
     const newSearchResults = searchResults.cloneNode(true);
     searchResults.parentNode.replaceChild(newSearchResults, searchResults);
     const freshSearchResults = document.getElementById('searchResults');
     
-    // ✅ EVENT DELEGATION (más eficiente)
     freshSearchResults.addEventListener('click', async (e) => {
-        const nextBtn = e.target.closest('.search-result-add-next-btn');
-        if (!nextBtn) return;
+        // Identificar si el clic fue en "Añadir Siguiente" o "Añadir a Cola"
+        const btn = e.target.closest('.search-result-add-next-btn, .add-to-queue-btn');
+        if (!btn) return;
         
         e.preventDefault();
         e.stopPropagation();
         
-        const videoId = nextBtn.dataset.videoId;
-        if (!videoId || videoId === 'undefined') {
+        // Extraer el videoId (priorizando el atributo del botón, luego el de la tarjeta)
+        const videoId = btn.dataset.videoId || btn.closest('.search-result-card')?.dataset.videoId;
+        
+        if (!videoId || videoId === 'undefined' || videoId.length !== 11) {
+            console.error('❌ ID de video no válido detectado en búsqueda');
             this.showMessage('Error: Video inválido', 'error');
             return;
         }
         
+        // Determinar la acción según la clase del botón
+        const isNextAction = btn.classList.contains('search-result-add-next-btn');
+        
+        // Construir objeto de datos unificado
         const videoData = {
             videoId: videoId,
-            title: nextBtn.dataset.title,
-            thumbnail: nextBtn.dataset.thumbnail,
-            duration: parseInt(nextBtn.dataset.duration) || 0,
-            uploaderName: nextBtn.dataset.artist,
-            author: nextBtn.dataset.artist,
-            artist: nextBtn.dataset.artist
+            title: btn.dataset.title || btn.closest('.search-result-card')?.querySelector('.search-result-title')?.textContent || 'Sin título',
+            thumbnail: btn.dataset.thumbnail || btn.closest('.search-result-card')?.querySelector('img')?.src || './electronic.ico',
+            duration: parseInt(btn.dataset.duration) || 0,
+            uploaderName: btn.dataset.artist || btn.dataset.author || 'Desconocido'
         };
         
-        nextBtn.disabled = true;
-        nextBtn.style.opacity = '0.5';
+        // Feedback visual en el botón
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         
         try {
-            // ✅ CORREGIDO: Usar el método correcto
-            await this.addVideoToQueueAfterCurrent(videoData);
+            if (isNextAction) {
+                // Añadir después del video actual
+                await this.addVideoToQueueAfterCurrent(videoData);
+            } else {
+                // Añadir al final de la cola
+                await this.addVideoToQueue(videoData);
+            }
             
-            nextBtn.innerHTML = '<i class="fas fa-check"></i> Añadido';
-            nextBtn.style.background = '#4caf50';
+            // Éxito: Feedback visual
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.style.background = '#4caf50';
+            btn.style.color = 'white';
             
-            // ✅ SINCRONIZAR COLA INMEDIATAMENTE
+            // Sincronizar UI de la cola si el manager existe
             if (window.playlistManager) {
                 window.playlistManager.updateQueueUI();
             }
-            if (this.updatePersistentQueue) {
-                this.updatePersistentQueue();
-            }
             
-            setTimeout(() => {
-                nextBtn.innerHTML = '<i class="fas fa-forward"></i>';
-                nextBtn.style.background = '';
-                nextBtn.disabled = false;
-                nextBtn.style.opacity = '1';
-            }, 2000);
         } catch (error) {
-            console.error('❌ Error:', error);
-            nextBtn.disabled = false;
-            nextBtn.style.opacity = '1';
-            this.showMessage('Error añadiendo video', 'error');
-        }
-    });
-    
-    // ✅ BOTÓN "AÑADIR A COLA"
-    freshSearchResults.addEventListener('click', async (e) => {
-        const addBtn = e.target.closest('.add-to-queue-btn');
-        if (!addBtn) return;
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const videoId = addBtn.dataset.videoId;
-        if (!videoId || videoId === 'undefined') {
-            this.showMessage('Error: Video inválido', 'error');
-            return;
-        }
-        
-        // Obtener datos del video desde el DOM
-        const card = addBtn.closest('.search-result-card');
-        const videoData = {
-            videoId: videoId,
-            title: card.querySelector('.search-result-title')?.textContent || 'Sin título',
-            thumbnail: card.querySelector('.search-result-thumbnail img')?.src || './electronic.ico',
-            duration: parseInt(card.querySelector('.search-result-duration')?.textContent) || 0,
-            uploaderName: card.querySelector('.search-result-author')?.textContent || 'Desconocido',
-            author: card.querySelector('.search-result-author')?.textContent || 'Desconocido',
-            artist: card.querySelector('.search-result-author')?.textContent || 'Desconocido'
-        };
-        
-        addBtn.disabled = true;
-        const icon = addBtn.querySelector('i');
-        icon.className = 'fas fa-spinner fa-spin';
-        
-        try {
-            await this.addVideoToQueue(videoData);
-            
-            icon.className = 'fas fa-check';
-            addBtn.style.background = '#4caf50';
-            
-            // ✅ SINCRONIZAR COLA
-            if (window.playlistManager) {
-                window.playlistManager.updateQueueUI();
-            }
-            if (this.updatePersistentQueue) {
-                this.updatePersistentQueue();
-            }
-            
+            console.error('❌ Error al procesar video desde búsqueda:', error);
+            btn.innerHTML = '<i class="fas fa-times"></i>';
+            btn.style.background = '#f44336';
+        } finally {
+            // Restaurar botón tras un breve retraso
             setTimeout(() => {
-                icon.className = 'fas fa-plus';
-                addBtn.style.background = '';
-                addBtn.disabled = false;
-            }, 1500);
-        } catch (error) {
-            console.error('❌ Error:', error);
-            icon.className = 'fas fa-times';
-            addBtn.style.background = '#f44336';
-            
-            setTimeout(() => {
-                icon.className = 'fas fa-plus';
-                addBtn.style.background = '';
-                addBtn.disabled = false;
+                btn.innerHTML = originalContent;
+                btn.style.background = '';
+                btn.style.color = '';
+                btn.disabled = false;
             }, 1500);
         }
     });
     
-    console.log('✅ Listeners configurados con event delegation');
+    console.log('✅ Listeners de búsqueda configurados correctamente.');
 }
     setupMiniPlayerObserver() {
         const miniPlayer = document.getElementById('miniPlayerFloat');
@@ -2462,30 +2412,22 @@ showEndOfResultsMessage(container) {
     container.appendChild(message);
 }
 async addVideoToQueue(videoData, fromPlaylist = false) {
-    console.log('🎵 addVideoToQueue:', videoData);
+    console.log('🎵 Intentando añadir video a la cola:', videoData);
     
-    // ✅ VALIDACIÓN ESTRICTA DEL VIDEO ID
-    if (!videoData || 
-        !videoData.videoId || 
-        videoData.videoId === 'undefined' || 
-        typeof videoData.videoId !== 'string' ||
-        videoData.videoId.trim() === '') {
-        console.error('❌ videoId inválido:', videoData);
+    // 1. VALIDACIÓN CRÍTICA DEL ID
+    // Aceptamos videoId o id para mayor compatibilidad
+    const id = videoData.videoId || videoData.id;
+    
+    if (!id || typeof id !== 'string' || id.trim() === '' || id === 'undefined' || id.length !== 11) {
+        console.error('❌ Validación de ID fallida:', id);
         this.showMessage('Error: Video inválido', 'error');
         return false;
     }
 
-    // ✅ VALIDAR TÍTULO
-    if (!videoData.title || videoData.title.trim() === '') {
-        console.warn('⚠️ Video sin título, usando fallback');
-        videoData.title = 'Video sin título';
-    }
-
-    // ✅ OBTENER COLA
+    // 2. OBTENER O CREAR LA COLA
     let queue = this.playlistsData.find(p => p.id === 'queue' || p.isQueue);
-
     if (!queue) {
-        console.log('✨ Creando cola...');
+        console.log('✨ Inicializando cola de reproducción inexistente...');
         queue = {
             id: 'queue',
             name: 'Cola de Reproducción',
@@ -2497,42 +2439,43 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         this.playlistsData.unshift(queue);
     }
     
-    // ✅ VALIDAR QUE queue.videos ES UN ARRAY
+    // Asegurar que la propiedad videos sea un array
     if (!Array.isArray(queue.videos)) {
-        console.error('❌ queue.videos no es un array:', queue.videos);
         queue.videos = [];
     }
 
-    // ✅ NORMALIZAR VIDEO (SIN LLAMAR A cleanArtistName)
-    let artistName = videoData.uploaderName || videoData.artist || 'Desconocido';
+    // 3. NORMALIZACIÓN DE DATOS
+    const cleanId = id.trim();
+    const cleanTitle = (videoData.title || 'Video sin título').trim();
+    let artistName = videoData.uploaderName || videoData.artist || videoData.author || 'Desconocido';
     
-    // Limpiar " - Topic" inline
+    // Limpieza de sufijos comunes de canales de YouTube
     artistName = artistName.replace(/\s*-\s*Topic$/i, '').trim();
-    if (!artistName || artistName.toLowerCase() === 'youtube') {
-        artistName = 'Desconocido';
-    }
+    if (artistName.toLowerCase() === 'youtube') artistName = 'Desconocido';
 
     const videoToAdd = {
-        videoId: videoData.videoId.trim(),
-        title: videoData.title.trim(),
+        videoId: cleanId,
+        title: cleanTitle,
         thumbnail: videoData.thumbnail || videoData.thumbnailUrl || './electronic.ico',
-        duration: parseInt(videoData.duration) || 0,
+        duration: this.parseDuration(videoData.duration),
         uploaderName: artistName,
         artist: artistName,
         sourcePlaylistId: 'queue'
     };
 
-    // ✅ VERIFICAR DUPLICADOS
+    // 4. VERIFICAR DUPLICADOS
     const isDuplicate = queue.videos.some(v => v && v.videoId === videoToAdd.videoId);
     if (isDuplicate) {
-        this.showMessage(`"${videoToAdd.title}" ya está en cola`, 'warning');
+        this.showMessage(`"${videoToAdd.title}" ya está en la cola`, 'warning');
         return false;
     }
 
-    // ✅ AÑADIR (al final si es desde playlist, inteligente si es manual)
+    // 5. INSERCIÓN LÓGICA
     if (fromPlaylist) {
+        // Si viene de una playlist entera, se añade al final
         queue.videos.push(videoToAdd);
     } else {
+        // Si es añadido manualmente, se inserta después del video actual o al final si no hay nada sonando
         const currentIndex = window.currentPlayingInfo?.flattenedIndex ?? -1;
         if (currentIndex === -1 || currentIndex >= queue.videos.length - 1) {
             queue.videos.push(videoToAdd);
@@ -2541,28 +2484,26 @@ async addVideoToQueue(videoData, fromPlaylist = false) {
         }
     }
 
-    // ✅ ACTUALIZAR UI
-    if (this.updateQueueUI) {
-        this.updateQueueUI();
+    // 6. ACTUALIZACIÓN DE ESTADO Y UI
+    this.invalidateFlattenedCache(); // Limpiar caché de la lista aplanada
+    
+    if (window.playlistManager) {
+        window.playlistManager.updateQueueUI();
     }
+    
+    this.updatePersistentQueue(); // Actualizar la vista de la cola en el DOM
+    this.enablePlayButton(); // Habilitar controles si estaban bloqueados
     
     this.showMessage(`Añadido: ${videoToAdd.title}`, 'success');
-    
-    if (typeof this.enablePlayButton === 'function') {
-        this.enablePlayButton();
-    }
-    
-    // Invalidar caché
-    if (typeof this.invalidateFlattenedCache === 'function') {
-        this.invalidateFlattenedCache();
-    }
 
-    // ✅ GUARDAR
-    setTimeout(() => {
+    // 7. PERSISTENCIA
+    // Debounce de guardado para evitar saturar el localStorage
+    if (this._saveTimeout) clearTimeout(this._saveTimeout);
+    this._saveTimeout = setTimeout(() => {
         if (typeof window.saveAllData === 'function') {
             window.saveAllData();
         }
-    }, 100);
+    }, 500);
     
     return true;
 }
