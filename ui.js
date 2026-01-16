@@ -397,39 +397,47 @@ showMiniPlayerFloat() {
             duration: video.duration || 0
         };
     }
-    
-    // ✅ HELPER: Template HTML
-    _getCardTemplate(data) {
-        return `
-            <div class="track-item card-track search-result-card" data-video-id="${data.videoId}">
-                <div class="search-result-thumbnail">
-                    <img src="${data.thumbnail}" 
-                         alt="${this.escapeHTML(data.title)}" 
-                         loading="lazy" 
-                         onerror="this.src='./electronic.ico';">
-                    ${data.durationDisplay ? `<span class="search-result-duration">${data.durationDisplay}</span>` : ''}
-                </div>
-                <div class="search-result-info">
-                    <h3 class="search-result-title" title="${this.escapeHTML(data.title)}">
-                        ${this.escapeHTML(data.title)}
-                    </h3>
-                    <p class="search-result-author">${this.escapeHTML(data.artist)}</p>
-                </div>
-                <div class="search-result-actions">
-                    <button class="search-result-add-next-btn" 
-                            data-action="add-next"
-                            title="Reproducir siguiente">
-                        <i class="fas fa-forward"></i>
-                    </button>
-                    <button class="add-to-queue-btn" 
-                            data-action="add-queue"
-                            title="Añadir a la cola">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
+_getCardTemplate(data) {
+    return `
+        <div class="track-item card-track search-result-card" data-video-id="${data.videoId}">
+            <div class="search-result-thumbnail">
+                <img src="${data.thumbnail}" 
+                     alt="${this.escapeHTML(data.title)}" 
+                     loading="lazy" 
+                     onerror="this.src='./electronic.ico';">
+                ${data.durationDisplay ? `<span class="search-result-duration">${data.durationDisplay}</span>` : ''}
             </div>
-        `.trim();
-    }
+            <div class="search-result-info">
+                <h3 class="search-result-title" title="${this.escapeHTML(data.title)}">
+                    ${this.escapeHTML(data.title)}
+                </h3>
+                <p class="search-result-author">${this.escapeHTML(data.artist)}</p>
+            </div>
+            <div class="search-result-actions">
+                <button class="search-result-add-next-btn" 
+                        data-action="add-next"
+                        data-video-id="${data.videoId}"
+                        data-title="${this.escapeHTML(data.title)}"
+                        data-thumbnail="${data.thumbnail}"
+                        data-duration="${data.duration}"
+                        data-artist="${this.escapeHTML(data.artist)}"
+                        title="Reproducir siguiente">
+                    <i class="fas fa-forward"></i>
+                </button>
+                <button class="add-to-queue-btn" 
+                        data-action="add-queue"
+                        data-video-id="${data.videoId}"
+                        data-title="${this.escapeHTML(data.title)}"
+                        data-thumbnail="${data.thumbnail}"
+                        data-duration="${data.duration}"
+                        data-artist="${this.escapeHTML(data.artist)}"
+                        title="Añadir a la cola">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+    `.trim();
+}
     
     // ✅ HELPER: Attachar listeners
     _attachCardListeners(card, data) {
