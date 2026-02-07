@@ -33,7 +33,7 @@ exports.handler = async function(event, context) {
         let result;
         let metadata = null;
 
-        // ✅ MODO 1: BÚSQUEDA POR PALABRAS CLAVE (como search.js)
+        // ✅ MODO 1: BÚSQUEDA POR PALABRAS CLAVE
         if (query && query.trim() !== '') {
             const sanitizedQuery = query.trim().substring(0, 200);
             
@@ -49,27 +49,21 @@ exports.handler = async function(event, context) {
                     // ✅ PARSEAR SI ES JSON
                     if (nextPageData.startsWith('{')) {
                         const parsed = JSON.parse(nextPageData);
-                        result = await youtubesearchapi.NextPage(parsed, true);
+                        result = await youtubesearchapi.NextPage(parsed, false);
                     } else {
-                        result = await youtubesearchapi.NextPage(nextPageData, true);
+                        result = await youtubesearchapi.NextPage(nextPageData, false);
                     }
                 } catch (e) {
                     console.warn('⚠️ Error en paginación:', e.message);
-                    result = await youtubesearchapi.NextPage(nextPageData, true);
+                    result = await youtubesearchapi.NextPage(nextPageData, false);
                 }
             } else {
-                // ✅ BÚSQUEDA EXACTA PARA MÚSICA
-                const exactQuery = `"${sanitizedQuery}"`;
-                result = await youtubesearchapi.GetListByKeyword(exactQuery, false, 25);
+                // ✅ BÚSQUEDA (sin comillas para mejor resultado)
+                result = await youtubesearchapi.GetListByKeyword(sanitizedQuery, false, 25);
             }
         } 
         // ✅ MODO 2: EXTRACCIÓN POR PLAYLIST ID
         else if (playlistId && playlistId.trim() !== '') {
-            // ✅ VALIDAR FORMATO DE PLAYLIST ID
-            // Las playlists de YouTube pueden tener diferentes formatos:
-            // - PL... (playlists normales)
-            // - RD... (radio/mix automático)
-            // - UU... (uploads de un canal)
             const sanitizedId = playlistId.trim();
             
             console.log(`📋 Playlist ID: "${sanitizedId}"${nextPageData ? ' (paginación)' : ''}`);
@@ -98,6 +92,14 @@ exports.handler = async function(event, context) {
             }
         }
 
+        console.log('📦 Estructura de result:', {
+            hasItems: !!result?.items,
+            itemsCount: result?.items?.length || 0,
+            hasMetadata: !!result?.metadata,
+            hasNextPage: !!result?.nextPage,
+            firstItem: result?.items?.[0]
+        });
+
         // ✅ VALIDAR RESPUESTA
         if (!result || !result.items || result.items.length === 0) {
             return {
@@ -111,22 +113,22 @@ exports.handler = async function(event, context) {
             };
         }
 
-        // ✅ EXTRAER METADATA SOLO SI ES PLAYLIST (no en búsquedas)
-        if (playlistId && playlistId.trim() !== '') {
+        // ✅ EXTRAER METADATA SOLO SI ES PLAYLIST
+        if (playlistId && playlistId.trim() !== '' && result.metadata) {
             metadata = {
-                title: result.metadata?.title || 'Playlist',
-                description: result.metadata?.description || '',
-                videoCount: result.metadata?.videoCount || result.items.length,
-                channelName: result.metadata?.channelName || result.metadata?.author || '',
+                title: result.metadata.title || 'Playlist',
+                description: result.metadata.description || '',
+                videoCount: result.metadata.videoCount || result.items.length,
+                channelName: result.metadata.channelTitle || result.metadata.author || '',
                 thumbnail: null
             };
 
-            // Obtener thumbnail de la playlist
-            if (result.metadata?.thumbnails && Array.isArray(result.metadata.thumbnails)) {
-                metadata.thumbnail = result.metadata.thumbnails[0]?.url || null;
-            } else if (result.metadata?.thumbnail) {
+            // ✅ Obtener thumbnail de la playlist
+            if (result.metadata.thumbnail) {
                 if (Array.isArray(result.metadata.thumbnail)) {
                     metadata.thumbnail = result.metadata.thumbnail[0]?.url || null;
+                } else if (result.metadata.thumbnail.thumbnails && Array.isArray(result.metadata.thumbnail.thumbnails)) {
+                    metadata.thumbnail = result.metadata.thumbnail.thumbnails[0]?.url || null;
                 } else if (typeof result.metadata.thumbnail === 'string') {
                     metadata.thumbnail = result.metadata.thumbnail;
                 }
@@ -136,45 +138,70 @@ exports.handler = async function(event, context) {
         // ✅ PROCESAR ITEMS CON VALIDACIÓN ROBUSTA
         const items = result.items
             .filter(item => {
-                // Solo videos válidos (para búsquedas verificar type, para playlists no siempre viene)
+                // Solo videos válidos
                 return item && 
-                       (!item.type || item.type === 'video') && // Permitir items sin type (playlists)
+                       (!item.type || item.type === 'video') && 
                        item.id && 
-                       item.id.length === 11 && // YouTube IDs son 11 caracteres
+                       item.id.length === 11 && 
                        item.title;
             })
             .map((item, index) => {
-                // Thumbnail con fallback
-                let thumb = './electronic.ico';
+                // ✅ THUMBNAIL con validación completa
+                let thumb = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
+                
                 if (item.thumbnail) {
                     if (Array.isArray(item.thumbnail) && item.thumbnail.length > 0) {
-                        thumb = item.thumbnail[item.thumbnail.length - 1].url; // Usar mejor calidad
+                        // Array de objetos con url
+                        const bestQuality = item.thumbnail[item.thumbnail.length - 1];
+                        thumb = bestQuality?.url || thumb;
                     } else if (item.thumbnail.thumbnails && Array.isArray(item.thumbnail.thumbnails)) {
-                        thumb = item.thumbnail.thumbnails[item.thumbnail.thumbnails.length - 1].url;
+                        // Objeto con propiedad thumbnails
+                        const bestQuality = item.thumbnail.thumbnails[item.thumbnail.thumbnails.length - 1];
+                        thumb = bestQuality?.url || thumb;
                     } else if (typeof item.thumbnail === 'string') {
+                        // String directo
                         thumb = item.thumbnail;
+                    } else if (item.thumbnail.url) {
+                        // Objeto simple con url
+                        thumb = item.thumbnail.url;
                     }
                 }
 
-                // Duración con fallback
+                // ✅ DURACIÓN con validación completa
                 let dur = "0:00";
+                
                 if (item.length) {
                     if (item.length.simpleText) {
+                        // Formato: {simpleText: "3:45"}
                         dur = item.length.simpleText;
                     } else if (typeof item.length === 'string') {
+                        // String directo
                         dur = item.length;
+                    } else if (typeof item.length === 'object' && item.length.text) {
+                        // Formato alternativo
+                        dur = item.length.text;
                     }
+                }
+
+                // ✅ CANAL/ARTISTA
+                let artist = "Artista Desconocido";
+                if (item.channelTitle) {
+                    artist = item.channelTitle;
+                } else if (item.shortBylineText?.simpleText) {
+                    artist = item.shortBylineText.simpleText;
+                } else if (item.longBylineText?.simpleText) {
+                    artist = item.longBylineText.simpleText;
                 }
 
                 return {
                     videoId: item.id,
-                    title: item.title.substring(0, 200), // Limitar longitud
+                    title: (item.title || 'Sin título').substring(0, 200),
                     thumbnail: thumb,
-                    artist: (item.channelTitle || item.author || "Artista Desconocido").substring(0, 100),
-                    uploaderName: (item.channelTitle || "Desconocido").substring(0, 100),
+                    artist: artist.substring(0, 100),
+                    uploaderName: artist.substring(0, 100),
                     duration: dur,
                     isLive: item.isLive || false,
-                    index: item.index || (playlistId ? index + 1 : undefined) // Solo para playlists
+                    index: playlistId ? (index + 1) : undefined
                 };
             });
 
@@ -182,11 +209,12 @@ exports.handler = async function(event, context) {
 
         // ✅ LIMPIAR CONTINUATION TOKEN
         let cleanToken = null;
-        if (result.continuation || result.nextPage) {
+        if (result.nextPage) {
+            // Para búsquedas: result.nextPage = {nextPageToken, nextPageContext}
             try {
-                cleanToken = JSON.stringify(result.continuation || result.nextPage);
+                cleanToken = JSON.stringify(result.nextPage);
             } catch (e) {
-                console.warn('⚠️ Error serializando continuation/nextPage');
+                console.warn('⚠️ Error serializando nextPage');
             }
         }
 
@@ -204,7 +232,7 @@ exports.handler = async function(event, context) {
         console.error("❌ Error en playlist/búsqueda:", error);
         
         return {
-            statusCode: 200, // ✅ NO devolver 500, mejor respuesta vacía
+            statusCode: 200,
             headers,
             body: JSON.stringify({ 
                 items: [], 
