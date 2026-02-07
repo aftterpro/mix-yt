@@ -16,7 +16,13 @@
 [[edge_functions]]
   path = "/.netlify/functions/publish-lyrics"
   function = "publish-lyrics"
+[[edge_functions]]
+  path = "/.netlify/functions/cors-proxy"
+  function = "cors-proxy"
 
+[[edge_functions]]
+  path = "/api/proxy"
+  function = "cors-proxy"
 # --- REDIRECTS ---
 # Redirigimos tus antiguas rutas /api/* a las nuevas Edge Functions
 
