@@ -1,25 +1,33 @@
 [build]
-  functions = "functions/"  # Directorio de tus funciones Netlify
-  publish = "."             # Directorio a publicar (tu sitio estático)
-  command = "npm run build" # Comando para construir tu sitio (si aplica)
+  # Si tu frontend se compila, usa el comando correspondiente, si es estático, déjalo vacío o usa "echo"
+  publish = "." 
 
-# Regla para dirigir las llamadas /api/sponsorblock/* a la función sponsorblock
+# --- EDGE FUNCTIONS (Deno) ---
+# Estas tienen prioridad sobre las Functions normales y son más rápidas
+
+[[edge_functions]]
+  path = "/.netlify/functions/search"
+  function = "search"
+
+[[edge_functions]]
+  path = "/.netlify/functions/sponsorblock"
+  function = "sponsorblock"
+
+[[edge_functions]]
+  path = "/.netlify/functions/publish-lyrics"
+  function = "publish-lyrics"
+
+# --- REDIRECTS ---
+# Redirigimos tus antiguas rutas /api/* a las nuevas Edge Functions
+
 [[redirects]]
-  from = "/api/sponsorblock/:splat"
-  to = "/.netlify/functions/sponsorblock/:splat"
+  from = "/api/sponsorblock/*"
+  to = "/.netlify/functions/sponsorblock"
   status = 200
+  force = true
 
-# Regla para redirigir /api/lyrics/* a la nueva función
 [[redirects]]
-  from = "/api/lyrics/:splat"
+  from = "/api/lyrics/*"
   to = "/.netlify/functions/publish-lyrics"
   status = 200
-
-# Regla nueva para SponsorBlock (segments) que faltaba agregar según tu solicitud anterior
-[[redirects]]
-  from = "/api/segments/*"
-  to = "/.netlify/functions/sponsorblock/api/segments/:splat"
-  status = 200
-
-# NOTA: Se eliminó la regla inválida de cors-proxy. 
-# No es necesaria, la función ya es accesible en /.netlify/functions/cors-proxy/ automáticamente.
+  force = true
