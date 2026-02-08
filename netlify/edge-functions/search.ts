@@ -1,5 +1,5 @@
 import { Context } from "https://edge.netlify.com";
-import yts from "npm:yt-search";
+import yts from "https://esm.sh/yt-search@2.12.1";
 
 export default async (request: Request, context: Context) => {
   const corsHeaders = {
@@ -104,3 +104,4 @@ export default async (request: Request, context: Context) => {
     );
   }
 };
+
