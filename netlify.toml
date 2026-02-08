@@ -2,7 +2,7 @@
   publish = "." 
 
 # --- EDGE FUNCTIONS (Deno) ---
-
+# Se mantienen solo las que son compatibles con Deno
 [[edge_functions]]
   path = "/.netlify/functions/sponsorblock"
   function = "sponsorblock"
@@ -20,12 +20,6 @@
   function = "cors-proxy"
 
 # --- REDIRECTS ---
-# Redirige la ruta antigua a la nueva Función Standard
-[[redirects]]
-  from = "/.netlify/functions/search" 
-  to = "/.netlify/functions/search"  
-  status = 200
-
 [[redirects]]
   from = "/api/sponsorblock/*"
   to = "/.netlify/functions/sponsorblock"
