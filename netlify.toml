@@ -1,13 +1,7 @@
 [build]
-  # Si tu frontend se compila, usa el comando correspondiente, si es estático, déjalo vacío o usa "echo"
   publish = "." 
 
 # --- EDGE FUNCTIONS (Deno) ---
-# Estas tienen prioridad sobre las Functions normales y son más rápidas
-
-[[edge_functions]]
-  path = "/.netlify/functions/search"
-  function = "search"
 
 [[edge_functions]]
   path = "/.netlify/functions/sponsorblock"
@@ -16,6 +10,7 @@
 [[edge_functions]]
   path = "/.netlify/functions/publish-lyrics"
   function = "publish-lyrics"
+
 [[edge_functions]]
   path = "/.netlify/functions/cors-proxy"
   function = "cors-proxy"
@@ -23,8 +18,13 @@
 [[edge_functions]]
   path = "/api/proxy"
   function = "cors-proxy"
+
 # --- REDIRECTS ---
-# Redirigimos tus antiguas rutas /api/* a las nuevas Edge Functions
+# Redirige la ruta antigua a la nueva Función Standard
+[[redirects]]
+  from = "/.netlify/functions/search" 
+  to = "/.netlify/functions/search"  
+  status = 200
 
 [[redirects]]
   from = "/api/sponsorblock/*"
