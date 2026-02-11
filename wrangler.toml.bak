@@ -1,7 +1,0 @@
-name = "mi-migracion-mix"
-main = "src/index.js"
-compatibility_date = "2024-02-11"
-compatibility_flags = ["nodejs_compat"]  
-
-[observability]
-enabled = true
