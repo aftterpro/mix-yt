@@ -1,117 +1,41 @@
-/* efecto.css - Solo estilos base, SIN transiciones automáticas */
-
-:root {
-  --crossfade-duration: 10s;
-  --glow-color: #ff6b35;
-  --pulse-speed: 2s;
+.fade-out {
+    animation: fadeOutAndRotate 0.5s ease-in-out forwards;
 }
 
-/* =============================================
-   REPRODUCTORES - SOLO ESTILOS BASE
-   ============================================= */
-.video-player {
-  position: absolute;
-  top: 0; 
-  left: 0;
-  width: 100%; 
-  height: 100%;
-  background: #000;
-  will-change: opacity;
-  backface-visibility: hidden;
+.fade-in {
+    animation: fadeInAndRotate 0.5s ease-in-out forwards;
 }
 
-/* Estados básicos controlados por JavaScript */
-.video-player.fade-in {
-  display: block !important;
-  visibility: visible !important;
-  z-index: 3;
+.fade-out::before { /* Capa para el efecto de desvanecimiento */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.8) 100%); /* Desvanecimiento radial */
+    animation: fadeOutOverlay 0.5s ease-in-out forwards;
+    pointer-events: none; /* Permite interactuar con el video */
 }
 
-.video-player.fade-out {
- z-index: 2;
-  pointer-events: none;
+.fade-in::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+    animation: fadeInOverlay 0.5s ease-in-out forwards;
+    pointer-events: none;
 }
 
-.video-player.hidden {
- display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  z-index: -1;
+@keyframes fadeOutOverlay {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
-/* =============================================
-   CONTENEDOR DE VIDEO
-   ============================================= */
-.video-wrapper,
-#videoWrapper {
- position: relative !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: #000 !important;
-  overflow: hidden !important;
-}
-
-/* =============================================
-   LETRAS SINCRONIZADAS
-   ============================================= */
-.lyrics-text.synced {
-    max-height: 400px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-  padding: 20px;
-  position: relative;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.lyrics-text.synced::-webkit-scrollbar {
-  display: none;
-}
-
-.lyrics-text.synced p {
-  font-size: 1.8rem;
-  line-height: 2.4;
-  color: rgba(255, 255, 255, 0.3);
-  font-weight: 400;
-  padding: 8px 0;
-  margin: 0;
-  transition: 
-    color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-    font-size 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  transform-origin: left center;
-}
-
-.lyrics-text.synced p.active {
-  color: #FFFFFF !important;
-  font-weight: 700 !important;
-  font-size: 2rem !important;
-  opacity: 1 !important;
-  transform: translateX(8px) scale(1.02);
-  text-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
-}
-
-.lyrics-text.synced p.active + p,
-.lyrics-text.synced p.active + p + p {
-  color: rgba(255, 255, 255, 0.5);
-  opacity: 0.8;
-}
-
-.lyrics-text.synced p.active::before {
-  content: '';
-  position: absolute;
-  left: -12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 24px;
-  background: linear-gradient(180deg, var(--primary-color), transparent);
-  border-radius: 2px;
-  animation: glowPulse 2s ease-in-out infinite;
-}
-
-@keyframes glowPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+@keyframes fadeInOverlay {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
