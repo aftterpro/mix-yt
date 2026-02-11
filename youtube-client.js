@@ -1,6 +1,6 @@
 class YouTubeSimplifiedClient {
     constructor() {
-       this.baseUrl = "https://mix-yt.netlify.app/.netlify/functions/search";
+       this.baseUrl = "https://mix-yt.pages.dev/";
         this.maxRetries = 3;
         this.retryDelay = 1000;
         
