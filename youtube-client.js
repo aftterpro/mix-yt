@@ -1,13 +1,10 @@
 class YouTubeSimplifiedClient {
     constructor() {
-        this.initialized = false;
-        this.searchApiUrl = 'https://mix-yt.netlify.app/.netlify/functions/search';
+       this.baseUrl = "https://mix-yt.netlify.app/.netlify/functions/search";
+        this.maxRetries = 3;
+        this.retryDelay = 1000;
         
-        this.requestCache = new Map();
-        this.searchCache = new Map(); 
-        this.maxCacheSize = 50;
-        this.cacheExpiry = 5 * 60 * 1000;
-        this.isLoadingMore = false;
+        console.log("✅ YouTube Client conectado a backend remoto:", this.baseUrl);
     }
     
     async init() {
@@ -16,125 +13,57 @@ class YouTubeSimplifiedClient {
         return true;
     }
     
-   async search(query, continuation = null) {
-        if (!query?.trim()) {
-            console.error('❌ Query vacío');
-            return { items: [], continuation: null };
-        }
+async search(query) {
+        const cleanQuery = query.trim();
+        if (!cleanQuery) return { items: [] };
 
-        const cacheKey = `${query}_${continuation || 'first'}`;
+        console.log(`🔍 Buscando: "${cleanQuery}"`);
         
-        // ✅ VERIFICAR CACHÉ
-        if (this.searchCache.has(cacheKey)) {
-            console.log(`💾 Resultado cacheado: ${cacheKey}`);
-            return this.searchCache.get(cacheKey);
-        }
-
-        // ✅ BLOQUEO DE CARGA MÚLTIPLE
-        if (this.isLoadingMore && continuation) {
-            console.log('⏳ Ya hay una carga en progreso...');
-            return { items: [], continuation: null };
-        }
-
-        this.isLoadingMore = true;
-
-        console.log(`🔍 Buscando: "${query}"${continuation ? ' (Pág. siguiente)' : ''}`);
-        
-        const params = new URLSearchParams({ q: query });
-        if (continuation) {
-            params.append('nextpage', continuation);
-        }
-
-        const url = `${this.searchApiUrl}?${params}`;
+        // La URL ya incluye el dominio completo, así que esto funciona directo
+        const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
 
         try {
-            const response = await this.fetchWithRetry(url, 3, 1000);
-            const data = await response.json();
-
-            if (!data?.items?.length) {
-                console.warn('⚠️ Sin resultados');
-                this.isLoadingMore = false;
-                return { items: [], continuation: null };
+            const data = await this.fetchWithRetry(url);
+            
+            if (!data) throw new Error("Datos vacíos");
+            if (data.error) {
+                console.error("Error del backend:", data.error);
+                return { items: [] };
             }
 
-            console.log(`✅ ${data.items.length} resultados encontrados`);
-
-            let cleanToken = data.continuation || null;
-
-            if (cleanToken && typeof cleanToken === 'string' && cleanToken.trim().startsWith('{')) {
-                try {
-                    const parsedToken = JSON.parse(cleanToken);
-                    // Si el objeto parseado tiene nextPageToken, usamos ese
-                    if (parsedToken.nextPageToken) {
-                        cleanToken = parsedToken.nextPageToken;
-                        console.log('✨ Token de paginación extraído y limpiado');
-                    }
-                } catch (e) {
-                    console.warn('⚠️ Error parseando token de continuación, usando original:', e);
-                }
-            }
-
-            const result = {
-                items: data.items,
-                continuation: cleanToken // Usamos el token limpio
-            };
-
-            // ✅ GUARDAR EN CACHÉ
-            this.searchCache.set(cacheKey, result);
-
-            // ✅ LIMITAR TAMAÑO DE CACHÉ
-            if (this.searchCache.size > 50) {
-                const firstKey = this.searchCache.keys().next().value;
-                this.searchCache.delete(firstKey);
-            }
-
-            this.isLoadingMore = false;
-            return result;
-
+            return data;
         } catch (error) {
-            console.error('❌ Error en búsqueda:', error);
-            this.isLoadingMore = false;
-            return { items: [], continuation: null };
+            console.error("❌ Error en búsqueda:", error);
+            return { items: [] };
         }
     }
     
-    async fetchWithRetry(url, maxRetries = 3, delay = 1000) {
-        let lastError;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`📡 Intento ${attempt}/${maxRetries}`);
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-                
-                const response = await fetch(url, {
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-                return response;
-                
-            } catch (error) {
-                lastError = error;
-                console.warn(`⚠️ Intento ${attempt} falló:`, error.message);
-                
-                if (attempt < maxRetries) {
-                    console.log(`🔄 Reintentando en ${delay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2;
-                }
+   async fetchWithRetry(url, attempt = 1) {
+        try {
+            // mode: 'cors' es importante para peticiones cruzadas
+            const response = await fetch(url, { mode: 'cors' });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+
+        } catch (error) {
+            console.warn(`⚠️ Intento ${attempt} falló:`, error.message);
+
+            if (attempt < this.maxRetries) {
+                const delay = this.retryDelay * attempt;
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this.fetchWithRetry(url, attempt + 1);
+            } else {
+                throw error;
             }
         }
-        
-        throw lastError;
     }
 }
+
+
 // =============================================
 // SPONSORBLOCK - Sistema de Detección y Salto
 // =============================================
@@ -183,27 +112,27 @@ async cargarSegmentos(videoId) {
         }
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `https://mix-yt.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
+        const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
 
-        try {
-            // ✅ PROMESA CON TIMEOUT DE 1 SEGUNDO
-            const fetchWithTimeout = new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Timeout'));
-                }, 1000); // ✅ 1 segundo máximo
-                
-                fetch(apiUrl, { 
-                    headers: { 'X-UserID': userId }
-                })
-                .then(response => {
-                    clearTimeout(timeout);
-                    resolve(response);
-                })
-                .catch(error => {
-                    clearTimeout(timeout);
-                    reject(error);
-                });
-            });
+try {
+    // ✅ PROMESA CON TIMEOUT AUMENTADO
+    const fetchWithTimeout = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error('Timeout'));
+        }, 5000); 
+        
+        fetch(apiUrl, { 
+            headers: { 'X-UserID': userId }
+        })
+        .then(response => {
+            clearTimeout(timeout);
+            resolve(response);
+        })
+        .catch(error => {
+            clearTimeout(timeout);
+            reject(error);
+        });
+    });
             
             const response = await fetchWithTimeout;
             
