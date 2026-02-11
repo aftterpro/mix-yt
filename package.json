@@ -10,8 +10,7 @@
     "serverless-http": "^3.2.0",
     "sponsorblock-api": "^0.2.4",
     "crypto-js": "^4.2.0",
-    "youtube-search-api": "^1.2.1",
-    "yt-search": "^2.12.1"
+    "youtube-search-api": "^1.2.1"
   },
   "devDependencies": {
     "serve": "^14.2.1"
