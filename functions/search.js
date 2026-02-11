@@ -1,4 +1,4 @@
-import yts from 'https://esm.sh/yt-search@2.12.1';
+import yts from 'yt-search';
 
 export async function onRequest(context) {
   const { request } = context;
