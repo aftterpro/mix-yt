@@ -1,4 +1,6 @@
 name = "mix-yt"
 compatibility_date = "2024-02-11"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "."
+
+[site]
+bucket = "." # Esto indica que tus archivos estáticos están en la raíz
