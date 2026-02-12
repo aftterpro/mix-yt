@@ -111,11 +111,10 @@ async cargarSegmentos(videoId) {
         }
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `https://yt-mix.netlify.app/.netlify/functions/sponsorblock?videoId=${videoId}`;
-
-try {
-    // ✅ PROMESA CON TIMEOUT AUMENTADO
-    const fetchWithTimeout = new Promise((resolve, reject) => {
+        const apiUrl = `/sponsorblock?videoId=${videoId}`;
+    try {
+        // ✅ PROMESA CON TIMEOUT AUMENTADO
+        const fetchWithTimeout = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error('Timeout'));
         }, 5000); 
