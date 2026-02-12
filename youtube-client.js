@@ -1,6 +1,6 @@
 class YouTubeSimplifiedClient {
     constructor() {
-       this.baseUrl = "https://mix-yt.pages.dev/";
+       this.baseUrl = "/search";
         this.maxRetries = 3;
         this.retryDelay = 1000;
         
@@ -21,7 +21,6 @@ async search(query) {
         
         // La URL ya incluye el dominio completo, así que esto funciona directo
         const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
-
         try {
             const data = await this.fetchWithRetry(url);
             
