@@ -80,6 +80,21 @@ function checkAndUpdateUI() {
 // ACCIONES DE USUARIO
 // =============================================
 window.handleAuthClick = function() {
+    // PROTECCIÓN: Verificar si gapi.client existe
+    if (!gapi || !gapi.client) {
+        console.warn("Google API no está lista todavía.");
+        mostrarMensajeFlotante("Espera un momento, conectando con Google...");
+        return;
+    }
+
+    // PROTECCIÓN: Verificar si getToken existe (a veces client carga pero no auth)
+    if (typeof gapi.client.getToken !== 'function') {
+        console.warn("El módulo de Auth no ha cargado.");
+        // Intentar inicializar de nuevo o esperar
+        return;
+    }
+
+    // Código original...
     if (gapi.client.getToken() === null) {
         tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
