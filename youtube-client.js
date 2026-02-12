@@ -1,6 +1,6 @@
 class YouTubeSimplifiedClient {
     constructor() {
-       this.baseUrl = "http://150.230.81.137:3000/search";
+       this.baseUrl = "https://94cc-150-230-81-137.ngrok-free.app/search";
         this.maxRetries = 3;
         this.retryDelay = 1000;
         
@@ -111,7 +111,7 @@ async cargarSegmentos(videoId) {
         }
 
         const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `http://150.230.81.137:3000/sponsorblock?videoId=${videoId}`;
+        const apiUrl = `https://94cc-150-230-81-137.ngrok-free.app/sponsorblock?videoId=${videoId}`;
     try {
         // ✅ PROMESA CON TIMEOUT AUMENTADO
         const fetchWithTimeout = new Promise((resolve, reject) => {
