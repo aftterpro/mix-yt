@@ -72,7 +72,7 @@ function initializePlayers() {
         height: '250',
         width: '350',
         playerVars: {
-            'origin': https://mix-yt.pages.dev,  
+            'origin': 'https://mix-yt.pages.dev',  
             'enablejsapi': 1
         },
         events: {
