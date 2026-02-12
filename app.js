@@ -1,7 +1,7 @@
 // Módulo: Configuración y Variables Globales
 const CONFIG = {
     origin: window.location.origin, 
-    apiBase: "https://mix-yt.pages.dev/"
+    apiBase: "/search"
 };
 const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
 let player1, player2;
