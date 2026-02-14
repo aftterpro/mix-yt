@@ -14,28 +14,17 @@ class YouTubeSimplifiedClient {
     }
     
 async search(query) {
-        const cleanQuery = query.trim();
-        if (!cleanQuery) return { items: [] };
-
-        console.log(`🔍 Buscando: "${cleanQuery}"`);
-        
-        // La URL ya incluye el dominio completo, así que esto funciona directo
-        const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
-        try {
-            const data = await this.fetchWithRetry(url);
-            
-            if (!data) throw new Error("Datos vacíos");
-            if (data.error) {
-                console.error("Error del backend:", data.error);
-                return { items: [] };
-            }
-
-            return data;
-        } catch (error) {
-            console.error("❌ Error en búsqueda:", error);
-            return { items: [] };
-        }
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return { items: [] };
+    const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
+    try {
+        const data = await this.fetchWithRetry(url);
+        return data;
+    } catch (error) {
+        console.error("❌ Error en búsqueda:", error);
+        return { items: [] };
     }
+}
     
    async fetchWithRetry(url, attempt = 1) {
         try {
