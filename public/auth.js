@@ -14,6 +14,25 @@ let currentDetailPlaylistId = null;
 // =============================================
 // INICIALIZACIÓN
 // =============================================
+async function loadAuthConfig() {
+    try {
+        // Pide las claves a tu función Cloudflare
+        const response = await fetch('/api/auth-config');
+        const config = await response.json();
+        
+        if (config.clientId) {
+            CLIENT_ID = config.clientId;
+            console.log("✅ Configuración cargada. CLIENT_ID recibido.");
+            
+            // Paso 2: AHORA sí inicializamos Google
+            initializeGoogleAPIs(); 
+        } else {
+            console.error("❌ No se recibió clientId del servidor");
+        }
+    } catch (error) {
+        console.error("❌ Error cargando configuración:", error);
+    }
+}
 function initializeGoogleAPIs() {
     if (typeof gapi !== 'undefined') gapi.load('client', gapiInitialize_auth);
     
@@ -311,5 +330,9 @@ function parseDuration(duration) {
     }
     return 0;
 }
-
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadAuthConfig); // Cambiado aquí
+} else {
+    loadAuthConfig(); // Cambiado aquí
+}
 document.addEventListener('DOMContentLoaded', initializeGoogleAPIs);
