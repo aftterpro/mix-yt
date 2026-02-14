@@ -1,15 +1,18 @@
 // =============================================
-// CONFIGURACIÓN OAUTH
+//  Lógica de Autenticación y Playlists
 // =============================================
+
 let CLIENT_ID = '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
 let isAuthorized = false;
 let tokenClient = null;
 let gapiReady = false;
 let gisReady = false;
+// Variable para saber qué playlist estamos viendo en detalle
+let currentDetailPlaylistId = null; 
 
 // =============================================
-// INICIALIZACIÓN DE APIS
+// INICIALIZACIÓN
 // =============================================
 function initializeGoogleAPIs() {
     if (typeof gapi !== 'undefined') gapi.load('client', gapiInitialize_auth);
@@ -20,6 +23,33 @@ function initializeGoogleAPIs() {
             gisInitalize_auth();
         }
     }, 500);
+
+    // Configurar el botón de "Atrás" en la vista de detalles
+    setupBackButton();
+}
+
+function setupBackButton() {
+    const backBtn = document.getElementById('back-to-playlists-btn');
+    if(backBtn) {
+        backBtn.addEventListener('click', () => {
+            // Ocultar detalles, mostrar overview
+            document.getElementById('user-playlist-details').style.display = 'none';
+            document.getElementById('user-playlists-overview').style.display = 'block';
+            currentDetailPlaylistId = null;
+        });
+    }
+
+    // Configurar el botón "Añadir todo" del encabezado
+    const importAllBtn = document.getElementById('import-current-playlist-btn');
+    if(importAllBtn) {
+        importAllBtn.addEventListener('click', () => {
+            if(currentDetailPlaylistId) {
+                const title = document.getElementById('details-playlist-title').textContent;
+                // Llamamos a la función de importación real
+                importPlaylistToApp(currentDetailPlaylistId, title);
+            }
+        });
+    }
 }
 
 window.gapiInitialize_auth = function() {
@@ -65,7 +95,7 @@ function checkAndUpdateUI() {
 }
 
 // =============================================
-// INTERFAZ DE USUARIO Y LÓGICA
+// LÓGICA DE USUARIO
 // =============================================
 
 window.handleAuthClick = function() {
@@ -85,7 +115,10 @@ window.handleSignOutClick = function() {
         localStorage.removeItem('yt_access_token');
         isAuthorized = false;
         updateAuthUI();
-        document.getElementById('user-playlists-content').innerHTML = '';
+        document.getElementById('user-playlists-content').innerHTML = '<p>Inicia sesión para ver tus playlists</p>';
+        // Asegurar que volvemos a la vista principal si estábamos en detalles
+        document.getElementById('user-playlist-details').style.display = 'none';
+        document.getElementById('user-playlists-overview').style.display = 'block';
     }
 };
 
@@ -102,9 +135,12 @@ function updateAuthUI() {
     }
 }
 
-// CARGAR PLAYLISTS DEL USUARIO (Corrección de Template Strings)
+// ----- CARGAR LISTA DE PLAYLISTS (VISTA GENERAL) -----
 async function loadUserPlaylistsUI() {
     if (!isAuthorized) return;
+    const container = document.getElementById('user-playlists-content');
+    if (!container) return;
+    container.innerHTML = '<p>Cargando playlists...</p>';
     
     try {
         const response = await gapi.client.youtube.playlists.list({
@@ -113,24 +149,21 @@ async function loadUserPlaylistsUI() {
             maxResults: 50
         });
 
-        // Apuntamos al contenido de la pestaña específica
-        const container = document.getElementById('user-playlists-content');
-        if (!container) return;
+        container.innerHTML = ''; // Limpiar cargando
         
-        container.innerHTML = ''; // Limpiar
-        
+        if(response.result.items.length === 0) {
+            container.innerHTML = '<p>No se encontraron playlists.</p>';
+            return;
+        }
+
         const list = document.createElement('div');
-        list.className = 'yt-playlist-grid'; // Clase para CSS grid
+        list.className = 'yt-playlist-grid';
 
         response.result.items.forEach(playlist => {
             const item = document.createElement('div');
             item.className = 'yt-playlist-card';
+            const thumb = playlist.snippet.thumbnails?.medium?.url || playlist.snippet.thumbnails?.default?.url || 'https://via.placeholder.com/120';
             
-            const thumb = playlist.snippet.thumbnails?.medium?.url || 
-                          playlist.snippet.thumbnails?.default?.url || 
-                          'https://via.placeholder.com/120';
-            
-            // CORRECCIÓN: Uso de backticks (`) SIN escapar las variables
             item.innerHTML = `
                 <div class="card-image">
                     <img src="${thumb}" alt="${playlist.snippet.title}">
@@ -138,11 +171,11 @@ async function loadUserPlaylistsUI() {
                 </div>
                 <div class="card-info">
                     <h4>${playlist.snippet.title}</h4>
-                    <button class="import-btn"><i class="fas fa-file-import"></i> Cargar</button>
+                    <button class="import-btn"><i class="fas fa-eye"></i> Ver videos</button>
                 </div>
             `;
 
-            item.onclick = () => importPlaylistToApp(playlist.id, playlist.snippet.title);
+            item.onclick = () => viewPlaylistDetails(playlist.id, playlist.snippet.title);
             list.appendChild(item);
         });
 
@@ -150,18 +183,69 @@ async function loadUserPlaylistsUI() {
 
     } catch (error) {
         console.error('Error cargando playlists:', error);
+        container.innerHTML = '<p>Error al cargar playlists.</p>';
     }
 }
 
-// IMPORTAR A LA APP PRINCIPAL
+// ----- NUEVA FUNCIÓN: VER DETALLES DE PLAYLIST (SUB-PÁGINA) -----
+async function viewPlaylistDetails(playlistId, playlistTitle) {
+    // 1. Cambiar la interfaz: Ocultar overview, mostrar detalles
+    document.getElementById('user-playlists-overview').style.display = 'none';
+    document.getElementById('user-playlist-details').style.display = 'block';
+    
+    // 2. Actualizar header
+    document.getElementById('details-playlist-title').textContent = playlistTitle;
+    currentDetailPlaylistId = playlistId;
+
+    const listContainer = document.getElementById('details-video-list');
+    listContainer.innerHTML = '<p style="padding: 20px;">Cargando vista previa de videos...</p>';
+
+    try {
+        // Carga rápida solo de snippets (títulos e imágenes) para previsualizar
+        const response = await gapi.client.youtube.playlistItems.list({
+            playlistId: playlistId,
+            part: 'snippet',
+            maxResults: 50 // Muestra los primeros 50
+        });
+
+        listContainer.innerHTML = ''; // Limpiar mensaje
+
+        if (response.result.items.length === 0) {
+            listContainer.innerHTML = '<p style="padding: 20px;">Esta playlist está vacía.</p>';
+            return;
+        }
+
+        response.result.items.forEach(item => {
+            if (item.snippet.title === "Private video" || item.snippet.title === "Deleted video") return;
+
+            const vidEl = document.createElement('div');
+            vidEl.className = 'detail-video-item';
+            const thumb = item.snippet.thumbnails?.default?.url || 'https://via.placeholder.com/60';
+            
+            vidEl.innerHTML = `
+                <img src="${thumb}" alt="thumbnail">
+                <div class="detail-video-info">
+                    <h5>${item.snippet.title}</h5>
+                    <p>Por: ${item.snippet.videoOwnerChannelTitle}</p>
+                </div>
+            `;
+            listContainer.appendChild(vidEl);
+        });
+
+    } catch (error) {
+        console.error("Error loading details:", error);
+        listContainer.innerHTML = '<p style="padding: 20px;">Error al cargar los videos.</p>';
+    }
+}
 async function importPlaylistToApp(playlistId, playlistTitle) {
     if (!isAuthorized) return;
-    mostrarMensajeFlotante(`Importando: ${playlistTitle}...`);
+    mostrarMensajeFlotante(`Iniciando importación de: ${playlistTitle}...`);
     
     let allVideos = [];
     let nextPageToken = null;
 
     try {
+        // Bucle para obtener TODOS los videos (paginación)
         do {
             const response = await gapi.client.youtube.playlistItems.list({
                 playlistId: playlistId,
@@ -170,17 +254,19 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
                 pageToken: nextPageToken
             });
 
-            // Obtener IDs para consultar duración exacta
+            // Obtener IDs para consultar duración exacta (necesario para el reproductor)
             const vidIds = response.result.items.map(i => i.contentDetails.videoId).join(',');
-            const durationRes = await gapi.client.youtube.videos.list({
-                part: 'contentDetails',
-                id: vidIds
-            });
+            let durMap = {};
             
-            const durMap = {};
-            durationRes.result.items.forEach(v => {
-                durMap[v.id] = parseDuration(v.contentDetails.duration);
-            });
+            if(vidIds.length > 0) {
+                 const durationRes = await gapi.client.youtube.videos.list({
+                    part: 'contentDetails',
+                    id: vidIds
+                });
+                durationRes.result.items.forEach(v => {
+                    durMap[v.id] = parseDuration(v.contentDetails.duration);
+                });
+            }
 
             const items = response.result.items.map(item => ({
                 videoId: item.contentDetails.videoId,
@@ -188,20 +274,20 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
                 thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
                 duration: durMap[item.contentDetails.videoId] || 0,
                 manual: false
-            }));
+            })).filter(i => i.title !== "Private video" && i.title !== "Deleted video");
 
             allVideos = [...allVideos, ...items];
             nextPageToken = response.result.nextPageToken;
 
-        } while (nextPageToken && allVideos.length < 200);
+        } while (nextPageToken && allVideos.length < 300); // Límite de seguridad aumentado a 300
 
         if (window.playlistVideos) {
             window.playlistVideos.push(...allVideos);
             window.updatePlaylistDOM();
-            mostrarMensajeFlotante(`¡${allVideos.length} videos añadidos a la Cola!`);
+            mostrarMensajeFlotante(`✅ ¡${allVideos.length} videos añadidos a la Cola!`);
             
-            // Cambiar automáticamente a la pestaña de Cola
-            document.querySelector('.tab-btn[data-tab="cola"]').click();
+            // OPCIONAL: Volver automáticamente a la pestaña de Cola tras importar
+             document.querySelector('.tab-btn[data-tab="cola"]').click();
             
             const btn = document.getElementById('iniciarButton');
             if(btn) btn.disabled = false;
@@ -209,13 +295,13 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
 
     } catch (error) {
         console.error("Error import:", error);
-        mostrarMensajeFlotante("Error al importar playlist.");
+        mostrarMensajeFlotante("❌ Error al importar playlist.");
     }
 }
 
+// Función auxiliar para duración
 function parseDuration(duration) {
     if (!duration) return 0;
-    if (typeof duration === 'number') return duration;
     const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
     if (match) {
         const hours = (parseInt(match[1]) || 0);
