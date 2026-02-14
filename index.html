@@ -69,11 +69,31 @@
       </div>
   </div>
 
-  <div id="tab-yt-playlists" class="tab-content">
-      <div id="user-playlists-content" class="empty-state">
-          <p>Inicia sesión para ver tus playlists</p>
-      </div>
-  </div>
+ <div id="tab-yt-playlists" class="tab-content">
+    
+    <div id="user-playlists-overview">
+        <div id="user-playlists-content" class="empty-state">
+            <p>Inicia sesión para ver tus playlists</p>
+        </div>
+    </div>
+
+    <div id="user-playlist-details" style="display: none;">
+        <div class="details-header">
+            <button id="back-to-playlists-btn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h3 id="details-playlist-title">Título Playlist</h3>
+             <button id="import-current-playlist-btn" class="header-action-btn">
+                <i class="fas fa-plus"></i> Añadir todo a Cola
+            </button>
+        </div>
+        
+        <div id="details-video-list-container">
+             <div id="details-video-list"></div>
+        </div>
+    </div>
+
+</div>
 </section>
   </main>
 
