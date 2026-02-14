@@ -1,13 +1,16 @@
 {
-  "name": "https://mix-yt.pages.dev/",
+  "name": "yt-mix-backend",
   "version": "1.0.0",
+  "description": "Backend proxy para YT CrossMix",
+  "main": "server.js",
   "scripts": {
-    "build": "echo 'No build needed'", 
-    "dev": "serve -s ."
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2", 
-    "serverless-http": "^3.2.0",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "sponsorblock-api": "^0.2.4",
     "crypto-js": "^4.2.0"
   },
