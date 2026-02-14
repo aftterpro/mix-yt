@@ -1178,8 +1178,7 @@ class LyricsManager {
         const safeTitle = encodeURIComponent(title);
 
         if (provider === 'lrclib') {
-            // ✅ API LRCLIB (Directa, soporta CORS)
-            const url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}&duration=${duration}`;
+            const url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
             console.log("🔗 Fetching LRCLIB:", url);
             
             const res = await fetch(url);
