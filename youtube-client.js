@@ -150,6 +150,7 @@ async cargarSegmentos(videoId) {
             };
             
             this.saveCache();
+             console.log(segments);        
             return segments;
             
         } catch (e) {
