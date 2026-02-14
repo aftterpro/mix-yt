@@ -157,9 +157,21 @@ function onPlayerReady(event) {
 }
 //Verificar si el usuario modifica la duración del video
 function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.ENDED) {
+  if (event.data === YT.PlayerState.ENDED) {
         console.log('Video finalizado.');
+        // Lógica existente de fin...
     } else if (event.data === YT.PlayerState.PLAYING) {
+        console.log('Video en reproducción.');
+        
+        // === NUEVO: DISPARAR CARGA DE LETRAS Y RELACIONADOS ===
+        const player = event.target; // El reproductor que disparó el evento
+        const videoData = player.getVideoData();
+        
+        // Pequeño delay para asegurar que tenemos datos
+        setTimeout(() => {
+            if (window.lyricsManager) window.lyricsManager.loadLyricsForCurrentVideo(videoData);
+            if (window.relatedManager) window.relatedManager.loadRelatedForVideo(videoData);
+        }, 500);
         console.log('Video en reproducción.');
     } else if (event.data === YT.PlayerState.PAUSED) {
         console.log('Video en pausa.');
@@ -1041,3 +1053,288 @@ function parseDuration(durationString) {
     const seconds = parseInt(match[3]) || 0;
     return hours * 3600 + minutes * 60 + seconds;
 }
+// =============================================
+// GESTOR DE LETRAS (LyricsManager)
+// =============================================
+class LyricsManager {
+    constructor() {
+        this.lyricsProvider = 'lrclib'; // Default
+        this.currentLrc = [];
+        this.syncInterval = null;
+    }
+
+    async loadLyricsForCurrentVideo(video) {
+        const container = document.getElementById('lyricsContent');
+        if (!container) return;
+
+        // Limpiar anterior
+        this.stopSync();
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
+
+        // Obtener datos limpios
+        let artist = video.author || video.uploaderName || '';
+        let title = video.title || '';
+        
+        // Limpieza básica de título/artista
+        artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+        if (title.includes('-') && (!artist || artist === 'Desconocido')) {
+            const parts = title.split('-');
+            artist = parts[0].trim();
+            title = parts.slice(1).join('-').trim();
+        }
+        title = this.cleanTrackTitle(title);
+
+        console.log(`🎵 Buscando letras: ${title} - ${artist}`);
+
+        try {
+            // Intentar fetch
+            const data = await this.fetchLyrics(this.lyricsProvider, artist, title, video.duration);
+            this.renderLyricsUI(data, artist, title);
+        } catch (e) {
+            console.warn('Fallo provider principal, intentando secundario...');
+            try {
+                // Fallback automático
+                const fallbackProvider = this.lyricsProvider === 'lrclib' ? 'lujjjh' : 'lrclib';
+                const data = await this.fetchLyrics(fallbackProvider, artist, title, video.duration);
+                this.renderLyricsUI(data, artist, title);
+            } catch (err2) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-times"></i>
+                        <p>No se encontraron letras.</p>
+                        <button onclick="window.lyricsManager.loadLyricsForCurrentVideo({title:'${video.title}', author:'${video.author}'})" class="lyrics-provider-btn">Reintentar</button>
+                    </div>`;
+            }
+        }
+    }
+
+    async fetchLyrics(provider, artist, title, duration) {
+        if (provider === 'lrclib') {
+            const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${Math.round(duration)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('LRCLIB Error');
+            const data = await res.json();
+            return {
+                syncedLyrics: data.syncedLyrics,
+                plainLyrics: data.plainLyrics,
+                provider: 'LRCLIB'
+            };
+        } else {
+            // PROXY PARA LUJJJH
+            const target = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
+            const proxy = `https://sphenographic-johnie-supersensually.ngrok-free.dev/cors-proxy?url=${encodeURIComponent(target)}`;
+            const res = await fetch(proxy);
+            if (!res.ok) throw new Error('LUJJJH Error');
+            const text = await res.text();
+            return {
+                syncedLyrics: text, // Esta API devuelve texto plano o LRC directo
+                plainLyrics: text.replace(/\[.*?\]/g, ''),
+                provider: 'LUJJJH'
+            };
+        }
+    }
+
+    renderLyricsUI(data, artist, title) {
+        const container = document.getElementById('lyricsContent');
+        const hasSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
+        
+        // Header HTML
+        let html = `
+            <div class="lyrics-header">
+                <div style="flex:1">
+                    <strong style="display:block">${this.escapeHTML(title)}</strong>
+                    <small>${this.escapeHTML(artist)}</small>
+                </div>
+                <button id="translateBtn" class="lyrics-provider-btn" title="Traducir"><i class="fas fa-language"></i></button>
+                <span style="font-size:0.7em; color:#666">${data.provider}</span>
+            </div>
+            <div class="lyrics-text ${hasSynced ? 'synced' : 'plain'}">
+        `;
+
+        if (hasSynced) {
+            this.currentLrc = this.parseLRC(data.syncedLyrics);
+            html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
+            this.startSync();
+        } else {
+            html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
+        }
+
+        html += '</div>';
+        container.innerHTML = html;
+
+        // Evento Traducción
+        document.getElementById('translateBtn').onclick = () => this.translateLyrics();
+    }
+
+    startSync() {
+        this.stopSync();
+        this.syncInterval = setInterval(() => {
+            const player = (currentPlayer === 1) ? player1 : player2;
+            if (!player || !player.getCurrentTime) return;
+            
+            const time = player.getCurrentTime();
+            const lines = document.querySelectorAll('.lyrics-text.synced p');
+            
+            let activeIndex = -1;
+            this.currentLrc.forEach((l, i) => {
+                if (time >= l.time) activeIndex = i;
+            });
+
+            lines.forEach((p, i) => {
+                if (i === activeIndex) {
+                    if (!p.classList.contains('active')) {
+                        p.classList.add('active');
+                        p.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    p.classList.remove('active');
+                }
+            });
+        }, 300);
+    }
+
+    stopSync() {
+        if (this.syncInterval) clearInterval(this.syncInterval);
+    }
+
+    async translateLyrics() {
+        const container = document.querySelector('.lyrics-text');
+        if (!container) return;
+        
+        const btn = document.getElementById('translateBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        let text = "";
+        const isSynced = container.classList.contains('synced');
+        
+        if (isSynced) {
+            text = this.currentLrc.map(l => l.text).join('\n');
+        } else {
+            text = container.innerText;
+        }
+
+        try {
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(text)}`;
+            const res = await fetch(url);
+            const json = await res.json();
+            
+            const translation = json[0].map(x => x[0]).join('');
+            
+            if (isSynced) {
+                const transLines = translation.split('\n');
+                const ps = container.querySelectorAll('p');
+                ps.forEach((p, i) => {
+                    if (transLines[i]) {
+                        const t = document.createElement('span');
+                        t.className = 'lyrics-translation';
+                        t.textContent = transLines[i];
+                        p.appendChild(t);
+                    }
+                });
+            } else {
+                const div = document.createElement('div');
+                div.className = 'lyrics-translation';
+                div.innerHTML = `<hr><strong>Traducción:</strong><br>${translation.replace(/\n/g, '<br>')}`;
+                container.appendChild(div);
+            }
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+        } catch (e) {
+            console.error(e);
+            btn.innerHTML = '<i class="fas fa-exclamation"></i>';
+            mostrarMensajeFlotante("Error al traducir");
+        }
+    }
+
+    // Helpers
+    cleanTrackTitle(title) {
+        return title.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix).*?[\)\]]/gi, '').trim();
+    }
+    
+    parseLRC(lrc) {
+        const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+        return lrc.split('\n').map(line => {
+            const m = line.match(regex);
+            if (!m) return null;
+            return {
+                time: parseInt(m[1])*60 + parseInt(m[2]) + parseFloat('0.'+m[3]),
+                text: m[4].trim()
+            };
+        }).filter(x => x);
+    }
+    
+    escapeHTML(str) {
+        return str.replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t]));
+    }
+}
+
+// =============================================
+// GESTOR DE RELACIONADOS (RelatedManager)
+// =============================================
+class RelatedManager {
+    constructor() {
+        this.lastId = null;
+    }
+
+    async loadRelatedForVideo(video) {
+        const container = document.getElementById('relatedVideosList');
+        if (!container || !video.video_id) return;
+
+        if (this.lastId === video.video_id) return; // Ya cargado
+        this.lastId = video.video_id;
+
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando recomendaciones...</p></div>';
+
+        try {
+            // Usamos el cliente de YouTube existente para buscar
+            // Estrategia: Buscar "Artista + Titulo" para obtener mix similar
+            let query = video.author ? `${video.author} ${video.title}` : video.title;
+            query = query.replace(/[\(\[].*?[\)\]]/g, ''); // Limpiar query
+
+            const results = await window.youtubeJSClient.search(query);
+            
+            if (!results.items || results.items.length === 0) throw new Error('No results');
+
+            container.innerHTML = '';
+            const list = document.createElement('div');
+            
+            results.items.filter(v => v.videoId !== video.video_id).forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'related-video-item';
+                item.innerHTML = `
+                    <img src="${v.thumbnail}" alt="thumb">
+                    <div class="related-info">
+                        <h4>${v.title}</h4>
+                        <p>${v.artist || 'Desconocido'}</p>
+                    </div>
+                    <button class="add-to-playlist" style="background:transparent; color:#007bff; border:none; margin-left:auto;">
+                        <i class="fas fa-plus-circle fa-lg"></i>
+                    </button>
+                `;
+                
+                // Click en todo el item: Reproducir ahora (Insertar siguiente)
+                item.onclick = (e) => {
+                    if (e.target.closest('button')) return; // Ignorar si click en botón +
+                    // Lógica para reproducir inmediato (Opcional, o añadir a cola)
+                    addToPlaylist(v);
+                    mostrarMensajeFlotante(`Añadido: ${v.title}`);
+                };
+
+                // Click en botón +: Añadir al final
+                item.querySelector('button').onclick = () => {
+                    addToPlaylist(v);
+                };
+
+                list.appendChild(item);
+            });
+            container.appendChild(list);
+
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div class="empty-state"><p>No se encontraron relacionados</p></div>';
+        }
+    }
+}
+
+// Inicializar Managers
+window.lyricsManager = new LyricsManager();
+window.relatedManager = new RelatedManager();
