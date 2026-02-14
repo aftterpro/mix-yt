@@ -3,92 +3,105 @@ const CONFIG = {
     origin: window.location.origin, 
     apiBase: "https://sphenographic-johnie-supersensually.ngrok-free.dev/search"
 };
-const CROSSFADE_DURATION = 15; // Duración del crossfade en segundos
+const CROSSFADE_DURATION = 15; 
 let player1, player2;
 let currentPlayer = 1;
-let playlistVideos = [];// Videos cargados desde la URL
-let manualVideos = [];// Videos añadidos desde la búsqueda
-let monitorInterval;// Declarar fuera para controlar el intervalo
-let playersInitialized = false;// Estado global para saber si ambos reproductores están listos
+
+window.playlistVideos = []; // Antes era: let playlistVideos = [];
+let playlistVideos = window.playlistVideos; // Referencia local para compatibilidad
+
+let manualVideos = [];
+let monitorInterval;
+let playersInitialized = false;
 let youtubeAPIReady = false;
 let currentIndex = 0;
 let reproduccionIniciada = false;
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
     console.log("🚀 Frontend en:", CONFIG.origin);
     console.log("🔗 Conectando a Backend:", CONFIG.apiBase);
     
+    // EXPORTAR FUNCIONES GLOBALES (Para que auth.js pueda usarlas)
+    window.updatePlaylistDOM = updatePlaylistDOM;
+    window.playNextVideo = playNextVideo;
+    window.currentIndex = currentIndex; // Por si acaso
+    
     loadYouTubeAPI();
     setupEventListeners();
     setupCrossfader();
     
-    // LÓGICA DE PESTAÑAS (Solo una versión, la correcta)
+    // LÓGICA DE PESTAÑAS
     const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content'); // Necesario para ocultar los contenidos
+    const tabContents = document.querySelectorAll('.tab-content');
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // 1. Quitar clase 'active' de todos los botones y contenidos
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
 
-            // 2. Activar el botón actual
             btn.classList.add('active');
-
-            // 3. Buscar y activar el contenido correcto (formato: tab-NOMBRE)
             const targetId = `tab-${btn.dataset.tab}`;
             const targetContent = document.getElementById(targetId);
-            
-            if (targetContent) {
-                targetContent.classList.add('active');
-            } else {
-                console.warn(`⚠️ No se encontró la pestaña con ID: ${targetId}`);
-            }
+            if (targetContent) targetContent.classList.add('active');
         });
     });
 });
 
-// Mensaje flotante 
+// Mensaje flotante
 function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
     mensajeDiv.className = 'mensaje-flotante';
-    const playlistContainer = document.getElementById('playlistContainer'); // Obtener referencia al contenedor
-    playlistContainer.insertAdjacentElement('afterend', mensajeDiv); // Insertar después del contenedor
+    const playlistContainer = document.getElementById('playlistContainer'); 
+    
+    // Si no encuentra el contenedor (por ejemplo, si estamos en otra pestaña), usar body
+    if (playlistContainer) {
+        playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
+    } else {
+        mensajeDiv.style.position = 'fixed';
+        mensajeDiv.style.bottom = '20px';
+        mensajeDiv.style.left = '50%';
+        mensajeDiv.style.transform = 'translateX(-50%)';
+        mensajeDiv.style.zIndex = '1000';
+        document.body.appendChild(mensajeDiv);
+    }
 
     setTimeout(() => {
         mensajeDiv.classList.add('fadeOut');
-        setTimeout(() => {
-            mensajeDiv.remove();
-        }, 1000);
-    },10000);// 10 segundos
+        setTimeout(() => mensajeDiv.remove(), 1000);
+    }, 4000); // Reducido a 4 seg para no molestar
 }
+window.mostrarMensajeFlotante = mostrarMensajeFlotante; // Exportar
 mostrarMensajeFlotante("¡Recomendamos instalar extencion : \n Amplificador de volumen - refuerzo de sonido \n SponsorBlock, para una mejor experiencia :)" );
 mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
 
-// Módulo: Carga del API de YouTube (Optimizado)
+// Módulo: Carga del API de YouTube  
 function loadYouTubeAPI() {
     if (youtubeAPIReady) return;
     youtubeAPIReady = true;
 
     const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api'; // Simplificado
+    script.src = 'https://www.youtube.com/iframe_api';
     script.async = true;
-    window.onYouTubeIframeAPIReady = () => { // Asignar directamente
+    window.onYouTubeIframeAPIReady = () => {
         console.log("API de YouTube cargada.");
         initializePlayers();
     };
-    document.head.appendChild(script); // Añadir al head
+    document.head.appendChild(script);
 }
+
 function initializePlayers() {
     if (player1 && player2) return;
 
     const playerConfig = {
-        height: '250',
-        width: '350',
+        height: '100%',
+        width: '100%',
         playerVars: {
-            'origin': 'https://mix-yt.pages.dev',  
-            'enablejsapi': 1
+            'origin': window.location.origin,  
+            'enablejsapi': 1,
+            'controls': 1,
+            'rel': 0
         },
         events: {
             'onReady': onPlayerReady,
@@ -99,6 +112,10 @@ function initializePlayers() {
 
     player1 = new YT.Player('player1', playerConfig);
     player2 = new YT.Player('player2', playerConfig);
+    
+    // Exponer players globalmente para SponsorBlock
+    window.player1 = player1;
+    window.player2 = player2;
 }
 function onPlayerError(event) { //Errores con Api
     console.error("Error del reproductor:", event);
@@ -330,9 +347,11 @@ function rearrangePlaylist(fromIndex, toIndex) { // Eliminar la función duplica
 //Actualizar DOM   
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
+    if (!playlistContainer) return;
+    
     playlistContainer.innerHTML = '';
 
-    playlistVideos.forEach((video, index) => {
+    window.playlistVideos.forEach((video, index) => { // Usar window.playlistVideos
         const item = document.createElement('div');
         item.className = 'playlist-item';
         item.draggable = true;
@@ -340,92 +359,48 @@ function updatePlaylistDOM() {
         const imageContainer = document.createElement('div');
         imageContainer.className = 'image-container';
 
-        // ✅ MOSTRAR THUMBNAIL REAL
         const img = document.createElement('img');
         img.src = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
         img.alt = video.title;
         img.className = 'drag-handle';
         
-        // ✅ FALLBACK SI FALLA LA IMAGEN
         img.onerror = () => {
-            img.src = 'https://i.ytimg.com/vi/' + video.videoId + '/default.jpg';
-            img.onerror = () => {
-                img.src = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
-            };
+            img.src = 'https://via.placeholder.com/100x75?text=No+Img';
         };
         
         imageContainer.appendChild(img);
 
+        // Icono de reproducción
         if (index === currentIndex) {
             item.classList.add('playing');
             const icon = document.createElement('i');
-            icon.className = 'fa-sharp-duotone fa-solid fa-share playing-icon';
+            icon.className = 'fas fa-play playing-icon'; // Corregido clase icono
+            icon.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-shadow: 0 0 5px black;";
             imageContainer.appendChild(icon);
         }
 
         item.appendChild(imageContainer);
-       item.innerHTML += `
-        <div>
-        <p style="margin: 0; font-size: 12px; font-weight: bold;">${video.title}</p>
-        <p style="margin: 0; font-size: 10px; color: #555;">
-            Duración: ${formatDuration(video.duration)}
-        </p>
-        </div>
-    `;
-
-        // Menú de eliminar
-        const deleteMenu = document.createElement('div');
-        deleteMenu.className = 'delete-menu';
-        deleteMenu.innerHTML = `
-            <button class="delete-menu-button"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-            <div class="delete-menu-content">
-                <button class="delete-button-item"><i class="fa-solid fa-xmark"></i>Eliminar</button>
-                <button class="move-up-button"><i class="fa-solid fa-arrow-up"></i>Reproducir Despues</button>
-            </div>
+        
+        // Info del video
+        const infoDiv = document.createElement('div');
+        infoDiv.style.flex = "1";
+        infoDiv.innerHTML = `
+            <p style="margin: 0; font-size: 12px; font-weight: bold;">${video.title}</p>
+            <p style="margin: 0; font-size: 10px; color: #555;">Duración: ${formatDuration(video.duration)}</p>
         `;
+        item.appendChild(infoDiv);
+
+        // Menú borrar
+        const deleteMenu = document.createElement('div');
+        deleteMenu.innerHTML = `<button class="delete-button" onclick="deleteVideo('${video.videoId}')"><i class="fas fa-trash"></i></button>`;
         item.appendChild(deleteMenu);
 
-        const deleteMenuButton = item.querySelector('.delete-menu-button');
-        const deleteMenuContent = item.querySelector('.delete-menu-content');
-
-        deleteMenuButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            deleteMenuContent.style.display = deleteMenuContent.style.display === 'block' ? 'none' : 'block';
-        });
-
-        document.addEventListener('click', (event) => {
-            if (!item.contains(event.target)) {
-                deleteMenuContent.style.display = 'none';
-            }
-        });
-
-        const deleteButtonItem = item.querySelector('.delete-button-item');
-        deleteButtonItem.addEventListener('click', () => {
-            deleteVideo(video.videoId);
-        });
-
-        const moveUpButton = item.querySelector('.move-up-button');
-        moveUpButton.addEventListener('click', () => {
-            const currentIndexInPlaylist = playlistVideos.findIndex(v => v.videoId === video.videoId);
-            let playingIndex = -1;
-            
-            if (playersInitialized) {
-                if (currentPlayer === 1 && player1 && player1.getVideoData() && player1.getVideoData().video_id) {
-                    playingIndex = playlistVideos.findIndex(v => v.videoId === player1.getVideoData().video_id);
-                } else if (currentPlayer === 2 && player2 && player2.getVideoData() && player2.getVideoData().video_id) {
-                    playingIndex = playlistVideos.findIndex(v => v.videoId === player2.getVideoData().video_id);
-                }
-            }
-            
-            if (currentIndexInPlaylist > 0) {
-                playlistVideos.splice(currentIndexInPlaylist, 1);
-                
-                if (playingIndex !== -1 && currentIndexInPlaylist > playingIndex) {
-                    playlistVideos.splice(playingIndex + 1, 0, video);
-                } else {
-                    playlistVideos.splice(0, 0, video);
-                }
-                
+        // Click para reproducir
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) { // Evitar click si se pulsa borrar
+                currentIndex = index;
+                const player = currentPlayer === 1 ? player1 : player2;
+                playVideo(video.videoId, player);
                 updatePlaylistDOM();
             }
         });
@@ -434,6 +409,12 @@ function updatePlaylistDOM() {
     });
     
     enableDragAndDrop();
+    
+    // Actualizar estado del botón iniciar
+    const iniciarBtn = document.getElementById('iniciarButton');
+    if (iniciarBtn) {
+        iniciarBtn.disabled = window.playlistVideos.length === 0;
+    }
 }
 // Estilos CSS (Modificados para el icono y el estilo)
 const style3 = document.createElement('style');
