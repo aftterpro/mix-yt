@@ -11,57 +11,80 @@ export async function onRequest(context) {
     "Content-Type": "application/json"
   };
 
-  if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (request.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     let items = [];
 
-    // Si es una Playlist, usamos este endpoint oficial (sin API KEY)
+    // CASO 1: Búsqueda de Playlist
     if (playlistId) {
-      const res = await fetch(`https://www.youtube.com/list_ajax?style=json&action_get_list=1&list=${playlistId}`);
+      // Usamos el endpoint AJAX de YouTube que es ligero y devuelve JSON
+      const res = await fetch(`https://www.youtube.com/list_ajax?style=json&action_get_list=1&list=${playlistId}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+      });
+      
+      if (!res.ok) throw new Error("Error fetching playlist");
+      
       const data = await res.json();
       
-      items = data.video.map(v => ({
-        videoId: v.encrypted_id,
-        title: v.title,
-        thumbnail: `https://i.ytimg.com/vi/${v.encrypted_id}/mqdefault.jpg`,
-        artist: v.author,
-        duration: v.length_seconds
-      }));
+      if (data.video) {
+        items = data.video.map(v => ({
+          videoId: v.encrypted_id,
+          title: v.title,
+          thumbnail: `https://i.ytimg.com/vi/${v.encrypted_id}/mqdefault.jpg`,
+          artist: v.author,
+          duration: v.length_seconds
+        }));
+      }
     } 
-    // Si es búsqueda normal
+    // CASO 2: Búsqueda normal por palabras
     else if (query) {
-      const res = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&pbj=1`, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Apple..." }
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "Accept-Language": "es-ES,es;q=0.9"
+        }
       });
-      const text = await res.text();
       
-      // Extraemos los datos del JSON que YouTube inyecta en la página
-      const regex = /ytInitialData\s*=\s*({.+?});/;
-      const match = text.match(regex);
-      if (match) {
+      const html = await res.text();
+      
+      // Extraemos el JSON incrustado en el HTML (ytInitialData)
+      // Esta regex busca el objeto JSON que contiene los resultados
+      const match = html.match(/ytInitialData\s*=\s*({.+?});/);
+      
+      if (match && match[1]) {
         const json = JSON.parse(match[1]);
-        const results = json.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents[0].itemSectionRenderer.contents;
         
-        items = results
-          .filter(i => i.videoRenderer)
-          .map(i => {
-            const v = i.videoRenderer;
-            return {
-              videoId: v.videoId,
-              title: v.title.runs[0].text,
-              thumbnail: v.thumbnail.thumbnails[0].url,
-              artist: v.ownerText.runs[0].text,
-              duration: v.lengthText?.simpleText || "0:00"
-            };
-          });
+        // Navegamos por la estructura profunda de YouTube
+        const contents = json.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
+        const itemSection = contents?.find(c => c.itemSectionRenderer)?.itemSectionRenderer?.contents;
+        
+        if (itemSection) {
+          items = itemSection
+            .filter(i => i.videoRenderer)
+            .map(i => {
+              const v = i.videoRenderer;
+              return {
+                videoId: v.videoId,
+                title: v.title?.runs[0]?.text || "Sin título",
+                thumbnail: v.thumbnail?.thumbnails[0]?.url,
+                artist: v.ownerText?.runs[0]?.text || "Desconocido",
+                duration: v.lengthText?.simpleText || "0:00"
+              };
+            });
+        }
       }
     }
 
     return new Response(JSON.stringify({ items }), { headers: corsHeaders });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: "Error en servidor", details: error.message }), { 
+    return new Response(JSON.stringify({ error: error.message }), { 
       status: 500, 
       headers: corsHeaders 
     });
