@@ -22,34 +22,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     setupCrossfader();
     
+    // LÓGICA DE PESTAÑAS (Solo una versión, la correcta)
     const tabBtns = document.querySelectorAll('.tab-btn');
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
-        });
-    });
-    // LÓGICA DE PESTAÑAS 
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+    const tabContents = document.querySelectorAll('.tab-content'); // Necesario para ocultar los contenidos
 
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Quitar activo de todos
+            // 1. Quitar clase 'active' de todos los botones y contenidos
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
 
-            // Activar actual
+            // 2. Activar el botón actual
             btn.classList.add('active');
+
+            // 3. Buscar y activar el contenido correcto (formato: tab-NOMBRE)
             const targetId = `tab-${btn.dataset.tab}`;
-            document.getElementById(targetId).classList.add('active');
+            const targetContent = document.getElementById(targetId);
+            
+            if (targetContent) {
+                targetContent.classList.add('active');
+            } else {
+                console.warn(`⚠️ No se encontró la pestaña con ID: ${targetId}`);
+            }
         });
     });
 });
 
-// Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
+// Mensaje flotante 
 function mostrarMensajeFlotante(mensaje) {
     const mensajeDiv = document.createElement('div');
     mensajeDiv.textContent = mensaje;
