@@ -1054,65 +1054,136 @@ function parseDuration(durationString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 // =============================================
-// GESTOR DE LETRAS (LyricsManager)
+// GESTOR DE LETRAS (LyricsManager) - VERSIÓN LIMPIA
 // =============================================
 class LyricsManager {
     constructor() {
-        this.lyricsProvider = 'lrclib'; // Default
+        this.lyricsProvider = 'lrclib'; // Proveedor por defecto
         this.currentLrc = [];
         this.syncInterval = null;
+    }
+
+    /**
+     * Limpia y normaliza los datos del video para mejorar la búsqueda
+     */
+    cleanData(video) {
+        let rawArtist = video.artist || video.uploaderName || video.author || '';
+        let rawTitle = video.title || '';
+        let duration = 0;
+
+        // 1. CORREGIR DURACIÓN (Evitar NaN)
+        if (typeof video.duration === 'number') {
+            duration = video.duration;
+        } else if (typeof video.duration === 'string') {
+            // Intenta usar tu función global si existe, sino parseo manual
+            if (typeof window.parseDuration === 'function') {
+                duration = window.parseDuration(video.duration);
+            } else {
+                // Fallback para "PT3M20S" o "3:20"
+                const parts = video.duration.replace('PT','').replace('S','').split('M');
+                if(parts.length === 2) duration = parseInt(parts[0])*60 + parseInt(parts[1]);
+            }
+        }
+        if (isNaN(duration)) duration = 0;
+
+        // 2. LIMPIEZA DE ARTISTA
+        // Elimina: VEVO, - Topic, Official, espacios extra
+        let artist = rawArtist
+            .replace(/VEVO$/i, '')          // SelenaGomezVEVO -> SelenaGomez
+            .replace(/([a-z])([A-Z])/g, '$1 $2') // SelenaGomez -> Selena Gomez (CamelCase a espacios)
+            .replace(/\s*-\s*Topic$/i, '')  // Artista - Topic -> Artista
+            .replace(/Official/i, '')
+            .trim();
+
+        // 3. LIMPIEZA DE TÍTULO
+        // Elimina basura común: (Official Video), [Audio], ft. Alguien, etc.
+        let title = rawTitle
+            .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv).*?[\)\]]/gi, '') // Elimina paréntesis
+            .replace(/^\s*\|\s*/, '') // Elimina barras al inicio
+            .trim();
+
+        // LÓGICA "ARTISTA - CANCIÓN"
+        // Muchos videos de música tienen el formato: "Artista - Canción" en el título
+        if (title.includes(' - ')) {
+            const parts = title.split(' - ');
+            const part1 = parts[0].trim().toLowerCase();
+            const part2 = parts[1].trim();
+            const artistLower = artist.toLowerCase();
+
+            // Si la primera parte del título se parece al artista del canal
+            // Ejemplo: Title="Rema, Selena Gomez - Calm Down", Artist="Selena Gomez"
+            if (part1.includes(artistLower) || artistLower.includes(part1) || part1.length > 3) {
+                // Asumimos que la parte 1 es el artista (o colaboradores) y la parte 2 es la canción
+                // Actualizamos el artista con la info del título que suele ser más precisa (ej. feats)
+                artist = parts[0].trim(); 
+                title = part2; 
+            }
+        }
+
+        // 4. LIMPIEZA FINAL DE "FEAT" EN TÍTULO Y ARTISTA
+        // Limpiamos "ft.", "feat." para dejar solo el nombre principal
+        title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
+        artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&)/i)[0].trim(); // Toma solo el primer artista principal
+
+        return { 
+            artist: artist, 
+            title: title, 
+            duration: Math.round(duration) 
+        };
     }
 
     async loadLyricsForCurrentVideo(video) {
         const container = document.getElementById('lyricsContent');
         if (!container) return;
 
-        // Limpiar anterior
         this.stopSync();
         container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
 
-        // Obtener datos limpios
-        let artist = video.author || video.uploaderName || '';
-        let title = video.title || '';
+        // ✅ USAR DATOS LIMPIOS
+        const clean = this.cleanData(video);
         
-        // Limpieza básica de título/artista
-        artist = artist.replace(/\s*-\s*Topic$/i, '').trim();
-        if (title.includes('-') && (!artist || artist === 'Desconocido')) {
-            const parts = title.split('-');
-            artist = parts[0].trim();
-            title = parts.slice(1).join('-').trim();
-        }
-        title = this.cleanTrackTitle(title);
-
-        console.log(`🎵 Buscando letras: ${title} - ${artist}`);
+        console.log(`🎵 Datos limpios: Artista="${clean.artist}", Titulo="${clean.title}"`);
 
         try {
-            // Intentar fetch
-            const data = await this.fetchLyrics(this.lyricsProvider, artist, title, video.duration);
-            this.renderLyricsUI(data, artist, title);
+            // Intentar proveedor principal
+            const data = await this.fetchLyrics(this.lyricsProvider, clean.artist, clean.title, clean.duration);
+            this.renderLyricsUI(data, clean.artist, clean.title);
         } catch (e) {
-            console.warn('Fallo provider principal, intentando secundario...');
+            console.warn(`Fallo ${this.lyricsProvider}, intentando fallback...`, e);
             try {
-                // Fallback automático
+                // Fallback automático al otro proveedor
                 const fallbackProvider = this.lyricsProvider === 'lrclib' ? 'lujjjh' : 'lrclib';
-                const data = await this.fetchLyrics(fallbackProvider, artist, title, video.duration);
-                this.renderLyricsUI(data, artist, title);
+                const data = await this.fetchLyrics(fallbackProvider, clean.artist, clean.title, clean.duration);
+                this.renderLyricsUI(data, clean.artist, clean.title);
             } catch (err2) {
+                console.error("Error final letras:", err2);
                 container.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-times"></i>
                         <p>No se encontraron letras.</p>
-                        <button onclick="window.lyricsManager.loadLyricsForCurrentVideo({title:'${video.title}', author:'${video.author}'})" class="lyrics-provider-btn">Reintentar</button>
+                        <small style="color:#666; font-size: 0.8em;">Buscado: ${clean.title} - ${clean.artist}</small>
+                        <br><br>
+                        <button id="retryLyricsBtn" class="lyrics-provider-btn" style="background:#333;color:white;">Reintentar</button>
                     </div>`;
+                
+                const retryBtn = document.getElementById('retryLyricsBtn');
+                if(retryBtn) retryBtn.onclick = () => this.loadLyricsForCurrentVideo(video);
             }
         }
     }
 
     async fetchLyrics(provider, artist, title, duration) {
+        // Codificar componentes para URL
+        const safeArtist = encodeURIComponent(artist);
+        const safeTitle = encodeURIComponent(title);
+
         if (provider === 'lrclib') {
-            const url = `https://lrclib.net/api/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}&duration=${Math.round(duration)}`;
+            // ✅ API LRCLIB (Directa, soporta CORS)
+            const url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}&duration=${duration}`;
+            console.log("🔗 Fetching LRCLIB:", url);
+            
             const res = await fetch(url);
-            if (!res.ok) throw new Error('LRCLIB Error');
+            if (!res.ok) throw new Error('LRCLIB 404/Error');
             const data = await res.json();
             return {
                 syncedLyrics: data.syncedLyrics,
@@ -1120,17 +1191,39 @@ class LyricsManager {
                 provider: 'LRCLIB'
             };
         } else {
-            // PROXY PARA LUJJJH
-            const target = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
-            const proxy = `https://sphenographic-johnie-supersensually.ngrok-free.dev/cors-proxy?url=${encodeURIComponent(target)}`;
-            const res = await fetch(proxy);
-            if (!res.ok) throw new Error('LUJJJH Error');
-            const text = await res.text();
-            return {
-                syncedLyrics: text, // Esta API devuelve texto plano o LRC directo
-                plainLyrics: text.replace(/\[.*?\]/g, ''),
-                provider: 'LUJJJH'
-            };
+            // ✅ API LUJJJH (Requiere Proxy)
+            // Usamos la ruta relativa que Cloudflare Pages mapea a tu archivo functions/cors-proxy.js
+            const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
+            const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;
+            
+            console.log("🔗 Fetching Proxy:", proxyUrl);
+
+            try {
+                const res = await fetch(proxyUrl);
+                
+                // Si estamos en localhost sin Wrangler, esto fallará con 404
+                if (res.status === 404 && window.location.hostname === 'localhost') {
+                    throw new Error('El proxy local no funciona con "serve". Usa "wrangler pages dev".');
+                }
+                
+                if (!res.ok) throw new Error('Proxy Error: ' + res.status);
+                
+                const text = await res.text();
+                // Validación básica de respuesta
+                if (!text || text.includes('Cannot GET') || text.length < 20) throw new Error('Respuesta inválida');
+
+                return {
+                    syncedLyrics: text, 
+                    plainLyrics: text.replace(/\[.*?\]/g, ''),
+                    provider: 'LUJJJH'
+                };
+            } catch (proxyError) {
+                console.warn("Error proxy, intentando acceso directo (puede fallar por CORS):", proxyError);
+                // Último intento: directo (algunos navegadores/extensiones lo permiten)
+                const directRes = await fetch(targetApi);
+                const directText = await directRes.text();
+                return { syncedLyrics: directText, plainLyrics: directText.replace(/\[.*?\]/g, ''), provider: 'LUJJJH (Direct)' };
+            }
         }
     }
 
@@ -1138,23 +1231,28 @@ class LyricsManager {
         const container = document.getElementById('lyricsContent');
         const hasSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
         
-        // Header HTML
+        // Limpiar para asegurar que no hay duplicados
+        container.innerHTML = '';
+
         let html = `
             <div class="lyrics-header">
-                <div style="flex:1">
-                    <strong style="display:block">${this.escapeHTML(title)}</strong>
-                    <small>${this.escapeHTML(artist)}</small>
+                <div style="flex:1; overflow:hidden;">
+                    <strong style="display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size: 1.1em;">${this.escapeHTML(title)}</strong>
+                    <small style="color:#aaa;">${this.escapeHTML(artist)}</small>
                 </div>
-                <button id="translateBtn" class="lyrics-provider-btn" title="Traducir"><i class="fas fa-language"></i></button>
-                <span style="font-size:0.7em; color:#666">${data.provider}</span>
+                <button id="translateBtn" class="lyrics-provider-btn" title="Traducir" style="background:transparent; border:none; color:white;"><i class="fas fa-language fa-lg"></i></button>
             </div>
-            <div class="lyrics-text ${hasSynced ? 'synced' : 'plain'}">
+            <div class="lyrics-text ${hasSynced ? 'synced' : 'plain'}" style="padding-top:10px;">
         `;
 
         if (hasSynced) {
             this.currentLrc = this.parseLRC(data.syncedLyrics);
-            html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
-            this.startSync();
+            if(this.currentLrc.length > 0) {
+                html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
+                this.startSync();
+            } else {
+                html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
+            }
         } else {
             html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
         }
@@ -1162,34 +1260,36 @@ class LyricsManager {
         html += '</div>';
         container.innerHTML = html;
 
-        // Evento Traducción
-        document.getElementById('translateBtn').onclick = () => this.translateLyrics();
+        const tBtn = document.getElementById('translateBtn');
+        if(tBtn) tBtn.onclick = () => this.translateLyrics();
     }
 
     startSync() {
         this.stopSync();
         this.syncInterval = setInterval(() => {
-            const player = (currentPlayer === 1) ? player1 : player2;
-            if (!player || !player.getCurrentTime) return;
+            const player = (window.currentPlayer === 1) ? window.player1 : window.player2;
+            if (!player || typeof player.getCurrentTime !== 'function') return;
             
             const time = player.getCurrentTime();
             const lines = document.querySelectorAll('.lyrics-text.synced p');
             
             let activeIndex = -1;
-            this.currentLrc.forEach((l, i) => {
-                if (time >= l.time) activeIndex = i;
-            });
-
-            lines.forEach((p, i) => {
-                if (i === activeIndex) {
-                    if (!p.classList.contains('active')) {
-                        p.classList.add('active');
-                        p.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
+            for (let i = 0; i < this.currentLrc.length; i++) {
+                if (time >= this.currentLrc[i].time) {
+                    activeIndex = i;
                 } else {
-                    p.classList.remove('active');
+                    break;
                 }
-            });
+            }
+
+            if (activeIndex !== -1 && lines[activeIndex]) {
+                const currentLine = lines[activeIndex];
+                if (!currentLine.classList.contains('active')) {
+                    lines.forEach(l => l.classList.remove('active'));
+                    currentLine.classList.add('active');
+                    currentLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
         }, 300);
     }
 
@@ -1197,12 +1297,15 @@ class LyricsManager {
         if (this.syncInterval) clearInterval(this.syncInterval);
     }
 
+    // Traducción simple usando Google Translate API (Gratis/Limitada)
     async translateLyrics() {
         const container = document.querySelector('.lyrics-text');
         if (!container) return;
         
         const btn = document.getElementById('translateBtn');
+        const originalIcon = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
         
         let text = "";
         const isSynced = container.classList.contains('synced');
@@ -1224,33 +1327,34 @@ class LyricsManager {
                 const transLines = translation.split('\n');
                 const ps = container.querySelectorAll('p');
                 ps.forEach((p, i) => {
-                    if (transLines[i]) {
+                    if (!p.querySelector('.lyrics-translation') && transLines[i]) {
                         const t = document.createElement('span');
                         t.className = 'lyrics-translation';
                         t.textContent = transLines[i];
+                        t.style.cssText = "display:block; font-size:0.8em; color:#4caf50; font-style:italic;";
                         p.appendChild(t);
                     }
                 });
             } else {
-                const div = document.createElement('div');
-                div.className = 'lyrics-translation';
-                div.innerHTML = `<hr><strong>Traducción:</strong><br>${translation.replace(/\n/g, '<br>')}`;
-                container.appendChild(div);
+                if (!container.querySelector('.translated-block')) {
+                    const div = document.createElement('div');
+                    div.className = 'lyrics-translation translated-block';
+                    div.innerHTML = `<hr style="border-color:#333; margin:20px 0;"><strong style="color:#4caf50">Traducción:</strong><br><br>${translation.replace(/\n/g, '<br>')}`;
+                    container.appendChild(div);
+                }
             }
-            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.innerHTML = '<i class="fas fa-check" style="color:#4caf50"></i>';
         } catch (e) {
             console.error(e);
-            btn.innerHTML = '<i class="fas fa-exclamation"></i>';
-            mostrarMensajeFlotante("Error al traducir");
+            window.mostrarMensajeFlotante("Error al traducir");
+            btn.innerHTML = originalIcon;
+        } finally {
+            btn.disabled = false;
         }
     }
 
-    // Helpers
-    cleanTrackTitle(title) {
-        return title.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix).*?[\)\]]/gi, '').trim();
-    }
-    
     parseLRC(lrc) {
+        if(!lrc) return [];
         const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
         return lrc.split('\n').map(line => {
             const m = line.match(regex);
@@ -1263,10 +1367,13 @@ class LyricsManager {
     }
     
     escapeHTML(str) {
+        if(!str) return '';
         return str.replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t]));
     }
 }
 
+// Inicializar
+window.lyricsManager = new LyricsManager();
 // =============================================
 // GESTOR DE RELACIONADOS (RelatedManager)
 // =============================================
