@@ -31,6 +31,22 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
         });
     });
+    // LÓGICA DE PESTAÑAS 
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Quitar activo de todos
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+
+            // Activar actual
+            btn.classList.add('active');
+            const targetId = `tab-${btn.dataset.tab}`;
+            document.getElementById(targetId).classList.add('active');
+        });
+    });
 });
 
 // Mensaje flotante (Ubicado debajo de playlistContainer y optimizado)
@@ -312,7 +328,7 @@ function rearrangePlaylist(fromIndex, toIndex) { // Eliminar la función duplica
     const [movedVideo] = playlistVideos.splice(fromIndex, 1);
     playlistVideos.splice(toIndex, 0, movedVideo);
 } 
-//Actualizar DOM  (CORREGIDO)
+//Actualizar DOM   
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
     playlistContainer.innerHTML = '';
@@ -349,12 +365,14 @@ function updatePlaylistDOM() {
         }
 
         item.appendChild(imageContainer);
-        item.innerHTML += `
-            <div>
-                <p style="margin: 0; font-size: 12px; font-weight: bold;">${video.title}</p>
-                <p style="margin: 0; font-size: 10px; color: #555;">Duración: ${formatDuration(video.duration)}</p>
-            </div>
-        `;
+       item.innerHTML += `
+        <div>
+        <p style="margin: 0; font-size: 12px; font-weight: bold;">${video.title}</p>
+        <p style="margin: 0; font-size: 10px; color: #555;">
+            Duración: ${formatDuration(video.duration)}
+        </p>
+        </div>
+    `;
 
         // Menú de eliminar
         const deleteMenu = document.createElement('div');
@@ -782,8 +800,8 @@ function playFirstVideo() {
 // Módulo: Monitoreo de Reproductores
 function startMonitoring() {
     if (!monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 1000); 
-        console.log('Monitoreo iniciado (1s).');
+        monitorInterval = setInterval(monitorPlayers, 500); 
+        console.log('Monitoreo iniciado (0.5s).');
     }
 }
 function stopMonitoring() {
