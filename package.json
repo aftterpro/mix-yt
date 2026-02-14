@@ -1,5 +1,5 @@
 {
-  "name": "mix-yt.netlify.app",
+  "name": "https://mix-yt.pages.dev/",
   "version": "1.0.0",
   "scripts": {
     "build": "echo 'No build needed'", 
@@ -9,8 +9,7 @@
     "express": "^4.21.2", 
     "serverless-http": "^3.2.0",
     "sponsorblock-api": "^0.2.4",
-    "crypto-js": "^4.2.0",
-    "youtube-search-api": "^1.2.1"
+    "crypto-js": "^4.2.0"
   },
   "devDependencies": {
     "serve": "^14.2.1"
