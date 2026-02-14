@@ -54,14 +54,38 @@
     </div>
   </div>
 
-  <div class="tabs-container">
+ <div class="tabs-container">
     <button class="tab-btn active" data-tab="cola">
-        <i class="fas fa-list"></i> Cola de Reproducción
+        <i class="fas fa-list"></i> Cola
     </button>
     <button class="tab-btn" data-tab="yt-playlists">
-        <i class="fab fa-youtube"></i> Mis Playlists
+        <i class="fab fa-youtube"></i> Playlists
     </button>
-  </div>
+    <button class="tab-btn" data-tab="lyrics">
+        <i class="fas fa-music"></i> Letras
+    </button>
+    <button class="tab-btn" data-tab="related">
+        <i class="fas fa-magic"></i> Relacionados
+    </button>
+</div>
+
+<div id="tab-lyrics" class="tab-content">
+    <div id="lyricsContent" class="lyrics-container">
+        <div class="empty-state">
+            <i class="fas fa-music"></i>
+            <p>Reproduce una canción para ver la letra</p>
+        </div>
+    </div>
+</div>
+
+<div id="tab-related" class="tab-content">
+    <div id="relatedVideosList" class="related-list">
+        <div class="empty-state">
+            <i class="fas fa-film"></i>
+            <p>Reproduce algo para ver recomendaciones</p>
+        </div>
+    </div>
+</div>
 
   <div id="tab-cola" class="tab-content active">
       <div id="playlistContainer">
