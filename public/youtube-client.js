@@ -15,7 +15,9 @@ class YouTubeSimplifiedClient {
     
 async search(query) {
     const cleanQuery = query.trim();
-    if (!cleanQuery) return { items: [] };
+    if (!cleanQuery){
+        return { items: [] };
+    }
     const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
     try {
         const data = await this.fetchWithRetry(url);
