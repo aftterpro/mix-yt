@@ -701,3 +701,88 @@ max-height: 150px; /* Reduce la altura en móviles */
     from { opacity: 0; }
     to { opacity: 1; }
 }
+/* === Estilos para Vista de Detalle de Playlist === */
+
+/* Encabezado oscuro tipo App */
+.details-header {
+    display: flex;
+    align-items: center;
+    background-color: #2c3e50; /* Color oscuro */
+    color: white;
+    padding: 15px;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+#back-to-playlists-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.4em;
+    cursor: pointer;
+    margin-right: 20px;
+    padding: 5px;
+    transition: transform 0.2s;
+}
+
+#back-to-playlists-btn:hover {
+    transform: translateX(-3px);
+}
+
+#details-playlist-title {
+    margin: 0;
+    font-size: 1.2em;
+    flex-grow: 1; /* Ocupa el espacio central */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-action-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+.header-action-btn:hover{ background: rgba(255,255,255,0.3); }
+
+
+/* Lista de videos en el detalle */
+#details-video-list-container {
+    background: #fff;
+    border: 1px solid #eee;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 500px; /* Altura máxima con scroll */
+    overflow-y: auto;
+}
+
+.detail-video-item {
+    display: flex;
+    padding: 10px;
+    border-bottom: 1px solid #f0f0f0;
+    align-items: center;
+}
+
+.detail-video-item img {
+    width: 80px;
+    height: 45px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 15px;
+}
+
+.detail-video-info h5 {
+    margin: 0 0 5px 0;
+    font-size: 1em;
+    color: #333;
+}
+
+.detail-video-info p {
+    margin: 0;
+    font-size: 0.8em;
+    color: #777;
+}
