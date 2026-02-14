@@ -1194,7 +1194,8 @@ class LyricsManager {
             // ✅ API LUJJJH (Requiere Proxy)
             // Usamos la ruta relativa que Cloudflare Pages mapea a tu archivo functions/cors-proxy.js
             const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-            const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;
+            const backendHost = "https://sphenographic-johnie-supersensually.ngrok-free.dev"; 
+            const proxyUrl = `${backendHost}/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
             
             console.log("🔗 Fetching Proxy:", proxyUrl);
 
