@@ -41,25 +41,40 @@
             </div>
     </section>
 
-    <section id="playlist-panel">
-      <h2>Playlist</h2>
-      
-      <div id="auth-container" style="margin-bottom: 15px; text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
-          <button id="googleSignInButton" onclick="handleAuthClick()" style="background: #db4437; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
-              <i class="fab fa-google"></i> Importar de YouTube
-          </button>
-          <button id="googleSignOutButton" onclick="handleSignOutClick()" style="background: #555; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; display: none;">
-              Cerrar Sesión
-          </button>
-      </div>
+   <section id="playlist-panel">
+  <div class="panel-header-tabs">
+    <h2>Biblioteca</h2>
+    <div id="auth-controls">
+        <button id="googleSignInButton" onclick="handleAuthClick()" class="auth-btn google-login">
+            <i class="fab fa-google"></i> Acceder
+        </button>
+        <button id="googleSignOutButton" onclick="handleSignOutClick()" class="auth-btn google-logout" style="display:none">
+            <i class="fas fa-sign-out-alt"></i> Salir
+        </button>
+    </div>
+  </div>
 
-      <div id="youtube-playlists-container" style="display:none;">
-          <div id="user-playlists"></div>
-      </div>
+  <div class="tabs-container">
+    <button class="tab-btn active" data-tab="cola">
+        <i class="fas fa-list"></i> Cola de Reproducción
+    </button>
+    <button class="tab-btn" data-tab="yt-playlists">
+        <i class="fab fa-youtube"></i> Mis Playlists
+    </button>
+  </div>
+
+  <div id="tab-cola" class="tab-content active">
       <div id="playlistContainer">
         <div id="playlist"></div>
       </div>
-    </section>
+  </div>
+
+  <div id="tab-yt-playlists" class="tab-content">
+      <div id="user-playlists-content" class="empty-state">
+          <p>Inicia sesión para ver tus playlists</p>
+      </div>
+  </div>
+</section>
   </main>
 
   <footer>
