@@ -9,7 +9,7 @@ export async function onRequest(context) {
     "Access-Control-Allow-Headers": "*"
   };
 
-  if (request.method === "OPTIONS") {
+if (request.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -24,21 +24,21 @@ export async function onRequest(context) {
     const response = await fetch(targetUrl, {
       method: request.method,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; MixYT/1.0)",
-        // Copiamos headers útiles si es necesario
+         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/"  
       }
     });
     
-    // Usamos arrayBuffer para no corromper imágenes o audio
-    const body = await response.arrayBuffer();
+     const body = await response.arrayBuffer();
 
     const newResponse = new Response(body, {
         status: response.status,
         headers: new Headers(response.headers)
     });
 
-    // Inyectamos CORS
-    newResponse.headers.set("Access-Control-Allow-Origin", "*");
+     newResponse.headers.set("Access-Control-Allow-Origin", "*");
     
     return newResponse;
   } catch (e) {
