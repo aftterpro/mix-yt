@@ -1190,11 +1190,9 @@ class LyricsManager {
                 provider: 'LRCLIB'
             };
         } else {
-            // ✅ API LUJJJH (Requiere Proxy)
-            // Usamos la ruta relativa que Cloudflare Pages mapea a tu archivo functions/cors-proxy.js
-            const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-            const backendHost = "https://sphenographic-johnie-supersensually.ngrok-free.dev"; 
-            const proxyUrl = `${backendHost}/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
+        const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
+        const backendHost = "https://sphenographic-johnie-supersensually.ngrok-free.dev"; 
+        const proxyUrl = `${backendHost}/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
             
             console.log("🔗 Fetching Proxy:", proxyUrl);
 
