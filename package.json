@@ -1,11 +1,9 @@
 {
   "name": "yt-mix-backend",
   "version": "1.0.0",
-  "description": "Backend proxy para YT CrossMix",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
@@ -13,8 +11,5 @@
     "express": "^4.21.2",
     "sponsorblock-api": "^0.2.4",
     "crypto-js": "^4.2.0"
-  },
-  "devDependencies": {
-    "serve": "^14.2.1"
   }
 }
