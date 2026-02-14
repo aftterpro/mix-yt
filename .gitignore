@@ -1,0 +1,19 @@
+# Variables de entorno
+.env
+.env.local
+.env.production
+.dev.vars
+
+# Node modules
+node_modules/
+
+# Wrangler
+.wrangler/
+wrangler.toml.backup
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
