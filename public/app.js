@@ -1,7 +1,7 @@
 // Módulo: Configuración y Variables Globales
 const CONFIG = {
     origin: window.location.origin, 
-    apiBase: "https://sphenographic-johnie-supersensually.ngrok-free.dev/search"
+    apiBase: "/search"
 };
 const CROSSFADE_DURATION = 15; 
 let player1, player2;
