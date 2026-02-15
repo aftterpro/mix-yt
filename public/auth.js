@@ -30,15 +30,15 @@ async function iniciarApp() {
 document.addEventListener('DOMContentLoaded', iniciarApp);
 async function loadAuthConfig() {
     try {
-        // Pide las claves a tu función Cloudflare
-        const response = await fetch('/api/auth-config');
+        console.log("⏳ Solicitando configuración de Auth...");
+        const response = await fetch('/api/auth-config'); // Asegúrate que esta ruta exista en Cloudflare Functions
         const config = await response.json();
         
         if (config.clientId) {
             CLIENT_ID = config.clientId;
             console.log("✅ Configuración cargada. CLIENT_ID recibido.");
             
-            // Paso 2: AHORA sí inicializamos Google
+            // SOLO AHORA iniciamos Google, una vez que tenemos el ID
             initializeGoogleAPIs(); 
         } else {
             console.error("❌ No se recibió clientId del servidor");
@@ -345,8 +345,7 @@ function parseDuration(duration) {
     return 0;
 }
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadAuthConfig); // Cambiado aquí
+    document.addEventListener('DOMContentLoaded', loadAuthConfig);
 } else {
-    loadAuthConfig(); // Cambiado aquí
+    loadAuthConfig();
 }
-document.addEventListener('DOMContentLoaded', initializeGoogleAPIs);
