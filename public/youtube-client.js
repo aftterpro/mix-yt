@@ -1,6 +1,6 @@
 class YouTubeSimplifiedClient {
     constructor() {
-       this.baseUrl = "https://sphenographic-johnie-supersensually.ngrok-free.dev/search";
+       this.baseUrl = "/search";
         this.maxRetries = 3;
         this.retryDelay = 1000;
         
