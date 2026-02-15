@@ -28,20 +28,13 @@ async search(query) {
     }
 }
     
-   async fetchWithRetry(url, attempt = 1) {
+  async fetchWithRetry(url, attempt = 1) {
         try {
-            // mode: 'cors' es importante para peticiones cruzadas
             const response = await fetch(url, { mode: 'cors' });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return await response.json();
-
         } catch (error) {
             console.warn(`⚠️ Intento ${attempt} falló:`, error.message);
-
             if (attempt < this.maxRetries) {
                 const delay = this.retryDelay * attempt;
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -51,6 +44,7 @@ async search(query) {
             }
         }
     }
+}
 // =============================================
 // SPONSORBLOCK - Sistema de Detección y Salto
 // =============================================
