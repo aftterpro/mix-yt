@@ -2,7 +2,8 @@
 //  Lógica de Autenticación y Playlists
 // =============================================
 
-let CLIENT_ID = '228375063584-r5lfjvv9p3k9p09582lpfe9ugphmp7nv.apps.googleusercontent.com';
+let CLIENT_ID = null;
+
 const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
 let isAuthorized = false;
 let tokenClient = null;
@@ -14,6 +15,19 @@ let currentDetailPlaylistId = null;
 // =============================================
 // INICIALIZACIÓN
 // =============================================
+async function iniciarApp() {
+    try {
+        const res = await fetch('/api/auth-config');
+        const config = await res.json();
+        CLIENT_ID = config.clientId;
+        console.log("🔑 Client ID cargado correctamente");
+        initializeGoogleAPIs(); 
+    } catch (e) {
+        console.error("❌ Error cargando configuración:", e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', iniciarApp);
 async function loadAuthConfig() {
     try {
         // Pide las claves a tu función Cloudflare
