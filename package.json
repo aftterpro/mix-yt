@@ -8,8 +8,8 @@
   "dependencies": {
     "axios": "^1.6.0",
     "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "express": "^4.21.2",
-    "sponsorblock-api": "^0.2.4",
-    "crypto-js": "^4.2.0"
+    "sponsorblock-api": "^0.2.4"
   }
 }
