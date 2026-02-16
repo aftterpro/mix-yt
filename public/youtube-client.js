@@ -285,6 +285,27 @@ calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
         this.segmentosCache = Object.fromEntries(validEntries);
         this.saveCache();
     }
+window.testSponsorBlock = async function(videoId) {
+    console.log('🧪 === TEST SPONSORBLOCK ===');
+    console.log('Video ID:', videoId);
+    
+    const segments = await window.sponsorBlockManager.cargarSegmentos(videoId);
+    console.log('Segmentos cargados:', segments);
+    
+    if (segments.length > 0) {
+        console.log('✅ SEGMENTOS ENCONTRADOS:');
+        segments.forEach((seg, i) => {
+            console.log(`  ${i+1}. ${seg.category}: ${seg.startTime}s - ${seg.endTime}s`);
+        });
+    } else {
+        console.log('❌ NO SE ENCONTRARON SEGMENTOS');
+    }
+    
+    console.log('Caché actual:', window.sponsorBlockManager.segmentosCache[videoId]);
+    console.log('🧪 === FIN TEST ===');
+};
+
+// Usar en consola: testSponsorBlock('OK_KvknlJxA')
 }
 
 
