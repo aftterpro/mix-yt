@@ -91,15 +91,14 @@ window.gapiInitialize_auth = function() {
         return;
     }
     
-    gapi.client.init({
-        apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4', 
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
+      gapi.client.init({
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+       
     }).then(() => {
         gapiReady = true;
         console.log('✅ GAPI Client inicializado correctamente');
         checkAndUpdateUI();
         
-        // Intentar restaurar sesión si hay token guardado
         const token = localStorage.getItem('yt_access_token');
         if (token) {
             gapi.client.setToken({ access_token: token });
@@ -110,6 +109,14 @@ window.gapiInitialize_auth = function() {
     }).catch((err) => {
         console.error('❌ Error GAPI:', err);
         gapiReady = false;
+  
+        const authControls = document.getElementById('auth-controls');
+        if (authControls) {
+            const errorMsg = document.createElement('small');
+            errorMsg.style.color = 'red';
+            errorMsg.textContent = 'Error al inicializar Google API';
+            authControls.appendChild(errorMsg);
+        }
     });
 };
 
