@@ -88,7 +88,7 @@ async cargarSegmentos(videoId) {
     if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
         const cacheAge = Date.now() - (cached.timestamp || 0);
         if (cacheAge < 10 * 60 * 1000) {
-            console.log(`📦 Usando caché para ${videoId} (${cached.segments.length} segmentos)`);
+            console.log(`📦 Usando caché SB para ${videoId}: ${cached.segments.length} segmentos`);
             return cached.segments;
         }
     }
@@ -96,7 +96,7 @@ async cargarSegmentos(videoId) {
     const apiUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/sponsorblock?videoId=${videoId}`;
     
     try {
-        console.log(`🔍 Consultando SponsorBlock: ${videoId}`);
+        console.log(`🔍 Consultando SponsorBlock API para: ${videoId}`);
         
         const fetchWithTimeout = new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Timeout')), 8000);
@@ -116,18 +116,35 @@ async cargarSegmentos(videoId) {
         
         if (!response.ok) {
             if (response.status === 404) {
-                console.log(`ℹ️ No hay segmentos para ${videoId}`);
+                console.log(`ℹ️ SponsorBlock: No hay segmentos para ${videoId}`);
                 throw new Error('No segments found');
             }
             throw new Error(`HTTP ${response.status}`);
         }
         
         const data = await response.json();
+        
+        // ✅ MAPEAR CORRECTAMENTE: segment: [start, end] → startTime, endTime
         const segments = Array.isArray(data) 
-            ? data.filter(s => s && typeof s.startTime === 'number')
+            ? data
+                .filter(s => s && Array.isArray(s.segment) && s.segment.length === 2)
+                .map(s => ({
+                    startTime: s.segment[0],
+                    endTime: s.segment[1],
+                    category: s.category,
+                    actionType: s.actionType,
+                    UUID: s.UUID,
+                    // Guardar también el segmento original por compatibilidad
+                    segment: s.segment
+                }))
             : [];
         
-        console.log(`✅ ${segments.length} segmentos cargados para ${videoId}`);
+        console.log(`✅ SponsorBlock cargado para ${videoId}:`, segments.length, 'segmentos');
+        
+        // Log detallado de los segmentos
+        segments.forEach(seg => {
+            console.log(`  └─ ${seg.category}: ${seg.startTime.toFixed(1)}s - ${seg.endTime.toFixed(1)}s`);
+        });
         
         this.segmentosCache[videoId] = {
             segments: segments,
@@ -139,9 +156,10 @@ async cargarSegmentos(videoId) {
         
     } catch (e) {
         if (e.message !== 'No segments found' && e.message !== 'Timeout') {
-            console.warn(`⚠️ SponsorBlock error para ${videoId}:`, e.message);
+            console.warn(`⚠️ Error SponsorBlock para ${videoId}:`, e.message);
         }
         
+        // Guardar caché vacía para evitar reintentos constantes
         this.segmentosCache[videoId] = { 
             segments: [], 
             timestamp: Date.now() 
@@ -151,49 +169,48 @@ async cargarSegmentos(videoId) {
     }
 }
     
-  checkAndSkip(player) {
+ checkAndSkip(player) {
     const videoId = player.getVideoData()?.video_id;
-    if (!videoId) {
-        console.log('⚠️ SB: No videoId');
-        return false;
-    }
+    if (!videoId) return false;
     
     const cached = this.segmentosCache[videoId];
     if (!cached || cached === 'fetching' || typeof cached !== 'object') {
-        console.log('⚠️ SB: No hay caché para', videoId);
         return false;
     }
     
     const segments = cached.segments || [];
-    if (segments.length === 0) {
-        console.log('ℹ️ SB: Sin segmentos para', videoId);
-        return false;
-    }
+    if (segments.length === 0) return false;
 
     const currentTime = player.getCurrentTime();
     const duration = player.getDuration();
 
-    console.log(`🔍 SB Check: ${currentTime.toFixed(1)}s en ${videoId} (${segments.length} segmentos)`);
-
-    if (Math.abs(currentTime - this.lastSkipTime) < 1.5) {
-        console.log('⏸️ SB: Cooldown activo');
-        return false;
-    }
+    // Cooldown para evitar saltos repetidos
+    if (Math.abs(currentTime - this.lastSkipTime) < 1.5) return false;
 
     for (const seg of segments) {
-        if (currentTime >= seg.startTime && currentTime < seg.endTime) {
+        // ✅ Soportar ambos formatos: startTime/endTime y segment[0]/segment[1]
+        const start = seg.startTime ?? seg.segment?.[0];
+        const end = seg.endTime ?? seg.segment?.[1];
+        
+        if (start === undefined || end === undefined) {
+            console.warn('⚠️ Segmento con formato inválido:', seg);
+            continue;
+        }
+        
+        if (currentTime >= start && currentTime < end) {
             const nombreCat = this.nombresCategorias[seg.category] || seg.category;
-            console.log(`⏩ SB: Saltando ${nombreCat} (${seg.startTime.toFixed(1)} - ${seg.endTime.toFixed(1)})`);
+            console.log(`⏩ SALTANDO ${nombreCat} en ${currentTime.toFixed(1)}s (${start.toFixed(1)} → ${end.toFixed(1)})`);
 
-            if (seg.endTime >= (duration - 2)) {
+            if (end >= (duration - 2)) {
+                console.log("🎬 Es un outro/final - saltando al final del video");
                 this.mostrarAviso(`🎬 Final saltado`, player.getIframe().parentElement);
                 player.seekTo(duration, true);
             } else {
                 this.mostrarAviso(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
-                player.seekTo(seg.endTime, true);
+                player.seekTo(end, true);
             }
 
-            this.lastSkipTime = seg.endTime;
+            this.lastSkipTime = end;
             return true;
         }
     }
@@ -222,27 +239,38 @@ async cargarSegmentos(videoId) {
         }, 2000);
     }
 
-    calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
-        const SAFETY_MARGIN = 0.5;
-        if (!videoId || !this.segmentosCache[videoId] || !Array.isArray(this.segmentosCache[videoId].segments)) {
-            return videoDuration - crossfadeDuration - SAFETY_MARGIN;
-        }
+calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
+    const SAFETY_MARGIN = 0.5;
+    
+    if (!videoId || !this.segmentosCache[videoId] || !Array.isArray(this.segmentosCache[videoId].segments)) {
+        return videoDuration - crossfadeDuration - SAFETY_MARGIN;
+    }
 
-        let effectiveEndTime = videoDuration;
-        const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
-        
-        this.segmentosCache[videoId].segments.forEach(segment => {
-            if (endCategories.includes(segment.category)) {
-                const start = segment.segment?.[0] ?? segment.startTime;
-                const end = segment.segment?.[1] ?? segment.endTime;
-                if (Math.abs(videoDuration - end) < 5) {
-                    if (start < effectiveEndTime) effectiveEndTime = start;
+    let effectiveEndTime = videoDuration;
+    const endCategories = ['outro', 'selfpromo', 'interaction', 'music_offtopic', 'preview'];
+    
+    this.segmentosCache[videoId].segments.forEach(segment => {
+        if (endCategories.includes(segment.category)) {
+            // ✅ Soportar ambos formatos
+            const start = segment.startTime ?? segment.segment?.[0];
+            const end = segment.endTime ?? segment.segment?.[1];
+            
+            if (start === undefined || end === undefined) return;
+            
+            // Si el segmento termina cerca del final del video
+            if (Math.abs(videoDuration - end) < 5) {
+                if (start < effectiveEndTime) {
+                    effectiveEndTime = start;
+                    console.log(`🎯 Crossfade ajustado por ${segment.category}: ${effectiveEndTime.toFixed(1)}s`);
                 }
             }
-        });
+        }
+    });
 
-        return effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
-    }
+    const triggerTime = effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
+    console.log(`⏱️ Trigger calculado: ${triggerTime.toFixed(1)}s (End: ${effectiveEndTime.toFixed(1)}s)`);
+    return triggerTime;
+}
 
     cleanup() {
         const MAX_AGE = 10 * 60 * 1000;
