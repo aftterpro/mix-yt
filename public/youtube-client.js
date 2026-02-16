@@ -79,113 +79,126 @@ class SponsorBlockManager {
     }
 
 async cargarSegmentos(videoId) {
-        if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
-            return [];
-        }
+    if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
+        return [];
+    }
 
-        // Verificar caché
-        const cached = this.segmentosCache[videoId];
-        if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
-            const cacheAge = Date.now() - (cached.timestamp || 0);
-            if (cacheAge < 10 * 60 * 1000) {
-                return cached.segments;
-            }
+    // Verificar caché
+    const cached = this.segmentosCache[videoId];
+    if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
+        const cacheAge = Date.now() - (cached.timestamp || 0);
+        if (cacheAge < 10 * 60 * 1000) {
+            console.log(`📦 Usando caché para ${videoId} (${cached.segments.length} segmentos)`);
+            return cached.segments;
         }
+    }
 
-        const userId = 'gaDZcHFATqVfqCtNlv3xGMP6bkrNnKkEHyUd';
-        const apiUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/sponsorblock?videoId=${videoId}`;
+    const apiUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/sponsorblock?videoId=${videoId}`;
+    
     try {
-        // ✅ PROMESA CON TIMEOUT AUMENTADO
-        const fetchWithTimeout = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-            reject(new Error('Timeout'));
-        }, 5000); 
+        console.log(`🔍 Consultando SponsorBlock: ${videoId}`);
         
-        fetch(apiUrl, { 
-            headers: { 'X-UserID': userId }
-        })
-        .then(response => {
-            clearTimeout(timeout);
-            resolve(response);
-        })
-        .catch(error => {
-            clearTimeout(timeout);
-            reject(error);
+        const fetchWithTimeout = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Timeout')), 8000);
+            
+            fetch(apiUrl)
+                .then(response => {
+                    clearTimeout(timeout);
+                    resolve(response);
+                })
+                .catch(error => {
+                    clearTimeout(timeout);
+                    reject(error);
+                });
         });
-    });
-            
-            const response = await fetchWithTimeout;
-            
-            if (!response.ok) {
-                if (response.status === 404) throw new Error('No segments found');
-                throw new Error(`HTTP ${response.status}`);
+        
+        const response = await fetchWithTimeout;
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                console.log(`ℹ️ No hay segmentos para ${videoId}`);
+                throw new Error('No segments found');
             }
-            
-            const data = await response.json();
-            const segments = Array.isArray(data) 
-                ? data.filter(s => s && typeof s.startTime === 'number')
-                : [];
-            
-            this.segmentosCache[videoId] = {
-                segments: segments,
-                timestamp: Date.now()
-            };
-            
-            this.saveCache();
-             console.log(segments);        
-            return segments;
-            
-        } catch (e) {
-            // ✅ NO BLOQUEAR REPRODUCCIÓN
-            if (e.message !== 'No segments found') {
-                console.log(`⚠️ SB timeout/error (ignorado): ${e.message}`);
-            }
-            
-            // Guardar caché vacía
-            this.segmentosCache[videoId] = { 
-                segments: [], 
-                timestamp: Date.now() 
-            };
-            this.saveCache();
-            return [];
+            throw new Error(`HTTP ${response.status}`);
         }
+        
+        const data = await response.json();
+        const segments = Array.isArray(data) 
+            ? data.filter(s => s && typeof s.startTime === 'number')
+            : [];
+        
+        console.log(`✅ ${segments.length} segmentos cargados para ${videoId}`);
+        
+        this.segmentosCache[videoId] = {
+            segments: segments,
+            timestamp: Date.now()
+        };
+        
+        this.saveCache();
+        return segments;
+        
+    } catch (e) {
+        if (e.message !== 'No segments found' && e.message !== 'Timeout') {
+            console.warn(`⚠️ SponsorBlock error para ${videoId}:`, e.message);
+        }
+        
+        this.segmentosCache[videoId] = { 
+            segments: [], 
+            timestamp: Date.now() 
+        };
+        this.saveCache();
+        return [];
+    }
 }
     
-    checkAndSkip(player) {
-        const videoId = player.getVideoData()?.video_id;
-        if (!videoId) return false;
-        
-        const cached = this.segmentosCache[videoId];
-        if (!cached || cached === 'fetching' || typeof cached !== 'object') return false;
-        
-        const segments = cached.segments || [];
-        if (segments.length === 0) return false;
-
-        const currentTime = player.getCurrentTime();
-        const duration = player.getDuration();
-
-        if (Math.abs(currentTime - this.lastSkipTime) < 1.5) return false;
-
-        for (const seg of segments) {
-            if (currentTime >= seg.startTime && currentTime < seg.endTime) {
-                const nombreCat = this.nombresCategorias[seg.category] || seg.category;
-
-                if (seg.endTime >= (duration - 2)) {
-                    console.log("🎬 SponsorBlock: Outro detectado");
-                    this.mostrarAviso(`🎬 Final saltado`, player.getIframe().parentElement);
-                    player.seekTo(duration, true);
-                } else {
-                    console.log(`⏩ SponsorBlock: Saltando ${nombreCat}`);
-                    this.mostrarAviso(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
-                    player.seekTo(seg.endTime, true);
-                }
-
-                this.lastSkipTime = seg.endTime;
-                return true;
-            }
-        }
+  checkAndSkip(player) {
+    const videoId = player.getVideoData()?.video_id;
+    if (!videoId) {
+        console.log('⚠️ SB: No videoId');
         return false;
     }
+    
+    const cached = this.segmentosCache[videoId];
+    if (!cached || cached === 'fetching' || typeof cached !== 'object') {
+        console.log('⚠️ SB: No hay caché para', videoId);
+        return false;
+    }
+    
+    const segments = cached.segments || [];
+    if (segments.length === 0) {
+        console.log('ℹ️ SB: Sin segmentos para', videoId);
+        return false;
+    }
+
+    const currentTime = player.getCurrentTime();
+    const duration = player.getDuration();
+
+    console.log(`🔍 SB Check: ${currentTime.toFixed(1)}s en ${videoId} (${segments.length} segmentos)`);
+
+    if (Math.abs(currentTime - this.lastSkipTime) < 1.5) {
+        console.log('⏸️ SB: Cooldown activo');
+        return false;
+    }
+
+    for (const seg of segments) {
+        if (currentTime >= seg.startTime && currentTime < seg.endTime) {
+            const nombreCat = this.nombresCategorias[seg.category] || seg.category;
+            console.log(`⏩ SB: Saltando ${nombreCat} (${seg.startTime.toFixed(1)} - ${seg.endTime.toFixed(1)})`);
+
+            if (seg.endTime >= (duration - 2)) {
+                this.mostrarAviso(`🎬 Final saltado`, player.getIframe().parentElement);
+                player.seekTo(duration, true);
+            } else {
+                this.mostrarAviso(`⏩ Saltado: ${nombreCat}`, player.getIframe().parentElement);
+                player.seekTo(seg.endTime, true);
+            }
+
+            this.lastSkipTime = seg.endTime;
+            return true;
+        }
+    }
+    return false;
+}
 
     mostrarAviso(mensaje, container) {
         const oldToasts = document.querySelectorAll('.sb-toast');
