@@ -771,7 +771,6 @@ function askToRepeatPlaylist() {
         console.log("Gracias por utilizar.");
     }
 }
-//Iniciar el monitoreo solo al reproducir la playlist
 function playFirstVideo() {
     if (!playersInitialized) {
         console.error('Los reproductores no están completamente inicializados.');
@@ -786,7 +785,16 @@ function playFirstVideo() {
         document.getElementById('player1').classList.remove('hidden');
         document.getElementById('player2').classList.add('hidden');
 
-        startMonitoring(); // Iniciar monitoreo al comenzar la reproducción
+        // ✅ PRECARGAR SEGMENTOS SPONSORBLOCK
+        if (window.sponsorBlockManager && firstVideoId) {
+            window.sponsorBlockManager.cargarSegmentos(firstVideoId).then(segments => {
+                if (segments.length > 0) {
+                    console.log(`✅ ${segments.length} segmentos SponsorBlock precargados`);
+                }
+            }).catch(() => {});
+        }
+
+        startMonitoring();
     }
 }
 // Módulo: Monitoreo de Reproductores
@@ -804,7 +812,7 @@ function stopMonitoring() {
     }
 }
 function monitorPlayers() {
-    // ✅ VERIFICAR que YT existe
+    
     if (typeof YT === 'undefined' || !YT.PlayerState) {
         return;
     }
@@ -827,67 +835,69 @@ function monitorPlayers() {
     
     const playerState = currentPlayerInstance.getPlayerState();
     
-    // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO O EN BUFFERING
-    if (playerState !== YT.PlayerState.PLAYING && playerState !== YT.PlayerState.BUFFERING) {
+    // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO
+    if (playerState !== YT.PlayerState.PLAYING) {
         return;
     }
     
-    // ✅ SponsorBlock: Revisar saltos normales (solo si está reproduciendo)
-    if (playerState === YT.PlayerState.PLAYING && window.sponsorBlockManager) {
+    // ✅ OBTENER DATOS DEL VIDEO
+    let videoData, videoId, currentTime, duration;
+    
+    try {
+        videoData = currentPlayerInstance.getVideoData();
+        videoId = videoData ? videoData.video_id : null;
+        currentTime = currentPlayerInstance.getCurrentTime();
+        duration = currentPlayerInstance.getDuration();
+    } catch (e) {
+        console.warn('Error obteniendo datos del player:', e);
+        return;
+    }
+    
+    // ✅ VALIDAR DATOS
+    if (!videoId || isNaN(duration) || duration <= 0 || isNaN(currentTime)) {
+        return;
+    }
+    
+    // ✅ SPONSORBLOCK: Revisar saltos (MUY IMPORTANTE - EJECUTAR PRIMERO)
+    if (window.sponsorBlockManager) {
         try {
-            window.sponsorBlockManager.checkAndSkip(currentPlayerInstance);
+            const skipped = window.sponsorBlockManager.checkAndSkip(currentPlayerInstance);
+            if (skipped) {
+                console.log('✅ SponsorBlock skip ejecutado');
+                return; // Salir si se saltó algo
+            }
         } catch (e) {
             console.warn('Error en SponsorBlock:', e);
         }
     }
-    
-    try {
-        const currentTime = currentPlayerInstance.getCurrentTime();
-        const duration = currentPlayerInstance.getDuration();
-        const videoData = currentPlayerInstance.getVideoData(); 
-        const videoId = videoData ? videoData.video_id : null;
 
-        // ✅ VALIDAR DURACIÓN
-        if (isNaN(duration) || duration <= 0 || isNaN(currentTime)) {
-            return;
-        }
+    // ✅ CROSSFADE: Calcular trigger time
+    let triggerTime;
+    if (window.sponsorBlockManager && videoId) {
+        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
+            duration, 
+            videoId, 
+            CROSSFADE_DURATION
+        );
+    } else {
+        triggerTime = duration - CROSSFADE_DURATION;
+    }
 
-        let triggerTime;
+    // ✅ DEBUG LOG (cada 5 segundos)
+    if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== window.lastLogTime) {
+        window.lastLogTime = Math.floor(currentTime);
+        console.log(`⏱️ Player${currentPlayer} | ${currentTime.toFixed(1)}/${duration.toFixed(1)}s | Trigger: ${triggerTime.toFixed(1)}s`);
+    }
 
-        // ✅ CALCULAR TRIGGER TIME CON SPONSORBLOCK
-        if (window.sponsorBlockManager && videoId) {
-            triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
-                duration, 
-                videoId, 
-                CROSSFADE_DURATION
-            );
-        } else {
-            // Fallback: sin SponsorBlock
-            triggerTime = duration - CROSSFADE_DURATION;
-        }
-
-        // ✅ DEBUG: Mostrar info cada 5 segundos
-        if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== window.lastLogTime) {
-            window.lastLogTime = Math.floor(currentTime);
-            console.log(`⏱️ Player${currentPlayer} | Tiempo: ${currentTime.toFixed(1)}/${duration.toFixed(1)} | Trigger: ${triggerTime.toFixed(1)}`);
-        }
-
-        // ✅ DISPARAR CROSSFADE CUANDO SE ALCANCE EL TRIGGER TIME
-        if (currentTime >= triggerTime && !window.crossfadeTriggered) {
-            window.crossfadeTriggered = true;
-            
-            console.log(`🔀 ¡CROSSFADE ACTIVADO! (Tiempo: ${currentTime.toFixed(1)}s | Trigger: ${triggerTime.toFixed(1)}s)`);
-            
-            playNextVideo();
-            
-            // ✅ RESET FLAG DESPUÉS DE 2 SEGUNDOS
-            setTimeout(() => {
-                window.crossfadeTriggered = false;
-            }, 2000);
-        }
+    // ✅ DISPARAR CROSSFADE
+    if (currentTime >= triggerTime && !window.crossfadeTriggered) {
+        window.crossfadeTriggered = true;
+        console.log(`🔀 CROSSFADE! (${currentTime.toFixed(1)}s / Trigger: ${triggerTime.toFixed(1)}s)`);
+        playNextVideo();
         
-    } catch (error) {
-        console.error(`Error al monitorear Player${currentPlayer}:`, error);
+        setTimeout(() => {
+            window.crossfadeTriggered = false;
+        }, 2000);
     }
 }
 // Módulo: Manejo de Eventos y Botones
@@ -1054,7 +1064,7 @@ function parseDuration(durationString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 // =============================================
-// GESTOR DE LETRAS (LyricsManager) - VERSIÓN LIMPIA
+// GESTOR DE LETRAS (LyricsManager) 
 // =============================================
 class LyricsManager {
     constructor() {
@@ -1172,58 +1182,75 @@ class LyricsManager {
         }
     }
 
-    async fetchLyrics(provider, artist, title, duration) {
-        // Codificar componentes para URL
-        const safeArtist = encodeURIComponent(artist);
-        const safeTitle = encodeURIComponent(title);
+ async fetchLyrics(provider, artist, title, duration) {
+    const safeArtist = encodeURIComponent(artist);
+    const safeTitle = encodeURIComponent(title);
 
-        if (provider === 'lrclib') {
-            const url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
-            console.log("🔗 Fetching LRCLIB:", url);
+    if (provider === 'lrclib') {
+        // ✅ BÚSQUEDA CON DURACIÓN para mejor precisión
+        const urlWithDuration = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}&duration=${Math.round(duration)}`;
+        const urlWithoutDuration = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
+        
+        console.log("🔗 Fetching LRCLIB:", urlWithDuration);
+        
+        try {
+            // Intentar primero con duración (más preciso)
+            let res = await fetch(urlWithDuration);
             
-            const res = await fetch(url);
+            // Si falla, intentar sin duración
+            if (!res.ok) {
+                console.log("⚠️ Reintentando sin duración...");
+                res = await fetch(urlWithoutDuration);
+            }
+            
             if (!res.ok) throw new Error('LRCLIB 404/Error');
+            
             const data = await res.json();
+            
+            // ✅ VALIDAR QUE TENGA syncedLyrics (prioritario)
+            if (!data.syncedLyrics && !data.plainLyrics) {
+                throw new Error('No lyrics found in response');
+            }
+            
             return {
-                syncedLyrics: data.syncedLyrics,
-                plainLyrics: data.plainLyrics,
+                syncedLyrics: data.syncedLyrics || null,
+                plainLyrics: data.plainLyrics || data.syncedLyrics?.replace(/\[.*?\]/g, ''),
                 provider: 'LRCLIB'
             };
-        } else {
+            
+        } catch (error) {
+            console.error('LRCLIB Error:', error);
+            throw error;
+        }
+        
+    } else {
+       
         const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
         const backendHost = "https://sphenographic-johnie-supersensually.ngrok-free.dev"; 
         const proxyUrl = `${backendHost}/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
+        
+        console.log("🔗 Fetching Proxy:", proxyUrl);
+
+        try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) throw new Error('Proxy Error: ' + res.status);
             
-            console.log("🔗 Fetching Proxy:", proxyUrl);
-
-            try {
-                const res = await fetch(proxyUrl);
-                
-                // Si estamos en localhost sin Wrangler, esto fallará con 404
-                if (res.status === 404 && window.location.hostname === 'localhost') {
-                    throw new Error('El proxy local no funciona con "serve". Usa "wrangler pages dev".');
-                }
-                
-                if (!res.ok) throw new Error('Proxy Error: ' + res.status);
-                
-                const text = await res.text();
-                // Validación básica de respuesta
-                if (!text || text.includes('Cannot GET') || text.length < 20) throw new Error('Respuesta inválida');
-
-                return {
-                    syncedLyrics: text, 
-                    plainLyrics: text.replace(/\[.*?\]/g, ''),
-                    provider: 'LUJJJH'
-                };
-            } catch (proxyError) {
-                console.warn("Error proxy, intentando acceso directo (puede fallar por CORS):", proxyError);
-                // Último intento: directo (algunos navegadores/extensiones lo permiten)
-                const directRes = await fetch(targetApi);
-                const directText = await directRes.text();
-                return { syncedLyrics: directText, plainLyrics: directText.replace(/\[.*?\]/g, ''), provider: 'LUJJJH (Direct)' };
+            const text = await res.text();
+            if (!text || text.includes('Cannot GET') || text.length < 20) {
+                throw new Error('Respuesta inválida');
             }
+
+            return {
+                syncedLyrics: text, 
+                plainLyrics: text.replace(/\[.*?\]/g, ''),
+                provider: 'LUJJJH'
+            };
+        } catch (proxyError) {
+            console.warn("Error proxy:", proxyError);
+            throw proxyError;
         }
     }
+}
 
     renderLyricsUI(data, artist, title) {
         const container = document.getElementById('lyricsContent');
