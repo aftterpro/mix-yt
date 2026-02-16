@@ -285,6 +285,20 @@ calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
         this.segmentosCache = Object.fromEntries(validEntries);
         this.saveCache();
     }
+
+}
+
+
+// Instancia global
+window.sponsorBlockManager = new SponsorBlockManager();
+
+// Limpieza automática cada 5 minutos
+setInterval(() => {
+    window.sponsorBlockManager?.cleanup();
+}, 5 * 60 * 1000);
+// =============================================
+// UTILIDADES MEJORADAS
+// =============================================
 window.testSponsorBlock = async function(videoId) {
     console.log('🧪 === TEST SPONSORBLOCK ===');
     console.log('Video ID:', videoId);
@@ -306,20 +320,6 @@ window.testSponsorBlock = async function(videoId) {
 };
 
 // Usar en consola: testSponsorBlock('OK_KvknlJxA')
-}
-
-
-// Instancia global
-window.sponsorBlockManager = new SponsorBlockManager();
-
-// Limpieza automática cada 5 minutos
-setInterval(() => {
-    window.sponsorBlockManager?.cleanup();
-}, 5 * 60 * 1000);
-// =============================================
-// UTILIDADES MEJORADAS
-// =============================================
-
 window.youtubeClientUtils = {
     formatDuration: (seconds) => {
         if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
