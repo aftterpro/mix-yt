@@ -86,20 +86,31 @@ function setupBackButton() {
 }
 
 window.gapiInitialize_auth = function() {
+    if (typeof gapi === 'undefined') {
+        console.error('❌ GAPI no disponible');
+        return;
+    }
+    
     gapi.client.init({
         apiKey: 'AIzaSyDg1EMvKc4D--b6hXTSOhR3ANrLPHsyIH4', 
         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest']
     }).then(() => {
         gapiReady = true;
+        console.log('✅ GAPI Client inicializado correctamente');
         checkAndUpdateUI();
+        
+        // Intentar restaurar sesión si hay token guardado
         const token = localStorage.getItem('yt_access_token');
         if (token) {
-             gapi.client.setToken({ access_token: token });
-             isAuthorized = true;
-             updateAuthUI();
-             loadUserPlaylistsUI();
+            gapi.client.setToken({ access_token: token });
+            isAuthorized = true;
+            updateAuthUI();
+            loadUserPlaylistsUI();
         }
-    }).catch((err) => console.error('❌ Error GAPI:', err));
+    }).catch((err) => {
+        console.error('❌ Error GAPI:', err);
+        gapiReady = false;
+    });
 };
 
 window.gisInitalize_auth = function() {
@@ -121,9 +132,17 @@ window.gisInitalize_auth = function() {
 };
 
 function checkAndUpdateUI() {
-    if (gapiReady && gisReady) {
-        const btn = document.getElementById('googleSignInButton');
-        if (btn) btn.disabled = false;
+    const btn = document.getElementById('googleSignInButton');
+    if (btn) {
+        if (gapiReady && gisReady) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        } else {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        }
     }
 }
 
@@ -132,26 +151,63 @@ function checkAndUpdateUI() {
 // =============================================
 
 window.handleAuthClick = function() {
-    if (!tokenClient) return;
-    if (gapi.client.getToken() === null) {
+    // Verificar que tokenClient existe
+    if (!tokenClient) {
+        console.error('❌ Token client no inicializado');
+        alert('El sistema de autenticación no está listo. Por favor, recarga la página.');
+        return;
+    }
+    
+    // Verificar que GAPI está disponible y el client está inicializado
+    if (typeof gapi === 'undefined' || !gapi.client) {
+        console.error('❌ GAPI client no disponible');
+        alert('Google API no está cargado. Por favor, recarga la página.');
+        return;
+    }
+    
+    // Verificar si ya hay un token activo
+    try {
+        const currentToken = gapi.client.getToken();
+        if (currentToken === null || !currentToken) {
+            // No hay token, solicitar con consentimiento
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        } else {
+            // Ya hay token, solicitar uno nuevo sin prompt
+            tokenClient.requestAccessToken({ prompt: '' });
+        }
+    } catch (error) {
+        console.error('❌ Error al verificar token:', error);
+        // Si hay error al verificar, intentar obtener token con consentimiento
         tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-        tokenClient.requestAccessToken({ prompt: '' });
     }
 };
 
 window.handleSignOutClick = function() {
-    const token = gapi.client.getToken();
-    if (token !== null) {
-        google.accounts.oauth2.revoke(token.access_token);
-        gapi.client.setToken('');
-        localStorage.removeItem('yt_access_token');
-        isAuthorized = false;
-        updateAuthUI();
-        document.getElementById('user-playlists-content').innerHTML = '<p>Inicia sesión para ver tus playlists</p>';
-        // Asegurar que volvemos a la vista principal si estábamos en detalles
-        document.getElementById('user-playlist-details').style.display = 'none';
-        document.getElementById('user-playlists-overview').style.display = 'block';
+    // Verificar que GAPI existe
+    if (typeof gapi === 'undefined' || !gapi.client) {
+        console.error('❌ GAPI no disponible para cerrar sesión');
+        return;
+    }
+    
+    try {
+        const token = gapi.client.getToken();
+        if (token !== null) {
+            // Verificar que google.accounts.oauth2 existe
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                google.accounts.oauth2.revoke(token.access_token);
+            }
+            gapi.client.setToken('');
+            localStorage.removeItem('yt_access_token');
+            isAuthorized = false;
+            updateAuthUI();
+            document.getElementById('user-playlists-content').innerHTML = '<p>Inicia sesión para ver tus playlists</p>';
+            
+            // Asegurar que volvemos a la vista principal
+            document.getElementById('user-playlist-details').style.display = 'none';
+            document.getElementById('user-playlists-overview').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('❌ Error al cerrar sesión:', error);
     }
 };
 
