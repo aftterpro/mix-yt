@@ -677,13 +677,12 @@ function displayPlaylist(playlist) {
 function playVideo(videoId, player) {
     player.loadVideoById(videoId);
 }
-// Función para reproducir el siguiente video con efecto crossfade
 function playNextVideo() {
     if (currentIndex < playlistVideos.length - 1) {
         currentIndex++;
         
-        // ✅ RESET DEL FLAG AL CAMBIAR DE VIDEO
-        window.crossfadeTriggered = false;
+        // ⚠️ IMPORTANTE: NO resetear window.crossfadeTriggered aquí.
+        // Lo haremos al final de la transición para evitar saltos dobles.
         
         const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
         const nextPlayer = currentPlayer === 1 ? player2 : player1;
@@ -694,28 +693,33 @@ function playNextVideo() {
         
         nextPlayer.loadVideoById(nextVideoId);
         
-        // ✅ Precargar segmentos de SponsorBlock
+        // Precarga de SponsorBlock
         if (window.sponsorBlockManager && nextVideoId) {
             window.sponsorBlockManager.cargarSegmentos(nextVideoId).then(segments => {
                 if (segments.length > 0) {
-                    console.log(`✅ ${segments.length} segmentos SponsorBlock precargados para próximo video`);
+                    console.log(`✅ ${segments.length} segmentos SB cargados`);
                 }
             }).catch(() => {});
         }
 
         updatePlaylistDOM();
 
-        // Efectos visuales
+        // Efectos visuales (Crossfade visual)
         currentPlayerElement.classList.add('fade-out');
         nextPlayerElement.classList.remove('hidden');
         nextPlayerElement.classList.add('fade-in');
 
+        // Esperar a que termine la transición visual (1.5s)
         setTimeout(() => {
             currentPlayerElement.classList.add('hidden');
             currentPlayerElement.classList.remove('fade-out');
             nextPlayerElement.classList.remove('fade-in');
 
+            // Cambio oficial del reproductor activo
             currentPlayer = currentPlayer === 1 ? 2 : 1;
+
+            // ✅ AQUÍ es donde se debe permitir el siguiente salto
+            window.crossfadeTriggered = false; 
 
             crossfadeAudio();
         }, 1500);
@@ -812,92 +816,49 @@ function stopMonitoring() {
     }
 }
 function monitorPlayers() {
-    
-    if (typeof YT === 'undefined' || !YT.PlayerState) {
-        return;
-    }
-    
-    // ✅ VERIFICAR que los players existen
-    if (!player1 || !player2) {
-        return;
-    }
-    
-    if (!playersInitialized) {
-        return;
-    }
+    if (typeof YT === 'undefined' || !player1 || !player2 || !playersInitialized) return;
 
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
-
-    // ✅ VERIFICAR que el método existe
-    if (!currentPlayerInstance || typeof currentPlayerInstance.getPlayerState !== 'function') {
-        return;
-    }
+    if (!currentPlayerInstance?.getPlayerState) return;
     
     const playerState = currentPlayerInstance.getPlayerState();
+    if (playerState !== YT.PlayerState.PLAYING) return;
     
-    // ✅ SOLO MONITOREAR SI ESTÁ REPRODUCIENDO
-    if (playerState !== YT.PlayerState.PLAYING) {
-        return;
-    }
-    
-    // ✅ OBTENER DATOS DEL VIDEO
-    let videoData, videoId, currentTime, duration;
-    
+    let videoId, currentTime, duration;
     try {
-        videoData = currentPlayerInstance.getVideoData();
+        const videoData = currentPlayerInstance.getVideoData();
         videoId = videoData ? videoData.video_id : null;
         currentTime = currentPlayerInstance.getCurrentTime();
         duration = currentPlayerInstance.getDuration();
-    } catch (e) {
-        console.warn('Error obteniendo datos del player:', e);
-        return;
-    }
+    } catch (e) { return; }
     
-    // ✅ VALIDAR DATOS
-    if (!videoId || isNaN(duration) || duration <= 0 || isNaN(currentTime)) {
-        return;
-    }
+    if (!videoId || isNaN(duration) || duration <= 0) return;
     
-    // ✅ SPONSORBLOCK: Revisar saltos (MUY IMPORTANTE - EJECUTAR PRIMERO)
+    // SponsorBlock
     if (window.sponsorBlockManager) {
-        try {
-            const skipped = window.sponsorBlockManager.checkAndSkip(currentPlayerInstance);
-            if (skipped) {
-                console.log('✅ SponsorBlock skip ejecutado');
-                return; // Salir si se saltó algo
-            }
-        } catch (e) {
-            console.warn('Error en SponsorBlock:', e);
-        }
+        if (window.sponsorBlockManager.checkAndSkip(currentPlayerInstance)) return;
     }
 
-    // ✅ CROSSFADE: Calcular trigger time
+    // Cálculo del tiempo de disparo
     let triggerTime;
     if (window.sponsorBlockManager && videoId) {
-        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
-            duration, 
-            videoId, 
-            CROSSFADE_DURATION
-        );
+        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(duration, videoId, CROSSFADE_DURATION);
     } else {
         triggerTime = duration - CROSSFADE_DURATION;
     }
 
-    // ✅ DEBUG LOG (cada 5 segundos)
+    // Debug log cada 5s
     if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== window.lastLogTime) {
         window.lastLogTime = Math.floor(currentTime);
         console.log(`⏱️ Player${currentPlayer} | ${currentTime.toFixed(1)}/${duration.toFixed(1)}s | Trigger: ${triggerTime.toFixed(1)}s`);
     }
 
-    // ✅ DISPARAR CROSSFADE
+    // ✅ DISPARAR CROSSFADE (Lógica corregida)
     if (currentTime >= triggerTime && !window.crossfadeTriggered) {
-        window.crossfadeTriggered = true;
-        console.log(`🔀 CROSSFADE! (${currentTime.toFixed(1)}s / Trigger: ${triggerTime.toFixed(1)}s)`);
+        window.crossfadeTriggered = true; // Bloquea inmediatamente
+        console.log(`🔀 CROSSFADE! (${currentTime.toFixed(1)}s >= ${triggerTime.toFixed(1)}s)`);
         playNextVideo();
-        
-        setTimeout(() => {
-            window.crossfadeTriggered = false;
-        }, 2000);
+        // Ya NO necesitamos el setTimeout aquí para resetear la bandera
     }
 }
 // Módulo: Manejo de Eventos y Botones
@@ -1064,82 +1025,38 @@ function parseDuration(durationString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 // =============================================
-// GESTOR DE LETRAS (LyricsManager) 
+// GESTOR DE LETRAS OPTIMIZADO
 // =============================================
 class LyricsManager {
     constructor() {
-        this.lyricsProvider = 'lrclib'; // Proveedor por defecto
+        this.lyricsProvider = 'lrclib';
         this.currentLrc = [];
         this.syncInterval = null;
+        this.activeLineIndex = -1;
     }
 
-    /**
-     * Limpia y normaliza los datos del video para mejorar la búsqueda
-     */
     cleanData(video) {
         let rawArtist = video.artist || video.uploaderName || video.author || '';
         let rawTitle = video.title || '';
         let duration = 0;
 
-        // 1. CORREGIR DURACIÓN (Evitar NaN)
-        if (typeof video.duration === 'number') {
-            duration = video.duration;
-        } else if (typeof video.duration === 'string') {
-            // Intenta usar tu función global si existe, sino parseo manual
-            if (typeof window.parseDuration === 'function') {
-                duration = window.parseDuration(video.duration);
-            } else {
-                // Fallback para "PT3M20S" o "3:20"
-                const parts = video.duration.replace('PT','').replace('S','').split('M');
-                if(parts.length === 2) duration = parseInt(parts[0])*60 + parseInt(parts[1]);
-            }
-        }
-        if (isNaN(duration)) duration = 0;
+        if (typeof video.duration === 'number') duration = video.duration;
+        else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
+        
+        let artist = rawArtist.replace(/VEVO$/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s*-\s*Topic$/i, '').replace(/Official/i, '').trim();
+        let title = rawTitle.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv).*?[\)\]]/gi, '').replace(/^\s*\|\s*/, '').trim();
 
-        // 2. LIMPIEZA DE ARTISTA
-        // Elimina: VEVO, - Topic, Official, espacios extra
-        let artist = rawArtist
-            .replace(/VEVO$/i, '')          // SelenaGomezVEVO -> SelenaGomez
-            .replace(/([a-z])([A-Z])/g, '$1 $2') // SelenaGomez -> Selena Gomez (CamelCase a espacios)
-            .replace(/\s*-\s*Topic$/i, '')  // Artista - Topic -> Artista
-            .replace(/Official/i, '')
-            .trim();
-
-        // 3. LIMPIEZA DE TÍTULO
-        // Elimina basura común: (Official Video), [Audio], ft. Alguien, etc.
-        let title = rawTitle
-            .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv).*?[\)\]]/gi, '') // Elimina paréntesis
-            .replace(/^\s*\|\s*/, '') // Elimina barras al inicio
-            .trim();
-
-        // LÓGICA "ARTISTA - CANCIÓN"
-        // Muchos videos de música tienen el formato: "Artista - Canción" en el título
         if (title.includes(' - ')) {
             const parts = title.split(' - ');
-            const part1 = parts[0].trim().toLowerCase();
-            const part2 = parts[1].trim();
-            const artistLower = artist.toLowerCase();
-
-            // Si la primera parte del título se parece al artista del canal
-            // Ejemplo: Title="Rema, Selena Gomez - Calm Down", Artist="Selena Gomez"
-            if (part1.includes(artistLower) || artistLower.includes(part1) || part1.length > 3) {
-                // Asumimos que la parte 1 es el artista (o colaboradores) y la parte 2 es la canción
-                // Actualizamos el artista con la info del título que suele ser más precisa (ej. feats)
+            if (parts[0].toLowerCase().includes(artist.toLowerCase()) || artist.toLowerCase().includes(parts[0].toLowerCase())) {
                 artist = parts[0].trim(); 
-                title = part2; 
+                title = parts[1].trim(); 
             }
         }
-
-        // 4. LIMPIEZA FINAL DE "FEAT" EN TÍTULO Y ARTISTA
-        // Limpiamos "ft.", "feat." para dejar solo el nombre principal
         title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
-        artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&)/i)[0].trim(); // Toma solo el primer artista principal
+        artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&)/i)[0].trim();
 
-        return { 
-            artist: artist, 
-            title: title, 
-            duration: Math.round(duration) 
-        };
+        return { artist, title, duration: Math.round(duration) };
     }
 
     async loadLyricsForCurrentVideo(video) {
@@ -1149,233 +1066,116 @@ class LyricsManager {
         this.stopSync();
         container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
 
-        // ✅ USAR DATOS LIMPIOS
         const clean = this.cleanData(video);
         
-        console.log(`🎵 Datos limpios: Artista="${clean.artist}", Titulo="${clean.title}"`);
-
         try {
-            // Intentar proveedor principal
             const data = await this.fetchLyrics(this.lyricsProvider, clean.artist, clean.title, clean.duration);
             this.renderLyricsUI(data, clean.artist, clean.title);
         } catch (e) {
-            console.warn(`Fallo ${this.lyricsProvider}, intentando fallback...`, e);
+            console.warn(`Fallo ${this.lyricsProvider}, intentando fallback...`);
             try {
-                // Fallback automático al otro proveedor
                 const fallbackProvider = this.lyricsProvider === 'lrclib' ? 'lujjjh' : 'lrclib';
-                const data = await this.fetchLyrics(fallbackProvider, clean.artist, clean.title, clean.duration);
+                const data = await this.fetchLyrics(fallbackProvider, clean.artist, clean.title, 0);
                 this.renderLyricsUI(data, clean.artist, clean.title);
             } catch (err2) {
-                console.error("Error final letras:", err2);
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-times"></i>
-                        <p>No se encontraron letras.</p>
-                        <small style="color:#666; font-size: 0.8em;">Buscado: ${clean.title} - ${clean.artist}</small>
-                        <br><br>
-                        <button id="retryLyricsBtn" class="lyrics-provider-btn" style="background:#333;color:white;">Reintentar</button>
-                    </div>`;
-                
-                const retryBtn = document.getElementById('retryLyricsBtn');
-                if(retryBtn) retryBtn.onclick = () => this.loadLyricsForCurrentVideo(video);
+                container.innerHTML = `<div class="empty-state"><p>No se encontraron letras.</p><small>${clean.title}</small></div>`;
             }
         }
     }
 
- async fetchLyrics(provider, artist, title, duration) {
-    const safeArtist = encodeURIComponent(artist);
-    const safeTitle = encodeURIComponent(title);
+    async fetchLyrics(provider, artist, title, duration) {
+        const safeArtist = encodeURIComponent(artist);
+        const safeTitle = encodeURIComponent(title);
 
-    if (provider === 'lrclib') {
-        // ✅ BÚSQUEDA CON DURACIÓN para mejor precisión
-        const urlWithDuration = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}&duration=${Math.round(duration)}`;
-        const urlWithoutDuration = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
-        
-        console.log("🔗 Fetching LRCLIB:", urlWithDuration);
-        
-        try {
-            // Intentar primero con duración (más preciso)
-            let res = await fetch(urlWithDuration);
-            
-            // Si falla, intentar sin duración
-            if (!res.ok) {
-                console.log("⚠️ Reintentando sin duración...");
-                res = await fetch(urlWithoutDuration);
-            }
-            
-            if (!res.ok) throw new Error('LRCLIB 404/Error');
-            
+        if (provider === 'lrclib') {
+            let url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
+            if (duration > 0) url += `&duration=${duration}`;
+
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('LRCLIB 404');
             const data = await res.json();
             
-            // ✅ VALIDAR QUE TENGA syncedLyrics (prioritario)
-            if (!data.syncedLyrics && !data.plainLyrics) {
-                throw new Error('No lyrics found in response');
-            }
-            
             return {
-                syncedLyrics: data.syncedLyrics || null,
-                plainLyrics: data.plainLyrics || data.syncedLyrics?.replace(/\[.*?\]/g, ''),
+                syncedLyrics: data.syncedLyrics,
+                plainLyrics: data.plainLyrics,
+                album: data.albumName,
+                duration: data.duration,
                 provider: 'LRCLIB'
             };
-            
-        } catch (error) {
-            console.error('LRCLIB Error:', error);
-            throw error;
-        }
-        
-    } else {
-       
-        const targetApi = `https://lyrics-api.lujjjh.com/?name=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`;
-        const backendHost = "https://sphenographic-johnie-supersensually.ngrok-free.dev"; 
-        const proxyUrl = `${backendHost}/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
-        
-        console.log("🔗 Fetching Proxy:", proxyUrl);
-
-        try {
+        } else {
+            // Fallback (Proxy)
+            const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
+            const proxyUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
             const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error('Proxy Error: ' + res.status);
-            
+            if (!res.ok) throw new Error('Proxy Error');
             const text = await res.text();
-            if (!text || text.includes('Cannot GET') || text.length < 20) {
-                throw new Error('Respuesta inválida');
-            }
-
-            return {
-                syncedLyrics: text, 
-                plainLyrics: text.replace(/\[.*?\]/g, ''),
-                provider: 'LUJJJH'
-            };
-        } catch (proxyError) {
-            console.warn("Error proxy:", proxyError);
-            throw proxyError;
+            return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
         }
     }
-}
 
     renderLyricsUI(data, artist, title) {
         const container = document.getElementById('lyricsContent');
         const hasSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
-        
-        // Limpiar para asegurar que no hay duplicados
         container.innerHTML = '';
+        
+        const metaInfo = [];
+        if(data.album) metaInfo.push(`💿 ${data.album}`);
+        if(data.duration) metaInfo.push(`⏳ ${formatDuration(data.duration)}`);
+        const metaHtml = metaInfo.length ? `<div class="lyrics-meta" style="font-size:0.8em; color:#aaa;">${metaInfo.join(' • ')}</div>` : '';
 
         let html = `
             <div class="lyrics-header">
                 <div style="flex:1; overflow:hidden;">
-                    <strong style="display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size: 1.1em;">${this.escapeHTML(title)}</strong>
+                    <strong style="display:block; font-size: 1.1em;">${this.escapeHTML(title)}</strong>
                     <small style="color:#aaa;">${this.escapeHTML(artist)}</small>
+                    ${metaHtml}
                 </div>
-                <button id="translateBtn" class="lyrics-provider-btn" title="Traducir" style="background:transparent; border:none; color:white;"><i class="fas fa-language fa-lg"></i></button>
             </div>
             <div class="lyrics-text ${hasSynced ? 'synced' : 'plain'}" style="padding-top:10px;">
         `;
 
         if (hasSynced) {
             this.currentLrc = this.parseLRC(data.syncedLyrics);
-            if(this.currentLrc.length > 0) {
-                html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
-                this.startSync();
-            } else {
-                html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
-            }
+            html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
+            this.startSync();
         } else {
             html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
         }
-
         html += '</div>';
         container.innerHTML = html;
-
-        const tBtn = document.getElementById('translateBtn');
-        if(tBtn) tBtn.onclick = () => this.translateLyrics();
     }
 
     startSync() {
         this.stopSync();
+        this.activeLineIndex = -1;
         this.syncInterval = setInterval(() => {
-            const player = (window.currentPlayer === 1) ? window.player1 : window.player2;
+            const player = (currentPlayer === 1) ? player1 : player2;
             if (!player || typeof player.getCurrentTime !== 'function') return;
             
             const time = player.getCurrentTime();
             const lines = document.querySelectorAll('.lyrics-text.synced p');
             
-            let activeIndex = -1;
-            for (let i = 0; i < this.currentLrc.length; i++) {
-                if (time >= this.currentLrc[i].time) {
-                    activeIndex = i;
-                } else {
-                    break;
+            let newIndex = -1;
+            if (this.currentLrc.length > 0) {
+                for (let i = 0; i < this.currentLrc.length; i++) {
+                    if (time >= this.currentLrc[i].time) newIndex = i;
+                    else break; 
                 }
             }
 
-            if (activeIndex !== -1 && lines[activeIndex]) {
-                const currentLine = lines[activeIndex];
-                if (!currentLine.classList.contains('active')) {
-                    lines.forEach(l => l.classList.remove('active'));
-                    currentLine.classList.add('active');
-                    currentLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (newIndex !== this.activeLineIndex && newIndex !== -1 && lines[newIndex]) {
+                if (this.activeLineIndex !== -1 && lines[this.activeLineIndex]) {
+                    lines[this.activeLineIndex].classList.remove('active');
                 }
+                lines[newIndex].classList.add('active');
+                lines[newIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                this.activeLineIndex = newIndex;
             }
-        }, 300);
+        }, 100); // ⚡ Sincronización rápida a 100ms
     }
 
     stopSync() {
         if (this.syncInterval) clearInterval(this.syncInterval);
-    }
-
-    // Traducción simple usando Google Translate API (Gratis/Limitada)
-    async translateLyrics() {
-        const container = document.querySelector('.lyrics-text');
-        if (!container) return;
-        
-        const btn = document.getElementById('translateBtn');
-        const originalIcon = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        btn.disabled = true;
-        
-        let text = "";
-        const isSynced = container.classList.contains('synced');
-        
-        if (isSynced) {
-            text = this.currentLrc.map(l => l.text).join('\n');
-        } else {
-            text = container.innerText;
-        }
-
-        try {
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(text)}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            
-            const translation = json[0].map(x => x[0]).join('');
-            
-            if (isSynced) {
-                const transLines = translation.split('\n');
-                const ps = container.querySelectorAll('p');
-                ps.forEach((p, i) => {
-                    if (!p.querySelector('.lyrics-translation') && transLines[i]) {
-                        const t = document.createElement('span');
-                        t.className = 'lyrics-translation';
-                        t.textContent = transLines[i];
-                        t.style.cssText = "display:block; font-size:0.8em; color:#4caf50; font-style:italic;";
-                        p.appendChild(t);
-                    }
-                });
-            } else {
-                if (!container.querySelector('.translated-block')) {
-                    const div = document.createElement('div');
-                    div.className = 'lyrics-translation translated-block';
-                    div.innerHTML = `<hr style="border-color:#333; margin:20px 0;"><strong style="color:#4caf50">Traducción:</strong><br><br>${translation.replace(/\n/g, '<br>')}`;
-                    container.appendChild(div);
-                }
-            }
-            btn.innerHTML = '<i class="fas fa-check" style="color:#4caf50"></i>';
-        } catch (e) {
-            console.error(e);
-            window.mostrarMensajeFlotante("Error al traducir");
-            btn.innerHTML = originalIcon;
-        } finally {
-            btn.disabled = false;
-        }
     }
 
     parseLRC(lrc) {
