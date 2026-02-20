@@ -1035,30 +1035,57 @@ class LyricsManager {
         this.activeLineIndex = -1;
     }
 
-    cleanData(video) {
-        let rawArtist = video.artist || video.uploaderName || video.author || '';
-        let rawTitle = video.title || '';
-        let duration = 0;
+  cleanData(video) {
+    let rawArtist = video.artist || video.uploaderName || video.author || '';
+    let rawTitle = video.title || '';
+    let duration = 0;
 
-        if (typeof video.duration === 'number') duration = video.duration;
-        else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
+    if (typeof video.duration === 'number') duration = video.duration;
+    else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
+    
+    // 1. LIMPIEZA DE ARTISTA
+    let artist = rawArtist
+        .replace(/VEVO$/i, '')
+        // Separa CamelCase (ej: "JesseyJoy" -> "Jesse y Joy" o "Jesse yJoy")
+        .replace(/([a-z])([A-Z])/g, '$1 $2') 
+        // Maneja el caso específico de "y" pegada entre nombres
+        .replace(/([a-z])y([A-Z])/gi, '$1 y $2')
+        .replace(/\s*-\s*Topic$/i, '')
+        .replace(/Official/i, '')
+        .trim();
+
+    // 2. LIMPIEZA DE TÍTULO
+    // Elimina etiquetas comunes como (Official Video), [Lyric], etc.
+    let title = rawTitle
+        .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '')
+        .replace(/^\s*\|\s*/, '')
+        .trim();
+
+    // 3. SEPARACIÓN ARTISTA - TÍTULO
+    // Si el título contiene " - ", intentamos extraer el artista real
+    if (title.includes(' - ')) {
+        const parts = title.split(' - ');
+        const potentialArtist = parts[0].trim();
+        const potentialTitle = parts[1].trim();
         
-        let artist = rawArtist.replace(/VEVO$/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s*-\s*Topic$/i, '').replace(/Official/i, '').trim();
-        let title = rawTitle.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv).*?[\)\]]/gi, '').replace(/^\s*\|\s*/, '').trim();
-
-        if (title.includes(' - ')) {
-            const parts = title.split(' - ');
-            if (parts[0].toLowerCase().includes(artist.toLowerCase()) || artist.toLowerCase().includes(parts[0].toLowerCase())) {
-                artist = parts[0].trim(); 
-                title = parts[1].trim(); 
-            }
+        // Si el artista del canal está contenido en la primera parte del título, es más fiable
+        if (potentialArtist.toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
+            artist = potentialArtist;
+            title = potentialTitle;
         }
-        title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
-        artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&)/i)[0].trim();
-
-        return { artist, title, duration: Math.round(duration) };
     }
 
+    // 4. ELIMINAR COLABORADORES PARA LA BÚSQUEDA
+    // Las APIs de letras suelen fallar si incluyes "ft. Artista 2"
+    title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
+    artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&|y\s)/i)[0].trim();
+
+    return { 
+        artist: artist.trim(), 
+        title: title.trim(), 
+        duration: Math.round(duration) 
+    };
+}
     async loadLyricsForCurrentVideo(video) {
         const container = document.getElementById('lyricsContent');
         if (!container) return;
