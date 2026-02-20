@@ -1093,34 +1093,31 @@ class LyricsManager {
         }
     }
 
-    async getOrFetchLyrics(clean, cacheKey) {
-        // Retornar instantáneo si ya existe
+  async getOrFetchLyrics(clean, cacheKey) {
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
-        // Ejecutar las dos APIs a la vez usando Promise.any
-        // La primera API que responda exitosamente ganará la carrera, eliminando tiempos muertos.
         try {
+            // Mandamos llamar a lrclib y a nuestro sistema de respaldos ('fallback') al mismo tiempo
             const data = await Promise.any([
                 this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
-                this.fetchLyrics('lujjjh', clean.artist, clean.title, 0)
+                this.fetchLyrics('fallback', clean.artist, clean.title, 0)
             ]);
             
-            this.cache.set(cacheKey, data); // Guardar resultado para el futuro
+            this.cache.set(cacheKey, data);
             return data;
         } catch (aggregateError) {
             throw new Error("Ambas APIs fallaron");
         }
     }
 
-    async fetchLyrics(provider, artist, title, duration) {
+  async fetchLyrics(provider, artist, title, duration) {
         const safeArtist = encodeURIComponent(artist);
         const safeTitle = encodeURIComponent(title);
         
-        // Timeout de seguridad: Si una API tarda más de 5 segundos, se aborta para no colgar el sistema
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         try {
             if (provider === 'lrclib') {
@@ -1139,23 +1136,41 @@ class LyricsManager {
                     provider: 'LRCLIB'
                 };
             } else {
-                const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-                const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;          
-                const res = await fetch(proxyUrl, { signal: controller.signal });
-                if (!res.ok) throw new Error('Proxy Error');
-                const text = await res.text();
-                
-                if (!text || text.includes('Not Found') || text.trim() === '') throw new Error('No lyrics');
-                
-                return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
+                // INTENTO 2: Lujjjh Directo (SIN el proxy) para usar tu IP local y evitar el bloqueo anti-bot
+                try {
+                    const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
+                    const res = await fetch(targetApi, { signal: controller.signal });
+                    if (!res.ok) throw new Error('Lujjjh HTTP error');
+                    const text = await res.text();
+                    
+                    // Verificamos si nos devolvió la página de bloqueo en lugar de la letra
+                    if (!text || text.includes('have been blocked') || text.includes('<html')) {
+                        throw new Error('Bloqueado por Firewall');
+                    }
+                    return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
+                    
+                } catch (err) {
+                    // INTENTO 3 (ÚLTIMO RECURSO): API pública de Lyrics.ovh (Devuelve texto plano, muy confiable)
+                    const ovhApi = `https://api.lyrics.ovh/v1/${safeArtist}/${safeTitle}`;
+                    const resOvh = await fetch(ovhApi, { signal: controller.signal });
+                    if (!resOvh.ok) throw new Error('OVH 404');
+                    const dataOvh = await resOvh.json();
+                    
+                    if (!dataOvh.lyrics) throw new Error('No lyrics en OVH');
+                    
+                    return { 
+                        syncedLyrics: dataOvh.lyrics, 
+                        plainLyrics: dataOvh.lyrics, 
+                        provider: 'LYRICS.OVH' 
+                    };
+                }
             }
         } finally {
             clearTimeout(timeoutId);
         }
     }
 
-    prefetchNextLyrics() {
-        // Precarga las letras de la siguiente canción de la cola sin afectar la UI
+  prefetchNextLyrics() {
         if (typeof window.currentIndex !== 'undefined' && window.playlistVideos && window.playlistVideos.length > window.currentIndex + 1) {
             const nextVideo = window.playlistVideos[window.currentIndex + 1];
             const clean = this.cleanData(nextVideo);
@@ -1164,11 +1179,11 @@ class LyricsManager {
             if (!this.cache.has(cacheKey)) {
                 Promise.any([
                     this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
-                    this.fetchLyrics('lujjjh', clean.artist, clean.title, 0)
+                    this.fetchLyrics('fallback', clean.artist, clean.title, 0)
                 ]).then(data => {
                     this.cache.set(cacheKey, data);
                     console.log(`[LyricsManager] ⚡ Precarga exitosa para la próxima canción: ${clean.title}`);
-                }).catch(() => {}); // Fallos en precarga son silenciosos
+                }).catch(() => {}); 
             }
         }
     }
