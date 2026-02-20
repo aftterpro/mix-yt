@@ -1132,8 +1132,7 @@ class LyricsManager {
         } else {
             // Fallback (Proxy)
             const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-            const proxyUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/lyrics-proxy?url=${encodeURIComponent(targetApi)}`;
-            const res = await fetch(proxyUrl);
+            const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;            const res = await fetch(proxyUrl);
             if (!res.ok) throw new Error('Proxy Error');
             const text = await res.text();
             return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
