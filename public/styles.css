@@ -893,3 +893,17 @@ max-height: 150px; /* Reduce la altura en móviles */
     color: #999;
 }
 .empty-state i { font-size: 3em; margin-bottom: 10px; opacity: 0.5; }
+.lyric-line {
+    transition: all 0.3s ease;
+    opacity: 0.4;
+    transform: scale(0.95);
+    margin: 12px 0;
+}
+
+.lyric-line.active {
+    opacity: 1;
+    transform: scale(1.05);
+    color: #00e5ff; /* Color cian para destacar */
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+}
