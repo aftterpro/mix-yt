@@ -93,8 +93,7 @@ async cargarSegmentos(videoId) {
         }
     }
 
-    const apiUrl = `https://sphenographic-johnie-supersensually.ngrok-free.dev/sponsorblock?videoId=${videoId}`;
-    
+    const apiUrl = `/sponsorblock?videoId=${videoId}`;    
     try {
         console.log(`🔍 Consultando SponsorBlock API para: ${videoId}`);
         
