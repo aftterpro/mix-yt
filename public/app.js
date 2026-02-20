@@ -1113,22 +1113,38 @@ class LyricsManager {
     }
 
 async fetchLyrics(provider, artist, title, duration) {
-    const videoId = window.currentVideoId; // Asegúrate de tener el ID a mano
-    const myOracleIp = "http://http://150.230.81.137:5000/get-lyrics?id=" + videoId;
+    // 1. Obtener el ID del video actual del reproductor activo
+    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
+    let videoId = null;
+
+    try {
+        if (activePlayer && typeof activePlayer.getVideoData === 'function') {
+            videoId = activePlayer.getVideoData().video_id;
+        }
+    } catch (e) {
+        console.warn("No se pudo obtener el video_id del reproductor");
+    }
+
+    // Si no hay ID, no podemos consultar tu servidor
+    if (!videoId) return null;
+
+    // 2. URL corregida (sin el doble http://)
+    const myOracleIp = `http://150.230.81.137:5000/get-lyrics?id=${videoId}`;
 
     try {
         const res = await fetch(myOracleIp);
-        const data = await res.json();
+        if (!res.ok) throw new Error('Error en servidor Oracle');
         
+        const data = await res.json();
         if (data.status === "success") {
             return {
                 syncedLyrics: data.data,
                 provider: 'MI_SERVIDOR_ORACLE'
             };
         }
-        // Si tu servidor falla, puedes dejar LRCLIB como respaldo final
     } catch (e) {
-        console.log("Mi servidor de Oracle está offline, usando respaldo...");
+        console.error("Error conectando a Oracle:", e.message);
+        // Aquí puedes poner el fallback a LRCLIB si tu servidor falla
     }
 }
 
