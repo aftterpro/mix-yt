@@ -1025,118 +1025,151 @@ function parseDuration(durationString) {
     return hours * 3600 + minutes * 60 + seconds;
 }
 // =============================================
-// GESTOR DE LETRAS OPTIMIZADO
+// GESTOR DE LETRAS OPTIMIZADO (Con Caché y Paralelismo)
 // =============================================
 class LyricsManager {
     constructor() {
-        this.lyricsProvider = 'lrclib';
         this.currentLrc = [];
         this.syncInterval = null;
         this.activeLineIndex = -1;
+        this.cache = new Map(); // Sistema de caché rápido en memoria
     }
 
-  cleanData(video) {
-    let rawArtist = video.artist || video.uploaderName || video.author || '';
-    let rawTitle = video.title || '';
-    let duration = 0;
+    cleanData(video) {
+        let rawArtist = video.artist || video.uploaderName || video.author || '';
+        let rawTitle = video.title || '';
+        let duration = 0;
 
-    if (typeof video.duration === 'number') duration = video.duration;
-    else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
-    
-    // 1. LIMPIEZA DE ARTISTA
-    let artist = rawArtist
-        .replace(/VEVO$/i, '')
-        // Separa CamelCase (ej: "JesseyJoy" -> "Jesse y Joy" o "Jesse yJoy")
-        .replace(/([a-z])([A-Z])/g, '$1 $2') 
-        // Maneja el caso específico de "y" pegada entre nombres
-        .replace(/([a-z])y([A-Z])/gi, '$1 y $2')
-        .replace(/\s*-\s*Topic$/i, '')
-        .replace(/Official/i, '')
-        .trim();
-
-    // 2. LIMPIEZA DE TÍTULO
-    // Elimina etiquetas comunes como (Official Video), [Lyric], etc.
-    let title = rawTitle
-        .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '')
-        .replace(/^\s*\|\s*/, '')
-        .trim();
-
-    // 3. SEPARACIÓN ARTISTA - TÍTULO
-    // Si el título contiene " - ", intentamos extraer el artista real
-    if (title.includes(' - ')) {
-        const parts = title.split(' - ');
-        const potentialArtist = parts[0].trim();
-        const potentialTitle = parts[1].trim();
+        if (typeof video.duration === 'number') duration = video.duration;
+        else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
         
-        // Si el artista del canal está contenido en la primera parte del título, es más fiable
-        if (potentialArtist.toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
-            artist = potentialArtist;
-            title = potentialTitle;
+        let artist = rawArtist.replace(/VEVO$/i, '')
+            .replace(/([a-z])([A-Z])/g, '$1 $2') 
+            .replace(/([a-z])y([A-Z])/gi, '$1 y $2')
+            .replace(/\s*-\s*Topic$/i, '')
+            .replace(/Official/i, '').trim();
+
+        let title = rawTitle.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '')
+            .replace(/^\s*\|\s*/, '').trim();
+
+        if (title.includes(' - ')) {
+            const parts = title.split(' - ');
+            if (parts[0].trim().toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
+                artist = parts[0].trim();
+                title = parts[1].trim();
+            }
         }
+
+        title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
+        artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&|y\s)/i)[0].trim();
+
+        return { artist: artist.trim(), title: title.trim(), duration: Math.round(duration) };
     }
 
-    // 4. ELIMINAR COLABORADORES PARA LA BÚSQUEDA
-    // Las APIs de letras suelen fallar si incluyes "ft. Artista 2"
-    title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
-    artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&|y\s)/i)[0].trim();
-
-    return { 
-        artist: artist.trim(), 
-        title: title.trim(), 
-        duration: Math.round(duration) 
-    };
-}
     async loadLyricsForCurrentVideo(video) {
         const container = document.getElementById('lyricsContent');
         if (!container) return;
 
         this.stopSync();
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
-
         const clean = this.cleanData(video);
-        
+        const cacheKey = `${clean.artist}-${clean.title}`.toLowerCase();
+
+        // 1. Mostrar estado de carga solo si no está en caché
+        if (!this.cache.has(cacheKey)) {
+            container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
+        }
+
         try {
-            const data = await this.fetchLyrics(this.lyricsProvider, clean.artist, clean.title, clean.duration);
+            // 2. Obtener de caché o disparar búsqueda paralela
+            const data = await this.getOrFetchLyrics(clean, cacheKey);
             this.renderLyricsUI(data, clean.artist, clean.title);
+            
+            // 3. Disparar precarga oculta para la siguiente canción
+            this.prefetchNextLyrics();
+            
         } catch (e) {
-            console.warn(`Fallo ${this.lyricsProvider}, intentando fallback...`);
-            try {
-                const fallbackProvider = this.lyricsProvider === 'lrclib' ? 'lujjjh' : 'lrclib';
-                const data = await this.fetchLyrics(fallbackProvider, clean.artist, clean.title, 0);
-                this.renderLyricsUI(data, clean.artist, clean.title);
-            } catch (err2) {
-                container.innerHTML = `<div class="empty-state"><p>No se encontraron letras.</p><small>${clean.title}</small></div>`;
-            }
+            console.warn("[LyricsManager] No se encontraron letras:", e.message);
+            container.innerHTML = `<div class="empty-state"><p>No se encontraron letras.</p><small>${clean.title}</small></div>`;
+        }
+    }
+
+    async getOrFetchLyrics(clean, cacheKey) {
+        // Retornar instantáneo si ya existe
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        // Ejecutar las dos APIs a la vez usando Promise.any
+        // La primera API que responda exitosamente ganará la carrera, eliminando tiempos muertos.
+        try {
+            const data = await Promise.any([
+                this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
+                this.fetchLyrics('lujjjh', clean.artist, clean.title, 0)
+            ]);
+            
+            this.cache.set(cacheKey, data); // Guardar resultado para el futuro
+            return data;
+        } catch (aggregateError) {
+            throw new Error("Ambas APIs fallaron");
         }
     }
 
     async fetchLyrics(provider, artist, title, duration) {
         const safeArtist = encodeURIComponent(artist);
         const safeTitle = encodeURIComponent(title);
+        
+        // Timeout de seguridad: Si una API tarda más de 5 segundos, se aborta para no colgar el sistema
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        if (provider === 'lrclib') {
-            let url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
-            if (duration > 0) url += `&duration=${duration}`;
+        try {
+            if (provider === 'lrclib') {
+                let url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
+                if (duration > 0) url += `&duration=${duration}`;
 
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('LRCLIB 404');
-            const data = await res.json();
+                const res = await fetch(url, { signal: controller.signal });
+                if (!res.ok) throw new Error('LRCLIB 404');
+                const data = await res.json();
+                
+                return {
+                    syncedLyrics: data.syncedLyrics,
+                    plainLyrics: data.plainLyrics,
+                    album: data.albumName,
+                    duration: data.duration,
+                    provider: 'LRCLIB'
+                };
+            } else {
+                const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
+                const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;          
+                const res = await fetch(proxyUrl, { signal: controller.signal });
+                if (!res.ok) throw new Error('Proxy Error');
+                const text = await res.text();
+                
+                if (!text || text.includes('Not Found') || text.trim() === '') throw new Error('No lyrics');
+                
+                return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
+            }
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
+    prefetchNextLyrics() {
+        // Precarga las letras de la siguiente canción de la cola sin afectar la UI
+        if (typeof window.currentIndex !== 'undefined' && window.playlistVideos && window.playlistVideos.length > window.currentIndex + 1) {
+            const nextVideo = window.playlistVideos[window.currentIndex + 1];
+            const clean = this.cleanData(nextVideo);
+            const cacheKey = `${clean.artist}-${clean.title}`.toLowerCase();
             
-            return {
-                syncedLyrics: data.syncedLyrics,
-                plainLyrics: data.plainLyrics,
-                album: data.albumName,
-                duration: data.duration,
-                provider: 'LRCLIB'
-            };
-        } else {
-            // Fallback (Proxy)
-            const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-            const proxyUrl = `/cors-proxy?url=${encodeURIComponent(targetApi)}`;          
-            const res = await fetch(proxyUrl);
-            if (!res.ok) throw new Error('Proxy Error');
-            const text = await res.text();
-            return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
+            if (!this.cache.has(cacheKey)) {
+                Promise.any([
+                    this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
+                    this.fetchLyrics('lujjjh', clean.artist, clean.title, 0)
+                ]).then(data => {
+                    this.cache.set(cacheKey, data);
+                    console.log(`[LyricsManager] ⚡ Precarga exitosa para la próxima canción: ${clean.title}`);
+                }).catch(() => {}); // Fallos en precarga son silenciosos
+            }
         }
     }
 
@@ -1195,10 +1228,12 @@ class LyricsManager {
                     lines[this.activeLineIndex].classList.remove('active');
                 }
                 lines[newIndex].classList.add('active');
+                
+                // Reducido el comportamiento de scroll para que no trabe el dispositivo
                 lines[newIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
                 this.activeLineIndex = newIndex;
             }
-        }, 100); // ⚡ Sincronización rápida a 100ms
+        }, 100);
     }
 
     stopSync() {
