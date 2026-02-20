@@ -1113,39 +1113,62 @@ class LyricsManager {
     }
 
 async fetchLyrics(provider, artist, title, duration) {
-    // 1. Obtener el ID del video actual del reproductor activo
+    // 1. Obtener el ID del video actual
     const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
     let videoId = null;
-
     try {
         if (activePlayer && typeof activePlayer.getVideoData === 'function') {
             videoId = activePlayer.getVideoData().video_id;
         }
-    } catch (e) {
-        console.warn("No se pudo obtener el video_id del reproductor");
-    }
+    } catch (e) { console.error("Error obteniendo ID"); }
 
-    // Si no hay ID, no podemos consultar tu servidor
     if (!videoId) return null;
 
-    // 2. URL corregida (sin el doble http://)
-    const myOracleIp = `http://150.230.81.137:5000/get-lyrics?id=${videoId}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de espera
 
     try {
-        const res = await fetch(myOracleIp);
-        if (!res.ok) throw new Error('Error en servidor Oracle');
+        // PRIORIDAD: Tu servidor de Oracle
+        const myOracleIp = `http://150.230.81.137:5000/get-lyrics?id=${videoId}`;
+        console.log(`[Lyrics] Consultando Oracle para ID: ${videoId}`);
         
+        const res = await fetch(myOracleIp, { signal: controller.signal });
         const data = await res.json();
-        if (data.status === "success") {
+
+        if (data.status === "success" && data.data) {
+            console.log(`[Lyrics] Éxito desde Oracle (Fuente: ${data.source})`);
             return {
                 syncedLyrics: data.data,
-                provider: 'MI_SERVIDOR_ORACLE'
+                plainLyrics: data.data.replace(/\[.*?\]/g, ''),
+                provider: 'ORACLE_CLOUD'
             };
         }
+        throw new Error("No encontrado en Oracle");
+
     } catch (e) {
-        console.error("Error conectando a Oracle:", e.message);
-        // Aquí puedes poner el fallback a LRCLIB si tu servidor falla
+        console.warn("[Lyrics] Oracle falló o no tiene la letra, usando LRCLIB de respaldo...");
+        
+        // RESPALDO: LRCLIB Directo (Plan B)
+        try {
+            const safeQuery = encodeURIComponent(`${artist} ${title}`);
+            const resLrc = await fetch(`https://lrclib.net/api/search?q=${safeQuery}`);
+            const dataLrc = await resLrc.json();
+            
+            if (dataLrc && dataLrc.length > 0) {
+                const best = dataLrc[0];
+                return {
+                    syncedLyrics: best.syncedLyrics,
+                    plainLyrics: best.plainLyrics,
+                    provider: 'LRCLIB_BACKUP'
+                };
+            }
+        } catch (err) {
+            console.error("[Lyrics] Todos los proveedores fallaron");
+        }
+    } finally {
+        clearTimeout(timeoutId);
     }
+    return null;
 }
 
   prefetchNextLyrics() {
@@ -1167,36 +1190,35 @@ async fetchLyrics(provider, artist, title, duration) {
     }
 
     renderLyricsUI(data, artist, title) {
-        const container = document.getElementById('lyricsContent');
-        const hasSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
-        container.innerHTML = '';
-        
-        const metaInfo = [];
-        if(data.album) metaInfo.push(`💿 ${data.album}`);
-        if(data.duration) metaInfo.push(`⏳ ${formatDuration(data.duration)}`);
-        const metaHtml = metaInfo.length ? `<div class="lyrics-meta" style="font-size:0.8em; color:#aaa;">${metaInfo.join(' • ')}</div>` : '';
+    const container = document.getElementById('lyricsContent');
+    if (!container) return;
 
-        let html = `
-            <div class="lyrics-header">
-                <div style="flex:1; overflow:hidden;">
-                    <strong style="display:block; font-size: 1.1em;">${this.escapeHTML(title)}</strong>
-                    <small style="color:#aaa;">${this.escapeHTML(artist)}</small>
-                    ${metaHtml}
-                </div>
-            </div>
-            <div class="lyrics-text ${hasSynced ? 'synced' : 'plain'}" style="padding-top:10px;">
-        `;
+    // Detectar si la letra es sincronizada (formato [00:00.00])
+    const isSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
+    container.innerHTML = '';
 
-        if (hasSynced) {
-            this.currentLrc = this.parseLRC(data.syncedLyrics);
-            html += this.currentLrc.map(l => `<p data-time="${l.time}">${this.escapeHTML(l.text)}</p>`).join('');
-            this.startSync();
-        } else {
-            html += (data.plainLyrics || data.syncedLyrics).replace(/\n/g, '<br>');
-        }
-        html += '</div>';
-        container.innerHTML = html;
+    let html = `
+        <div class="lyrics-header" style="margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px;">
+            <strong style="display:block; font-size: 1.2em; color: #fff;">${this.escapeHTML(title)}</strong>
+            <small style="color:#aaa;">${this.escapeHTML(artist)}</small>
+            <div style="font-size: 0.7em; color: #555; margin-top: 5px;">SERVER: ${data.provider}</div>
+        </div>
+        <div class="lyrics-text ${isSynced ? 'synced' : 'plain'}">
+    `;
+
+    if (isSynced) {
+        this.currentLrc = this.parseLRC(data.syncedLyrics);
+        html += this.currentLrc.map(line => 
+            `<p data-time="${line.time}" class="lyric-line">${this.escapeHTML(line.text) || '🎵'}</p>`
+        ).join('');
+        this.startSync();
+    } else {
+        html += `<div class="plain-text">${data.plainLyrics.replace(/\n/g, '<br>')}</div>`;
     }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
 
     startSync() {
         this.stopSync();
