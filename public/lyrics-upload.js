@@ -2,7 +2,7 @@ console.log('🎵 Cargando módulo de subida de letras (Auto-inyección)...');
 
 class LyricsUploader {
     constructor() {
-        this.apiUrl = '/.netlify/functions/publish-lyrics'; // Ruta corregida a tu función
+        this.apiUrl = '/publish-lyrics';
         this.observer = null;
         this.setupAutoInjection();
     }
