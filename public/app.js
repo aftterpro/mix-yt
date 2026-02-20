@@ -1112,63 +1112,25 @@ class LyricsManager {
         }
     }
 
-  async fetchLyrics(provider, artist, title, duration) {
-        const safeArtist = encodeURIComponent(artist);
-        const safeTitle = encodeURIComponent(title);
+async fetchLyrics(provider, artist, title, duration) {
+    const videoId = window.currentVideoId; // Asegúrate de tener el ID a mano
+    const myOracleIp = "http://http://150.230.81.137:5000/get-lyrics?id=" + videoId;
+
+    try {
+        const res = await fetch(myOracleIp);
+        const data = await res.json();
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-        try {
-            if (provider === 'lrclib') {
-                let url = `https://lrclib.net/api/get?artist_name=${safeArtist}&track_name=${safeTitle}`;
-                if (duration > 0) url += `&duration=${duration}`;
-
-                const res = await fetch(url, { signal: controller.signal });
-                if (!res.ok) throw new Error('LRCLIB 404');
-                const data = await res.json();
-                
-                return {
-                    syncedLyrics: data.syncedLyrics,
-                    plainLyrics: data.plainLyrics,
-                    album: data.albumName,
-                    duration: data.duration,
-                    provider: 'LRCLIB'
-                };
-            } else {
-                // INTENTO 2: Lujjjh Directo (SIN el proxy) para usar tu IP local y evitar el bloqueo anti-bot
-                try {
-                    const targetApi = `https://lyrics-api.lujjjh.com/?name=${safeTitle}&artist=${safeArtist}`;
-                    const res = await fetch(targetApi, { signal: controller.signal });
-                    if (!res.ok) throw new Error('Lujjjh HTTP error');
-                    const text = await res.text();
-                    
-                    // Verificamos si nos devolvió la página de bloqueo en lugar de la letra
-                    if (!text || text.includes('have been blocked') || text.includes('<html')) {
-                        throw new Error('Bloqueado por Firewall');
-                    }
-                    return { syncedLyrics: text, plainLyrics: text.replace(/\[.*?\]/g, ''), provider: 'LUJJJH' };
-                    
-                } catch (err) {
-                    // INTENTO 3 (ÚLTIMO RECURSO): API pública de Lyrics.ovh (Devuelve texto plano, muy confiable)
-                    const ovhApi = `https://api.lyrics.ovh/v1/${safeArtist}/${safeTitle}`;
-                    const resOvh = await fetch(ovhApi, { signal: controller.signal });
-                    if (!resOvh.ok) throw new Error('OVH 404');
-                    const dataOvh = await resOvh.json();
-                    
-                    if (!dataOvh.lyrics) throw new Error('No lyrics en OVH');
-                    
-                    return { 
-                        syncedLyrics: dataOvh.lyrics, 
-                        plainLyrics: dataOvh.lyrics, 
-                        provider: 'LYRICS.OVH' 
-                    };
-                }
-            }
-        } finally {
-            clearTimeout(timeoutId);
+        if (data.status === "success") {
+            return {
+                syncedLyrics: data.data,
+                provider: 'MI_SERVIDOR_ORACLE'
+            };
         }
+        // Si tu servidor falla, puedes dejar LRCLIB como respaldo final
+    } catch (e) {
+        console.log("Mi servidor de Oracle está offline, usando respaldo...");
     }
+}
 
   prefetchNextLyrics() {
         if (typeof window.currentIndex !== 'undefined' && window.playlistVideos && window.playlistVideos.length > window.currentIndex + 1) {
