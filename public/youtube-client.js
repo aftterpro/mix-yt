@@ -28,22 +28,39 @@ async search(query) {
     }
 }
     
-  async fetchWithRetry(url, attempt = 1) {
-        try {
-            const response = await fetch(url, { mode: 'cors' });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return await response.json();
-        } catch (error) {
-            console.warn(`⚠️ Intento ${attempt} falló:`, error.message);
-            if (attempt < this.maxRetries) {
-                const delay = this.retryDelay * attempt;
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return this.fetchWithRetry(url, attempt + 1);
-            } else {
-                throw error;
-            }
+async fetchWithRetry(url, attempt = 1) {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch(url, {
+            signal: controller.signal,
+            mode: "cors"
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
+
+        return await response.json();
+
+    } catch (error) {
+
+        if (attempt >= this.maxRetries) {
+            console.error("❌ Fetch falló definitivamente:", error.message);
+            throw error;
+        }
+
+        const delay = this.retryDelay * attempt;
+        console.warn(`⚠️ Reintentando en ${delay}ms...`);
+
+        await new Promise(res => setTimeout(res, delay));
+
+        return this.fetchWithRetry(url, attempt + 1);
     }
+}
 }
 // =============================================
 // SPONSORBLOCK - Sistema de Detección y Salto
@@ -79,91 +96,43 @@ class SponsorBlockManager {
     }
 
 async cargarSegmentos(videoId) {
-    if (!videoId || typeof videoId !== 'string' || videoId.length !== 11) {
-        return [];
-    }
+    if (!videoId || videoId.length !== 11) return [];
 
-    // Verificar caché
     const cached = this.segmentosCache[videoId];
-    if (cached && typeof cached === 'object' && Array.isArray(cached.segments)) {
-        const cacheAge = Date.now() - (cached.timestamp || 0);
-        if (cacheAge < 10 * 60 * 1000) {
-            console.log(`📦 Usando caché SB para ${videoId}: ${cached.segments.length} segmentos`);
-            return cached.segments;
-        }
+
+    if (cached && Date.now() - cached.timestamp < 600000) {
+        return cached.segments;
     }
 
-    const apiUrl = `/sponsorblock?videoId=${videoId}`;    
     try {
-        console.log(`🔍 Consultando SponsorBlock API para: ${videoId}`);
-        
-        const fetchWithTimeout = new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Timeout')), 8000);
-            
-            fetch(apiUrl)
-                .then(response => {
-                    clearTimeout(timeout);
-                    resolve(response);
-                })
-                .catch(error => {
-                    clearTimeout(timeout);
-                    reject(error);
-                });
-        });
-        
-        const response = await fetchWithTimeout;
-        
+        const response = await fetch(`/sponsorblock?videoId=${videoId}`);
+
         if (!response.ok) {
-            if (response.status === 404) {
-                console.log(`ℹ️ SponsorBlock: No hay segmentos para ${videoId}`);
-                throw new Error('No segments found');
-            }
+            if (response.status === 404) return [];
             throw new Error(`HTTP ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
-        // ✅ MAPEAR CORRECTAMENTE: segment: [start, end] → startTime, endTime
-        const segments = Array.isArray(data) 
-            ? data
-                .filter(s => s && Array.isArray(s.segment) && s.segment.length === 2)
-                .map(s => ({
-                    startTime: s.segment[0],
-                    endTime: s.segment[1],
-                    category: s.category,
-                    actionType: s.actionType,
-                    UUID: s.UUID,
-                    // Guardar también el segmento original por compatibilidad
-                    segment: s.segment
-                }))
-            : [];
-        
-        console.log(`✅ SponsorBlock cargado para ${videoId}:`, segments.length, 'segmentos');
-        
-        // Log detallado de los segmentos
-        segments.forEach(seg => {
-            console.log(`  └─ ${seg.category}: ${seg.startTime.toFixed(1)}s - ${seg.endTime.toFixed(1)}s`);
-        });
-        
+
+        const segments = (Array.isArray(data) ? data : [])
+            .filter(s => Array.isArray(s.segment))
+            .map(s => ({
+                startTime: s.segment[0],
+                endTime: s.segment[1],
+                category: s.category
+            }));
+
         this.segmentosCache[videoId] = {
-            segments: segments,
+            segments,
             timestamp: Date.now()
         };
-        
+
         this.saveCache();
+
         return segments;
-        
-    } catch (e) {
-        if (e.message !== 'No segments found' && e.message !== 'Timeout') {
-            console.warn(`⚠️ Error SponsorBlock para ${videoId}:`, e.message);
-        }
-        
-        // Guardar caché vacía para evitar reintentos constantes
-        this.segmentosCache[videoId] = { 
-            segments: [], 
-            timestamp: Date.now() 
-        };
-        this.saveCache();
+
+    } catch (err) {
+        console.warn("SponsorBlock error:", err.message);
         return [];
     }
 }
