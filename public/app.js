@@ -1,15 +1,19 @@
-// Módulo: Configuración y Variables Globales
+// =============================================
+// YT CrossMix - Spotify Effect Engine v2.0
+// =============================================
+
 const CONFIG = {
-    origin: window.location.origin, 
+    origin: window.location.origin,
     apiBase: "/search"
 };
-const CROSSFADE_DURATION = 15; 
+
+const CROSSFADE_DURATION = 12;
+
 let player1, player2;
 let currentPlayer = 1;
 
-window.playlistVideos = []; // Antes era: let playlistVideos = [];
-let playlistVideos = window.playlistVideos; // Referencia local para compatibilidad
-
+window.playlistVideos = [];
+let playlistVideos = window.playlistVideos;
 let manualVideos = [];
 let monitorInterval;
 let playersInitialized = false;
@@ -17,1282 +21,1559 @@ let youtubeAPIReady = false;
 let currentIndex = 0;
 let reproduccionIniciada = false;
 
-// Inicialización
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("🚀 Frontend en:", CONFIG.origin);
-    console.log("🔗 Conectando a Backend:", CONFIG.apiBase);
-    
-    // EXPORTAR FUNCIONES GLOBALES (Para que auth.js pueda usarlas)
-    window.updatePlaylistDOM = updatePlaylistDOM;
-    window.playNextVideo = playNextVideo;
-    window.currentIndex = currentIndex; // Por si acaso
-    
-    loadYouTubeAPI();
-    setupEventListeners();
-    setupCrossfader();
-    
-    // LÓGICA DE PESTAÑAS
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
+// =============================================
+// SPOTIFY COLOR EXTRACTOR - Paleta dinámica
+// =============================================
+class SpotifyColorEngine {
+    constructor() {
+        this.currentPalette = { primary: '#1DB954', dark: '#121212', text: '#fff' };
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+    }
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-
-            btn.classList.add('active');
-            const targetId = `tab-${btn.dataset.tab}`;
-            const targetContent = document.getElementById(targetId);
-            if (targetContent) targetContent.classList.add('active');
+    async extractFromThumbnail(thumbnailUrl) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                try {
+                    this.canvas.width = 50;
+                    this.canvas.height = 50;
+                    this.ctx.drawImage(img, 0, 0, 50, 50);
+                    const data = this.ctx.getImageData(0, 0, 50, 50).data;
+                    const palette = this.getDominantColors(data);
+                    resolve(palette);
+                } catch (e) {
+                    resolve(this.currentPalette);
+                }
+            };
+            img.onerror = () => resolve(this.currentPalette);
+            // Proxy para evitar CORS
+            img.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(thumbnailUrl)}`;
+            // Fallback directo
+            setTimeout(() => resolve(this.currentPalette), 3000);
         });
-    });
-});
-
-function mostrarMensajeFlotante(mensaje, duracion = 4000) {
-    let container = document.getElementById('mensaje-flotante-container');
-
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'mensaje-flotante-container';
-        container.style.position = 'fixed';
-        container.style.bottom = '20px';
-        container.style.left = '50%';
-        container.style.transform = 'translateX(-50%)';
-        container.style.zIndex = '1000';
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.gap = '8px';
-        document.body.appendChild(container);
     }
 
-    const mensajeDiv = document.createElement('div');
-    mensajeDiv.className = 'mensaje-flotante';
-    mensajeDiv.textContent = mensaje;
-
-    container.appendChild(mensajeDiv);
-
-    setTimeout(() => {
-        mensajeDiv.classList.add('fadeOut');
-
-        setTimeout(() => {
-            mensajeDiv.remove();
-        }, 500);
-    }, duracion);
-}
-window.mostrarMensajeFlotante = mostrarMensajeFlotante; // Exportar
-mostrarMensajeFlotante("¡Recomendamos instalar extencion : \n Amplificador de volumen - refuerzo de sonido \n SponsorBlock, para una mejor experiencia :)" );
-mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
-
-// Módulo: Carga del API de YouTube  
-function loadYouTubeAPI() {
-    if (youtubeAPIReady || window.YT) return;
-
-    youtubeAPIReady = true;
-
-    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        return;
-    }
-
-    const script = document.createElement('script');
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-
-    window.onYouTubeIframeAPIReady = () => {
-        console.log("✅ API de YouTube cargada");
-        initializePlayers();
-    };
-
-    document.head.appendChild(script);
-}
-
-function initializePlayers() {
-    if (player1 && player2) return;
-
-    const playerConfig = {
-        height: '100%',
-        width: '100%',
-        playerVars: {
-            'origin': window.location.origin,  
-            'enablejsapi': 1,
-            'controls': 1,
-            'rel': 0
-        },
-        events: {
-            'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
+    getDominantColors(data) {
+        const colorMap = {};
+        for (let i = 0; i < data.length; i += 16) {
+            const r = Math.floor(data[i] / 32) * 32;
+            const g = Math.floor(data[i+1] / 32) * 32;
+            const b = Math.floor(data[i+2] / 32) * 32;
+            const key = `${r},${g},${b}`;
+            colorMap[key] = (colorMap[key] || 0) + 1;
         }
-    };
+        const sorted = Object.entries(colorMap).sort((a, b) => b[1] - a[1]);
+        const dominant = sorted[0]?.[0]?.split(',').map(Number) || [29, 185, 84];
 
-    player1 = new YT.Player('player1', playerConfig);
-    player2 = new YT.Player('player2', playerConfig);
-    
-    // Exponer players globalmente para SponsorBlock
-    window.player1 = player1;
-    window.player2 = player2;
-}
-function onPlayerError(event) {
-    const errores = {
-        2: "ID de video no válido.",
-        5: "No se puede reproducir el video (posible restricción).",
-        100: "Video no encontrado.",
-        101: "El propietario no permite reproducción incrustada.",
-        150: "El propietario no permite reproducción incrustada."
-    };
+        const luminance = (0.299 * dominant[0] + 0.587 * dominant[1] + 0.114 * dominant[2]) / 255;
+        const isDark = luminance < 0.5;
 
-    const mensaje = errores[event.data] || "Error desconocido del reproductor.";
+        return {
+            primary: `rgb(${dominant[0]}, ${dominant[1]}, ${dominant[2]})`,
+            primaryDark: `rgb(${Math.floor(dominant[0]*0.6)}, ${Math.floor(dominant[1]*0.6)}, ${Math.floor(dominant[2]*0.6)})`,
+            text: isDark ? '#ffffff' : '#000000',
+            luminance
+        };
+    }
 
-    console.error("Error reproductor:", event.data, mensaje);
-    mostrarMensajeFlotante(mensaje);
+    applyPalette(palette) {
+        this.currentPalette = palette;
+        const root = document.documentElement;
 
-    if ([5, 101, 150].includes(event.data)) {
-        playNextVideo();
+        // Transición suave de colores como Spotify
+        root.style.setProperty('--spotify-accent', palette.primary);
+        root.style.setProperty('--spotify-accent-dark', palette.primaryDark || palette.primary);
+
+        const nowPlayingSection = document.getElementById('now-playing-bg');
+        if (nowPlayingSection) {
+            nowPlayingSection.style.background = `linear-gradient(180deg, ${palette.primary} 0%, #121212 100%)`;
+            nowPlayingSection.style.transition = 'background 1.5s ease';
+        }
+
+        const playerPanel = document.getElementById('player-panel');
+        if (playerPanel) {
+            playerPanel.style.background = `linear-gradient(160deg, ${palette.primaryDark || palette.primary}88 0%, #0a0a0a 60%)`;
+            playerPanel.style.transition = 'background 1.5s ease';
+        }
     }
 }
-//Verifica que monitorPlayers se llama correctamente cada 10 segundos:
-function onPlayerReady(event) {
-   // console.log(`Reproductor listo: player${currentPlayer}`);
-     //
-    if (player1 && player2) {
-        playersInitialized = true;
-       // console.log("Ambos reproductores están inicializados.");
+
+window.colorEngine = new SpotifyColorEngine();
+
+// =============================================
+// NOW PLAYING - Panel estilo Spotify
+// =============================================
+class NowPlayingManager {
+    constructor() {
+        this.currentVideo = null;
+        this.isLiked = false;
+        this.createNowPlayingUI();
     }
-}
-//Verificar si el usuario modifica la duración del video
-function onPlayerStateChange(event) {
-  if (event.data === YT.PlayerState.ENDED) {
-        console.log('Video finalizado.');
-        // Lógica existente de fin...
-    } else if (event.data === YT.PlayerState.PLAYING) {
-        console.log('Video en reproducción.');
-        
-        // === NUEVO: DISPARAR CARGA DE LETRAS Y RELACIONADOS ===
-        const player = event.target; // El reproductor que disparó el evento
-        const videoData = player.getVideoData();
-        
-        // Pequeño delay para asegurar que tenemos datos
-        setTimeout(() => {
-            if (window.lyricsManager) window.lyricsManager.loadLyricsForCurrentVideo(videoData);
-            if (window.relatedManager) window.relatedManager.loadRelatedForVideo(videoData);
+
+    createNowPlayingUI() {
+        // Crear el panel "Now Playing" flotante estilo Spotify
+        const panel = document.createElement('div');
+        panel.id = 'spotify-now-playing';
+        panel.innerHTML = `
+            <div id="now-playing-bg"></div>
+            <div class="np-artwork-container">
+                <div class="np-artwork-shadow"></div>
+                <img id="np-artwork" src="" alt="artwork" class="np-artwork">
+                <div class="np-artwork-overlay"></div>
+            </div>
+            <div class="np-info">
+                <div class="np-title-row">
+                    <div class="np-texts">
+                        <div id="np-title" class="np-title">Esperando canción...</div>
+                        <div id="np-artist" class="np-artist">Selecciona una playlist</div>
+                    </div>
+                    <button id="np-like-btn" class="np-action-btn" title="Me gusta">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+                <div class="np-progress-container">
+                    <span id="np-current-time" class="np-time">0:00</span>
+                    <div class="np-progress-bar" id="np-progress-bar">
+                        <div class="np-progress-fill" id="np-progress-fill"></div>
+                        <div class="np-progress-thumb" id="np-progress-thumb"></div>
+                    </div>
+                    <span id="np-total-time" class="np-time">0:00</span>
+                </div>
+                <div class="np-controls">
+                    <button class="np-ctrl-btn" id="np-shuffle-btn" title="Aleatorio">
+                        <i class="fas fa-random"></i>
+                    </button>
+                    <button class="np-ctrl-btn" id="np-prev-btn" title="Anterior">
+                        <i class="fas fa-step-backward"></i>
+                    </button>
+                    <button class="np-ctrl-btn np-play-btn" id="np-play-pause-btn" title="Play/Pause">
+                        <i class="fas fa-play" id="np-play-icon"></i>
+                    </button>
+                    <button class="np-ctrl-btn" id="np-next-btn" title="Siguiente">
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                    <button class="np-ctrl-btn" id="np-repeat-btn" title="Repetir">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+                <div class="np-volume-row">
+                    <i class="fas fa-volume-down np-vol-icon"></i>
+                    <div class="np-volume-bar" id="np-volume-bar">
+                        <div class="np-volume-fill" id="np-volume-fill" style="width:80%"></div>
+                        <div class="np-volume-thumb"></div>
+                    </div>
+                    <i class="fas fa-volume-up np-vol-icon"></i>
+                    <div class="np-crossfade-label">
+                        <i class="fas fa-water"></i>
+                        <span id="np-crossfade-val">${CROSSFADE_DURATION}s</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('player-panel').prepend(panel);
+        this.setupControls();
+        this.setupProgressBarScrubbing();
+        this.setupVolumeScrubbing();
+        this.startProgressUpdater();
+    }
+
+    update(video) {
+        this.currentVideo = video;
+        if (!video) return;
+
+        const title = document.getElementById('np-title');
+        const artist = document.getElementById('np-artist');
+        const artwork = document.getElementById('np-artwork');
+
+        if (title) {
+            title.textContent = video.title || 'Sin título';
+            // Scroll automático para títulos largos
+            if (video.title && video.title.length > 30) {
+                title.classList.add('scrolling-text');
+            } else {
+                title.classList.remove('scrolling-text');
+            }
+        }
+        if (artist) artist.textContent = video.artist || video.uploaderName || 'Artista desconocido';
+
+        const thumbUrl = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
+        if (artwork) {
+            // Animación de cambio de portada estilo Spotify
+            artwork.style.opacity = '0';
+            artwork.style.transform = 'scale(0.9) rotate(-2deg)';
+            setTimeout(() => {
+                artwork.src = thumbUrl;
+                artwork.onload = () => {
+                    artwork.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    artwork.style.opacity = '1';
+                    artwork.style.transform = 'scale(1) rotate(0deg)';
+                };
+            }, 200);
+        }
+
+        // Extraer colores de la portada
+        window.colorEngine.extractFromThumbnail(thumbUrl).then(palette => {
+            window.colorEngine.applyPalette(palette);
+        });
+    }
+
+    setupControls() {
+        document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
+            const player = currentPlayer === 1 ? player1 : player2;
+            if (!player) return;
+            const state = player.getPlayerState();
+            if (state === YT.PlayerState.PLAYING) {
+                player.pauseVideo();
+                document.getElementById('np-play-icon').className = 'fas fa-play';
+            } else {
+                player.playVideo();
+                document.getElementById('np-play-icon').className = 'fas fa-pause';
+            }
+        });
+
+        document.getElementById('np-next-btn')?.addEventListener('click', () => playNextVideo());
+        document.getElementById('np-prev-btn')?.addEventListener('click', () => playPrevVideo());
+
+        document.getElementById('np-shuffle-btn')?.addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            btn.classList.toggle('active');
+            if (btn.classList.contains('active')) {
+                shufflePlaylist();
+                mostrarMensajeFlotante('🔀 Modo aleatorio activado');
+            } else {
+                mostrarMensajeFlotante('Modo aleatorio desactivado');
+            }
+        });
+
+        let repeatMode = 0; // 0=off, 1=all, 2=one
+        document.getElementById('np-repeat-btn')?.addEventListener('click', (e) => {
+            repeatMode = (repeatMode + 1) % 3;
+            const btn = e.currentTarget;
+            const icon = btn.querySelector('i');
+            const modes = [
+                { class: '', icon: 'fa-redo', label: 'Repetición desactivada' },
+                { class: 'active', icon: 'fa-redo', label: '🔁 Repetir lista' },
+                { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
+            ];
+            btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
+            icon.className = `fas ${modes[repeatMode].icon}`;
+            window.repeatMode = repeatMode;
+            mostrarMensajeFlotante(modes[repeatMode].label);
+        });
+
+        document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
+            this.isLiked = !this.isLiked;
+            const icon = e.currentTarget.querySelector('i');
+            icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
+            icon.style.color = this.isLiked ? '#1DB954' : '';
+            mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
+        });
+    }
+
+    setupProgressBarScrubbing() {
+        const bar = document.getElementById('np-progress-bar');
+        if (!bar) return;
+        let isDragging = false;
+
+        bar.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            this.seekTo(e, bar);
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) this.seekTo(e, bar);
+        });
+        document.addEventListener('mouseup', () => { isDragging = false; });
+
+        bar.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            this.seekTo(e.touches[0], bar);
+        });
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging) this.seekTo(e.touches[0], bar);
+        });
+        document.addEventListener('touchend', () => { isDragging = false; });
+    }
+
+    seekTo(e, bar) {
+        const rect = bar.getBoundingClientRect();
+        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+        const pct = x / rect.width;
+        const player = currentPlayer === 1 ? player1 : player2;
+        if (player && player.getDuration) {
+            const duration = player.getDuration();
+            player.seekTo(pct * duration, true);
+        }
+    }
+
+    setupVolumeScrubbing() {
+        const bar = document.getElementById('np-volume-bar');
+        if (!bar) return;
+        let isDragging = false;
+        let currentVolume = 80;
+
+        const setVolume = (e) => {
+            const rect = bar.getBoundingClientRect();
+            const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            currentVolume = Math.round((x / rect.width) * 100);
+            document.getElementById('np-volume-fill').style.width = currentVolume + '%';
+            const player = currentPlayer === 1 ? player1 : player2;
+            if (player) player.setVolume(currentVolume);
+        };
+
+        bar.addEventListener('mousedown', (e) => { isDragging = true; setVolume(e); });
+        document.addEventListener('mousemove', (e) => { if (isDragging) setVolume(e); });
+        document.addEventListener('mouseup', () => { isDragging = false; });
+    }
+
+    startProgressUpdater() {
+        setInterval(() => {
+            const player = currentPlayer === 1 ? player1 : player2;
+            if (!player || !player.getCurrentTime) return;
+            try {
+                const current = player.getCurrentTime();
+                const duration = player.getDuration();
+                if (!duration || isNaN(current)) return;
+
+                const pct = (current / duration) * 100;
+                const fill = document.getElementById('np-progress-fill');
+                const thumb = document.getElementById('np-progress-thumb');
+                if (fill) fill.style.width = pct + '%';
+                if (thumb) thumb.style.left = pct + '%';
+
+                document.getElementById('np-current-time').textContent = formatDuration(Math.floor(current));
+                document.getElementById('np-total-time').textContent = formatDuration(Math.floor(duration));
+
+                // Actualizar estado play/pause
+                const state = player.getPlayerState();
+                const icon = document.getElementById('np-play-icon');
+                if (icon) {
+                    icon.className = state === YT.PlayerState.PLAYING ? 'fas fa-pause' : 'fas fa-play';
+                }
+            } catch (e) {}
         }, 500);
-        console.log('Video en reproducción.');
-    } else if (event.data === YT.PlayerState.PAUSED) {
-        console.log('Video en pausa.');
     }
 }
-// Nueva función para mostrar resultados de la API de Piped Y YT V3
+
+window.nowPlayingManager = null; // Se inicializa en DOMContentLoaded
+
+// =============================================
+// SMART SEARCH - Búsqueda inteligente al estilo Spotify
+// =============================================
+class SmartSearch {
+    constructor() {
+        this.genres = [
+            { name: 'Pop', icon: '🎵', query: 'pop hits 2024' },
+            { name: 'Rock', icon: '🎸', query: 'rock classics' },
+            { name: 'Hip-Hop', icon: '🎤', query: 'hip hop rap 2024' },
+            { name: 'Electronic', icon: '🎛️', query: 'electronic dance music' },
+            { name: 'Jazz', icon: '🎷', query: 'jazz music' },
+            { name: 'Reggaeton', icon: '🌴', query: 'reggaeton 2024' },
+            { name: 'R&B', icon: '🎙️', query: 'rnb soul music' },
+            { name: 'Classical', icon: '🎻', query: 'classical music orchestra' },
+            { name: 'Lo-fi', icon: '🌙', query: 'lofi hip hop chill beats' },
+            { name: 'Metal', icon: '⚡', query: 'heavy metal rock' },
+            { name: 'Latin', icon: '💃', query: 'latin pop music 2024' },
+            { name: 'K-Pop', icon: '🌸', query: 'kpop 2024' }
+        ];
+        this.recentSearches = JSON.parse(localStorage.getItem('ytcm_recent_searches') || '[]');
+        this.searchHistory = [];
+        this.setupSmartUI();
+    }
+
+    setupSmartUI() {
+        const searchPanel = document.getElementById('search-panel');
+        if (!searchPanel) return;
+
+        // Añadir géneros rápidos
+        const genresContainer = document.createElement('div');
+        genresContainer.id = 'genres-grid';
+        genresContainer.innerHTML = `
+            <div class="genres-title">Explora por género</div>
+            <div class="genres-chips">
+                ${this.genres.map(g => `
+                    <button class="genre-chip" data-query="${g.query}">
+                        <span class="genre-icon">${g.icon}</span>
+                        <span>${g.name}</span>
+                    </button>
+                `).join('')}
+            </div>
+        `;
+        searchPanel.insertBefore(genresContainer, document.getElementById('resultsContainer'));
+
+        // Añadir sugerencias de búsqueda recientes
+        this.renderRecentSearches();
+
+        // Eventos de géneros
+        genresContainer.querySelectorAll('.genre-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const query = chip.dataset.query;
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.value = query;
+                performSearch(query);
+                // Marcar chip activo
+                genresContainer.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+    }
+
+    renderRecentSearches() {
+        const existing = document.getElementById('recent-searches');
+        if (existing) existing.remove();
+        if (this.recentSearches.length === 0) return;
+
+        const container = document.createElement('div');
+        container.id = 'recent-searches';
+        container.innerHTML = `
+            <div class="recent-title">
+                <span>Búsquedas recientes</span>
+                <button id="clear-recent" class="clear-btn">Limpiar</button>
+            </div>
+            <div class="recent-chips">
+                ${this.recentSearches.slice(0, 6).map(q => `
+                    <button class="recent-chip" data-query="${q}">
+                        <i class="fas fa-history"></i> ${q}
+                    </button>
+                `).join('')}
+            </div>
+        `;
+        const resultsContainer = document.getElementById('resultsContainer');
+        if (resultsContainer) resultsContainer.before(container);
+
+        container.querySelectorAll('.recent-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const q = chip.dataset.query;
+                document.getElementById('searchInput').value = q;
+                performSearch(q);
+            });
+        });
+
+        document.getElementById('clear-recent')?.addEventListener('click', () => {
+            this.recentSearches = [];
+            localStorage.removeItem('ytcm_recent_searches');
+            this.renderRecentSearches();
+        });
+    }
+
+    saveSearch(query) {
+        if (!query || query.length < 2) return;
+        this.recentSearches = [query, ...this.recentSearches.filter(q => q !== query)].slice(0, 10);
+        localStorage.setItem('ytcm_recent_searches', JSON.stringify(this.recentSearches));
+        this.renderRecentSearches();
+    }
+}
+
+window.smartSearch = null; // Se inicializa en DOMContentLoaded
+
+// =============================================
+// DISPLAY DE RESULTADOS - Estilo Spotify Cards
+// =============================================
 function displaySearchResultsPiped(results = []) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
 
     if (!Array.isArray(results) || results.length === 0) {
-        resultsDiv.innerHTML = '<p>No se encontraron resultados.</p>';
-        mostrarMensajeFlotante("No se encontraron resultados.");
+        resultsDiv.innerHTML = `
+            <div class="no-results-spotify">
+                <i class="fas fa-search"></i>
+                <p>No se encontraron resultados</p>
+                <small>Intenta con otra búsqueda</small>
+            </div>`;
         return;
     }
 
     const fragment = document.createDocumentFragment();
 
     results.forEach((video, index) => {
-        if (!video?.videoId) {
-            console.warn(`Video inválido en índice ${index}`, video);
-            return;
-        }
+        if (!video?.videoId) return;
 
         const el = document.createElement('div');
-        el.className = 'result';
+        el.className = 'result-spotify';
         el.dataset.videoId = video.videoId;
+        el.style.animationDelay = `${index * 0.05}s`;
+
+        const duration = typeof video.duration === 'number'
+            ? formatDuration(video.duration)
+            : (video.duration || '');
 
         el.innerHTML = `
-            <img src="https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg">
-            <div class="video-info">
-                <h4>${video.title || "Sin título"}</h4>
-                <button class="add-video">Agregar</button>
+            <div class="result-num">${index + 1}</div>
+            <div class="result-thumb-container">
+                <img src="https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg"
+                     onerror="this.src='https://i.ytimg.com/vi/${video.videoId}/default.jpg'"
+                     alt="${video.title || ''}">
+                <div class="result-play-overlay">
+                    <i class="fas fa-play"></i>
+                </div>
             </div>
+            <div class="result-info">
+                <div class="result-title">${video.title || 'Sin título'}</div>
+                <div class="result-artist">${video.artist || video.uploaderName || 'Desconocido'}</div>
+            </div>
+            <div class="result-duration">${duration}</div>
+            <button class="result-add-btn" title="Añadir a cola">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="result-play-now-btn" title="Reproducir ahora">
+                <i class="fas fa-play-circle"></i>
+            </button>
         `;
+
+        // Añadir a cola
+        el.querySelector('.result-add-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            addToPlaylist(video);
+        });
+
+        // Reproducir ahora (insertar siguiente)
+        el.querySelector('.result-play-now-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            insertAndPlayNow(video);
+        });
+
+        // Click en la fila: añadir a cola
+        el.addEventListener('click', () => addToPlaylist(video));
 
         fragment.appendChild(el);
     });
 
     resultsDiv.appendChild(fragment);
 }
-// Módulo: Búsqueda
 
-const performSearch = async (query) => {
-  const resultsContainer = document.getElementById('results'); 
-    if (!resultsContainer) return;
-
-    resultsContainer.innerHTML = '<div class="loading">Buscando en servidor remoto...</div>';
-    
-    if (!window.youtubeJSClient) { 
-        resultsContainer.innerHTML = '<div class="error">Error: Cliente no inicializado.</div>';
-        return;
-    }
-
-    try {
-        const data = await window.youtubeJSClient.search(query);
-        
-        if (!data.items || data.items.length === 0) {
-            resultsContainer.innerHTML = '<div class="no-results">No se encontraron resultados</div>';
-            return;
-        }
-
-        displaySearchResultsPiped(data.items);
-    } catch (error) {
-        console.error("Error:", error);
-        resultsContainer.innerHTML = `<div class="error">Error de conexión: ${error.message}</div>`;
-    }
-};
-// Módulo: Manejo de la Playlist (Añadir, Eliminar, Reordenar, Actualizar DOM)
-//Agregar a la playlist
-const addToPlaylist = (videoData) => {
-    // **VALIDACIÓN EXHAUSTIVA DE LOS DATOS**
-    if (!videoData || !videoData.videoId) {
-        console.error("Error: Datos de video inválidos:", videoData);
-        mostrarMensajeFlotante("Error al añadir el video. Datos inválidos.");
-        return; // Salir de la función si los datos son inválidos
-    }
-    const videoObject = {
-        videoId: videoData.videoId,
-        title: videoData.title || "Título no disponible", // Valor por defecto si no hay título
-        thumbnail: videoData.thumbnail || 'https://via.placeholder.com/100x75/0000FF/FFFFFF/?text=No+Thumbnail', // Placeholder si no hay miniatura
-        duration: parseDuration(videoData.duration) || 0, // 0 si la duración no es válida
-        manual: true,
-    };
-    // Verificar si el video ya está en la playlist
-    const isDuplicate = playlistVideos.some(video => video.videoId === videoObject.videoId);
-    if (isDuplicate) {
-        mostrarMensajeFlotante("Este video ya está en la playlist.");
-        return; // No agregar duplicados
-    }
-    playlistVideos.splice(currentIndex + 1, 0, videoObject);
-    manualVideos.push(videoObject);
-    mostrarMensajeFlotante(`Video añadido: ${videoObject.title}`); // Mostrar el título (o "Título no disponible")
-    console.log(`Video añadido desde búsqueda: ${videoObject.title}`);
-    updatePlaylistDOM();
-};
-// Función para eliminar un video de la playlist
-function deleteVideo(videoId) {
-    const videoIndex = playlistVideos.findIndex((video) => video.videoId === videoId);
-
-    if (videoIndex !== -1) {
-       mostrarMensajeFlotante(`Video: ${playlistVideos[videoIndex].title} eliminado`);
-        console.log(`Eliminando video: ${playlistVideos[videoIndex].title}`);
-
-        // Verificar si es un video añadido manualmente
-        const isManual = playlistVideos[videoIndex].manual;
-
-        // Eliminar de la playlist principal
-        playlistVideos.splice(videoIndex, 1);
-
-        // Si es manual, también eliminarlo de manualVideos
-        if (isManual) {
-            manualVideos = manualVideos.filter((video) => video.videoId !== videoId);
-        }
-        // Ajustar el índice actual si afecta la reproducción
-        if (currentIndex >= videoIndex) {
-            currentIndex = Math.max(0, currentIndex - 1);
-        }
-
-        updatePlaylistDOM();
-    } else {
-        console.error('El video no fue encontrado en la lista.');
-    }
-}
-function rearrangePlaylist(fromIndex, toIndex) { // Eliminar la función duplicada
-    if (fromIndex === toIndex) return;
-
-    const [movedVideo] = playlistVideos.splice(fromIndex, 1);
-    playlistVideos.splice(toIndex, 0, movedVideo);
-} 
-//Actualizar DOM   
+// =============================================
+// QUEUE DISPLAY - Lista estilo Spotify
+// =============================================
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
     if (!playlistContainer) return;
-    
     playlistContainer.innerHTML = '';
 
-    window.playlistVideos.forEach((video, index) => { // Usar window.playlistVideos
+    if (window.playlistVideos.length === 0) {
+        playlistContainer.innerHTML = `
+            <div class="queue-empty">
+                <i class="fas fa-music"></i>
+                <p>Tu cola está vacía</p>
+                <small>Busca canciones o añade una playlist</small>
+            </div>`;
+        return;
+    }
+
+    // Header de cola
+    const header = document.createElement('div');
+    header.className = 'queue-header';
+    header.innerHTML = `
+        <span class="queue-count">${window.playlistVideos.length} canciones</span>
+        <button class="queue-clear-btn" onclick="clearPlaylist()">
+            <i class="fas fa-trash-alt"></i> Limpiar
+        </button>
+    `;
+    playlistContainer.appendChild(header);
+
+    // "Reproduciendo ahora" - canción actual destacada
+    if (currentIndex >= 0 && window.playlistVideos[currentIndex]) {
+        const nowSection = document.createElement('div');
+        nowSection.className = 'queue-section-label';
+        nowSection.textContent = 'Reproduciendo ahora';
+        playlistContainer.appendChild(nowSection);
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    window.playlistVideos.forEach((video, index) => {
         const item = document.createElement('div');
-        item.className = 'playlist-item';
+        item.className = 'queue-item' + (index === currentIndex ? ' queue-item--playing' : '');
         item.draggable = true;
+        item.dataset.index = index;
 
-        const imageContainer = document.createElement('div');
-        imageContainer.className = 'image-container';
+        const isPlaying = index === currentIndex;
+        const duration = formatDuration(video.duration || 0);
 
-        const img = document.createElement('img');
-        img.src = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
-        img.alt = video.title;
-        img.className = 'drag-handle';
-        
-        img.onerror = () => {
-            img.src = 'https://via.placeholder.com/100x75?text=No+Img';
-        };
-        
-        imageContainer.appendChild(img);
-
-        // Icono de reproducción
-        if (index === currentIndex) {
-            item.classList.add('playing');
-            const icon = document.createElement('i');
-            icon.className = 'fas fa-play playing-icon'; // Corregido clase icono
-            icon.style.cssText = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-shadow: 0 0 5px black;";
-            imageContainer.appendChild(icon);
-        }
-
-        item.appendChild(imageContainer);
-        
-        // Info del video
-        const infoDiv = document.createElement('div');
-        infoDiv.style.flex = "1";
-        infoDiv.innerHTML = `
-            <p style="margin: 0; font-size: 12px; font-weight: bold;">${video.title}</p>
-            <p style="margin: 0; font-size: 10px; color: #555;">Duración: ${formatDuration(video.duration)}</p>
+        item.innerHTML = `
+            <div class="queue-item-left">
+                ${isPlaying
+                    ? '<div class="queue-playing-indicator"><span></span><span></span><span></span></div>'
+                    : `<span class="queue-num">${index + 1}</span>`
+                }
+            </div>
+            <div class="queue-thumb-wrap">
+                <img src="${video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`}"
+                     alt="${video.title}"
+                     onerror="this.src='https://i.ytimg.com/vi/${video.videoId}/default.jpg'">
+                ${!isPlaying ? '<div class="queue-hover-play"><i class="fas fa-play"></i></div>' : ''}
+            </div>
+            <div class="queue-info">
+                <div class="queue-title ${isPlaying ? 'queue-title--active' : ''}">${video.title}</div>
+                <div class="queue-artist">${video.artist || video.uploaderName || ''}</div>
+            </div>
+            <div class="queue-duration">${duration}</div>
+            <button class="queue-delete-btn" data-id="${video.videoId}" title="Eliminar">
+                <i class="fas fa-times"></i>
+            </button>
         `;
-        item.appendChild(infoDiv);
 
-        // Menú borrar
-        const deleteMenu = document.createElement('div');
-        deleteMenu.innerHTML = `<button class="delete-button" onclick="deleteVideo('${video.videoId}')"><i class="fas fa-trash"></i></button>`;
-        item.appendChild(deleteMenu);
+        // Sección "A continuación"
+        if (index === currentIndex + 1) {
+            const nextSection = document.createElement('div');
+            nextSection.className = 'queue-section-label';
+            nextSection.textContent = 'A continuación';
+            fragment.appendChild(nextSection);
+        }
 
         // Click para reproducir
         item.addEventListener('click', (e) => {
-            if (!e.target.closest('button')) { // Evitar click si se pulsa borrar
-                currentIndex = index;
-                const player = currentPlayer === 1 ? player1 : player2;
-                playVideo(video.videoId, player);
-                updatePlaylistDOM();
-            }
+            if (e.target.closest('.queue-delete-btn')) return;
+            currentIndex = index;
+            const player = currentPlayer === 1 ? player1 : player2;
+            playVideo(video.videoId, player);
+            updatePlaylistDOM();
+            if (window.nowPlayingManager) window.nowPlayingManager.update(video);
         });
 
-        playlistContainer.appendChild(item);
+        // Eliminar
+        item.querySelector('.queue-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteVideo(video.videoId);
+        });
+
+        fragment.appendChild(item);
     });
-    
+
+    playlistContainer.appendChild(fragment);
     enableDragAndDrop();
-    
-    // Actualizar estado del botón iniciar
+
+    // Scroll al elemento actual
+    const currentItem = playlistContainer.querySelector('.queue-item--playing');
+    if (currentItem) {
+        setTimeout(() => currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+
+    // Actualizar botón iniciar
     const iniciarBtn = document.getElementById('iniciarButton');
-    if (iniciarBtn) {
-        iniciarBtn.disabled = window.playlistVideos.length === 0;
-    }
+    if (iniciarBtn) iniciarBtn.disabled = window.playlistVideos.length === 0;
 }
-// Estilos CSS (Modificados para el icono y el estilo)
-const style3 = document.createElement('style');
-style3.textContent = `
-    /* ... (otros estilos) */
-    .playlist-item {
-        display: flex; /* Para alinear el contenedor de imagen y el resto del contenido */
-        align-items: center;
-        padding: 0.5rem;
-        border-bottom: 1px solid #ddd;
-        cursor: pointer;
-        position: relative; /* Para posicionar el icono absolutamente */
+
+// =============================================
+// ACCIONES DE PLAYLIST
+// =============================================
+function clearPlaylist() {
+    if (!confirm('¿Limpiar toda la cola?')) return;
+    window.playlistVideos.length = 0;
+    manualVideos = [];
+    currentIndex = 0;
+    reproduccionIniciada = false;
+    updatePlaylistDOM();
+    mostrarMensajeFlotante('Cola limpiada');
+}
+
+function shufflePlaylist() {
+    const current = window.playlistVideos[currentIndex];
+    const rest = window.playlistVideos.filter((_, i) => i !== currentIndex);
+    for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    window.playlistVideos.length = 0;
+    window.playlistVideos.push(current, ...rest);
+    currentIndex = 0;
+    updatePlaylistDOM();
+    mostrarMensajeFlotante('🔀 Lista mezclada');
+}
+
+function insertAndPlayNow(videoData) {
+    if (!videoData?.videoId) return;
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || 'Sin título',
+        thumbnail: videoData.thumbnail || `https://i.ytimg.com/vi/${videoData.videoId}/mqdefault.jpg`,
+        duration: parseDuration(videoData.duration) || 0,
+        artist: videoData.artist || videoData.uploaderName || '',
+        manual: true
+    };
+
+    // Insertar en posición siguiente
+    window.playlistVideos.splice(currentIndex + 1, 0, videoObject);
+    updatePlaylistDOM();
+    playNextVideo();
+    mostrarMensajeFlotante(`▶️ Reproduciendo: ${videoObject.title}`);
+}
+
+const addToPlaylist = (videoData) => {
+    if (!videoData?.videoId) {
+        mostrarMensajeFlotante('⚠️ Error: datos de video inválidos');
+        return;
+    }
+    const videoObject = {
+        videoId: videoData.videoId,
+        title: videoData.title || 'Sin título',
+        thumbnail: videoData.thumbnail || `https://i.ytimg.com/vi/${videoData.videoId}/mqdefault.jpg`,
+        duration: parseDuration(videoData.duration) || 0,
+        artist: videoData.artist || videoData.uploaderName || '',
+        manual: true
+    };
+
+    const isDuplicate = window.playlistVideos.some(v => v.videoId === videoObject.videoId);
+    if (isDuplicate) {
+        mostrarMensajeFlotante('Este video ya está en la cola');
+        return;
     }
 
-    .image-container {
-        position: relative; /* Para posicionar el icono absolutamente dentro del contenedor */
-        margin-right: 0.5rem;
-    }
+    window.playlistVideos.splice(currentIndex + 1, 0, videoObject);
+    manualVideos.push(videoObject);
+    mostrarMensajeFlotante(`✅ Añadido: ${videoObject.title}`);
+    updatePlaylistDOM();
+};
 
-    .playing-icon {
-        position: absolute;
-        top: 55px; /* Ajustar posición vertical */
-        left: 5px; /* Ajustar posición horizontal */
-        color: #007bff;
-        font-size: 1.2em;
-    }
+function deleteVideo(videoId) {
+    const idx = window.playlistVideos.findIndex(v => v.videoId === videoId);
+    if (idx === -1) return;
+    const title = window.playlistVideos[idx].title;
+    window.playlistVideos.splice(idx, 1);
+    manualVideos = manualVideos.filter(v => v.videoId !== videoId);
+    if (currentIndex >= idx && currentIndex > 0) currentIndex--;
+    updatePlaylistDOM();
+    mostrarMensajeFlotante(`Eliminado: ${title}`);
+}
 
-    .playlist-item.playing {
-        border: 2px dashed #007bff;
-        background-color: #e0f2f7;
-    }
-    .playlist-item.playing img{
-        border: 2px solid #007bff;
-    }
+function rearrangePlaylist(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    const [moved] = window.playlistVideos.splice(fromIndex, 1);
+    window.playlistVideos.splice(toIndex, 0, moved);
+    if (currentIndex === fromIndex) currentIndex = toIndex;
+    else if (fromIndex < currentIndex && toIndex >= currentIndex) currentIndex--;
+    else if (fromIndex > currentIndex && toIndex <= currentIndex) currentIndex++;
+}
 
-    /* ... (otros estilos) */
-`;
-document.head.appendChild(style3);
-// CSS adicional para mejorar la experiencia de arrastre
-const style = document.createElement('style');
-style.innerHTML = `
-    .playlist-item {
-        user-select: none; /* Evitar la selección de texto */
-    }
-    .drag-handle {
-        cursor: move; /* Cambiar el cursor al arrastrar */
-    }
-`;
-document.head.appendChild(style);
-// Añadimos eventos para manejar el arrastre y reorganizar los elementos de la lista de reproducción.
+// =============================================
+// DRAG AND DROP - Mejorado
+// =============================================
 function enableDragAndDrop() {
-    const playlistContainer = document.getElementById('playlist');
-    let draggedItemIndex = null;
+    const container = document.getElementById('playlist');
+    if (!container) return;
+    let draggedIndex = null;
+    let draggedEl = null;
 
-    playlistContainer.addEventListener('dragstart', (event) => {
-        const item = event.target.closest('.playlist-item');
+    container.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.queue-item');
         if (!item) return;
-
-        draggedItemIndex = Array.from(playlistContainer.children).indexOf(item);
+        draggedIndex = parseInt(item.dataset.index);
+        draggedEl = item;
         item.classList.add('dragging');
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/html', item.innerHTML);
+        e.dataTransfer.effectAllowed = 'move';
     });
 
-    playlistContainer.addEventListener('dragend', (event) => {
-        const item = event.target.closest('.playlist-item');
-        if (!item) return;
-
-        item.classList.remove('dragging');
+    container.addEventListener('dragend', () => {
+        draggedEl?.classList.remove('dragging');
+        container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        draggedEl = null;
     });
 
-    playlistContainer.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        const item = event.target.closest('.playlist-item');
-        if (!item || item.classList.contains('dragging')) return;
-
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const item = e.target.closest('.queue-item');
+        if (!item || item === draggedEl) return;
+        container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         item.classList.add('drag-over');
     });
 
-    playlistContainer.addEventListener('dragleave', (event) => {
-        const item = event.target.closest('.playlist-item');
-        if (!item) return;
-
-        item.classList.remove('drag-over');
-    });
-
-    playlistContainer.addEventListener('drop', (event) => {
-        event.preventDefault();
-        const droppedItem = event.target.closest('.playlist-item');
-        if (!droppedItem || droppedItem.classList.contains('dragging')) return;
-
-        const droppedItemIndex = Array.from(playlistContainer.children).indexOf(droppedItem);
-        rearrangePlaylist(draggedItemIndex, droppedItemIndex);
-
-        // Actualizar el DOM
+    container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const target = e.target.closest('.queue-item');
+        if (!target || draggedIndex === null) return;
+        const toIndex = parseInt(target.dataset.index);
+        rearrangePlaylist(draggedIndex, toIndex);
         updatePlaylistDOM();
     });
 }
 
-// Módulo: Carga de Playlist, miniaturas desde URL, cache
-// Función para extraer el ID de la playlist de una URL de YouTube
-function extractPlaylistId(url) {
-    try {
-        if (!url.includes('http') && url.length > 10) return url.trim();
-        const urlObj = new URL(url);
-        if (urlObj.searchParams.has('list')) return urlObj.searchParams.get('list');
-        return null;
-    } catch (e) {
-        return url.length > 10 ? url.trim() : null;
-    }
-}
-// Obtener información de la playlist
-async function getPlaylistInfo(playlistId) {
-    try {
-        const url = `${CONFIG.apiBase}?id=${playlistId}`; 
-        console.log("Solicitando playlist remota:", url);
-        
-        const response = await fetch(url, { mode: 'cors' });
-        if (!response.ok) throw new Error(`Error API: ${response.status}`);
-        
-        const data = await response.json();
+// =============================================
+// REPRODUCCIÓN Y CROSSFADE
+// =============================================
+function loadYouTubeAPI() {
+    if (youtubeAPIReady || window.YT) return;
+    youtubeAPIReady = true;
+    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) return;
 
-        return {
-            items: data.items || [],
-            name: data.metadata?.title || "Playlist Importada", // Recuperamos el título
-            relatedStreams: null // Compatibilidad si la usabas antes
-        };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
 
-    } catch (error) {
-        console.error("❌ Error playlist:", error);
-        alert("Error al cargar la lista. Verifica que el servidor yt-mix esté activo.");
-        return null; // Devuelve null en error para que la validación falle correctamente
-    }
-}
-//Función para obtener miniaturas 
-async function obtenerMiniaturas(videoIds) {
-  const apiKey = obtenerClaveAPI(); // Obtiene la clave de API actual
-  //  Divide el arreglo de IDs en grupos de 50 (límite de la API)
-  const gruposDeIds = chunkArray(videoIds, 50);
-
-  const miniaturas = {};
-
-  for (const grupoDeIds of gruposDeIds) {
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${grupoDeIds.join(',')}&key=${apiKey}`;
-
-    try {
-      const response = await fetch(url);
-      const data = await response.json();
-
-      if (data.items) {
-        data.items.forEach(video => {
-          const videoId = video.id;
-          const thumbnails = video.snippet.thumbnails;
-
-          miniaturas[videoId] = thumbnails;
-        });
-      }
-    } catch (error) {
-      console.error('Error al obtener miniaturas:', error);
-    }
-  }
-
-  return miniaturas;
+    window.onYouTubeIframeAPIReady = () => {
+        console.log('✅ YouTube API cargada');
+        initializePlayers();
+    };
+    document.head.appendChild(script);
 }
 
-// Función auxiliar para dividir un arreglo en grupos
-function chunkArray(array, size) {
-  const chunkedArray = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunkedArray.push(array.slice(i, i + size));
-  }
-  return chunkedArray;
-}
-// Utiliza las miniaturas almacenadas en caché
-async function mostrarMiniaturas(videoIds) {
-  // Obtén las miniaturas almacenadas en caché
-  const miniaturasCache = JSON.parse(localStorage.getItem('miniaturas')) || {};
-
-  // Obtén las IDs de los videos que no están en caché
-  const idsSinCache = videoIds.filter(id => !miniaturasCache[id]);
-
-  // Si hay IDs sin caché, obtén las miniaturas de la API
-  if (idsSinCache.length > 0) {
-    const nuevasMiniaturas = await obtenerMiniaturas(idsSinCache);
-    // Actualiza el caché con las nuevas miniaturas
-    Object.assign(miniaturasCache, nuevasMiniaturas);
-  }
-
-  // Muestra las miniaturas
-  videoIds.forEach(videoId => {
-    const thumbnails = miniaturasCache[videoId];
-    if (thumbnails) {
-      // Muestra las miniaturas del video
-      console.log(`Miniaturas para ${videoId}:`, thumbnails);
-      // ... (código para mostrar las miniaturas en tu aplicación)
-    } else {
-      console.error(`No se encontraron miniaturas para ${videoId}`);
-    }
-  });
-}
-
-//  Mostrar playlist
-function displayPlaylist(playlist) {
-    if (!playlist || !playlist.items || !Array.isArray(playlist.items)) {
-        console.error('Error: La playlist no contiene videos válidos.');
-        alert('No se encontraron videos válidos en la playlist.');
-        return;
-    }
-    
-    const playlistHeader = document.getElementById('playlist-panel').querySelector('h2');
-    if (playlistHeader && playlist.metadata?.title) {
-        playlistHeader.textContent = playlist.metadata.title;
-    }
-
-    // ✅ MAPEAR CON THUMBNAILS REALES
-    const loadedVideos = playlist.items.map((video) => {
-        if (!video.videoId) {
-            console.warn('Video sin videoId:', video);
-            return null;
+function initializePlayers() {
+    if (player1 && player2) return;
+    const cfg = {
+        height: '100%', width: '100%',
+        playerVars: { origin: window.location.origin, enablejsapi: 1, controls: 0, rel: 0, modestbranding: 1 },
+        events: {
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange,
+            onError: onPlayerError
         }
-
-        // ✅ USAR THUMBNAIL REAL DEL API
-        const thumbnail = video.thumbnail || 
-                         `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`;
-
-        return {
-            videoId: video.videoId,
-            title: video.title || 'Sin título',
-            thumbnail: thumbnail, // ✅ THUMBNAIL REAL
-            duration: parseDuration(video.duration) || 0,
-            manual: false,
-        };
-    }).filter(v => v !== null);
-
-    playlistVideos = [...loadedVideos, ...manualVideos];
-    console.log(`✅ Playlist cargada con ${loadedVideos.length} videos`);
-    
-    if (loadedVideos.length > 0) {
-        mostrarMensajeFlotante(`Playlist añadida: ${loadedVideos.length} videos`);
-    }
-    
-    updatePlaylistDOM();
+    };
+    player1 = new YT.Player('player1', cfg);
+    player2 = new YT.Player('player2', cfg);
+    window.player1 = player1;
+    window.player2 = player2;
 }
 
-// Módulo: Reproducción y Crossfade
-// Función para reproducir un video
+function onPlayerReady() {
+    if (player1 && player2) {
+        playersInitialized = true;
+        console.log('✅ Ambos reproductores listos');
+    }
+}
+
+function onPlayerError(event) {
+    const errores = {
+        2: 'ID de video inválido.',
+        5: 'Restricción de reproducción.',
+        100: 'Video no encontrado.',
+        101: 'Incrustación no permitida.',
+        150: 'Incrustación no permitida.'
+    };
+    const msg = errores[event.data] || 'Error del reproductor';
+    mostrarMensajeFlotante(`⚠️ ${msg} - Siguiente video...`);
+    if ([5, 100, 101, 150].includes(event.data)) setTimeout(() => playNextVideo(), 1500);
+}
+
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.PLAYING) {
+        const videoData = event.target.getVideoData();
+        const icon = document.getElementById('np-play-icon');
+        if (icon) icon.className = 'fas fa-pause';
+
+        setTimeout(() => {
+            if (window.lyricsManager) window.lyricsManager.loadLyricsForCurrentVideo(videoData);
+            if (window.relatedManager) window.relatedManager.loadRelatedForVideo(videoData);
+        }, 600);
+
+        // Actualizar Now Playing con datos del video actual
+        if (window.nowPlayingManager && currentIndex < window.playlistVideos.length) {
+            window.nowPlayingManager.update(window.playlistVideos[currentIndex]);
+        }
+    } else if (event.data === YT.PlayerState.PAUSED) {
+        const icon = document.getElementById('np-play-icon');
+        if (icon) icon.className = 'fas fa-play';
+    }
+}
+
 function playVideo(videoId, player) {
     player.loadVideoById(videoId);
 }
-function playNextVideo() {
-    if (currentIndex < playlistVideos.length - 1) {
-        currentIndex++;
-        
-        // ⚠️ IMPORTANTE: NO resetear window.crossfadeTriggered aquí.
-        // Lo haremos al final de la transición para evitar saltos dobles.
-        
-        const currentPlayerElement = document.getElementById(`player${currentPlayer}`);
-        const nextPlayer = currentPlayer === 1 ? player2 : player1;
-        const nextPlayerElement = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        const nextVideoId = playlistVideos[currentIndex].videoId;
-        
-        console.log(`▶️ Reproduciendo siguiente video: ${playlistVideos[currentIndex].title}`);
-        
-        nextPlayer.loadVideoById(nextVideoId);
-        
-        // Precarga de SponsorBlock
-        if (window.sponsorBlockManager && nextVideoId) {
-            window.sponsorBlockManager.cargarSegmentos(nextVideoId).then(segments => {
-                if (segments.length > 0) {
-                    console.log(`✅ ${segments.length} segmentos SB cargados`);
-                }
-            }).catch(() => {});
-        }
 
+function playPrevVideo() {
+    if (currentIndex > 0) {
+        currentIndex--;
+        const player = currentPlayer === 1 ? player1 : player2;
+        const video = window.playlistVideos[currentIndex];
+        if (video) {
+            playVideo(video.videoId, player);
+            if (window.nowPlayingManager) window.nowPlayingManager.update(video);
+        }
         updatePlaylistDOM();
-
-        // Efectos visuales (Crossfade visual)
-        currentPlayerElement.classList.add('fade-out');
-        nextPlayerElement.classList.remove('hidden');
-        nextPlayerElement.classList.add('fade-in');
-
-        // Esperar a que termine la transición visual (1.5s)
-        setTimeout(() => {
-            currentPlayerElement.classList.add('hidden');
-            currentPlayerElement.classList.remove('fade-out');
-            nextPlayerElement.classList.remove('fade-in');
-
-            // Cambio oficial del reproductor activo
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-
-            // ✅ AQUÍ es donde se debe permitir el siguiente salto
-            window.crossfadeTriggered = false; 
-
-            crossfadeAudio();
-        }, 1500);
     } else {
-        console.log('Fin de la lista de reproducción.');
-        askToRepeatPlaylist();
+        // Reiniciar canción actual
+        const player = currentPlayer === 1 ? player1 : player2;
+        player?.seekTo(0, true);
     }
 }
 
-function crossfadeAudio() {
-    const previousPlayer = currentPlayer === 1 ? player2 : player1;
-    const nextPlayer = currentPlayer === 1 ? player1 : player2;
+function playNextVideo() {
+    const list = window.playlistVideos;
 
-    let progress = 0; // De 0 a 1
-    const durationMs = CROSSFADE_DURATION * 1000;
-    const intervalMs = 100;
-    const steps = durationMs / intervalMs;
-    const increment = 1 / steps;
-
-    const crossfadeInterval = setInterval(() => {
-        progress += increment;
-
-        // Curva Logarítmica/Potencia Constante
-        // El volumen se calcula como el cuadrado del progreso para una transición suave
-        const outVolume = Math.cos(progress * 0.5 * Math.PI) * 100;
-        const inVolume = Math.sin(progress * 0.5 * Math.PI) * 100;
-
-        if (previousPlayer && typeof previousPlayer.setVolume === 'function') {
-            previousPlayer.setVolume(Math.max(0, outVolume));
-        }
-        if (nextPlayer && typeof nextPlayer.setVolume === 'function') {
-            nextPlayer.setVolume(Math.min(100, inVolume));
-        }
-
-        if (progress >= 1) {
-            clearInterval(crossfadeInterval);
-            if (previousPlayer && typeof previousPlayer.pauseVideo === 'function') {
-                previousPlayer.pauseVideo();
-            }
-        }
-    }, intervalMs);
-}
-
-//Agregar gestión de repetición de playlist
-function askToRepeatPlaylist() {
-    const repeat = confirm('¿Desea repetir la playlist?');
-    if (repeat) {
-        currentIndex = 0;
-        playFirstVideo();
-    } else {
-        stopMonitoring(); // Detener el monitoreo
-       mostrarMensajeFlotante("Gracias por utilizar :) !");
-        console.log("Gracias por utilizar.");
-    }
-}
-function playFirstVideo() {
-    if (!playersInitialized) {
-        console.error('Los reproductores no están completamente inicializados.');
+    // Modo repetir uno
+    if (window.repeatMode === 2) {
+        const player = currentPlayer === 1 ? player1 : player2;
+        player?.seekTo(0, true);
+        player?.playVideo();
         return;
     }
 
-    if (playlistVideos.length > 0) {
-        const firstVideoId = playlistVideos[currentIndex].videoId;
-        console.log('Reproduciendo el primer video:', firstVideoId);
-
-        player1.loadVideoById(firstVideoId);
-        document.getElementById('player1').classList.remove('hidden');
-        document.getElementById('player2').classList.add('hidden');
-
-        // ✅ PRECARGAR SEGMENTOS SPONSORBLOCK
-        if (window.sponsorBlockManager && firstVideoId) {
-            window.sponsorBlockManager.cargarSegmentos(firstVideoId).then(segments => {
-                if (segments.length > 0) {
-                    console.log(`✅ ${segments.length} segmentos SponsorBlock precargados`);
-                }
-            }).catch(() => {});
-        }
-
-        startMonitoring();
+    if (currentIndex < list.length - 1) {
+        currentIndex++;
+    } else if (window.repeatMode === 1) {
+        // Repetir lista
+        currentIndex = 0;
+    } else {
+        askToRepeatPlaylist();
+        return;
     }
+
+    const currentEl = document.getElementById(`player${currentPlayer}`);
+    const nextPlayerNum = currentPlayer === 1 ? 2 : 1;
+    const nextPlayerObj = currentPlayer === 1 ? player2 : player1;
+    const nextEl = document.getElementById(`player${nextPlayerNum}`);
+    const nextVideoId = list[currentIndex].videoId;
+
+    nextPlayerObj.loadVideoById(nextVideoId);
+
+    // Precargar SponsorBlock
+    if (window.sponsorBlockManager) {
+        window.sponsorBlockManager.cargarSegmentos(nextVideoId).catch(() => {});
+    }
+
+    // Actualizar Now Playing inmediatamente con fade
+    if (window.nowPlayingManager) window.nowPlayingManager.update(list[currentIndex]);
+
+    updatePlaylistDOM();
+
+    // Transición visual cruzada
+    currentEl.classList.add('fade-out');
+    nextEl.classList.remove('hidden');
+    nextEl.classList.add('fade-in');
+
+    setTimeout(() => {
+        currentEl.classList.add('hidden');
+        currentEl.classList.remove('fade-out');
+        nextEl.classList.remove('fade-in');
+        currentPlayer = nextPlayerNum;
+        window.crossfadeTriggered = false;
+        crossfadeAudio();
+    }, 1500);
 }
-// Módulo: Monitoreo de Reproductores
+
+function crossfadeAudio() {
+    const prevPlayer = currentPlayer === 1 ? player2 : player1;
+    const nextPlayer = currentPlayer === 1 ? player1 : player2;
+    let progress = 0;
+    const steps = (CROSSFADE_DURATION * 1000) / 100;
+    const increment = 1 / steps;
+
+    const interval = setInterval(() => {
+        progress += increment;
+        const outVol = Math.cos(progress * 0.5 * Math.PI) * 100;
+        const inVol = Math.sin(progress * 0.5 * Math.PI) * 100;
+
+        prevPlayer?.setVolume?.(Math.max(0, outVol));
+        nextPlayer?.setVolume?.(Math.min(100, inVol));
+
+        if (progress >= 1) {
+            clearInterval(interval);
+            prevPlayer?.pauseVideo?.();
+            nextPlayer?.setVolume?.(100);
+        }
+    }, 100);
+}
+
+// =============================================
+// MONITOR DE REPRODUCTORES
+// =============================================
 function startMonitoring() {
     if (!monitorInterval) {
-        monitorInterval = setInterval(monitorPlayers, 500); 
-        console.log('Monitoreo iniciado (0.5s).');
+        monitorInterval = setInterval(monitorPlayers, 500);
     }
 }
+
 function stopMonitoring() {
     if (monitorInterval) {
         clearInterval(monitorInterval);
         monitorInterval = null;
-        console.log('Monitoreo detenido.');
     }
 }
+
 function monitorPlayers() {
     if (typeof YT === 'undefined' || !player1 || !player2 || !playersInitialized) return;
 
     const currentPlayerInstance = currentPlayer === 1 ? player1 : player2;
     if (!currentPlayerInstance?.getPlayerState) return;
-    
-    const playerState = currentPlayerInstance.getPlayerState();
-    if (playerState !== YT.PlayerState.PLAYING) return;
-    
+
+    const state = currentPlayerInstance.getPlayerState();
+    if (state !== YT.PlayerState.PLAYING) return;
+
     let videoId, currentTime, duration;
     try {
-        const videoData = currentPlayerInstance.getVideoData();
-        videoId = videoData ? videoData.video_id : null;
+        const data = currentPlayerInstance.getVideoData();
+        videoId = data?.video_id;
         currentTime = currentPlayerInstance.getCurrentTime();
         duration = currentPlayerInstance.getDuration();
     } catch (e) { return; }
-    
-    if (!videoId || isNaN(duration) || duration <= 0) return;
-    
-    // SponsorBlock
-    if (window.sponsorBlockManager) {
-        if (window.sponsorBlockManager.checkAndSkip(currentPlayerInstance)) return;
-    }
 
-    // Cálculo del tiempo de disparo
+    if (!videoId || isNaN(duration) || duration <= 0) return;
+
+    // SponsorBlock
+    if (window.sponsorBlockManager?.checkAndSkip(currentPlayerInstance)) return;
+
+    // Tiempo de crossfade
     let triggerTime;
-    if (window.sponsorBlockManager && videoId) {
+    if (window.sponsorBlockManager) {
         triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(duration, videoId, CROSSFADE_DURATION);
     } else {
         triggerTime = duration - CROSSFADE_DURATION;
     }
 
-    // Debug log cada 5s
-    if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime) !== window.lastLogTime) {
-        window.lastLogTime = Math.floor(currentTime);
-        console.log(`⏱️ Player${currentPlayer} | ${currentTime.toFixed(1)}/${duration.toFixed(1)}s | Trigger: ${triggerTime.toFixed(1)}s`);
-    }
-
-    // ✅ DISPARAR CROSSFADE (Lógica corregida)
     if (currentTime >= triggerTime && !window.crossfadeTriggered) {
-        window.crossfadeTriggered = true; // Bloquea inmediatamente
-        console.log(`🔀 CROSSFADE! (${currentTime.toFixed(1)}s >= ${triggerTime.toFixed(1)}s)`);
+        window.crossfadeTriggered = true;
         playNextVideo();
-        // Ya NO necesitamos el setTimeout aquí para resetear la bandera
     }
 }
-// Módulo: Manejo de Eventos y Botones
-function setupEventListeners() {
-    // Botón Mix
-    const mixBtn = document.getElementById('mixButton');
-    if (mixBtn) {
-        mixBtn.addEventListener('click', () => playNextVideo());
+
+// =============================================
+// PLAYLIST LOADING
+// =============================================
+function extractPlaylistId(url) {
+    try {
+        if (!url.includes('http') && url.length > 10) return url.trim();
+        const urlObj = new URL(url);
+        return urlObj.searchParams.get('list') || null;
+    } catch (e) {
+        return url.length > 10 ? url.trim() : null;
+    }
+}
+
+async function getPlaylistInfo(playlistId) {
+    try {
+        const res = await fetch(`${CONFIG.apiBase}?id=${playlistId}`, { mode: 'cors' });
+        if (!res.ok) throw new Error(`Error API: ${res.status}`);
+        const data = await res.json();
+        return { items: data.items || [], name: data.metadata?.title || 'Playlist importada' };
+    } catch (e) {
+        console.error('Error playlist:', e);
+        mostrarMensajeFlotante('❌ Error al cargar la playlist');
+        return null;
+    }
+}
+
+function displayPlaylist(playlist) {
+    if (!playlist?.items?.length) {
+        mostrarMensajeFlotante('No se encontraron videos en la playlist');
+        return;
     }
 
-    // Búsqueda por palabras
+    const loaded = playlist.items.map(video => {
+        if (!video.videoId) return null;
+        return {
+            videoId: video.videoId,
+            title: video.title || 'Sin título',
+            thumbnail: video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+            duration: parseDuration(video.duration) || 0,
+            artist: video.artist || video.uploaderName || '',
+            manual: false
+        };
+    }).filter(Boolean);
+
+    window.playlistVideos.push(...loaded);
+    playlistVideos = window.playlistVideos;
+
+    mostrarMensajeFlotante(`✅ Añadidas ${loaded.length} canciones a la cola`);
+    updatePlaylistDOM();
+}
+
+function playFirstVideo() {
+    if (!playersInitialized || window.playlistVideos.length === 0) return;
+
+    const video = window.playlistVideos[currentIndex];
+    player1.loadVideoById(video.videoId);
+    document.getElementById('player1').classList.remove('hidden');
+    document.getElementById('player2').classList.add('hidden');
+
+    if (window.nowPlayingManager) window.nowPlayingManager.update(video);
+
+    if (window.sponsorBlockManager) {
+        window.sponsorBlockManager.cargarSegmentos(video.videoId).catch(() => {});
+    }
+    startMonitoring();
+}
+
+function askToRepeatPlaylist() {
+    mostrarMensajeFlotante('✅ Fin de la lista');
+    stopMonitoring();
+}
+
+// =============================================
+// BÚSQUEDA
+// =============================================
+const performSearch = async (query) => {
+    const resultsContainer = document.getElementById('results');
+    if (!resultsContainer) return;
+
+    if (window.smartSearch) window.smartSearch.saveSearch(query);
+
+    resultsContainer.innerHTML = `
+        <div class="search-loading">
+            <div class="search-loading-spinner"></div>
+            <span>Buscando "${query}"...</span>
+        </div>`;
+
+    if (!window.youtubeJSClient) {
+        resultsContainer.innerHTML = '<div class="no-results-spotify"><p>Cliente no inicializado</p></div>';
+        return;
+    }
+
+    try {
+        const data = await window.youtubeJSClient.search(query);
+        if (!data.items?.length) {
+            resultsContainer.innerHTML = `
+                <div class="no-results-spotify">
+                    <i class="fas fa-search"></i>
+                    <p>Sin resultados para "${query}"</p>
+                </div>`;
+            return;
+        }
+        displaySearchResultsPiped(data.items);
+    } catch (e) {
+        resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Error: ${e.message}</p></div>`;
+    }
+};
+
+// =============================================
+// UTILIDADES
+// =============================================
+function formatDuration(duration) {
+    if (isNaN(duration) || duration < 0) return '0:00';
+    const h = Math.floor(duration / 3600);
+    const m = Math.floor((duration % 3600) / 60);
+    const s = Math.floor(duration % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function parseDuration(d) {
+    if (typeof d === 'number') return d;
+    if (typeof d !== 'string') return 0;
+    if (d.includes(':')) {
+        const parts = d.split(':').map(Number);
+        if (parts.length === 2) return parts[0] * 60 + parts[1];
+        if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    const m = d.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!m) return 0;
+    return (parseInt(m[1])||0)*3600 + (parseInt(m[2])||0)*60 + (parseInt(m[3])||0);
+}
+
+function debounce(fn, delay) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+function mostrarMensajeFlotante(mensaje, duracion = 3500) {
+    let container = document.getElementById('mensaje-flotante-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'mensaje-flotante-container';
+        Object.assign(container.style, {
+            position: 'fixed', bottom: '20px', left: '50%',
+            transform: 'translateX(-50%)', zIndex: '9999',
+            display: 'flex', flexDirection: 'column', gap: '8px',
+            pointerEvents: 'none'
+        });
+        document.body.appendChild(container);
+    }
+
+    const div = document.createElement('div');
+    div.className = 'spotify-toast';
+    div.textContent = mensaje;
+    container.appendChild(div);
+
+    requestAnimationFrame(() => div.classList.add('toast-visible'));
+
+    setTimeout(() => {
+        div.classList.remove('toast-visible');
+        setTimeout(() => div.remove(), 400);
+    }, duracion);
+}
+window.mostrarMensajeFlotante = mostrarMensajeFlotante;
+
+// =============================================
+// SETUP DE EVENTOS
+// =============================================
+function setupEventListeners() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
-        searchInput.addEventListener('input', (event) => {
-            const query = event.target.value.trim();
-            if (query.length > 0) {
-                debouncedSearch(query);
-            } else {
-                const results = document.getElementById('results');
-                if (results) results.innerHTML = '';
+        const debouncedSearch = debounce(performSearch, 350);
+        searchInput.addEventListener('input', (e) => {
+            const q = e.target.value.trim();
+            if (q.length > 1) debouncedSearch(q);
+            else {
+                document.getElementById('results').innerHTML = '';
+                // Mostrar géneros cuando no hay query
+                document.getElementById('genres-grid')?.style.setProperty('display', 'block');
+            }
+        });
+        // Enter para buscar
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const q = e.target.value.trim();
+                if (q) performSearch(q);
             }
         });
     }
 
-    // Evento para el botón "Añadir URL"
-    const añadirUrlBtn = document.getElementById('añadirUrlButton');
-    const searchInput2 = document.getElementById('searchInput2');
-    if (añadirUrlBtn && searchInput2) {
-        añadirUrlBtn.addEventListener('click', async () => {
-            const url = searchInput2.value.trim();
-            const playlistId = extractPlaylistId(url);
+    // Botón añadir URL playlist
+    document.getElementById('añadirUrlButton')?.addEventListener('click', async () => {
+        const input = document.getElementById('searchInput2');
+        const url = input?.value.trim();
+        const playlistId = extractPlaylistId(url);
 
-            if (!playlistId) {
-                alert('URL de la playlist no válida.');
-                return;
-            }
+        if (!playlistId) {
+            mostrarMensajeFlotante('⚠️ URL de playlist no válida');
+            return;
+        }
 
-                const playlistInfo = await getPlaylistInfo(playlistId);
-               if (playlistInfo && (playlistInfo.items || playlistInfo.relatedStreams)) {
-                displayPlaylist(playlistInfo);
-                searchInput2.value = '';
-                    const iniciarBtn = document.getElementById('iniciarButton');
-                    if (iniciarBtn) {
-                iniciarBtn.disabled = false; // Esto permite que el usuario le de clic tras cargar la playlist
-                iniciarBtn.style.opacity = "1"; // Opcional: para que se vea activo visualmente
-                }
-                    mostrarMensajeFlotante("Playlist añadida.");
-            } else {
-                alert('No se pudo obtener información de la playlist.');
-            }
-        });
-    }
+        mostrarMensajeFlotante('⏳ Cargando playlist...');
+        const info = await getPlaylistInfo(playlistId);
+        if (info?.items?.length) {
+            displayPlaylist(info);
+            if (input) input.value = '';
+            document.getElementById('iniciarButton').disabled = false;
+        } else {
+            mostrarMensajeFlotante('❌ No se pudo cargar la playlist');
+        }
+    });
 
-    // Iniciar botón
-  const iniciarBtn = document.getElementById('iniciarButton');
+    // Botón iniciar
+    const iniciarBtn = document.getElementById('iniciarButton');
     if (iniciarBtn) {
-        iniciarBtn.disabled = true; 
+        iniciarBtn.disabled = true;
         iniciarBtn.addEventListener('click', () => {
-            // Usamos la variable para evitar múltiples inicios
-            if (playlistVideos.length > 0 && !reproduccionIniciada) {
+            if (window.playlistVideos.length > 0 && !reproduccionIniciada) {
                 reproduccionIniciada = true;
                 currentIndex = 0;
                 if (playersInitialized) {
                     playFirstVideo();
-                    mostrarMensajeFlotante(`Iniciando con video: ${playlistVideos[currentIndex].title}`);
+                } else {
+                    // Reintentar cuando estén listos
+                    const check = setInterval(() => {
+                        if (playersInitialized) {
+                            clearInterval(check);
+                            playFirstVideo();
+                        }
+                    }, 200);
                 }
                 iniciarBtn.disabled = true;
             }
         });
     }
-}
 
-function setupCrossfader() {
-    console.log("Crossfader configurado a:", CROSSFADE_DURATION, "segundos");
-}
+    // Botón Mix (aleatorio)
+    document.getElementById('mixButton')?.addEventListener('click', () => {
+        shufflePlaylist();
+        if (reproduccionIniciada) playNextVideo();
+    });
 
-// Carga inicial del API de YouTube (se puede retrasar con DOMContentLoaded si se desea)
-loadYouTubeAPI();
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            const target = document.getElementById(`tab-${btn.dataset.tab}`);
+            if (target) target.classList.add('active');
+        });
+    });
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const searchInput = document.getElementById('searchInput');
-    if(searchInput) {
-        searchInput.disabled = true;
-        searchInput.placeholder = "Iniciando sistema...";
-    }
-    if (window.youtubeJSClient) {
-        await window.youtubeJSClient.init();
-        console.log('✅ YouTube Client inicializado');
-        
-        // 3. Habilitar búsqueda ahora que es seguro
-        if(searchInput) {
-            searchInput.disabled = false;
-            searchInput.placeholder = "Search";
+    // Soporte teclado global
+    document.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        if (e.code === 'Space') {
+            e.preventDefault();
+            document.getElementById('np-play-pause-btn')?.click();
         }
-    }
-});
-//Debounce para la busqueda
-function debounce(func, delay) {
-    let timeoutId;
-    return function (...args) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-            func.apply(this, args);
-        }, delay);
-    };
+        if (e.code === 'ArrowRight') playNextVideo();
+        if (e.code === 'ArrowLeft') playPrevVideo();
+    });
 }
-const debouncedSearch = debounce(performSearch, 300); // 300ms de retraso
-// Estilos CSS (con la nueva ubicación del mensaje)
-const style2 = document.createElement('style');
-style2.textContent = `
-    /* ... (tus otros estilos) */
-    .mensaje-flotante {
-        margin-top: 25px; /* Espacio entre la playlist y el mensaje */
-        background-color: rgba(32, 96, 187, 0.7);
-        color: white;
-        padding: 10px 30px;
-        border: 2px dashed white;
-        border-radius: 5px;
-        text-align: center; /* Centrar el texto */
-        opacity: 1;
-        transition: opacity 1s ease-in-out;
-    }
-    .mensaje-flotante.fadeOut {
-        opacity: 0;
-    }
-    /* ... (otros estilos) */
-`;
-document.head.appendChild(style2);
-//Funciones de formato de tiempo
-function formatDuration(duration) {
-    if (isNaN(duration) || duration < 0) {
-        return "Desconocida";
-    }
 
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds;
-    return `${minutes}:${formattedSeconds}`;
-}
-function parseDuration(durationString) {
-    if (typeof durationString === 'number') {
-        return durationString;
-    }
-    if (typeof durationString !== 'string') return 0;
-    
-    // ✅ Manejar formato MM:SS o HH:MM:SS
-    if (durationString.includes(':')) {
-        const parts = durationString.split(':').map(Number);
-        if (parts.length === 2) {
-            // MM:SS
-            return parts[0] * 60 + parts[1];
-        } else if (parts.length === 3) {
-            // HH:MM:SS
-            return parts[0] * 3600 + parts[1] * 60 + parts[2];
-        }
-    }
-    
-    // Formato ISO 8601 (PT1M30S)
-    const match = durationString.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-    if (!match) return 0;
-    const hours = parseInt(match[1]) || 0;
-    const minutes = parseInt(match[2]) || 0;
-    const seconds = parseInt(match[3]) || 0;
-    return hours * 3600 + minutes * 60 + seconds;
-}
 // =============================================
-// GESTOR DE LETRAS OPTIMIZADO (Con Caché y Paralelismo)
+// LETRAS MEJORADAS
 // =============================================
 class LyricsManager {
     constructor() {
         this.currentLrc = [];
         this.syncInterval = null;
         this.activeLineIndex = -1;
-        this.cache = new Map(); // Sistema de caché rápido en memoria
+        this.cache = new Map();
     }
 
     cleanData(video) {
-        let rawArtist = video.artist || video.uploaderName || video.author || '';
-        let rawTitle = video.title || '';
-        let duration = 0;
-
-        if (typeof video.duration === 'number') duration = video.duration;
-        else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
-        
-        let artist = rawArtist.replace(/VEVO$/i, '')
-            .replace(/([a-z])([A-Z])/g, '$1 $2') 
-            .replace(/([a-z])y([A-Z])/gi, '$1 y $2')
-            .replace(/\s*-\s*Topic$/i, '')
-            .replace(/Official/i, '').trim();
-
-        let title = rawTitle.replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '')
-            .replace(/^\s*\|\s*/, '').trim();
+        let artist = (video.artist || video.uploaderName || video.author || '')
+            .replace(/VEVO$/i, '').replace(/\s*-\s*Topic$/i, '').replace(/Official/i, '').trim();
+        let title = (video.title || '')
+            .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '').trim();
 
         if (title.includes(' - ')) {
-            const parts = title.split(' - ');
-            if (parts[0].trim().toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
-                artist = parts[0].trim();
-                title = parts[1].trim();
+            const [p0, p1] = title.split(' - ');
+            if (p0.toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
+                artist = p0.trim(); title = p1.trim();
             }
         }
-
         title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
         artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&|y\s)/i)[0].trim();
 
-        return { artist: artist.trim(), title: title.trim(), duration: Math.round(duration) };
+        let duration = 0;
+        if (typeof video.duration === 'number') duration = video.duration;
+        else if (typeof video.duration === 'string') duration = parseDuration(video.duration);
+
+        return { artist, title, duration: Math.round(duration) };
     }
 
     async loadLyricsForCurrentVideo(video) {
         const container = document.getElementById('lyricsContent');
         if (!container) return;
-
         this.stopSync();
+
         const clean = this.cleanData(video);
         const cacheKey = `${clean.artist}-${clean.title}`.toLowerCase();
 
-        // 1. Mostrar estado de carga solo si no está en caché
         if (!this.cache.has(cacheKey)) {
-            container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando letras...</p></div>';
+            container.innerHTML = `
+                <div class="lyrics-loading">
+                    <div class="lyrics-spinner"></div>
+                    <p>Buscando letra de "${clean.title}"...</p>
+                </div>`;
         }
 
         try {
-            // 2. Obtener de caché o disparar búsqueda paralela
             const data = await this.getOrFetchLyrics(clean, cacheKey);
+            if (!data) throw new Error('Sin datos');
             this.renderLyricsUI(data, clean.artist, clean.title);
-            
-            // 3. Disparar precarga oculta para la siguiente canción
-            this.prefetchNextLyrics();
-            
+            this.prefetchNext();
         } catch (e) {
-            console.warn("[LyricsManager] No se encontraron letras:", e.message);
-            container.innerHTML = `<div class="empty-state"><p>No se encontraron letras.</p><small>${clean.title}</small></div>`;
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-music" style="opacity:0.3"></i>
+                    <p>Letra no disponible</p>
+                    <small>${clean.title}</small>
+                </div>`;
         }
     }
 
-  async getOrFetchLyrics(clean, cacheKey) {
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
+    async getOrFetchLyrics(clean, cacheKey) {
+        if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
         try {
-            // Mandamos llamar a lrclib y a nuestro sistema de respaldos ('fallback') al mismo tiempo
             const data = await Promise.any([
-                this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
-                this.fetchLyrics('fallback', clean.artist, clean.title, 0)
+                this.fetchFromOracle(clean),
+                this.fetchFromLrclib(clean)
             ]);
-            
-            this.cache.set(cacheKey, data);
+            if (data) this.cache.set(cacheKey, data);
             return data;
-        } catch (aggregateError) {
-            throw new Error("Ambas APIs fallaron");
+        } catch {
+            throw new Error('Todos los proveedores fallaron');
         }
     }
 
-async fetchLyrics(provider, artist, title, duration) {
-    // 1. Obtener el ID del video actual
-    const activePlayer = (window.currentPlayer === 1) ? window.player1 : window.player2;
-    let videoId = null;
-    try {
-        if (activePlayer && typeof activePlayer.getVideoData === 'function') {
-            videoId = activePlayer.getVideoData().video_id;
-        }
-    } catch (e) { console.error("Error obteniendo ID"); }
+    async fetchFromOracle(clean) {
+        const activePlayer = currentPlayer === 1 ? player1 : player2;
+        let videoId = null;
+        try { videoId = activePlayer?.getVideoData()?.video_id; } catch {}
+        if (!videoId) throw new Error('Sin videoId');
 
-    if (!videoId) return null;
+        const ctrl = new AbortController();
+        setTimeout(() => ctrl.abort(), 7000);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de espera
-
-    try {
-        // PRIORIDAD: Tu servidor de Oracle
-        const myOracleIp = `http://150.230.81.137:5000/get-lyrics?id=${videoId}`;
-        console.log(`[Lyrics] Consultando Oracle para ID: ${videoId}`);
-        
-        const res = await fetch(myOracleIp, { signal: controller.signal });
+        const res = await fetch(`http://150.230.81.137:5000/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
         const data = await res.json();
-
-        if (data.status === "success" && data.data) {
-            console.log(`[Lyrics] Éxito desde Oracle (Fuente: ${data.source})`);
-            return {
-                syncedLyrics: data.data,
-                plainLyrics: data.data.replace(/\[.*?\]/g, ''),
-                provider: 'ORACLE_CLOUD'
-            };
-        }
-        throw new Error("No encontrado en Oracle");
-
-    } catch (e) {
-        console.warn("[Lyrics] Oracle falló o no tiene la letra, usando LRCLIB de respaldo...");
-        
-        // RESPALDO: LRCLIB Directo (Plan B)
-        try {
-            const safeQuery = encodeURIComponent(`${artist} ${title}`);
-            const resLrc = await fetch(`https://lrclib.net/api/search?q=${safeQuery}`);
-            const dataLrc = await resLrc.json();
-            
-            if (dataLrc && dataLrc.length > 0) {
-                const best = dataLrc[0];
-                return {
-                    syncedLyrics: best.syncedLyrics,
-                    plainLyrics: best.plainLyrics,
-                    provider: 'LRCLIB_BACKUP'
-                };
-            }
-        } catch (err) {
-            console.error("[Lyrics] Todos los proveedores fallaron");
-        }
-    } finally {
-        clearTimeout(timeoutId);
+        if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
+        return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
     }
-    return null;
-}
 
-  prefetchNextLyrics() {
-        if (typeof window.currentIndex !== 'undefined' && window.playlistVideos && window.playlistVideos.length > window.currentIndex + 1) {
-            const nextVideo = window.playlistVideos[window.currentIndex + 1];
-            const clean = this.cleanData(nextVideo);
-            const cacheKey = `${clean.artist}-${clean.title}`.toLowerCase();
-            
-            if (!this.cache.has(cacheKey)) {
-                Promise.any([
-                    this.fetchLyrics('lrclib', clean.artist, clean.title, clean.duration),
-                    this.fetchLyrics('fallback', clean.artist, clean.title, 0)
-                ]).then(data => {
-                    this.cache.set(cacheKey, data);
-                    console.log(`[LyricsManager] ⚡ Precarga exitosa para la próxima canción: ${clean.title}`);
-                }).catch(() => {}); 
-            }
+    async fetchFromLrclib(clean) {
+        const q = encodeURIComponent(`${clean.artist} ${clean.title}`);
+        const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
+        const data = await res.json();
+        if (!data?.length) throw new Error('LRCLIB: no encontrado');
+        const best = data[0];
+        return {
+            syncedLyrics: best.syncedLyrics,
+            plainLyrics: best.plainLyrics,
+            provider: 'LRCLib'
+        };
+    }
+
+    prefetchNext() {
+        const next = window.playlistVideos[currentIndex + 1];
+        if (!next) return;
+        const clean = this.cleanData(next);
+        const key = `${clean.artist}-${clean.title}`.toLowerCase();
+        if (!this.cache.has(key)) {
+            this.getOrFetchLyrics(clean, key).catch(() => {});
         }
     }
 
     renderLyricsUI(data, artist, title) {
-    const container = document.getElementById('lyricsContent');
-    if (!container) return;
+        const container = document.getElementById('lyricsContent');
+        if (!container) return;
 
-    // Detectar si la letra es sincronizada (formato [00:00.00])
-    const isSynced = data.syncedLyrics && data.syncedLyrics.includes('[');
-    container.innerHTML = '';
+        const isSynced = data.syncedLyrics?.includes('[');
+        container.innerHTML = '';
 
-    let html = `
-        <div class="lyrics-header" style="margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px;">
-            <strong style="display:block; font-size: 1.2em; color: #fff;">${this.escapeHTML(title)}</strong>
-            <small style="color:#aaa;">${this.escapeHTML(artist)}</small>
-            <div style="font-size: 0.7em; color: #555; margin-top: 5px;">SERVER: ${data.provider}</div>
-        </div>
-        <div class="lyrics-text ${isSynced ? 'synced' : 'plain'}">
-    `;
+        container.innerHTML = `
+            <div class="lyrics-header">
+                <div style="flex:1">
+                    <strong style="display:block;font-size:1.1em;color:#fff">${this.escape(title)}</strong>
+                    <small style="color:#aaa">${this.escape(artist)}</small>
+                </div>
+                <span class="lyrics-source-badge">${data.provider}</span>
+            </div>
+            <div class="lyrics-body ${isSynced ? 'synced' : 'plain'}">
+                ${isSynced ? this.renderSynced(data.syncedLyrics) : this.renderPlain(data.plainLyrics)}
+            </div>
+        `;
 
-    if (isSynced) {
-        this.currentLrc = this.parseLRC(data.syncedLyrics);
-        html += this.currentLrc.map(line => 
-            `<p data-time="${line.time}" class="lyric-line">${this.escapeHTML(line.text) || '🎵'}</p>`
-        ).join('');
-        this.startSync();
-    } else {
-        html += `<div class="plain-text">${data.plainLyrics.replace(/\n/g, '<br>')}</div>`;
+        if (isSynced) this.startSync();
     }
 
-    html += '</div>';
-    container.innerHTML = html;
-}
+    renderSynced(lrc) {
+        this.currentLrc = this.parseLRC(lrc);
+        return this.currentLrc.map(line =>
+            `<p class="lyric-line" data-time="${line.time}">${this.escape(line.text) || '♪'}</p>`
+        ).join('');
+    }
+
+    renderPlain(text) {
+        return `<div class="plain-lyrics">${(text || '').replace(/\n/g, '<br>')}</div>`;
+    }
 
     startSync() {
         this.stopSync();
         this.activeLineIndex = -1;
         this.syncInterval = setInterval(() => {
-            const player = (currentPlayer === 1) ? player1 : player2;
-            if (!player || typeof player.getCurrentTime !== 'function') return;
-            
-            const time = player.getCurrentTime();
-            const lines = document.querySelectorAll('.lyrics-text.synced p');
-            
-            let newIndex = -1;
-            if (this.currentLrc.length > 0) {
-                for (let i = 0; i < this.currentLrc.length; i++) {
-                    if (time >= this.currentLrc[i].time) newIndex = i;
-                    else break; 
-                }
+            const p = currentPlayer === 1 ? player1 : player2;
+            if (!p?.getCurrentTime) return;
+            const time = p.getCurrentTime();
+            const lines = document.querySelectorAll('.lyrics-body.synced .lyric-line');
+            let newIdx = -1;
+            for (let i = 0; i < this.currentLrc.length; i++) {
+                if (time >= this.currentLrc[i].time) newIdx = i;
+                else break;
             }
-
-            if (newIndex !== this.activeLineIndex && newIndex !== -1 && lines[newIndex]) {
-                if (this.activeLineIndex !== -1 && lines[this.activeLineIndex]) {
-                    lines[this.activeLineIndex].classList.remove('active');
-                }
-                lines[newIndex].classList.add('active');
-                
-                // Reducido el comportamiento de scroll para que no trabe el dispositivo
-                lines[newIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                this.activeLineIndex = newIndex;
+            if (newIdx !== this.activeLineIndex && newIdx >= 0 && lines[newIdx]) {
+                lines[this.activeLineIndex]?.classList.remove('active');
+                lines[newIdx].classList.add('active');
+                lines[newIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                this.activeLineIndex = newIdx;
             }
         }, 100);
     }
 
     stopSync() {
         if (this.syncInterval) clearInterval(this.syncInterval);
+        this.syncInterval = null;
     }
 
     parseLRC(lrc) {
-        if(!lrc) return [];
-        const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+        if (!lrc) return [];
         return lrc.split('\n').map(line => {
-            const m = line.match(regex);
+            const m = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
             if (!m) return null;
             return {
                 time: parseInt(m[1])*60 + parseInt(m[2]) + parseFloat('0.'+m[3]),
                 text: m[4].trim()
             };
-        }).filter(x => x);
+        }).filter(Boolean);
     }
-    
-    escapeHTML(str) {
-        if(!str) return '';
-        return str.replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t]));
+
+    escape(s) {
+        if (!s) return '';
+        return s.replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[t] || t));
     }
 }
 
-// Inicializar
-window.lyricsManager = new LyricsManager();
 // =============================================
-// GESTOR DE RELACIONADOS (RelatedManager)
+// RELACIONADOS MEJORADOS
 // =============================================
 class RelatedManager {
-    constructor() {
-        this.lastId = null;
-    }
+    constructor() { this.lastId = null; }
 
     async loadRelatedForVideo(video) {
         const container = document.getElementById('relatedVideosList');
         if (!container || !video.video_id) return;
-
-        if (this.lastId === video.video_id) return; // Ya cargado
+        if (this.lastId === video.video_id) return;
         this.lastId = video.video_id;
 
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Buscando recomendaciones...</p></div>';
+        container.innerHTML = `
+            <div class="related-loading">
+                <div class="related-spinner"></div>
+                <p>Buscando recomendaciones...</p>
+            </div>`;
 
         try {
-            // Usamos el cliente de YouTube existente para buscar
-            // Estrategia: Buscar "Artista + Titulo" para obtener mix similar
-            let query = video.author ? `${video.author} ${video.title}` : video.title;
-            query = query.replace(/[\(\[].*?[\)\]]/g, ''); // Limpiar query
+            let query = `${video.author || ''} ${video.title || ''}`.replace(/[\(\[].*?[\)\]]/g, '').trim();
+            const data = await window.youtubeJSClient.search(query);
+            if (!data.items?.length) throw new Error('Sin resultados');
 
-            const results = await window.youtubeJSClient.search(query);
-            
-            if (!results.items || results.items.length === 0) throw new Error('No results');
-
-            container.innerHTML = '';
+            container.innerHTML = '<div class="related-header">Recomendaciones</div>';
             const list = document.createElement('div');
-            
-            results.items.filter(v => v.videoId !== video.video_id).forEach(v => {
-                const item = document.createElement('div');
-                item.className = 'related-video-item';
-                item.innerHTML = `
-                    <img src="${v.thumbnail}" alt="thumb">
-                    <div class="related-info">
-                        <h4>${v.title}</h4>
-                        <p>${v.artist || 'Desconocido'}</p>
-                    </div>
-                    <button class="add-to-playlist" style="background:transparent; color:#007bff; border:none; margin-left:auto;">
-                        <i class="fas fa-plus-circle fa-lg"></i>
-                    </button>
-                `;
-                
-                // Click en todo el item: Reproducir ahora (Insertar siguiente)
-                item.onclick = (e) => {
-                    if (e.target.closest('button')) return; // Ignorar si click en botón +
-                    // Lógica para reproducir inmediato (Opcional, o añadir a cola)
-                    addToPlaylist(v);
-                    mostrarMensajeFlotante(`Añadido: ${v.title}`);
-                };
+            list.className = 'related-grid';
 
-                // Click en botón +: Añadir al final
-                item.querySelector('button').onclick = () => {
+            data.items.filter(v => v.videoId !== video.video_id).slice(0, 10).forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'related-card';
+                item.innerHTML = `
+                    <div class="related-thumb">
+                        <img src="${v.thumbnail || `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`}" alt="">
+                        <div class="related-play-overlay"><i class="fas fa-play"></i></div>
+                    </div>
+                    <div class="related-info">
+                        <div class="related-title">${v.title}</div>
+                        <div class="related-artist">${v.artist || 'Desconocido'}</div>
+                    </div>
+                    <button class="related-add-btn" title="Añadir a cola"><i class="fas fa-plus"></i></button>
+                `;
+
+                item.querySelector('.related-add-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
                     addToPlaylist(v);
-                };
+                });
+
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.related-add-btn')) return;
+                    insertAndPlayNow(v);
+                });
 
                 list.appendChild(item);
             });
             container.appendChild(list);
-
         } catch (e) {
-            console.error(e);
-            container.innerHTML = '<div class="empty-state"><p>No se encontraron relacionados</p></div>';
+            container.innerHTML = `<div class="empty-state"><p>Sin recomendaciones disponibles</p></div>`;
         }
     }
 }
 
-// Inicializar Managers
-window.lyricsManager = new LyricsManager();
-window.relatedManager = new RelatedManager();
+// =============================================
+// INICIALIZACIÓN
+// =============================================
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 YT CrossMix Spotify Mode iniciando...');
+
+    // Exportar funciones globales
+    window.updatePlaylistDOM = updatePlaylistDOM;
+    window.playNextVideo = playNextVideo;
+    window.addToPlaylist = addToPlaylist;
+    window.deleteVideo = deleteVideo;
+    window.clearPlaylist = clearPlaylist;
+    window.shufflePlaylist = shufflePlaylist;
+
+    // Inicializar managers
+    window.nowPlayingManager = new NowPlayingManager();
+    window.lyricsManager = new LyricsManager();
+    window.relatedManager = new RelatedManager();
+    window.smartSearch = new SmartSearch();
+
+    // Cargar API YouTube
+    loadYouTubeAPI();
+    setupEventListeners();
+
+    // Inicializar cliente YouTube
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.disabled = true;
+        searchInput.placeholder = 'Cargando...';
+    }
+
+    if (window.youtubeJSClient) {
+        await window.youtubeJSClient.init();
+        if (searchInput) {
+            searchInput.disabled = false;
+            searchInput.placeholder = '🔍 Busca artistas, canciones...';
+        }
+    }
+
+    mostrarMensajeFlotante('🎵 YT CrossMix listo — Añade una playlist para comenzar');
+});
