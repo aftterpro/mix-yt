@@ -48,29 +48,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Mensaje flotante
-function mostrarMensajeFlotante(mensaje) {
-    const mensajeDiv = document.createElement('div');
-    mensajeDiv.textContent = mensaje;
-    mensajeDiv.className = 'mensaje-flotante';
-    const playlistContainer = document.getElementById('playlistContainer'); 
-    
-    // Si no encuentra el contenedor (por ejemplo, si estamos en otra pestaña), usar body
-    if (playlistContainer) {
-        playlistContainer.insertAdjacentElement('afterend', mensajeDiv);
-    } else {
-        mensajeDiv.style.position = 'fixed';
-        mensajeDiv.style.bottom = '20px';
-        mensajeDiv.style.left = '50%';
-        mensajeDiv.style.transform = 'translateX(-50%)';
-        mensajeDiv.style.zIndex = '1000';
-        document.body.appendChild(mensajeDiv);
+function mostrarMensajeFlotante(mensaje, duracion = 4000) {
+    let container = document.getElementById('mensaje-flotante-container');
+
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'mensaje-flotante-container';
+        container.style.position = 'fixed';
+        container.style.bottom = '20px';
+        container.style.left = '50%';
+        container.style.transform = 'translateX(-50%)';
+        container.style.zIndex = '1000';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '8px';
+        document.body.appendChild(container);
     }
+
+    const mensajeDiv = document.createElement('div');
+    mensajeDiv.className = 'mensaje-flotante';
+    mensajeDiv.textContent = mensaje;
+
+    container.appendChild(mensajeDiv);
 
     setTimeout(() => {
         mensajeDiv.classList.add('fadeOut');
-        setTimeout(() => mensajeDiv.remove(), 1000);
-    }, 4000); // Reducido a 4 seg para no molestar
+
+        setTimeout(() => {
+            mensajeDiv.remove();
+        }, 500);
+    }, duracion);
 }
 window.mostrarMensajeFlotante = mostrarMensajeFlotante; // Exportar
 mostrarMensajeFlotante("¡Recomendamos instalar extencion : \n Amplificador de volumen - refuerzo de sonido \n SponsorBlock, para una mejor experiencia :)" );
@@ -78,16 +85,23 @@ mostrarMensajeFlotante("¡Recomendamos primero agregar una playlist!");
 
 // Módulo: Carga del API de YouTube  
 function loadYouTubeAPI() {
-    if (youtubeAPIReady) return;
+    if (youtubeAPIReady || window.YT) return;
+
     youtubeAPIReady = true;
 
+    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        return;
+    }
+
     const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
+    script.src = "https://www.youtube.com/iframe_api";
     script.async = true;
+
     window.onYouTubeIframeAPIReady = () => {
-        console.log("API de YouTube cargada.");
+        console.log("✅ API de YouTube cargada");
         initializePlayers();
     };
+
     document.head.appendChild(script);
 }
 
@@ -117,33 +131,22 @@ function initializePlayers() {
     window.player1 = player1;
     window.player2 = player2;
 }
-function onPlayerError(event) { //Errores con Api
-    console.error("Error del reproductor:", event);
-    // Manejar diferentes códigos de error
-    switch (event.data) {
-        case 2: // Petición de video inválida (ID incorrecto)
-            console.error("Error: ID de video no válido.");
-            mostrarMensajeFlotante("Error: ID de video no válido.");
-            break;
-        case 5: // Error al reproducir el video solicitado
-            console.error("Error: No se puede reproducir el video. (Posible problema de derechos de autor).");
-            mostrarMensajeFlotante("Este video no está disponible. No se puede reproducir el video. (Posible problema de derechos de autor)");
-            playNextVideo(); // Saltar al siguiente video
-            break;
-        case 100: // Video no encontrado
-            console.error("Error: Video no encontrado.");
-            mostrarMensajeFlotante("Error: Video no encontrado.");
-            break;
-        case 101: // El propietario del video no permite la reproducción incrustada
-        case 150:
-            console.error("Error: El propietario del video no permite la reproducción incrustada.");
-            mostrarMensajeFlotante("Este video no se puede reproducir. El propietario del video no permite la reproducción incrustada");
-            playNextVideo();//Saltar al siguiente video
-            break;
-        default:
-            console.error("Error desconocido del reproductor:", event.data);
-            mostrarMensajeFlotante("Ocurrió un error al reproducir el video.");
-            break;
+function onPlayerError(event) {
+    const errores = {
+        2: "ID de video no válido.",
+        5: "No se puede reproducir el video (posible restricción).",
+        100: "Video no encontrado.",
+        101: "El propietario no permite reproducción incrustada.",
+        150: "El propietario no permite reproducción incrustada."
+    };
+
+    const mensaje = errores[event.data] || "Error desconocido del reproductor.";
+
+    console.error("Error reproductor:", event.data, mensaje);
+    mostrarMensajeFlotante(mensaje);
+
+    if ([5, 101, 150].includes(event.data)) {
+        playNextVideo();
     }
 }
 //Verifica que monitorPlayers se llama correctamente cada 10 segundos:
@@ -178,95 +181,41 @@ function onPlayerStateChange(event) {
     }
 }
 // Nueva función para mostrar resultados de la API de Piped Y YT V3
-const displaySearchResultsPiped = (results) => {
+function displaySearchResultsPiped(results = []) {
     const resultsDiv = document.getElementById('results');
-    resultsDiv.innerHTML = ''; // Limpiar contenedor
+    resultsDiv.innerHTML = '';
 
-    if (!results || results.length === 0) {
+    if (!Array.isArray(results) || results.length === 0) {
         resultsDiv.innerHTML = '<p>No se encontraron resultados.</p>';
         mostrarMensajeFlotante("No se encontraron resultados.");
         return;
     }
-    
-    console.log(`🎨 Renderizando ${results.length} videos en el DOM`);
-    
+
     const fragment = document.createDocumentFragment();
 
     results.forEach((video, index) => {
-        // ✅ VALIDAR estructura del video
-        if (!video || !video.videoId) {
-            console.warn(`Video ${index} sin videoId:`, video);
+        if (!video?.videoId) {
+            console.warn(`Video inválido en índice ${index}`, video);
             return;
         }
 
-        const videoElement = document.createElement('div');
-        videoElement.className = 'result';
-        videoElement.dataset.videoId = video.videoId;
+        const el = document.createElement('div');
+        el.className = 'result';
+        el.dataset.videoId = video.videoId;
 
-        const img = document.createElement('img');
-        img.src = video.thumbnail || 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
-        img.alt = video.title || 'Sin título';
-        img.onerror = () => {
-            img.src = 'https://static.vecteezy.com/system/resources/previews/016/771/877/non_2x/student-dj-party-icon-outline-person-club-vector.jpg';
-        };
+        el.innerHTML = `
+            <img src="https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg">
+            <div class="video-info">
+                <h4>${video.title || "Sin título"}</h4>
+                <button class="add-video">Agregar</button>
+            </div>
+        `;
 
-        const infoDiv = document.createElement('div');
-        infoDiv.style.flex = '1';
-
-        const title = document.createElement('h3');
-        title.textContent = video.title || 'Sin título';
-        title.style.margin = '0 0 5px 0';
-        title.style.fontSize = '14px';
-
-        const artist = document.createElement('p');
-        artist.textContent = video.artist || video.uploaderName || 'Artista desconocido';
-        artist.style.margin = '0';
-        artist.style.fontSize = '12px';
-        artist.style.color = '#666';
-
-        const duration = document.createElement('p');
-        duration.className = 'result-duration';
-        duration.textContent = `⏱️ ${video.duration || '0:00'}`;
-        duration.style.margin = '5px 0 0 0';
-        duration.style.fontSize = '11px';
-        duration.style.color = '#999';
-
-        infoDiv.appendChild(title);
-        infoDiv.appendChild(artist);
-        infoDiv.appendChild(duration);
-
-        const button = document.createElement('button');
-        button.className = 'add-to-playlist';
-        button.dataset.videoId = video.videoId;
-        button.dataset.videoTitle = video.title || 'Sin título';
-        button.dataset.videoDuration = parseDuration(video.duration || '0:00');
-        button.dataset.videoThumbnail = video.thumbnail || '';
-
-        const icon = document.createElement('i');
-        icon.className = 'fa-solid fa-plus';
-        button.appendChild(icon);
-
-        // Event listener directo
-        button.addEventListener('click', () => {
-            const videoData = {
-                videoId: button.dataset.videoId,
-                title: button.dataset.videoTitle,
-                thumbnail: button.dataset.videoThumbnail,
-                duration: parseInt(button.dataset.videoDuration) || 0,
-            };
-            console.log('➕ Añadiendo video:', videoData);
-            addToPlaylist(videoData);
-        });
-
-        videoElement.appendChild(img);
-        videoElement.appendChild(infoDiv);
-        videoElement.appendChild(button);
-        fragment.appendChild(videoElement);
+        fragment.appendChild(el);
     });
 
     resultsDiv.appendChild(fragment);
-    console.log('✅ DOM actualizado con resultados');
-};
+}
 // Módulo: Búsqueda
 
 const performSearch = async (query) => {
