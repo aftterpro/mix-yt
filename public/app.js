@@ -26,34 +26,47 @@ let reproduccionIniciada = false;
 // =============================================
 class SpotifyColorEngine {
     constructor() {
-        this.currentPalette = { primary: '#1DB954', dark: '#121212', text: '#fff' };
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
-    }
+    this.currentPalette = { primary: '#1DB954', dark: '#121212', text: '#fff' };
+    this.canvas = document.createElement('canvas');
+    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+}
 
-    async extractFromThumbnail(thumbnailUrl) {
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                try {
-                    this.canvas.width = 50;
-                    this.canvas.height = 50;
-                    this.ctx.drawImage(img, 0, 0, 50, 50);
-                    const data = this.ctx.getImageData(0, 0, 50, 50).data;
-                    const palette = this.getDominantColors(data);
-                    resolve(palette);
-                } catch (e) {
-                    resolve(this.currentPalette);
-                }
-            };
-            img.onerror = () => resolve(this.currentPalette);
-            // Proxy para evitar CORS
-            img.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(thumbnailUrl)}`;
-            // Fallback directo
-            setTimeout(() => resolve(this.currentPalette), 3000);
-        });
+   async extractFromThumbnail(thumbnailUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        // Sin crossOrigin para evitar CORS bloqueado — usamos el fallback de paleta
+        img.onload = () => {
+            try {
+                this.canvas.width = 50;
+                this.canvas.height = 50;
+                this.ctx.drawImage(img, 0, 0, 50, 50);
+                const data = this.ctx.getImageData(0, 0, 50, 50).data;
+                resolve(this.getDominantColors(data));
+            } catch (e) {
+                // CORS bloqueó getImageData — usamos color por hash de URL
+                resolve(this.colorFromString(thumbnailUrl));
+            }
+        };
+        img.onerror = () => resolve(this.colorFromString(thumbnailUrl));
+        img.src = thumbnailUrl;  
+    });
+}
+
+colorFromString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
+    const h = Math.abs(hash) % 360;
+    const hslColor = `hsl(${h}, 50%, 35%)`;
+    const darkColor = `hsl(${h}, 50%, 20%)`;
+    return {
+        primary: hslColor,
+        primaryDark: darkColor,
+        text: '#ffffff',
+        luminance: 0.3
+    };
+}
 
     getDominantColors(data) {
         const colorMap = {};
@@ -111,74 +124,74 @@ class NowPlayingManager {
         this.isLiked = false;
         this.createNowPlayingUI();
     }
-
-    createNowPlayingUI() {
-        // Crear el panel "Now Playing" flotante estilo Spotify
-        const panel = document.createElement('div');
-        panel.id = 'spotify-now-playing';
-        panel.innerHTML = `
-            <div id="now-playing-bg"></div>
-            <div class="np-artwork-container">
-                <div class="np-artwork-shadow"></div>
-                <img id="np-artwork" src="" alt="artwork" class="np-artwork">
-                <div class="np-artwork-overlay"></div>
+   createNowPlayingUI() {
+    const panel = document.createElement('div');
+    panel.id = 'spotify-now-playing';
+    panel.innerHTML = `
+        <div id="now-playing-bg"></div>
+        <div class="np-artwork-container">
+            <div class="np-artwork-shadow"></div>
+            <img id="np-artwork" src="" alt="artwork" class="np-artwork">
+            <div class="np-artwork-overlay"></div>
+        </div>
+        <div class="np-info">
+            <div class="np-title-row">
+                <div class="np-texts">
+                    <div id="np-title" class="np-title">Esperando canción...</div>
+                    <div id="np-artist" class="np-artist">Selecciona una playlist</div>
+                </div>
+                <button id="np-like-btn" class="np-action-btn" title="Me gusta">
+                    <i class="far fa-heart"></i>
+                </button>
             </div>
-            <div class="np-info">
-                <div class="np-title-row">
-                    <div class="np-texts">
-                        <div id="np-title" class="np-title">Esperando canción...</div>
-                        <div id="np-artist" class="np-artist">Selecciona una playlist</div>
-                    </div>
-                    <button id="np-like-btn" class="np-action-btn" title="Me gusta">
-                        <i class="far fa-heart"></i>
-                    </button>
+            <div class="np-progress-container">
+                <span id="np-current-time" class="np-time">0:00</span>
+                <div class="np-progress-bar" id="np-progress-bar">
+                    <div class="np-progress-fill" id="np-progress-fill"></div>
+                    <div class="np-progress-thumb" id="np-progress-thumb"></div>
                 </div>
-                <div class="np-progress-container">
-                    <span id="np-current-time" class="np-time">0:00</span>
-                    <div class="np-progress-bar" id="np-progress-bar">
-                        <div class="np-progress-fill" id="np-progress-fill"></div>
-                        <div class="np-progress-thumb" id="np-progress-thumb"></div>
-                    </div>
-                    <span id="np-total-time" class="np-time">0:00</span>
-                </div>
-                <div class="np-controls">
-                    <button class="np-ctrl-btn" id="np-shuffle-btn" title="Aleatorio">
-                        <i class="fas fa-random"></i>
-                    </button>
-                    <button class="np-ctrl-btn" id="np-prev-btn" title="Anterior">
-                        <i class="fas fa-step-backward"></i>
-                    </button>
-                    <button class="np-ctrl-btn np-play-btn" id="np-play-pause-btn" title="Play/Pause">
-                        <i class="fas fa-play" id="np-play-icon"></i>
-                    </button>
-                    <button class="np-ctrl-btn" id="np-next-btn" title="Siguiente">
-                        <i class="fas fa-step-forward"></i>
-                    </button>
-                    <button class="np-ctrl-btn" id="np-repeat-btn" title="Repetir">
-                        <i class="fas fa-redo"></i>
-                    </button>
-                </div>
-                <div class="np-volume-row">
-                    <i class="fas fa-volume-down np-vol-icon"></i>
-                    <div class="np-volume-bar" id="np-volume-bar">
-                        <div class="np-volume-fill" id="np-volume-fill" style="width:80%"></div>
-                        <div class="np-volume-thumb"></div>
-                    </div>
-                    <i class="fas fa-volume-up np-vol-icon"></i>
-                    <div class="np-crossfade-label">
-                        <i class="fas fa-water"></i>
-                        <span id="np-crossfade-val">${CROSSFADE_DURATION}s</span>
-                    </div>
-                </div>
+                <span id="np-total-time" class="np-time">0:00</span>
             </div>
-        `;
-        document.getElementById('player-panel').prepend(panel);
-        this.setupControls();
-        this.setupProgressBarScrubbing();
-        this.setupVolumeScrubbing();
-        this.startProgressUpdater();
-    }
-
+            <div class="np-controls">
+                <button class="np-ctrl-btn" id="np-shuffle-btn" title="Aleatorio">
+                    <i class="fas fa-random"></i>
+                </button>
+                <button class="np-ctrl-btn" id="np-prev-btn" title="Anterior">
+                    <i class="fas fa-step-backward"></i>
+                </button>
+                <button class="np-ctrl-btn np-play-btn" id="np-play-pause-btn" title="Play/Pause">
+                    <i class="fas fa-play" id="np-play-icon"></i>
+                </button>
+                <button class="np-ctrl-btn" id="np-next-btn" title="Siguiente">
+                    <i class="fas fa-step-forward"></i>
+                </button>
+                <button class="np-ctrl-btn" id="np-repeat-btn" title="Repetir">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div class="np-volume-row">
+                <i class="fas fa-volume-down np-vol-icon"></i>
+                <div class="np-volume-bar" id="np-volume-bar">
+                    <div class="np-volume-fill" id="np-volume-fill" style="width:80%"></div>
+                    <div class="np-volume-thumb"></div>
+                </div>
+                <i class="fas fa-volume-up np-vol-icon"></i>
+                <div class="np-crossfade-label">
+                    <i class="fas fa-water"></i>
+                    <span id="np-crossfade-val">${CROSSFADE_DURATION}s</span>
+                </div>
+                <button id="np-view-toggle" class="np-ctrl-btn" title="Cambiar vista">
+                    <i class="fas fa-film"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.getElementById('player-panel').prepend(panel);
+    this.setupControls();
+    this.setupProgressBarScrubbing();
+    this.setupVolumeScrubbing();
+    this.startProgressUpdater();
+}
     update(video) {
         this.currentVideo = video;
         if (!video) return;
@@ -262,7 +275,42 @@ class NowPlayingManager {
             window.repeatMode = repeatMode;
             mostrarMensajeFlotante(modes[repeatMode].label);
         });
+    let videoMode = false; // false = portada, true = video
 
+    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+    videoMode = !videoMode;
+    const videoContainer = document.getElementById('videoContainer');
+    const artworkContainer = document.querySelector('.np-artwork-container');
+    const icon = document.querySelector('#np-view-toggle i');
+
+    if (videoMode) {
+        // Mostrar video real
+        if (videoContainer) {
+            videoContainer.style.cssText = `
+                position: relative; width: 100%; aspect-ratio: 16/9;
+                border-radius: 12px; overflow: hidden;
+                opacity: 1; pointer-events: auto;
+                box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+                transition: all 0.4s ease;
+            `;
+        }
+        if (artworkContainer) artworkContainer.style.display = 'none';
+        if (icon) icon.className = 'fas fa-image';
+        mostrarMensajeFlotante('🎬 Modo video');
+        } else {
+        // Mostrar portada
+        if (videoContainer) {
+            videoContainer.style.cssText = `
+                width: 1px; height: 1px; overflow: hidden;
+                position: absolute; opacity: 0; pointer-events: none;
+            `;
+        }
+        if (artworkContainer) artworkContainer.style.display = 'block';
+        if (icon) icon.className = 'fas fa-film';
+        mostrarMensajeFlotante('🖼️ Modo portada');
+        }
+        });
+        
         document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
             this.isLiked = !this.isLiked;
             const icon = e.currentTarget.querySelector('i');
@@ -470,6 +518,7 @@ window.smartSearch = null; // Se inicializa en DOMContentLoaded
 // =============================================
 // DISPLAY DE RESULTADOS - Estilo Spotify Cards
 // =============================================
+
 function displaySearchResultsPiped(results = []) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = '';
@@ -494,7 +543,7 @@ function displaySearchResultsPiped(results = []) {
         el.dataset.videoId = video.videoId;
         el.style.animationDelay = `${index * 0.05}s`;
 
-        const duration = typeof video.duration === 'number'
+        const durationStr = typeof video.duration === 'number'
             ? formatDuration(video.duration)
             : (video.duration || '');
 
@@ -512,7 +561,7 @@ function displaySearchResultsPiped(results = []) {
                 <div class="result-title">${video.title || 'Sin título'}</div>
                 <div class="result-artist">${video.artist || video.uploaderName || 'Desconocido'}</div>
             </div>
-            <div class="result-duration">${duration}</div>
+            <div class="result-duration">${durationStr}</div>
             <button class="result-add-btn" title="Añadir a cola">
                 <i class="fas fa-plus"></i>
             </button>
@@ -520,21 +569,35 @@ function displaySearchResultsPiped(results = []) {
                 <i class="fas fa-play-circle"></i>
             </button>
         `;
-
-        // Añadir a cola
         el.querySelector('.result-add-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            addToPlaylist(video);
+            addToPlaylist({
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+                duration: parseDuration(video.duration), // ✅ convertir a número aquí
+                artist: video.artist || video.uploaderName || video.author || ''
+            });
         });
 
-        // Reproducir ahora (insertar siguiente)
         el.querySelector('.result-play-now-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            insertAndPlayNow(video);
+            insertAndPlayNow({
+                videoId: video.videoId,
+                title: video.title,
+                thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+                duration: parseDuration(video.duration),
+                artist: video.artist || video.uploaderName || video.author || ''
+            });
         });
 
-        // Click en la fila: añadir a cola
-        el.addEventListener('click', () => addToPlaylist(video));
+        el.addEventListener('click', () => addToPlaylist({
+            videoId: video.videoId,
+            title: video.title,
+            thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+            duration: parseDuration(video.duration),
+            artist: video.artist || video.uploaderName || video.author || ''
+        }));
 
         fragment.appendChild(el);
     });
@@ -751,39 +814,64 @@ function rearrangePlaylist(fromIndex, toIndex) {
 function enableDragAndDrop() {
     const container = document.getElementById('playlist');
     if (!container) return;
-    let draggedIndex = null;
-    let draggedEl = null;
 
+    let dragSrcIndex = null;
+
+    // Usamos delegación de eventos en el container
     container.addEventListener('dragstart', (e) => {
         const item = e.target.closest('.queue-item');
         if (!item) return;
-        draggedIndex = parseInt(item.dataset.index);
-        draggedEl = item;
+        dragSrcIndex = parseInt(item.dataset.index);
         item.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSrcIndex);
     });
 
-    container.addEventListener('dragend', () => {
-        draggedEl?.classList.remove('dragging');
-        container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        draggedEl = null;
+    container.addEventListener('dragend', (e) => {
+        document.querySelectorAll('.queue-item').forEach(el => {
+            el.classList.remove('dragging', 'drag-over');
+        });
     });
 
     container.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         const item = e.target.closest('.queue-item');
-        if (!item || item === draggedEl) return;
-        container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        item.classList.add('drag-over');
+        if (!item) return;
+        document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
+        if (!item.classList.contains('dragging')) {
+            item.classList.add('drag-over');
+        }
+    });
+
+    container.addEventListener('dragleave', (e) => {
+        const item = e.target.closest('.queue-item');
+        if (item) item.classList.remove('drag-over');
     });
 
     container.addEventListener('drop', (e) => {
         e.preventDefault();
         const target = e.target.closest('.queue-item');
-        if (!target || draggedIndex === null) return;
-        const toIndex = parseInt(target.dataset.index);
-        rearrangePlaylist(draggedIndex, toIndex);
-        updatePlaylistDOM();
+        if (!target || dragSrcIndex === null) return;
+
+        const destIndex = parseInt(target.dataset.index);
+        if (dragSrcIndex === destIndex) return;
+
+        // Reordenar array
+        const [moved] = window.playlistVideos.splice(dragSrcIndex, 1);
+        window.playlistVideos.splice(destIndex, 0, moved);
+
+        // Actualizar currentIndex
+        if (currentIndex === dragSrcIndex) {
+            currentIndex = destIndex;
+        } else if (dragSrcIndex < currentIndex && destIndex >= currentIndex) {
+            currentIndex--;
+        } else if (dragSrcIndex > currentIndex && destIndex <= currentIndex) {
+            currentIndex++;
+        }
+
+        dragSrcIndex = null;
+        updatePlaylistDOM(); // re-render con índices actualizados
     });
 }
 
@@ -1000,16 +1088,24 @@ function monitorPlayers() {
     // SponsorBlock
     if (window.sponsorBlockManager?.checkAndSkip(currentPlayerInstance)) return;
 
-    // Tiempo de crossfade
+    // Calcular trigger
     let triggerTime;
     if (window.sponsorBlockManager) {
-        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(duration, videoId, CROSSFADE_DURATION);
+        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
+            duration, videoId, CROSSFADE_DURATION
+        );
     } else {
         triggerTime = duration - CROSSFADE_DURATION;
+    }
+    const flooredTime = Math.floor(currentTime);
+    if (flooredTime % 5 === 0 && flooredTime !== window._lastLogTime) {
+        window._lastLogTime = flooredTime;
+        console.log(`⏱️ P${currentPlayer} | ${currentTime.toFixed(1)}/${duration.toFixed(1)}s | Trigger@${triggerTime.toFixed(1)}s`);
     }
 
     if (currentTime >= triggerTime && !window.crossfadeTriggered) {
         window.crossfadeTriggered = true;
+        console.log(`🔀 CROSSFADE disparado en ${currentTime.toFixed(1)}s`);
         playNextVideo();
     }
 }
