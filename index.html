@@ -3,128 +3,136 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YT Playlist Manager With Crossfire</title>
+  <title>YT CrossMix — Spotify Mode</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
   <link rel="stylesheet" type="text/css" href="/public/styles.css">
-  <link rel="stylesheet" type="text/css" href="/public/efecto.css">
-  <link rel="stylesheet" type="text/css" href="/public/botones.css">
   <link rel="icon" href="/electronic.ico">
 </head>
 <body>
   <header>
-    <h3>YT Playlist Manager With Crossfire</h3>
+    <h3>YT CrossMix</h3>
   </header>
   <main>
+    <!-- PANEL BÚSQUEDA -->
     <section id="search-panel">
-      <h2>Search Videos</h2>
       <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search">
+        <input type="text" id="searchInput" placeholder="🔍 Busca artistas, canciones...">
       </div>
       <div id="resultsContainer">
         <div id="results"></div>
       </div>
     </section>
 
+    <!-- PANEL REPRODUCTOR -->
     <section id="player-panel">
-      <h2>Reproductor</h2>
-       <div class="playlist-url-input"> <input type="text" id="searchInput2" placeholder="Añadir Link Playlist :)"> </div>     
-	<button id="añadirUrlButton" class="add-to-playlist">
-    <i class="fa-solid fa-plus"></i> <span class="add-text">Añadir a la playlist</span>
-	</button>
-            <div id="videoContainer">
-       <div id="player1" class="video-player"></div>
+      <!-- Now Playing se inyecta aquí por JS -->
+
+      <div class="playlist-url-input">
+        <input type="text" id="searchInput2" placeholder="🔗 Pega el link de una playlist de YouTube">
+      </div>
+      <button id="añadirUrlButton" class="add-to-playlist">
+        <i class="fa-solid fa-plus"></i> Añadir Playlist a la Cola
+      </button>
+
+      <!-- Reproductores ocultos pero funcionales -->
+      <div id="videoContainer">
+        <div id="player1" class="video-player"></div>
         <div id="player2" class="video-player hidden"></div>
       </div>
+
       <div id="controls">
-        <button id="mixButton"><i class="fas fa-random"></i> Mix</button>
-            <button id="iniciarButton">Iniciar</button>
-            </div>
+        <button id="mixButton"><i class="fas fa-random"></i> Mezclar</button>
+        <button id="iniciarButton">▶ Reproducir</button>
+      </div>
     </section>
 
-   <section id="playlist-panel">
-  <div class="panel-header-tabs">
-    <h2>Biblioteca</h2>
-    <div id="auth-controls">
-        <button id="googleSignInButton" onclick="handleAuthClick()" class="auth-btn google-login">
-            <i class="fab fa-google"></i> Acceder
-        </button>
-        <button id="googleSignOutButton" onclick="handleSignOutClick()" class="auth-btn google-logout" style="display:none">
+    <!-- PANEL BIBLIOTECA -->
+    <section id="playlist-panel">
+      <div class="panel-header-tabs">
+        <h2>Biblioteca</h2>
+        <div id="auth-controls">
+          <button id="googleSignInButton" onclick="handleAuthClick()" class="auth-btn google-login">
+            <i class="fab fa-google"></i> Conectar
+          </button>
+          <button id="googleSignOutButton" onclick="handleSignOutClick()" class="auth-btn google-logout" style="display:none">
             <i class="fas fa-sign-out-alt"></i> Salir
-        </button>
-    </div>
-  </div>
-
- <div class="tabs-container">
-    <button class="tab-btn active" data-tab="cola">
-        <i class="fas fa-list"></i> Cola
-    </button>
-    <button class="tab-btn" data-tab="yt-playlists">
-        <i class="fab fa-youtube"></i> Playlists
-    </button>
-    <button class="tab-btn" data-tab="lyrics">
-        <i class="fas fa-music"></i> Letras
-    </button>
-    <button class="tab-btn" data-tab="related">
-        <i class="fas fa-magic"></i> Relacionados
-    </button>
-</div>
-
-<div id="tab-lyrics" class="tab-content">
-    <div id="lyricsContent" class="lyrics-container">
-        <div class="empty-state">
-            <i class="fas fa-music"></i>
-            <p>Reproduce una canción para ver la letra</p>
+          </button>
         </div>
-    </div>
-</div>
-
-<div id="tab-related" class="tab-content">
-    <div id="relatedVideosList" class="related-list">
-        <div class="empty-state">
-            <i class="fas fa-film"></i>
-            <p>Reproduce algo para ver recomendaciones</p>
-        </div>
-    </div>
-</div>
-
-  <div id="tab-cola" class="tab-content active">
-      <div id="playlistContainer">
-        <div id="playlist"></div>
       </div>
-  </div>
 
- <div id="tab-yt-playlists" class="tab-content">
-    
-    <div id="user-playlists-overview">
-        <div id="user-playlists-content" class="empty-state">
-            <p>Inicia sesión para ver tus playlists</p>
+      <div class="tabs-container">
+        <button class="tab-btn active" data-tab="cola">
+          <i class="fas fa-list-music"></i> Cola
+        </button>
+        <button class="tab-btn" data-tab="yt-playlists">
+          <i class="fab fa-youtube"></i> Mis Playlists
+        </button>
+        <button class="tab-btn" data-tab="lyrics">
+          <i class="fas fa-align-left"></i> Letras
+        </button>
+        <button class="tab-btn" data-tab="related">
+          <i class="fas fa-magic-wand-sparkles"></i> Similares
+        </button>
+      </div>
+
+      <!-- TAB COLA -->
+      <div id="tab-cola" class="tab-content active">
+        <div id="playlistContainer">
+          <div id="playlist"></div>
         </div>
-    </div>
+      </div>
 
-    <div id="user-playlist-details" style="display: none;">
-        <div class="details-header">
-            <button id="back-to-playlists-btn">
-                <i class="fas fa-arrow-left"></i>
+      <!-- TAB MIS PLAYLISTS -->
+      <div id="tab-yt-playlists" class="tab-content">
+        <div id="user-playlists-overview">
+          <div id="user-playlists-content" class="empty-state">
+            <i class="fab fa-youtube"></i>
+            <p>Conecta tu cuenta</p>
+            <small>Ve tus playlists de YouTube aquí</small>
+          </div>
+        </div>
+        <div id="user-playlist-details" style="display: none;">
+          <div class="details-header">
+            <button id="back-to-playlists-btn"><i class="fas fa-arrow-left"></i></button>
+            <h3 id="details-playlist-title">Playlist</h3>
+            <button id="import-current-playlist-btn" class="header-action-btn">
+              <i class="fas fa-plus"></i> Añadir todo
             </button>
-            <h3 id="details-playlist-title">Título Playlist</h3>
-             <button id="import-current-playlist-btn" class="header-action-btn">
-                <i class="fas fa-plus"></i> Añadir todo a Cola
-            </button>
+          </div>
+          <div id="details-video-list-container">
+            <div id="details-video-list"></div>
+          </div>
         </div>
-        
-        <div id="details-video-list-container">
-             <div id="details-video-list"></div>
-        </div>
-    </div>
+      </div>
 
-</div>
-</section>
+      <!-- TAB LETRAS -->
+      <div id="tab-lyrics" class="tab-content">
+        <div id="lyricsContent" class="lyrics-container">
+          <div class="empty-state">
+            <i class="fas fa-align-left"></i>
+            <p>Sin reproducción activa</p>
+            <small>Las letras aparecerán aquí automáticamente</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB RELACIONADOS -->
+      <div id="tab-related" class="tab-content">
+        <div id="relatedVideosList">
+          <div class="empty-state">
+            <i class="fas fa-magic-wand-sparkles"></i>
+            <p>Descubre música similar</p>
+            <small>Las recomendaciones aparecen al reproducir</small>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
-    <p>Made with ❤️ by: <a href="https://www.facebook.com/edwin.jr.ch" target="_blank">Eduu</a></p>
+    <p>Hecho con ❤️ por <a href="https://www.facebook.com/edwin.jr.ch" target="_blank">Eduu</a> · Potenciado por YouTube + SponsorBlock</p>
   </footer>
-  
+
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://apis.google.com/js/api.js" async defer></script>
   <script src="/public/youtube-client.js"></script>
@@ -132,5 +140,6 @@
   <script src="/public/botones.js"></script>
   <script src="/public/auth.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
 </body>
 </html>
