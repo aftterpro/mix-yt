@@ -282,14 +282,10 @@ async function loadUserPlaylistsUI() {
         container.innerHTML = '<p>Error al cargar playlists.</p>';
     }
 }
-
-// ----- NUEVA FUNCIÓN: VER DETALLES DE PLAYLIST (SUB-PÁGINA) -----
 async function viewPlaylistDetails(playlistId, playlistTitle) {
-    // 1. Cambiar la interfaz: Ocultar overview, mostrar detalles
     document.getElementById('user-playlists-overview').style.display = 'none';
     document.getElementById('user-playlist-details').style.display = 'block';
     
-    // 2. Actualizar header
     document.getElementById('details-playlist-title').textContent = playlistTitle;
     currentDetailPlaylistId = playlistId;
 
@@ -297,14 +293,13 @@ async function viewPlaylistDetails(playlistId, playlistTitle) {
     listContainer.innerHTML = '<p style="padding: 20px;">Cargando vista previa de videos...</p>';
 
     try {
-        // Carga rápida solo de snippets (títulos e imágenes) para previsualizar
         const response = await gapi.client.youtube.playlistItems.list({
             playlistId: playlistId,
-            part: 'snippet',
-            maxResults: 50 // Muestra los primeros 50
+            part: 'snippet,contentDetails', // Se añade contentDetails para obtener el videoId correctamente
+            maxResults: 50
         });
 
-        listContainer.innerHTML = ''; // Limpiar mensaje
+        listContainer.innerHTML = '';
 
         if (response.result.items.length === 0) {
             listContainer.innerHTML = '<p style="padding: 20px;">Esta playlist está vacía.</p>';
@@ -318,13 +313,33 @@ async function viewPlaylistDetails(playlistId, playlistTitle) {
             vidEl.className = 'detail-video-item';
             const thumb = item.snippet.thumbnails?.default?.url || 'https://via.placeholder.com/60';
             
+            // ✅ Nueva estructura con botón de añadir
             vidEl.innerHTML = `
                 <img src="${thumb}" alt="thumbnail">
                 <div class="detail-video-info">
                     <h5>${item.snippet.title}</h5>
-                    <p>Por: ${item.snippet.videoOwnerChannelTitle}</p>
+                    <p>${item.snippet.videoOwnerChannelTitle || 'Artista desconocido'}</p>
                 </div>
+                <button class="detail-add-btn" title="Añadir a Cola">
+                    <i class="fas fa-plus-circle"></i>
+                </button>
             `;
+
+            // ✅ Event listener para el botón añadir desde la vista de detalle
+            vidEl.querySelector('.detail-add-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const videoId = item.contentDetails?.videoId || item.snippet?.resourceId?.videoId;
+                if (!videoId) return;
+                
+                addToPlaylist({
+                    videoId,
+                    title: item.snippet.title,
+                    thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
+                    duration: 0, // La duración se puede obtener bajo demanda si es necesario
+                    artist: item.snippet.videoOwnerChannelTitle || ''
+                });
+            });
+
             listContainer.appendChild(vidEl);
         });
 
@@ -341,7 +356,6 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
     let nextPageToken = null;
 
     try {
-        // Bucle para obtener TODOS los videos (paginación)
         do {
             const response = await gapi.client.youtube.playlistItems.list({
                 playlistId: playlistId,
@@ -350,7 +364,6 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
                 pageToken: nextPageToken
             });
 
-            // Obtener IDs para consultar duración exacta (necesario para el reproductor)
             const vidIds = response.result.items.map(i => i.contentDetails.videoId).join(',');
             let durMap = {};
             
@@ -364,26 +377,26 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
                 });
             }
 
+            // ✅ Reemplazo del .map() para incluir artist
             const items = response.result.items.map(item => ({
                 videoId: item.contentDetails.videoId,
                 title: item.snippet.title,
                 thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url,
                 duration: durMap[item.contentDetails.videoId] || 0,
+                artist: item.snippet.videoOwnerChannelTitle || '', // ✅ Pasar el canal como artist
                 manual: false
             })).filter(i => i.title !== "Private video" && i.title !== "Deleted video");
 
             allVideos = [...allVideos, ...items];
             nextPageToken = response.result.nextPageToken;
 
-        } while (nextPageToken && allVideos.length < 300); // Límite de seguridad aumentado a 300
+        } while (nextPageToken && allVideos.length < 300);
 
         if (window.playlistVideos) {
             window.playlistVideos.push(...allVideos);
             window.updatePlaylistDOM();
             mostrarMensajeFlotante(`✅ ¡${allVideos.length} videos añadidos a la Cola!`);
-            
-            // OPCIONAL: Volver automáticamente a la pestaña de Cola tras importar
-             document.querySelector('.tab-btn[data-tab="cola"]').click();
+            document.querySelector('.tab-btn[data-tab="cola"]').click();
             
             const btn = document.getElementById('iniciarButton');
             if(btn) btn.disabled = false;
