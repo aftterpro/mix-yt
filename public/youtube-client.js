@@ -219,25 +219,22 @@ calculateCrossfadeTriggerTime(videoDuration, videoId, crossfadeDuration = 10) {
     
     this.segmentosCache[videoId].segments.forEach(segment => {
         if (endCategories.includes(segment.category)) {
-            // ✅ Soportar ambos formatos
             const start = segment.startTime ?? segment.segment?.[0];
             const end = segment.endTime ?? segment.segment?.[1];
             
             if (start === undefined || end === undefined) return;
             
-            // Si el segmento termina cerca del final del video
+            // Si el segmento está al final del video
             if (Math.abs(videoDuration - end) < 5) {
                 if (start < effectiveEndTime) {
                     effectiveEndTime = start;
-                    console.log(`🎯 Crossfade ajustado por ${segment.category}: ${effectiveEndTime.toFixed(1)}s`);
                 }
             }
         }
     });
 
-    const triggerTime = effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
-    console.log(`⏱️ Trigger calculado: ${triggerTime.toFixed(1)}s (End: ${effectiveEndTime.toFixed(1)}s)`);
-    return triggerTime;
+    // El log se hace ahora una sola vez desde app.js cuando se guarda en el cache
+    return effectiveEndTime - crossfadeDuration - SAFETY_MARGIN;
 }
 
     cleanup() {
