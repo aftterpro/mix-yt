@@ -24,27 +24,23 @@
     </section>
 
     <!-- PANEL REPRODUCTOR -->
-    <section id="player-panel">
-      <!-- Now Playing se inyecta aquí por JS -->
+  <section id="player-panel">
+    <div class="playlist-url-input">
+      <input type="text" id="searchInput2" placeholder="🔗 Pega el link de una playlist de YouTube">
+    </div>
+    <button id="añadirUrlButton" class="add-to-playlist">
+    <i class="fa-solid fa-plus"></i> Añadir Playlist a la Cola
+    </button>
 
-      <div class="playlist-url-input">
-        <input type="text" id="searchInput2" placeholder="🔗 Pega el link de una playlist de YouTube">
-      </div>
-      <button id="añadirUrlButton" class="add-to-playlist">
-        <i class="fa-solid fa-plus"></i> Añadir Playlist a la Cola
-      </button>
-
-      <!-- Reproductores ocultos pero funcionales -->
-      <div id="videoContainer">
-        <div id="player1" class="video-player"></div>
-        <div id="player2" class="video-player hidden"></div>
+    <div id="videoContainer">
+      <div id="player1" class="video-player"></div>
+      <div id="player2" class="video-player hidden"></div>
       </div>
 
-      <div id="controls">
-        <button id="mixButton"><i class="fas fa-random"></i> Mezclar</button>
-        <button id="iniciarButton">▶ Reproducir</button>
-      </div>
-    </section>
+    <div id="controls">
+    <button id="mixButton"><i class="fas fa-random"></i> Mezclar</button>
+    </div>
+  </section>
 
     <!-- PANEL BIBLIOTECA -->
     <section id="playlist-panel">
