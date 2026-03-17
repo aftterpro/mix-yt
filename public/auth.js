@@ -398,8 +398,11 @@ async function importPlaylistToApp(playlistId, playlistTitle) {
             mostrarMensajeFlotante(`✅ ¡${allVideos.length} videos añadidos a la Cola!`);
             document.querySelector('.tab-btn[data-tab="cola"]').click();
             
-            const btn = document.getElementById('iniciarButton');
-            if(btn) btn.disabled = false;
+            const playBtn = document.getElementById('np-play-pause-btn');
+            if (playBtn) {
+                playBtn.style.opacity = '1';
+                playBtn.title = '▶ Iniciar reproducción';
+            }
         }
 
     } catch (error) {
