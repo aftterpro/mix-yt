@@ -304,50 +304,29 @@ class NowPlayingManager {
         mostrarMensajeFlotante(modes[repeatMode].label);
     });
 
-    // 2. Fix Modo Video / Portada con posicionamiento correcto
+    // 2.   Modo Video / Portada con posicionamiento correcto
     let videoMode = false;
     document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-        videoMode = !videoMode;
-        const videoContainer = document.getElementById('videoContainer');
-        const artworkContainer = document.querySelector('.np-artwork-container');
-        const icon = document.querySelector('#np-view-toggle i');
-        const nowPlaying = document.getElementById('spotify-now-playing');
+    videoMode = !videoMode;
+    const videoContainer = document.getElementById('videoContainer');
+    const artworkContainer = document.querySelector('.np-artwork-container');
+    const icon = document.querySelector('#np-view-toggle i');
 
-        if (videoMode) {
-            if (videoContainer && nowPlaying) {
-                videoContainer.removeAttribute('style');
-                videoContainer.style.cssText = `
-                    width: 100%;
-                    aspect-ratio: 16/9;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
-                    position: relative;
-                    z-index: 5;
-                    flex-shrink: 0;
-                    transition: all 0.4s ease;
-                `;
-                // Insertar el video después del artwork para asegurar visibilidad
-                if (artworkContainer && artworkContainer.parentNode === nowPlaying) {
-                    nowPlaying.insertBefore(videoContainer, artworkContainer.nextSibling);
-                }
-            }
-            if (artworkContainer) artworkContainer.style.display = 'none';
-            if (icon) icon.className = 'fas fa-image';
-            mostrarMensajeFlotante('🎬 Modo video');
-        } else {
-            if (videoContainer) {
-                videoContainer.style.cssText = `
-                    width: 1px; height: 1px; overflow: hidden;
-                    position: absolute; opacity: 0; pointer-events: none;
-                `;
-            }
-            if (artworkContainer) artworkContainer.style.display = 'block';
-            if (icon) icon.className = 'fas fa-film';
-            mostrarMensajeFlotante('🖼️ Modo portada');
-        }
-    });
-
+    if (videoMode) {
+        // En lugar de moverlo, solo cámbiale la clase
+        videoContainer.classList.remove('hidden-player'); // Crea esta clase en CSS
+        videoContainer.classList.add('visible-player');
+        if (artworkContainer) artworkContainer.style.display = 'none';
+        icon.className = 'fas fa-image';
+        mostrarMensajeFlotante('🎬 Modo video');
+    } else {
+        videoContainer.classList.add('hidden-player');
+        videoContainer.classList.remove('visible-player');
+        if (artworkContainer) artworkContainer.style.display = 'block';
+        icon.className = 'fas fa-film';
+        mostrarMensajeFlotante('🖼️ Modo portada');
+    }
+});
     document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
         this.isLiked = !this.isLiked;
         const icon = e.currentTarget.querySelector('i');
