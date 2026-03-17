@@ -723,16 +723,16 @@ function updatePlaylistDOM() {
     // Actualizar botón iniciar
     const playBtn = document.getElementById('np-play-pause-btn');
     if (playBtn) {
-    if (window.playlistVideos.length > 0) {
+        if (window.playlistVideos.length > 0) {
         playBtn.style.opacity = '1';
         playBtn.style.cursor = 'pointer';
         playBtn.title = reproduccionIniciada ? 'Play/Pause' : '▶ Iniciar reproducción';
     } else {
         playBtn.style.opacity = '0.4';
         playBtn.title = 'Añade canciones primero';
-    }
+     }
+   }
 }
-
 // =============================================
 // ACCIONES DE PLAYLIST
 // =============================================
