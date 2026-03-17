@@ -306,24 +306,23 @@ class NowPlayingManager {
 
     // 2.   Modo Video / Portada con posicionamiento correcto
     let videoMode = false;
-    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
     videoMode = !videoMode;
     const videoContainer = document.getElementById('videoContainer');
     const artworkContainer = document.querySelector('.np-artwork-container');
     const icon = document.querySelector('#np-view-toggle i');
 
     if (videoMode) {
-        // En lugar de moverlo, solo cámbiale la clase
-        videoContainer.classList.remove('hidden-player'); // Crea esta clase en CSS
-        videoContainer.classList.add('visible-player');
+        videoContainer.style.display = 'block'; // Mostrar video
+        videoContainer.style.opacity = '1';
+        videoContainer.style.pointerEvents = 'auto';
         if (artworkContainer) artworkContainer.style.display = 'none';
-        icon.className = 'fas fa-image';
+        if (icon) icon.className = 'fas fa-image';
         mostrarMensajeFlotante('🎬 Modo video');
     } else {
-        videoContainer.classList.add('hidden-player');
-        videoContainer.classList.remove('visible-player');
+        videoContainer.style.display = 'none'; // Ocultar video
         if (artworkContainer) artworkContainer.style.display = 'block';
-        icon.className = 'fas fa-film';
+        if (icon) icon.className = 'fas fa-film';
         mostrarMensajeFlotante('🖼️ Modo portada');
     }
 });
