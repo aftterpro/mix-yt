@@ -1445,3 +1445,17 @@ footer a:hover { text-decoration: underline; }
     .np-artwork-container { width: 160px; height: 160px; }
     .lyric-line { font-size: 1.2rem; }
 }
+/* Limpieza de elementos obsoletos */
+#iniciarButton { display: none !important; }
+
+/* Centrar controles restantes */
+#controls {
+    display: flex;
+    justify-content: center;
+    padding: 6px 16px 12px;
+}
+
+/* Estado del botón play cuando está desactivado */
+#np-play-pause-btn {
+    transition: opacity 0.3s ease, transform 0.2s ease;
+}
