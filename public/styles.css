@@ -53,9 +53,9 @@ body {
    HEADER
    ============================================= */
 header {
-    background: rgba(0,0,0,0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+background: rgba(0,0,0,0.8); 
+    backdrop-filter: blur(8px); /* Bajado de 20px a 8px */
+    -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--spotify-border);
     padding: 0 24px;
     height: 56px;
@@ -88,8 +88,8 @@ header h3::before {
 main {
     display: grid;
     grid-template-columns: 340px 1fr 340px;
-    gap: 8px;
-    padding: 8px;
+    gap: 12px; /* Aumentado de 8px a 12px */
+    padding: 12px;
     flex: 1;
     height: calc(100vh - 56px - 48px);
     max-height: calc(100vh - 56px - 48px);
@@ -712,14 +712,13 @@ section h2 {
 }
 .add-to-playlist:hover { background: var(--spotify-green-hover); transform: scale(1.01); }
 
-/* Video container oculto pero funcional */
 #videoContainer {
-    width: 1px;
-    height: 1px;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+    border-radius: 12px;
     overflow: hidden;
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
+    display: none; /* Inicialmente oculto */
 }
 
 #controls {
@@ -766,10 +765,11 @@ section h2 {
 .panel-header-tabs h2 { display: block !important; font-size: 0.875rem; font-weight: 700; }
 
 .tabs-container {
-   display: flex;
-    gap: 10px; /* Añade espacio entre botones */
+    display: flex;
     padding: 8px 16px;
-    overflow-x: auto; /* Permite scroll horizontal si no caben */
+    border-bottom: 1px solid var(--spotify-border);
+    gap: 12px;             /* CAMBIADO de 0 a 12px */
+    overflow-x: auto;
     scrollbar-width: none;
 }
 .tabs-container::-webkit-scrollbar {
@@ -785,14 +785,14 @@ section h2 {
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: all var(--transition-fast);
-    white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 6px;
     font-family: var(--font-main);
-   flex-shrink: 0; /* No deja que los botones se encojan */
+   white-space: nowrap;   /* Evita que el texto se amontone */
+    flex-shrink: 0;
 }
-
+.hidden { display: none !important; }
 .tab-btn:hover { color: var(--spotify-text); }
 .tab-btn.active { color: var(--spotify-text); border-bottom-color: var(--spotify-green); }
 
