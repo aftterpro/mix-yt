@@ -26,9 +26,9 @@ let reproduccionIniciada = false;
 // =============================================
 class SpotifyColorEngine {
     constructor() {
-    this.currentPalette = { primary: '#1DB954', dark: '#121212', text: '#fff' };
-    this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        this.currentPalette = { primary: '#1DB954', dark: '#121212', text: '#fff' };
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
 }
 
    async extractFromThumbnail(thumbnailUrl) {
@@ -232,10 +232,35 @@ class NowPlayingManager {
         });
     }
 
-    setupControls() {
-        document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
-            const player = currentPlayer === 1 ? player1 : player2;
-            if (!player) return;
+  setupControls() {
+    // 1. Unificación de Play/Pause e Inicio de Reproducción
+    document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
+        const player = currentPlayer === 1 ? player1 : player2;
+
+        // CASO 1: Aún no se ha iniciado la reproducción
+        if (!reproduccionIniciada) {
+            if (window.playlistVideos.length === 0) {
+                mostrarMensajeFlotante('⚠️ Añade una playlist o canción primero');
+                return;
+            }
+            reproduccionIniciada = true;
+            currentIndex = 0;
+            window.crossfadeTriggered = false;
+            
+            const tryPlay = () => {
+                if (playersInitialized) {
+                    playFirstVideo();
+                } else {
+                    setTimeout(tryPlay, 200);
+                }
+            };
+            tryPlay();
+            return;
+        }
+
+        // CASO 2: Ya hay reproducción — toggle play/pause
+        if (!player || typeof player.getPlayerState !== 'function') return;
+        try {
             const state = player.getPlayerState();
             if (state === YT.PlayerState.PLAYING) {
                 player.pauseVideo();
@@ -244,81 +269,93 @@ class NowPlayingManager {
                 player.playVideo();
                 document.getElementById('np-play-icon').className = 'fas fa-pause';
             }
-        });
-
-        document.getElementById('np-next-btn')?.addEventListener('click', () => playNextVideo());
-        document.getElementById('np-prev-btn')?.addEventListener('click', () => playPrevVideo());
-
-        document.getElementById('np-shuffle-btn')?.addEventListener('click', (e) => {
-            const btn = e.currentTarget;
-            btn.classList.toggle('active');
-            if (btn.classList.contains('active')) {
-                shufflePlaylist();
-                mostrarMensajeFlotante('🔀 Modo aleatorio activado');
-            } else {
-                mostrarMensajeFlotante('Modo aleatorio desactivado');
-            }
-        });
-
-        let repeatMode = 0; // 0=off, 1=all, 2=one
-        document.getElementById('np-repeat-btn')?.addEventListener('click', (e) => {
-            repeatMode = (repeatMode + 1) % 3;
-            const btn = e.currentTarget;
-            const icon = btn.querySelector('i');
-            const modes = [
-                { class: '', icon: 'fa-redo', label: 'Repetición desactivada' },
-                { class: 'active', icon: 'fa-redo', label: '🔁 Repetir lista' },
-                { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
-            ];
-            btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
-            icon.className = `fas ${modes[repeatMode].icon}`;
-            window.repeatMode = repeatMode;
-            mostrarMensajeFlotante(modes[repeatMode].label);
-        });
-    let videoMode = false; // false = portada, true = video
-
-    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-    videoMode = !videoMode;
-    const videoContainer = document.getElementById('videoContainer');
-    const artworkContainer = document.querySelector('.np-artwork-container');
-    const icon = document.querySelector('#np-view-toggle i');
-
-    if (videoMode) {
-        // Mostrar video real
-        if (videoContainer) {
-            videoContainer.style.cssText = `
-                position: relative; width: 100%; aspect-ratio: 16/9;
-                border-radius: 12px; overflow: hidden;
-                opacity: 1; pointer-events: auto;
-                box-shadow: 0 16px 48px rgba(0,0,0,0.6);
-                transition: all 0.4s ease;
-            `;
+        } catch (e) {
+            console.warn('Error en play-pause:', e);
         }
-        if (artworkContainer) artworkContainer.style.display = 'none';
-        if (icon) icon.className = 'fas fa-image';
-        mostrarMensajeFlotante('🎬 Modo video');
+    });
+
+    document.getElementById('np-next-btn')?.addEventListener('click', () => playNextVideo());
+    document.getElementById('np-prev-btn')?.addEventListener('click', () => playPrevVideo());
+
+    document.getElementById('np-shuffle-btn')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        btn.classList.toggle('active');
+        if (btn.classList.contains('active')) {
+            shufflePlaylist();
+            mostrarMensajeFlotante('🔀 Modo aleatorio activado');
         } else {
-        // Mostrar portada
-        if (videoContainer) {
-            videoContainer.style.cssText = `
-                width: 1px; height: 1px; overflow: hidden;
-                position: absolute; opacity: 0; pointer-events: none;
-            `;
+            mostrarMensajeFlotante('Modo aleatorio desactivado');
         }
-        if (artworkContainer) artworkContainer.style.display = 'block';
-        if (icon) icon.className = 'fas fa-film';
-        mostrarMensajeFlotante('🖼️ Modo portada');
+    });
+
+    let repeatMode = 0; // 0=off, 1=all, 2=one
+    document.getElementById('np-repeat-btn')?.addEventListener('click', (e) => {
+        repeatMode = (repeatMode + 1) % 3;
+        const btn = e.currentTarget;
+        const icon = btn.querySelector('i');
+        const modes = [
+            { class: '', icon: 'fa-redo', label: 'Repetición desactivada' },
+            { class: 'active', icon: 'fa-redo', label: '🔁 Repetir lista' },
+            { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
+        ];
+        btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
+        icon.className = `fas ${modes[repeatMode].icon}`;
+        window.repeatMode = repeatMode;
+        mostrarMensajeFlotante(modes[repeatMode].label);
+    });
+
+    // 2. Fix Modo Video / Portada con posicionamiento correcto
+    let videoMode = false;
+    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+        videoMode = !videoMode;
+        const videoContainer = document.getElementById('videoContainer');
+        const artworkContainer = document.querySelector('.np-artwork-container');
+        const icon = document.querySelector('#np-view-toggle i');
+        const nowPlaying = document.getElementById('spotify-now-playing');
+
+        if (videoMode) {
+            if (videoContainer && nowPlaying) {
+                videoContainer.removeAttribute('style');
+                videoContainer.style.cssText = `
+                    width: 100%;
+                    aspect-ratio: 16/9;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+                    position: relative;
+                    z-index: 5;
+                    flex-shrink: 0;
+                    transition: all 0.4s ease;
+                `;
+                // Insertar el video después del artwork para asegurar visibilidad
+                if (artworkContainer && artworkContainer.parentNode === nowPlaying) {
+                    nowPlaying.insertBefore(videoContainer, artworkContainer.nextSibling);
+                }
+            }
+            if (artworkContainer) artworkContainer.style.display = 'none';
+            if (icon) icon.className = 'fas fa-image';
+            mostrarMensajeFlotante('🎬 Modo video');
+        } else {
+            if (videoContainer) {
+                videoContainer.style.cssText = `
+                    width: 1px; height: 1px; overflow: hidden;
+                    position: absolute; opacity: 0; pointer-events: none;
+                `;
+            }
+            if (artworkContainer) artworkContainer.style.display = 'block';
+            if (icon) icon.className = 'fas fa-film';
+            mostrarMensajeFlotante('🖼️ Modo portada');
         }
-        });
-        
-        document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
-            this.isLiked = !this.isLiked;
-            const icon = e.currentTarget.querySelector('i');
-            icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
-            icon.style.color = this.isLiked ? '#1DB954' : '';
-            mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
-        });
-    }
+    });
+
+    document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
+        this.isLiked = !this.isLiked;
+        const icon = e.currentTarget.querySelector('i');
+        icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
+        icon.style.color = this.isLiked ? '#1DB954' : '';
+        mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
+    });
+}
 
     setupProgressBarScrubbing() {
         const bar = document.getElementById('np-progress-bar');
@@ -524,84 +561,55 @@ function displaySearchResultsPiped(results = []) {
     resultsDiv.innerHTML = '';
 
     if (!Array.isArray(results) || results.length === 0) {
-        resultsDiv.innerHTML = `
-            <div class="no-results-spotify">
-                <i class="fas fa-search"></i>
-                <p>No se encontraron resultados</p>
-                <small>Intenta con otra búsqueda</small>
-            </div>`;
+        resultsDiv.innerHTML = `<div class="no-results-spotify"><i class="fas fa-search"></i><p>Sin resultados</p></div>`;
         return;
     }
 
     const fragment = document.createDocumentFragment();
-
     results.forEach((video, index) => {
         if (!video?.videoId) return;
 
+        // ✅ Normalización de duración: asegurar que sea número desde el inicio
+        const durationSecs = parseDuration(video.duration);
+        const durationDisplay = durationSecs > 0 ? formatDuration(durationSecs) : '';
+
+        const normalizedVideo = {
+            videoId: video.videoId,
+            title: video.title || 'Sin título',
+            thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
+            duration: durationSecs,
+            artist: video.artist || video.uploaderName || video.author || 'YouTube'
+        };
+
         const el = document.createElement('div');
         el.className = 'result-spotify';
-        el.dataset.videoId = video.videoId;
-        el.style.animationDelay = `${index * 0.05}s`;
-
-        const durationStr = typeof video.duration === 'number'
-            ? formatDuration(video.duration)
-            : (video.duration || '');
-
+        el.style.animationDelay = `${index * 0.04}s`;
         el.innerHTML = `
             <div class="result-num">${index + 1}</div>
             <div class="result-thumb-container">
-                <img src="https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg"
-                     onerror="this.src='https://i.ytimg.com/vi/${video.videoId}/default.jpg'"
-                     alt="${video.title || ''}">
-                <div class="result-play-overlay">
-                    <i class="fas fa-play"></i>
-                </div>
+                <img src="${normalizedVideo.thumbnail}" onerror="this.src='https://i.ytimg.com/vi/${video.videoId}/default.jpg'">
+                <div class="result-play-overlay"><i class="fas fa-play"></i></div>
             </div>
             <div class="result-info">
-                <div class="result-title">${video.title || 'Sin título'}</div>
-                <div class="result-artist">${video.artist || video.uploaderName || 'Desconocido'}</div>
+                <div class="result-title">${normalizedVideo.title}</div>
+                <div class="result-artist">${normalizedVideo.artist}</div>
             </div>
-            <div class="result-duration">${durationStr}</div>
-            <button class="result-add-btn" title="Añadir a cola">
-                <i class="fas fa-plus"></i>
-            </button>
-            <button class="result-play-now-btn" title="Reproducir ahora">
-                <i class="fas fa-play-circle"></i>
-            </button>
+            <div class="result-duration">${durationDisplay}</div>
+            <button class="result-add-btn" title="Añadir a cola"><i class="fas fa-plus"></i></button>
+            <button class="result-play-now-btn" title="Reproducir ahora"><i class="fas fa-play-circle"></i></button>
         `;
+
         el.querySelector('.result-add-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            addToPlaylist({
-                videoId: video.videoId,
-                title: video.title,
-                thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
-                duration: parseDuration(video.duration), // ✅ convertir a número aquí
-                artist: video.artist || video.uploaderName || video.author || ''
-            });
+            addToPlaylist(normalizedVideo);
         });
-
         el.querySelector('.result-play-now-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            insertAndPlayNow({
-                videoId: video.videoId,
-                title: video.title,
-                thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
-                duration: parseDuration(video.duration),
-                artist: video.artist || video.uploaderName || video.author || ''
-            });
+            insertAndPlayNow(normalizedVideo);
         });
-
-        el.addEventListener('click', () => addToPlaylist({
-            videoId: video.videoId,
-            title: video.title,
-            thumbnail: `https://i.ytimg.com/vi/${video.videoId}/mqdefault.jpg`,
-            duration: parseDuration(video.duration),
-            artist: video.artist || video.uploaderName || video.author || ''
-        }));
-
+        el.addEventListener('click', () => addToPlaylist(normalizedVideo));
         fragment.appendChild(el);
     });
-
     resultsDiv.appendChild(fragment);
 }
 
@@ -713,8 +721,16 @@ function updatePlaylistDOM() {
     }
 
     // Actualizar botón iniciar
-    const iniciarBtn = document.getElementById('iniciarButton');
-    if (iniciarBtn) iniciarBtn.disabled = window.playlistVideos.length === 0;
+    const playBtn = document.getElementById('np-play-pause-btn');
+    if (playBtn) {
+    if (window.playlistVideos.length > 0) {
+        playBtn.style.opacity = '1';
+        playBtn.style.cursor = 'pointer';
+        playBtn.title = reproduccionIniciada ? 'Play/Pause' : '▶ Iniciar reproducción';
+    } else {
+        playBtn.style.opacity = '0.4';
+        playBtn.title = 'Añade canciones primero';
+    }
 }
 
 // =============================================
@@ -974,6 +990,7 @@ function playPrevVideo() {
 }
 
 function playNextVideo() {
+    Object.keys(_triggerCache).forEach(k => delete _triggerCache[k]);
     const list = window.playlistVideos;
 
     // Modo repetir uno
@@ -1066,6 +1083,8 @@ function stopMonitoring() {
     }
 }
 
+const _triggerCache = {}; // Cache global para tiempos de disparo
+
 function monitorPlayers() {
     if (typeof YT === 'undefined' || !player1 || !player2 || !playersInitialized) return;
 
@@ -1085,27 +1104,32 @@ function monitorPlayers() {
 
     if (!videoId || isNaN(duration) || duration <= 0) return;
 
-    // SponsorBlock
-    if (window.sponsorBlockManager?.checkAndSkip(currentPlayerInstance)) return;
-
-    // Calcular trigger
-    let triggerTime;
-    if (window.sponsorBlockManager) {
-        triggerTime = window.sponsorBlockManager.calculateCrossfadeTriggerTime(
-            duration, videoId, CROSSFADE_DURATION
-        );
-    } else {
-        triggerTime = duration - CROSSFADE_DURATION;
+    // SponsorBlock solo se procesa si no estamos ya en transición
+    if (!window.crossfadeTriggered) {
+        if (window.sponsorBlockManager?.checkAndSkip(currentPlayerInstance)) return;
     }
+
+    // ✅ Cachear triggerTime para evitar recalcular 2 veces por segundo
+    if (!_triggerCache[videoId]) {
+        if (window.sponsorBlockManager) {
+            _triggerCache[videoId] = window.sponsorBlockManager.calculateCrossfadeTriggerTime(duration, videoId, CROSSFADE_DURATION);
+        } else {
+            _triggerCache[videoId] = duration - CROSSFADE_DURATION;
+        }
+        console.log(`📍 TriggerTime establecido para ${videoId}: ${_triggerCache[videoId].toFixed(1)}s`);
+    }
+
+    const triggerTime = _triggerCache[videoId];
+
+    // ✅ Log reducido: cada 30 segundos en lugar de cada 5
     const flooredTime = Math.floor(currentTime);
-    if (flooredTime % 5 === 0 && flooredTime !== window._lastLogTime) {
+    if (flooredTime % 30 === 0 && flooredTime !== window._lastLogTime) {
         window._lastLogTime = flooredTime;
-        console.log(`⏱️ P${currentPlayer} | ${currentTime.toFixed(1)}/${duration.toFixed(1)}s | Trigger@${triggerTime.toFixed(1)}s`);
+        console.log(`⏱️ P${currentPlayer} activo | ${flooredTime}s / ${duration.toFixed(0)}s | Mezcla@${triggerTime.toFixed(0)}s`);
     }
 
     if (currentTime >= triggerTime && !window.crossfadeTriggered) {
         window.crossfadeTriggered = true;
-        console.log(`🔀 CROSSFADE disparado en ${currentTime.toFixed(1)}s`);
         playNextVideo();
     }
 }
