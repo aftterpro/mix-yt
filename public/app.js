@@ -232,7 +232,7 @@ class NowPlayingManager {
         });
     }
 
-  setupControls() {
+ setupControls() {
     // 1. Unificación de Play/Pause e Inicio de Reproducción
     document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
         const player = currentPlayer === 1 ? player1 : player2;
@@ -262,12 +262,13 @@ class NowPlayingManager {
         if (!player || typeof player.getPlayerState !== 'function') return;
         try {
             const state = player.getPlayerState();
+            const icon = document.getElementById('np-play-icon');
             if (state === YT.PlayerState.PLAYING) {
                 player.pauseVideo();
-                document.getElementById('np-play-icon').className = 'fas fa-play';
+                if (icon) icon.className = 'fas fa-play';
             } else {
                 player.playVideo();
-                document.getElementById('np-play-icon').className = 'fas fa-pause';
+                if (icon) icon.className = 'fas fa-pause';
             }
         } catch (e) {
             console.warn('Error en play-pause:', e);
@@ -299,38 +300,47 @@ class NowPlayingManager {
             { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
         ];
         btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
-        icon.className = `fas ${modes[repeatMode].icon}`;
+        if (icon) icon.className = `fas ${modes[repeatMode].icon}`;
         window.repeatMode = repeatMode;
         mostrarMensajeFlotante(modes[repeatMode].label);
     });
 
-    // 2.   Modo Video / Portada con posicionamiento correcto
+    // 2. Modo Video / Portada con posicionamiento corregido
     let videoMode = false;
-   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-    videoMode = !videoMode;
-    const videoContainer = document.getElementById('videoContainer');
-    const artworkContainer = document.querySelector('.np-artwork-container');
-    const icon = document.querySelector('#np-view-toggle i');
+    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+        videoMode = !videoMode;
+        const videoContainer = document.getElementById('videoContainer');
+        const artworkContainer = document.querySelector('.np-artwork-container');
+        const icon = document.querySelector('#np-view-toggle i');
 
-    if (videoMode) {
-        videoContainer.style.display = 'block'; // Mostrar video
-        videoContainer.style.opacity = '1';
-        videoContainer.style.pointerEvents = 'auto';
-        if (artworkContainer) artworkContainer.style.display = 'none';
-        if (icon) icon.className = 'fas fa-image';
-        mostrarMensajeFlotante('🎬 Modo video');
-    } else {
-        videoContainer.style.display = 'none'; // Ocultar video
-        if (artworkContainer) artworkContainer.style.display = 'block';
-        if (icon) icon.className = 'fas fa-film';
-        mostrarMensajeFlotante('🖼️ Modo portada');
-    }
-});
+        if (videoMode) {
+            // Mostrar video con posición relativa para no romper el layout
+            videoContainer.style.display = 'block'; 
+            videoContainer.style.position = 'relative';
+            videoContainer.style.opacity = '1';
+            videoContainer.style.pointerEvents = 'auto';
+            if (artworkContainer) artworkContainer.style.display = 'none';
+            if (icon) icon.className = 'fas fa-image';
+            mostrarMensajeFlotante('🎬 Modo video');
+        } else {
+            // Ocultar video y restaurar visibilidad de la portada
+            videoContainer.style.display = 'none'; 
+            if (artworkContainer) {
+                artworkContainer.style.display = 'block';
+                artworkContainer.style.opacity = '1';
+            }
+            if (icon) icon.className = 'fas fa-film';
+            mostrarMensajeFlotante('🖼️ Modo portada');
+        }
+    });
+
     document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
         this.isLiked = !this.isLiked;
         const icon = e.currentTarget.querySelector('i');
-        icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
-        icon.style.color = this.isLiked ? '#1DB954' : '';
+        if (icon) {
+            icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
+            icon.style.color = this.isLiked ? '#1DB954' : '';
+        }
         mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
     });
 }
