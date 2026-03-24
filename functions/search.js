@@ -63,8 +63,9 @@ export async function onRequest(context) {
       const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       const res = await fetch(searchUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept-Language": "es-ES,es;q=0.9"
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+        "Accept-Language": "es-ES,es;q=0.9",
+        "Service-Worker-Navigation-Preload": "true" 
         }
       });
       
