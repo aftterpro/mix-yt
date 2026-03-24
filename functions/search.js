@@ -1,13 +1,14 @@
 export async function onRequest(context) {
-  const { request } = context;
-  const url = new URL(request.url);
-  const query = url.searchParams.get("q");
-  const playlistId = url.searchParams.get("id");
+  const { request, env } = context; //
+  const url = new URL(request.url); //
+  const query = url.searchParams.get("q"); //
+  const playlistId = url.searchParams.get("id"); //
+  const authHeader = request.headers.get("Authorization"); 
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization", 
     "Content-Type": "application/json"
   };
 
@@ -17,10 +18,27 @@ export async function onRequest(context) {
 
   try {
     let items = [];
-
-    // CASO 1: Búsqueda de Playlist
-    if (playlistId) {
-      // Usamos el endpoint AJAX de YouTube que es ligero y devuelve JSON
+    if (authHeader && query) {
+      const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=25&key=${env.YOUTUBE_API_KEY || ''}`;
+      
+      const res = await fetch(apiUrl, {
+        headers: { "Authorization": authHeader }
+      });
+      
+      const data = await res.json();
+      
+      if (data.items) {
+        items = data.items.map(v => ({
+          videoId: v.id.videoId,
+          title: v.snippet.title,
+          thumbnail: v.snippet.thumbnails.medium.url,
+          artist: v.snippet.channelTitle,
+          duration: "0:00" 
+        }));
+      }
+    } 
+ 
+    else if (playlistId) {
       const res = await fetch(`https://www.youtube.com/list_ajax?style=json&action_get_list=1&list=${playlistId}`, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
@@ -41,28 +59,22 @@ export async function onRequest(context) {
         }));
       }
     } 
-    // CASO 2: Búsqueda normal por palabras
     else if (query) {
       const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
       const res = await fetch(searchUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept-Language": "es-ES,es;q=0.9"
         }
       });
       
       const html = await res.text();
-      
-      // Extraemos el JSON incrustado en el HTML (ytInitialData)
-      // Esta regex busca el objeto JSON que contiene los resultados
       const match = html.match(/ytInitialData\s*=\s*({.+?});/);
       
       if (match && match[1]) {
-        const json = JSON.parse(match[1]);
-        
-        // Navegamos por la estructura profunda de YouTube
-        const contents = json.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
-        const itemSection = contents?.find(c => c.itemSectionRenderer)?.itemSectionRenderer?.contents;
+        const json = JSON.parse(match[1]); 
+        const contents = json.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents; //
+        const itemSection = contents?.find(c => c.itemSectionRenderer)?.itemSectionRenderer?.contents; //
         
         if (itemSection) {
           items = itemSection
