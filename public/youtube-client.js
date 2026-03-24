@@ -12,24 +12,27 @@ constructor() {
     }
     
 async search(query) {
-        const cleanQuery = query.trim();
-        if (!cleanQuery) return { items: [] };
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return { items: [] };
 
-         const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
-        
-        try {
-            const data = await this.fetchWithRetry(url);
-            
-            if (data.error && data.error.includes("bot")) {
-                window.mostrarMensajeFlotante?.("⚠️ YouTube requiere verificación. Intenta loguearte.");
-            }
-            
-            return data;
-        } catch (error) {
-            console.error("❌ Error en búsqueda:", error);
-            return { items: [] };
-        }
+        const token = localStorage.getItem('yt_access_token');
+    const headers = { "Content-Type": "application/json" };
+    
+     if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
     }
+
+    const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
+    
+    try {
+        const response = await fetch(url, { headers }); // Enviamos las cabeceras
+        if (!response.ok) throw new Error("Error en la respuesta del servidor");
+        return await response.json();
+    } catch (error) {
+        console.error("❌ Error en búsqueda:", error);
+        return { items: [] };
+    }
+}
     
 async fetchWithRetry(url, attempt = 1) {
         try {
