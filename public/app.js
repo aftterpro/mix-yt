@@ -903,7 +903,7 @@ function initializePlayers() {
     if (player1 && player2) return;
     const cfg = {
         height: '100%', width: '100%',
-        playerVars: { origin: window.location.origin, enablejsapi: 1, controls: 0, rel: 0, modestbranding: 1 },
+        playerVars: { origin: window.location.origin, enablejsapi: 1, controls: 0, rel: 0, modestbranding: 1, widget_referrer: window.location.href, playsinline: 1 },
         events: {
             onReady: onPlayerReady,
             onStateChange: onPlayerStateChange,
@@ -1206,6 +1206,7 @@ function askToRepeatPlaylist() {
 // =============================================
 // BÚSQUEDA
 // =============================================
+
 const performSearch = async (query) => {
     const resultsContainer = document.getElementById('results');
     if (!resultsContainer || !query || query.trim().length < 2) return;
@@ -1213,21 +1214,41 @@ const performSearch = async (query) => {
     const q = query.trim();
     if (window.smartSearch) window.smartSearch.saveSearch(q);
 
-    const genresGrid = document.getElementById('genres-grid');
-    if (genresGrid) genresGrid.style.display = 'none';
-
     resultsContainer.innerHTML = `<div class="search-loading"><span>Buscando "${q}"...</span></div>`;
 
     try {
-        if (!window.youtubeJSClient) throw new Error('Cliente no disponible');
-        const data = await window.youtubeJSClient.search(q);
-        if (!data?.items?.length) {
-            resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Sin resultados</p></div>`;
-            return;
+        let items = [];
+     
+        if (window.isAuthorized && window.gapi?.client?.youtube) {
+            console.log("🔍 Buscando vía GAPI oficial...");
+            const response = await gapi.client.youtube.search.list({
+                part: 'snippet',
+                q: q,
+                maxResults: 25,
+                type: 'video'
+            });
+            items = response.result.items.map(v => ({
+                videoId: v.id.videoId,
+                title: v.snippet.title,
+                thumbnail: v.snippet.thumbnails.medium.url,
+                artist: v.snippet.channelTitle,
+                duration: "0:00"
+            }));
+        } else {
+         
+            console.log("🌐 Buscando vía Backend Proxy...");
+            const data = await window.youtubeJSClient.search(q);
+            items = data.items || [];
         }
-        displaySearchResultsPiped(data.items);
+
+        if (items.length === 0) {
+            resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Sin resultados</p></div>`;
+        } else {
+            displaySearchResultsPiped(items);
+        }
     } catch (e) {
-        resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Error al buscar</p></div>`;
+        console.error('Error:', e);
+        resultsContainer.innerHTML = `<div class="no-results-spotify"><p>YouTube bloqueó la conexión</p></div>`;
     }
 };
 
