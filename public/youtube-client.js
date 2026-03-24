@@ -1,66 +1,67 @@
 class YouTubeSimplifiedClient {
-    constructor() {
-       this.baseUrl = "/search";
+constructor() {
+        this.baseUrl = "/search";  
         this.maxRetries = 3;
-        this.retryDelay = 1000;
-        
-        console.log("✅ YouTube Client conectado a backend remoto:", this.baseUrl);
+        this.retryDelay = 2000;  
+        console.log("✅ YouTube Client activo con mitigación de bloqueos");
     }
     
-    async init() {
+   async init() {
         this.initialized = true;
-        console.log(' YouTube Client inicializado');
         return true;
     }
     
 async search(query) {
-    const cleanQuery = query.trim();
-    if (!cleanQuery) return { items: [] };
+        const cleanQuery = query.trim();
+        if (!cleanQuery) return { items: [] };
 
-    const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
-    
-    try {
-        const data = await this.fetchWithRetry(url);
-        return data;
-    } catch (error) {
-        console.error("❌ Error en búsqueda:", error);
-        return { items: [] };
+         const url = `${this.baseUrl}?q=${encodeURIComponent(cleanQuery)}`;
+        
+        try {
+            const data = await this.fetchWithRetry(url);
+            
+            if (data.error && data.error.includes("bot")) {
+                window.mostrarMensajeFlotante?.("⚠️ YouTube requiere verificación. Intenta loguearte.");
+            }
+            
+            return data;
+        } catch (error) {
+            console.error("❌ Error en búsqueda:", error);
+            return { items: [] };
+        }
     }
-}
     
 async fetchWithRetry(url, attempt = 1) {
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000); 
 
-        const response = await fetch(url, {
-            signal: controller.signal,
-            mode: "cors"
-        });
+            const response = await fetch(url, {
+                signal: controller.signal,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'  
+                }
+            });
 
-        clearTimeout(timeout);
+            clearTimeout(timeout);
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            if (response.status === 429) {
+                throw new Error("Demasiadas peticiones (Bot detection)");
+            }
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            return await response.json();
+
+        } catch (error) {
+            if (attempt >= this.maxRetries) throw error;
+            
+            const delay = this.retryDelay * attempt;
+            console.warn(`⚠️ YouTube bloqueó la petición. Reintentando en ${delay}ms...`);
+            await new Promise(res => setTimeout(res, delay));
+            return this.fetchWithRetry(url, attempt + 1);
         }
-
-        return await response.json();
-
-    } catch (error) {
-
-        if (attempt >= this.maxRetries) {
-            console.error("❌ Fetch falló definitivamente:", error.message);
-            throw error;
-        }
-
-        const delay = this.retryDelay * attempt;
-        console.warn(`⚠️ Reintentando en ${delay}ms...`);
-
-        await new Promise(res => setTimeout(res, delay));
-
-        return this.fetchWithRetry(url, attempt + 1);
     }
-}
 }
 // =============================================
 // SPONSORBLOCK - Sistema de Detección y Salto
