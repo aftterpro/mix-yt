@@ -11,10 +11,7 @@ const CROSSFADE_DURATION = 12;
 
 window.playersInitialized = false;
 let currentPlayer = 1;
-let reproduccionIniciada = false;
-
 let player1, player2;
-
 
 window.playlistVideos = [];
 let playlistVideos = window.playlistVideos;
