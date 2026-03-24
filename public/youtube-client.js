@@ -288,7 +288,6 @@ window.testSponsorBlock = async function(videoId) {
     console.log('🧪 === FIN TEST ===');
 };
 
-// Usar en consola: testSponsorBlock('OK_KvknlJxA')
 window.youtubeClientUtils = {
     formatDuration: (seconds) => {
         if (!seconds || isNaN(seconds) || seconds < 0) return '0:00';
@@ -353,7 +352,50 @@ window.youtubeClientUtils = {
         return null;
     }
 };
+let player1Ready = false;
+let player2Ready = false;
 
+window.initializePlayers = function() {
+    if (window._playersCreated) return;
+    window._playersCreated = true;
+
+    const commonVars = { 
+        origin: window.location.origin, 
+        enablejsapi: 1, 
+        controls: 0, 
+        rel: 0, 
+        modestbranding: 1,
+        playsinline: 1
+    };
+
+    window.player1 = new YT.Player('player1', {
+        height: '100%', width: '100%',
+        playerVars: commonVars,
+        events: {
+            onReady: (e) => {
+                player1Ready = true;
+                console.log('✅ Player 1 listo');
+                if (player1Ready && player2Ready) window.playersInitialized = true;
+            },
+            onStateChange: window.onPlayerStateChange,
+            onError: window.onPlayerError
+        }
+    });
+
+    window.player2 = new YT.Player('player2', {
+        height: '100%', width: '100%',
+        playerVars: commonVars,
+        events: {
+            onReady: (e) => {
+                player2Ready = true;
+                console.log('✅ Player 2 listo');
+                if (player1Ready && player2Ready) window.playersInitialized = true;
+            },
+            onStateChange: window.onPlayerStateChange,
+            onError: window.onPlayerError
+        }
+    });
+};
 // =============================================
 // EXPORTAR INSTANCIA GLOBAL
 // =============================================
