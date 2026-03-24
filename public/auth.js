@@ -3,7 +3,7 @@
 // =============================================
 
 let CLIENT_ID = null;
-
+window.isAuthorized = true;
 const SCOPES = 'https://www.googleapis.com/auth/youtube.readonly';
 let isAuthorized = false;
 let tokenClient = null;
