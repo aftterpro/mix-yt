@@ -9,8 +9,12 @@ const CONFIG = {
 
 const CROSSFADE_DURATION = 12;
 
-let player1, player2;
+window.playersInitialized = false;
 let currentPlayer = 1;
+let reproduccionIniciada = false;
+
+let player1, player2;
+
 
 window.playlistVideos = [];
 let playlistVideos = window.playlistVideos;
@@ -883,20 +887,20 @@ function enableDragAndDrop() {
 // REPRODUCCIÓN Y CROSSFADE
 // =============================================
 function loadYouTubeAPI() {
-    if (youtubeAPIReady || window.YT) return;
-    youtubeAPIReady = true;
-    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) return;
-
+    if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        if (window.YT && window.YT.Player) window.initializePlayers();
+        return;
+    }
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
     script.async = true;
-
-    window.onYouTubeIframeAPIReady = () => {
-        console.log('✅ YouTube API cargada');
-        initializePlayers();
-    };
     document.head.appendChild(script);
-}
+    }
+
+window.onYouTubeIframeAPIReady = () => {
+    console.log('✅ YouTube API lista');
+    window.initializePlayers();
+};
 
 function initializePlayers() {
     if (player1 && player2) return;
@@ -1172,21 +1176,29 @@ function displayPlaylist(playlist) {
     mostrarMensajeFlotante(`✅ Añadidas ${loaded.length} canciones a la cola`);
     updatePlaylistDOM();
 }
-
 function playFirstVideo() {
-    if (!playersInitialized || window.playlistVideos.length === 0) return;
-
+    if (!window.playersInitialized) {
+        console.warn('Players no listos, reintentando...');
+        setTimeout(playFirstVideo, 300);
+        return;
+    }
     const video = window.playlistVideos[currentIndex];
-    player1.loadVideoById(video.videoId);
-    document.getElementById('player1').classList.remove('hidden');
-    document.getElementById('player2').classList.add('hidden');
+    if (!video) return;
+
+    currentPlayer = 1;
+    window.crossfadeTriggered = false;
+
+    // Reset visual del container para asegurar que YT active el autoplay
+    const vc = document.getElementById('videoContainer');
+    if (vc) vc.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px;top:-9999px;';
+
+    window.player1.loadVideoById(video.videoId);
+    window.player1.setVolume(80);
 
     if (window.nowPlayingManager) window.nowPlayingManager.update(video);
-
-    if (window.sponsorBlockManager) {
-        window.sponsorBlockManager.cargarSegmentos(video.videoId).catch(() => {});
-    }
     startMonitoring();
+    updatePlaylistDOM();
+    mostrarMensajeFlotante(`▶️ Reproduciendo: ${video.title}`);
 }
 
 function askToRepeatPlaylist() {
@@ -1199,34 +1211,26 @@ function askToRepeatPlaylist() {
 // =============================================
 const performSearch = async (query) => {
     const resultsContainer = document.getElementById('results');
-    if (!resultsContainer) return;
+    if (!resultsContainer || !query || query.trim().length < 2) return;
 
-    if (window.smartSearch) window.smartSearch.saveSearch(query);
+    const q = query.trim();
+    if (window.smartSearch) window.smartSearch.saveSearch(q);
 
-    resultsContainer.innerHTML = `
-        <div class="search-loading">
-            <div class="search-loading-spinner"></div>
-            <span>Buscando "${query}"...</span>
-        </div>`;
+    const genresGrid = document.getElementById('genres-grid');
+    if (genresGrid) genresGrid.style.display = 'none';
 
-    if (!window.youtubeJSClient) {
-        resultsContainer.innerHTML = '<div class="no-results-spotify"><p>Cliente no inicializado</p></div>';
-        return;
-    }
+    resultsContainer.innerHTML = `<div class="search-loading"><span>Buscando "${q}"...</span></div>`;
 
     try {
-        const data = await window.youtubeJSClient.search(query);
-        if (!data.items?.length) {
-            resultsContainer.innerHTML = `
-                <div class="no-results-spotify">
-                    <i class="fas fa-search"></i>
-                    <p>Sin resultados para "${query}"</p>
-                </div>`;
+        if (!window.youtubeJSClient) throw new Error('Cliente no disponible');
+        const data = await window.youtubeJSClient.search(q);
+        if (!data?.items?.length) {
+            resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Sin resultados</p></div>`;
             return;
         }
         displaySearchResultsPiped(data.items);
     } catch (e) {
-        resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Error: ${e.message}</p></div>`;
+        resultsContainer.innerHTML = `<div class="no-results-spotify"><p>Error al buscar</p></div>`;
     }
 };
 
@@ -1648,40 +1652,21 @@ class RelatedManager {
 // INICIALIZACIÓN
 // =============================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 YT CrossMix Spotify Mode iniciando...');
+    console.log('🚀 YT CrossMix iniciando...');
+    
+    // 1. Exportar funciones y cargar config de Auth
+    if (window.youtubeJSClient) await window.youtubeJSClient.init();
 
-    // Exportar funciones globales
-    window.updatePlaylistDOM = updatePlaylistDOM;
-    window.playNextVideo = playNextVideo;
-    window.addToPlaylist = addToPlaylist;
-    window.deleteVideo = deleteVideo;
-    window.clearPlaylist = clearPlaylist;
-    window.shufflePlaylist = shufflePlaylist;
-
-    // Inicializar managers
+    // 2. Inicializar UI Managers 
     window.nowPlayingManager = new NowPlayingManager();
     window.lyricsManager = new LyricsManager();
     window.relatedManager = new RelatedManager();
     window.smartSearch = new SmartSearch();
 
-    // Cargar API YouTube
+    // 3. Cargar API de YouTube
     loadYouTubeAPI();
+
+    // 4. Setup de eventos
     setupEventListeners();
-
-    // Inicializar cliente YouTube
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.disabled = true;
-        searchInput.placeholder = 'Cargando...';
-    }
-
-    if (window.youtubeJSClient) {
-        await window.youtubeJSClient.init();
-        if (searchInput) {
-            searchInput.disabled = false;
-            searchInput.placeholder = '🔍 Busca artistas, canciones...';
-        }
-    }
-
-    mostrarMensajeFlotante('🎵 YT CrossMix listo — Añade una playlist para comenzar');
+    updatePlaylistDOM();
 });
