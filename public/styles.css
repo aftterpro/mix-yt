@@ -37,7 +37,7 @@
 
 body {
     font-family: var(--font-main);
-    background: var(--spotify-black);
+    background: linear-gradient(135deg, #020617, #0f172a);
     color: var(--spotify-text);
     min-height: 100vh;
     display: flex;
@@ -192,7 +192,48 @@ section h2 {
     align-items: center;
     gap: 4px;
 }
+/* paneles   */
+.sidebar, .library, .player {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+}
+.sidebar *, .library * {
+  border-color: rgba(255,255,255,0.06) !important;
+}
+/* botones */
+button {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: all 0.2s ease;
+}
 
+button:hover {
+  background: #22c55e;
+  color: black;
+  transform: scale(1.05);
+}
+/* play más visible */
+button.play {
+  background: #22c55e;
+  color: black;
+  transform: scale(1.15);
+}
+/* progreso */
+.progress {
+  height: 5px;
+  background: #1f2937;
+  border-radius: 10px;
+}
+
+.progress-fill {
+  background: #22c55e;
+}
+/* texto */
+.muted {
+  color: #9ca3af;
+}
 .genre-chip:hover { background: #3a3a3a; color: var(--spotify-text); border-color: rgba(255,255,255,0.2); }
 .genre-chip.active { background: var(--spotify-green); color: #000; font-weight: 700; border-color: transparent; }
 
