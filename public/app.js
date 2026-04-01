@@ -323,8 +323,8 @@ class NowPlayingManager {
             if (icon) icon.className = 'fas fa-image';
             mostrarMensajeFlotante('🎬 Modo video');
         } else {
-            // Ocultar video — volver a posición fuera de pantalla para mantener audio
-            videoContainer.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;overflow:hidden;';
+            
+            videoContainer.style.cssText = 'width:300px;height:200px;position:absolute;z-index:-10;opacity:0.01;pointer-events:none;overflow:hidden;';
             if (artworkContainer) {
                 artworkContainer.style.display = 'block';
                 artworkContainer.style.opacity = '1';
@@ -1220,10 +1220,10 @@ function playFirstVideo() {
     // Mantener videoContainer en DOM pero oculto visualmente (sin sacarlo del viewport)
     // para que el autoplay de YouTube funcione
     const vc = document.getElementById('videoContainer');
-    if (vc && vc.style.display === 'none') {
-        // Solo forzar visibilidad mínima si está completamente hidden
-        vc.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;overflow:hidden;';
-    }
+   if (vc && vc.style.display === 'none') {
+    // Mantener un tamaño válido para engañar al sistema anti-bots de YT
+    vc.style.cssText = 'width:300px;height:200px;position:absolute;z-index:-10;opacity:0.01;pointer-events:none;overflow:hidden;';
+}
 
     window.player1.loadVideoById(video.videoId);
     window.player1.setVolume(80);
