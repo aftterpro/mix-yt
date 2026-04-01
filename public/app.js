@@ -12,7 +12,7 @@ const CROSSFADE_DURATION = 12;
 window.playersInitialized = false;
 let currentPlayer = 1;
 let player1, player2;
-
+let playerReady = false;
 window.playlistVideos = [];
 let playlistVideos = window.playlistVideos;
 let manualVideos = [];
@@ -917,10 +917,11 @@ function initializePlayers() {
 }
 
 function onPlayerReady() {
-    if (player1 && player2) {
-        playersInitialized = true;
-        console.log('✅ Ambos reproductores listos');
-    }
+   playerReady = true;
+  console.log("Player listo");
+  if (typeof playFirstVideo === "function") {
+    playFirstVideo();
+  }
 }
 
 function onPlayerError(event) {
@@ -1174,11 +1175,10 @@ function displayPlaylist(playlist) {
     updatePlaylistDOM();
 }
 function playFirstVideo() {
-    if (!window.playersInitialized) {
-        console.warn('Players no listos, reintentando...');
-        setTimeout(playFirstVideo, 300);
-        return;
-    }
+    if (!playerReady || !player || typeof player.loadVideoById !== "function") {
+    console.log("⏳ Players no listos, reintentando...");
+    return; // ❌ quitamos loop infinito
+  }
     const video = window.playlistVideos[currentIndex];
     if (!video) return;
 
@@ -1197,11 +1197,30 @@ function playFirstVideo() {
     updatePlaylistDOM();
     mostrarMensajeFlotante(`▶️ Reproduciendo: ${video.title}`);
 }
+function getThumbnail(videoId) {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+}
 
+// fallback seguro
+function safeThumbnail(img, videoId) {
+  img.onerror = () => {
+    img.src = "https://via.placeholder.com/320x180?text=No+Image";
+  };
+  img.src = getThumbnail(videoId);
+}
 function askToRepeatPlaylist() {
     mostrarMensajeFlotante('✅ Fin de la lista');
     stopMonitoring();
 }
+// limpia spam de youtube 
+window.addEventListener('error', (e) => {
+  if (
+    e.message?.includes('youtube.com') ||
+    e.message?.includes('ERR_BLOCKED_BY_CLIENT')
+  ) {
+    e.preventDefault();
+  }
+});
 
 // =============================================
 // BÚSQUEDA
