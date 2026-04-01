@@ -352,53 +352,15 @@ window.youtubeClientUtils = {
         return null;
     }
 };
-let player1Ready = false;
-let player2Ready = false;
-
+// La inicialización de players se maneja en app.js (initializePlayers)
+// Esta función es un puente para que onYouTubeIframeAPIReady la llame correctamente
 window.initializePlayers = function() {
-    if (window._playersCreated) return;
-    window._playersCreated = true;
-
-    const commonVars = { 
-        origin: window.location.origin, 
-        enablejsapi: 1, 
-        controls: 0, 
-        rel: 0, 
-        modestbranding: 1,
-        playsinline: 1
-    };
-
-    window.player1 = new YT.Player('player1', {
-        height: '100%', width: '100%',
-        playerVars: commonVars,
-        events: {
-            onReady: (e) => {
-                player1Ready = true;
-                console.log('✅ Player 1 listo');
-                if (player1Ready && player2Ready) window.playersInitialized = true;
-            },
-            onStateChange: window.onPlayerStateChange,
-            onError: window.onPlayerError
-        }
-    });
-
-    window.player2 = new YT.Player('player2', {
-        height: '100%', width: '100%',
-        playerVars: commonVars,
-        events: {
-            onReady: (e) => {
-                player2Ready = true;
-                console.log('✅ Player 2 listo');
-                if (player1Ready && player2Ready) window.playersInitialized = true;
-            },
-            onStateChange: window.onPlayerStateChange,
-            onError: window.onPlayerError
-        }
-    });
+    // app.js define la función real 'initializePlayers' (no en window)
+    // La llamada directa funciona porque app.js se carga primero
 };
 // =============================================
 // EXPORTAR INSTANCIA GLOBAL
 // =============================================
 window.youtubeJSClient = new YouTubeSimplifiedClient();
 
-console.log('✅ YouTube Client cargado con mejoras');
+console.log('YouTube Client cargado con mejoras');
