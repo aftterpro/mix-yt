@@ -315,17 +315,16 @@ class NowPlayingManager {
         const icon = document.querySelector('#np-view-toggle i');
 
         if (videoMode) {
-            // Mostrar video con posición relativa para no romper el layout
-            videoContainer.style.display = 'block'; 
-            videoContainer.style.position = 'relative';
+            // Restaurar videoContainer al flujo normal del layout
+            videoContainer.style.cssText = 'display:block; position:relative; width:100%; aspect-ratio:16/9; left:auto; top:auto; overflow:hidden;';
             videoContainer.style.opacity = '1';
             videoContainer.style.pointerEvents = 'auto';
             if (artworkContainer) artworkContainer.style.display = 'none';
             if (icon) icon.className = 'fas fa-image';
             mostrarMensajeFlotante('🎬 Modo video');
         } else {
-            // Ocultar video y restaurar visibilidad de la portada
-            videoContainer.style.display = 'none'; 
+            // Ocultar video — volver a posición fuera de pantalla para mantener audio
+            videoContainer.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;overflow:hidden;';
             if (artworkContainer) {
                 artworkContainer.style.display = 'block';
                 artworkContainer.style.opacity = '1';
@@ -885,27 +884,47 @@ function enableDragAndDrop() {
 // =============================================
 function loadYouTubeAPI() {
     if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        if (window.YT && window.YT.Player) window.initializePlayers();
+        if (window.YT && window.YT.Player) initializePlayers();
         return;
     }
     const script = document.createElement('script');
     script.src = 'https://www.youtube.com/iframe_api';
     script.async = true;
     document.head.appendChild(script);
-    }
+}
 
 window.onYouTubeIframeAPIReady = () => {
     console.log('✅ YouTube API lista');
-    window.initializePlayers();
+    initializePlayers();
+    window.initializePlayers = initializePlayers; // exponer para youtube-client.js
 };
 
 function initializePlayers() {
-    if (player1 && player2) return;
+    if (window._appPlayersCreated) return;
+    window._appPlayersCreated = true;
+
+    let p1Ready = false;
+    let p2Ready = false;
+
+    function checkBothReady() {
+        if (p1Ready && p2Ready) {
+            playersInitialized = true;
+            window.playersInitialized = true;
+            playerReady = true;
+            console.log('✅ Ambos players inicializados y listos');
+        }
+    }
+
     const cfg = {
         height: '100%', width: '100%',
         playerVars: { origin: window.location.origin, enablejsapi: 1, controls: 0, rel: 0, modestbranding: 1, widget_referrer: window.location.href, playsinline: 1 },
         events: {
-            onReady: onPlayerReady,
+            onReady: function(e) {
+                const id = e.target.getIframe().id;
+                if (id === 'player1') p1Ready = true;
+                if (id === 'player2') p2Ready = true;
+                checkBothReady();
+            },
             onStateChange: onPlayerStateChange,
             onError: onPlayerError
         }
@@ -917,11 +936,16 @@ function initializePlayers() {
 }
 
 function onPlayerReady() {
-   playerReady = true;
-  console.log("Player listo");
-  if (typeof playFirstVideo === "function") {
-    playFirstVideo();
-  }
+    playerReady = true;
+    // Verificar si ambos players están listos
+    const p1ok = window.player1 && typeof window.player1.loadVideoById === 'function';
+    const p2ok = window.player2 && typeof window.player2.loadVideoById === 'function';
+    if (p1ok && p2ok) {
+        playersInitialized = true;
+        window.playersInitialized = true;
+        console.log("✅ Ambos players listos");
+    }
+    // NO iniciar reproducción automáticamente — el usuario debe presionar play
 }
 
 function onPlayerError(event) {
@@ -933,8 +957,13 @@ function onPlayerError(event) {
         150: 'Incrustación no permitida.'
     };
     const msg = errores[event.data] || 'Error del reproductor';
+    console.warn(`⚠️ Error YT [${event.data}]: ${msg}`);
     mostrarMensajeFlotante(`⚠️ ${msg} - Siguiente video...`);
-    if ([5, 100, 101, 150].includes(event.data)) setTimeout(() => playNextVideo(), 1500);
+    // Error 2 puede ocurrir si el player aún no está completamente listo;
+    // solo saltar si hay una lista activa con reproducción iniciada
+    if ([2, 5, 100, 101, 150].includes(event.data) && reproduccionIniciada) {
+        setTimeout(() => playNextVideo(), 1500);
+    }
 }
 
 function onPlayerStateChange(event) {
@@ -1175,19 +1204,26 @@ function displayPlaylist(playlist) {
     updatePlaylistDOM();
 }
 function playFirstVideo() {
-    if (!playerReady || !player || typeof player.loadVideoById !== "function") {
-    console.log("⏳ Players no listos, reintentando...");
-    return; // ❌ quitamos loop infinito
-  }
+    // Verificar que ambos players estén inicializados correctamente
+    if (!window.playersInitialized || !window.player1 || typeof window.player1.loadVideoById !== "function") {
+        console.log("⏳ Players no listos, reintentando...");
+        setTimeout(playFirstVideo, 300);
+        return;
+    }
+
     const video = window.playlistVideos[currentIndex];
     if (!video) return;
 
     currentPlayer = 1;
     window.crossfadeTriggered = false;
 
-    // Reset visual del container para asegurar que YT active el autoplay
+    // Mantener videoContainer en DOM pero oculto visualmente (sin sacarlo del viewport)
+    // para que el autoplay de YouTube funcione
     const vc = document.getElementById('videoContainer');
-    if (vc) vc.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px;top:-9999px;';
+    if (vc && vc.style.display === 'none') {
+        // Solo forzar visibilidad mínima si está completamente hidden
+        vc.style.cssText = 'width:1px;height:1px;position:fixed;left:-9999px;top:-9999px;overflow:hidden;';
+    }
 
     window.player1.loadVideoById(video.videoId);
     window.player1.setVolume(80);
