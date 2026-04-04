@@ -1552,7 +1552,7 @@ class LyricsManager {
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 7000);
 
-        const res = await fetch(`http://150.230.81.137:5000/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
+        const res = await fetch(`http://20.63.18.153:5000/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
         const data = await res.json();
         if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
         return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
