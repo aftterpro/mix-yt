@@ -64,3 +64,4 @@ def get_lyrics(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(json.dumps({"error": str(e)}), status_code=500)
 
     return func.HttpResponse(json.dumps({"message": "No encontrado"}), status_code=404)
+
