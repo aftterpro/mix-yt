@@ -1553,6 +1553,7 @@ class LyricsManager {
         setTimeout(() => ctrl.abort(), 7000);
 
         const res = await fetch(`https://api-letras-e8g5gvahc3hqb5ae.eastus-01.azurewebsites.net/api/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
+        console.log("Url consultada: ", res);
         const data = await res.json();
         if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
         return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
