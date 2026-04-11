@@ -1560,7 +1560,7 @@ class LyricsManager {
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 7000);
 
-        const res = await fetch(`http://137.131.175.179:5000/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
+        const res = await fetch(`https://prescribed-marks-neighbors-southwest.trycloudflare.com/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
         console.log("Url consultada: ", res);
         const data = await res.json();
         if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
