@@ -917,7 +917,15 @@ function initializePlayers() {
 
     const cfg = {
         height: '100%', width: '100%',
-        playerVars: { origin: window.location.origin, enablejsapi: 1, controls: 0, rel: 0, modestbranding: 1, widget_referrer: window.location.href, playsinline: 1 },
+        playerVars: { 
+            origin: 'https://www.youtube.com', 
+            enablejsapi: 1, 
+            controls: 0, 
+            rel: 0, 
+            modestbranding: 1, 
+            widget_referrer: 'https://www.youtube.com', 
+            playsinline: 1 
+        },
         events: {
             onReady: function(e) {
                 const id = e.target.getIframe().id;
