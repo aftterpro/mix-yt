@@ -1551,21 +1551,21 @@ class LyricsManager {
         }
     }
 
-    async fetchFromOracle(clean) {
-        const activePlayer = currentPlayer === 1 ? player1 : player2;
-        let videoId = null;
-        try { videoId = activePlayer?.getVideoData()?.video_id; } catch {}
-        if (!videoId) throw new Error('Sin videoId');
+async fetchFromOracle(clean) {
+    const activePlayer = currentPlayer === 1 ? player1 : player2;
+    let videoId = null;
+    try { videoId = activePlayer?.getVideoData()?.video_id; } catch {}
+    if (!videoId) throw new Error('Sin videoId');
 
-        const ctrl = new AbortController();
-        setTimeout(() => ctrl.abort(), 7000);
+    const ctrl = new AbortController();
+    // Aumentamos a 15s porque yt-dlp puede tardar la primera vez
+    setTimeout(() => ctrl.abort(), 15000); 
 
-        const res = await fetch(`https://prescribed-marks-neighbors-southwest.trycloudflare.com/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
-        console.log("Url consultada: ", res);
-        const data = await res.json();
-        if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
-        return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
-    }
+    const res = await fetch(`https://lyric.sys-lab.app/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
+    const data = await res.json();
+    if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
+    return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
+}
 
     async fetchFromLrclib(clean) {
         const q = encodeURIComponent(`${clean.artist} ${clean.title}`);
