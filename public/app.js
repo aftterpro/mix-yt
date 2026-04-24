@@ -1558,8 +1558,8 @@ async fetchFromOracle(clean) {
     if (!videoId) throw new Error('Sin videoId');
 
     const ctrl = new AbortController();
-    // Aumentamos a 15s porque yt-dlp puede tardar la primera vez
-    setTimeout(() => ctrl.abort(), 15000); 
+    // Aumentamos a 65s porque yt-dlp puede tardar
+    setTimeout(() => ctrl.abort(), 65000); 
 
     const res = await fetch(`https://lyric.sys-lab.app/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
     const data = await res.json();
