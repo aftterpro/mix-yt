@@ -96,19 +96,24 @@ colorFromString(str) {
         this.currentPalette = palette;
         const root = document.documentElement;
 
-        // Transición suave de colores como Spotify
         root.style.setProperty('--spotify-accent', palette.primary);
         root.style.setProperty('--spotify-accent-dark', palette.primaryDark || palette.primary);
 
+        // Extraer los valores RGB para usar opacidades RGBA de forma segura
+        const rgbMatch = palette.primary.match(/\d+, \d+, \d+/);
+        const rgb = rgbMatch ? rgbMatch[0] : '29, 185, 84'; // Default verde Spotify
+
         const nowPlayingSection = document.getElementById('now-playing-bg');
         if (nowPlayingSection) {
-            nowPlayingSection.style.background = `linear-gradient(180deg, ${palette.primary} 0%, #121212 100%)`;
+            // Gradiente mucho más suave (solo 15% opacidad inicial)
+            nowPlayingSection.style.background = `linear-gradient(180deg, rgba(${rgb}, 0.15) 0%, rgba(${rgb}, 0.02) 40%, var(--spotify-black) 100%)`;
             nowPlayingSection.style.transition = 'background 1.5s ease';
         }
 
         const playerPanel = document.getElementById('player-panel');
         if (playerPanel) {
-            playerPanel.style.background = `linear-gradient(160deg, ${palette.primaryDark || palette.primary}88 0%, #0a0a0a 60%)`;
+            // Fondo general casi negro
+            playerPanel.style.background = `linear-gradient(160deg, rgba(${rgb}, 0.08) 0%, var(--spotify-black) 50%)`;
             playerPanel.style.transition = 'background 1.5s ease';
         }
     }
@@ -306,7 +311,7 @@ class NowPlayingManager {
         mostrarMensajeFlotante(modes[repeatMode].label);
     });
 
-    // 2. Modo Video / Portada con posicionamiento corregido
+ // 2. Modo Video / Portada
     let videoMode = false;
     document.getElementById('np-view-toggle')?.addEventListener('click', () => {
         videoMode = !videoMode;
@@ -315,19 +320,23 @@ class NowPlayingManager {
         const icon = document.querySelector('#np-view-toggle i');
 
         if (videoMode) {
-            // Restaurar videoContainer al flujo normal del layout
-            videoContainer.style.cssText = 'display:block; position:relative; width:100%; aspect-ratio:16/9; left:auto; top:auto; overflow:hidden;';
-            videoContainer.style.opacity = '1';
-            videoContainer.style.pointerEvents = 'auto';
-            if (artworkContainer) artworkContainer.style.display = 'none';
+            // Mover el video para que ocupe el lugar exacto de la portada y no rompa el Flexbox
+            videoContainer.style.cssText = 'position: relative; width: 100%; aspect-ratio: 16/9; z-index: 10; opacity: 1; pointer-events: auto; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; flex-shrink: 0;';
+            
+            if (artworkContainer) {
+                artworkContainer.style.display = 'none';
+                artworkContainer.parentNode.insertBefore(videoContainer, artworkContainer);
+            }
             if (icon) icon.className = 'fas fa-image';
             mostrarMensajeFlotante('🎬 Modo video');
         } else {
-            
+            // Restaurar a modo oculto (anti-bots) al fondo del panel
             videoContainer.style.cssText = 'width:300px;height:200px;position:absolute;z-index:-10;opacity:0.01;pointer-events:none;overflow:hidden;';
+            document.getElementById('player-panel').appendChild(videoContainer);
+
             if (artworkContainer) {
                 artworkContainer.style.display = 'block';
-                artworkContainer.style.opacity = '1';
+                setTimeout(() => artworkContainer.style.opacity = '1', 50);
             }
             if (icon) icon.className = 'fas fa-film';
             mostrarMensajeFlotante('🖼️ Modo portada');
@@ -683,11 +692,16 @@ function updatePlaylistDOM() {
         // Click para reproducir
         item.addEventListener('click', (e) => {
             if (e.target.closest('.queue-delete-btn')) return;
-            currentIndex = index;
-            const player = currentPlayer === 1 ? player1 : player2;
-            playVideo(video.videoId, player);
-            updatePlaylistDOM();
-            if (window.nowPlayingManager) window.nowPlayingManager.update(video);
+            
+            if (!reproduccionIniciada) {
+                // Primer clic: Iniciar normalmente
+                currentIndex = index;
+                reproduccionIniciada = true;
+                playFirstVideo();
+            } else {
+                // Siguientes clics: usar crossfade
+                window.playSpecificVideoWithCrossfade(index);
+            }
         });
 
         // Eliminar
@@ -1015,7 +1029,45 @@ function playPrevVideo() {
         player?.seekTo(0, true);
     }
 }
+window.playSpecificVideoWithCrossfade = function(targetIndex) {
+    if (targetIndex === currentIndex) return; // Si ya suena, no hacer nada
 
+    const currentEl = document.getElementById(`player${currentPlayer}`);
+    const nextPlayerNum = currentPlayer === 1 ? 2 : 1;
+    const nextPlayerObj = currentPlayer === 1 ? player2 : player1;
+    const nextEl = document.getElementById(`player${nextPlayerNum}`);
+    
+    currentIndex = targetIndex;
+    const video = window.playlistVideos[currentIndex];
+
+    // Cargar en el reproductor oculto
+    nextPlayerObj.loadVideoById(video.videoId);
+
+    if (window.sponsorBlockManager) {
+        window.sponsorBlockManager.cargarSegmentos(video.videoId).catch(() => {});
+    }
+
+    if (window.nowPlayingManager) window.nowPlayingManager.update(video);
+    updatePlaylistDOM();
+
+    // Transición visual cruzada
+    currentEl.classList.add('fade-out');
+    nextEl.classList.remove('hidden');
+    nextEl.classList.add('fade-in');
+
+    // Bloquear el monitor automático para que no salte videos durante el efecto
+    window.crossfadeTriggered = true;
+
+    // Terminar transición después de 1.5s y llamar al crossfade de volumen
+    setTimeout(() => {
+        currentEl.classList.add('hidden');
+        currentEl.classList.remove('fade-out');
+        nextEl.classList.remove('fade-in');
+        currentPlayer = nextPlayerNum;
+        window.crossfadeTriggered = false;
+        crossfadeAudio(); 
+    }, 1500);
+}
 function playNextVideo() {
     Object.keys(_triggerCache).forEach(k => delete _triggerCache[k]);
     const list = window.playlistVideos;
@@ -1688,15 +1740,27 @@ class RelatedManager {
             </div>`;
 
         try {
-            let query = `${video.author || ''} ${video.title || ''}`.replace(/[\(\[].*?[\)\]]/g, '').trim();
-            const data = await window.youtubeJSClient.search(query);
-            if (!data.items?.length) throw new Error('Sin resultados');
+            // Limpieza agresiva de la query para garantizar resultados
+            let artist = video.author || video.artist || video.uploaderName || '';
+            let title = video.title || '';
+            let cleanTitle = title.replace(/[\(\[].*?[\)\]]/g, '').replace(/official|video|audio|lyric|hd|hq/gi, '').trim();
+            
+            let query = `${artist} ${cleanTitle}`.trim();
+            if (!query) query = "musica recomendada 2024";
 
-            container.innerHTML = '<div class="related-header">Recomendaciones</div>';
+            // Forzamos la palabra 'audio' para que devuelva canciones y no vlogs
+            const data = await window.youtubeJSClient.search(query + " audio");
+            if (!data || !data.items || !data.items.length) throw new Error('Sin resultados');
+
+            container.innerHTML = '<div class="related-header">Recomendaciones sugeridas</div>';
             const list = document.createElement('div');
             list.className = 'related-grid';
 
-            data.items.filter(v => v.videoId !== video.video_id).slice(0, 10).forEach(v => {
+            // Filtrar el video actual para que no se recomiende a sí mismo
+            const items = data.items.filter(v => v.videoId !== video.video_id).slice(0, 12);
+            if(items.length === 0) throw new Error('Resultados vacíos post-filtrado');
+
+            items.forEach(v => {
                 const item = document.createElement('div');
                 item.className = 'related-card';
                 item.innerHTML = `
@@ -1706,26 +1770,32 @@ class RelatedManager {
                     </div>
                     <div class="related-info">
                         <div class="related-title">${v.title}</div>
-                        <div class="related-artist">${v.artist || 'Desconocido'}</div>
+                        <div class="related-artist">${v.artist || 'Sugerencia'}</div>
                     </div>
                     <button class="related-add-btn" title="Añadir a cola"><i class="fas fa-plus"></i></button>
                 `;
 
                 item.querySelector('.related-add-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    addToPlaylist(v);
+                    window.addToPlaylist(v);
                 });
 
                 item.addEventListener('click', (e) => {
                     if (e.target.closest('.related-add-btn')) return;
-                    insertAndPlayNow(v);
+                    window.insertAndPlayNow(v);
                 });
 
                 list.appendChild(item);
             });
             container.appendChild(list);
         } catch (e) {
-            container.innerHTML = `<div class="empty-state"><p>Sin recomendaciones disponibles</p></div>`;
+            console.error("Recomendados falló:", e);
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-magic-wand-sparkles" style="opacity:0.3"></i>
+                    <p>No pudimos cargar similares</p>
+                    <button onclick="window.relatedManager.loadRelatedForVideo(window.playlistVideos[window.currentIndex])" style="margin-top:10px; padding:6px 12px; border-radius:12px; background:rgba(255,255,255,0.1); color:white; border:none; cursor:pointer;">Reintentar</button>
+                </div>`;
         }
     }
 }
