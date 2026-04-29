@@ -131,73 +131,67 @@ class NowPlayingManager {
         this.createNowPlayingUI();
     }
    createNowPlayingUI() {
-    const panel = document.createElement('div');
-    panel.id = 'spotify-now-playing';
-    panel.innerHTML = `
-        <div id="now-playing-bg"></div>
-        <div class="np-artwork-container">
-            <div class="np-artwork-shadow"></div>
-            <img id="np-artwork" src="" alt="artwork" class="np-artwork">
-            <div class="np-artwork-overlay"></div>
-        </div>
-        <div class="np-info">
-            <div class="np-title-row">
-                <div class="np-texts">
-                    <div id="np-title" class="np-title">Esperando canción...</div>
-                    <div id="np-artist" class="np-artist">Selecciona una playlist</div>
-                </div>
-                <button id="np-like-btn" class="np-action-btn" title="Me gusta">
-                    <i class="far fa-heart"></i>
-                </button>
+        const panel = document.createElement('div');
+        panel.id = 'spotify-now-playing';
+        panel.innerHTML = `
+            <div id="now-playing-bg"></div>
+            <div class="np-artwork-container" style="transition: all 0.5s ease;">
+                <div class="np-artwork-shadow"></div>
+                <img id="np-artwork" src="" alt="artwork" class="np-artwork" style="transition: opacity 0.5s ease, transform 0.3s ease;">
+                <div class="np-artwork-overlay" style="transition: opacity 0.5s ease;"></div>
             </div>
-            <div class="np-progress-container">
-                <span id="np-current-time" class="np-time">0:00</span>
-                <div class="np-progress-bar" id="np-progress-bar">
-                    <div class="np-progress-fill" id="np-progress-fill"></div>
-                    <div class="np-progress-thumb" id="np-progress-thumb"></div>
+            <div class="np-info">
+                <div class="np-title-row">
+                    <div class="np-texts">
+                        <div id="np-title" class="np-title">Esperando canción...</div>
+                        <div id="np-artist" class="np-artist">Selecciona una playlist</div>
+                    </div>
+                    <button id="np-like-btn" class="np-action-btn" title="Me gusta"><i class="far fa-heart"></i></button>
                 </div>
-                <span id="np-total-time" class="np-time">0:00</span>
-            </div>
-            <div class="np-controls">
-                <button class="np-ctrl-btn" id="np-shuffle-btn" title="Aleatorio">
-                    <i class="fas fa-random"></i>
-                </button>
-                <button class="np-ctrl-btn" id="np-prev-btn" title="Anterior">
-                    <i class="fas fa-step-backward"></i>
-                </button>
-                <button class="np-ctrl-btn np-play-btn" id="np-play-pause-btn" title="Play/Pause">
-                    <i class="fas fa-play" id="np-play-icon"></i>
-                </button>
-                <button class="np-ctrl-btn" id="np-next-btn" title="Siguiente">
-                    <i class="fas fa-step-forward"></i>
-                </button>
-                <button class="np-ctrl-btn" id="np-repeat-btn" title="Repetir">
-                    <i class="fas fa-redo"></i>
-                </button>
-            </div>
-            <div class="np-volume-row">
-                <i class="fas fa-volume-down np-vol-icon"></i>
-                <div class="np-volume-bar" id="np-volume-bar">
-                    <div class="np-volume-fill" id="np-volume-fill" style="width:80%"></div>
-                    <div class="np-volume-thumb"></div>
+                <div class="np-progress-container">
+                    <span id="np-current-time" class="np-time">0:00</span>
+                    <div class="np-progress-bar" id="np-progress-bar">
+                        <div class="np-progress-fill" id="np-progress-fill"></div>
+                        <div class="np-progress-thumb" id="np-progress-thumb"></div>
+                    </div>
+                    <span id="np-total-time" class="np-time">0:00</span>
                 </div>
-                <i class="fas fa-volume-up np-vol-icon"></i>
-                <div class="np-crossfade-label">
-                    <i class="fas fa-water"></i>
-                    <span id="np-crossfade-val">${CROSSFADE_DURATION}s</span>
+                <div class="np-controls">
+                    <button class="np-ctrl-btn" id="np-shuffle-btn" title="Aleatorio"><i class="fas fa-random"></i></button>
+                    <button class="np-ctrl-btn" id="np-prev-btn" title="Anterior"><i class="fas fa-step-backward"></i></button>
+                    <button class="np-ctrl-btn np-play-btn" id="np-play-pause-btn" title="Play/Pause"><i class="fas fa-play" id="np-play-icon"></i></button>
+                    <button class="np-ctrl-btn" id="np-next-btn" title="Siguiente"><i class="fas fa-step-forward"></i></button>
+                    <button class="np-ctrl-btn" id="np-repeat-btn" title="Repetir"><i class="fas fa-redo"></i></button>
                 </div>
-                <button id="np-view-toggle" class="np-ctrl-btn" title="Cambiar vista">
-                    <i class="fas fa-film"></i>
-                </button>
+                <div class="np-volume-row">
+                    <i class="fas fa-volume-down np-vol-icon"></i>
+                    <div class="np-volume-bar" id="np-volume-bar">
+                        <div class="np-volume-fill" id="np-volume-fill" style="width:80%"></div>
+                        <div class="np-volume-thumb"></div>
+                    </div>
+                    <i class="fas fa-volume-up np-vol-icon"></i>
+                    <div class="np-crossfade-label">
+                        <i class="fas fa-water"></i><span id="np-crossfade-val">${CROSSFADE_DURATION}s</span>
+                    </div>
+                    <button id="np-view-toggle" class="np-ctrl-btn" title="Cambiar vista"><i class="fas fa-film"></i></button>
+                </div>
             </div>
-        </div>
-    `;
-    document.getElementById('player-panel').prepend(panel);
-    this.setupControls();
-    this.setupProgressBarScrubbing();
-    this.setupVolumeScrubbing();
-    this.startProgressUpdater();
-}
+        `;
+        document.getElementById('player-panel').prepend(panel);
+
+        // ¡CLAVE! Mover videoContainer detrás de la portada una única vez.
+        const videoContainer = document.getElementById('videoContainer');
+        const artworkContainer = document.querySelector('.np-artwork-container');
+        if (videoContainer && artworkContainer) {
+            artworkContainer.insertBefore(videoContainer, artworkContainer.firstChild);
+            videoContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0.01; pointer-events: none; border-radius: var(--radius-md); overflow: hidden; transition: opacity 0.5s ease;';
+        }
+
+        this.setupControls();
+        this.setupProgressBarScrubbing();
+        this.setupVolumeScrubbing();
+        this.startProgressUpdater();
+    }
     update(video) {
         this.currentVideo = video;
         if (!video) return;
@@ -311,33 +305,50 @@ class NowPlayingManager {
         mostrarMensajeFlotante(modes[repeatMode].label);
     });
 
- // 2. Modo Video / Portada
+ // 2. Modo Video / Portada con Transición Suave
     let videoMode = false;
     document.getElementById('np-view-toggle')?.addEventListener('click', () => {
         videoMode = !videoMode;
         const videoContainer = document.getElementById('videoContainer');
         const artworkContainer = document.querySelector('.np-artwork-container');
+        const artwork = document.getElementById('np-artwork');
+        const overlay = document.querySelector('.np-artwork-overlay');
         const icon = document.querySelector('#np-view-toggle i');
 
         if (videoMode) {
-            // Mover el video para que ocupe el lugar exacto de la portada y no rompa el Flexbox
-            videoContainer.style.cssText = 'position: relative; width: 100%; aspect-ratio: 16/9; z-index: 10; opacity: 1; pointer-events: auto; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; flex-shrink: 0;';
-            
+            // Adaptar tamaño para que el video se vea bien (16:9)
             if (artworkContainer) {
-                artworkContainer.style.display = 'none';
-                artworkContainer.parentNode.insertBefore(videoContainer, artworkContainer);
+                artworkContainer.style.width = '100%';
+                artworkContainer.style.height = 'auto';
+                artworkContainer.style.aspectRatio = '16/9';
             }
+            // Mostrar video habilitando clics
+            if (videoContainer) {
+                videoContainer.style.opacity = '1';
+                videoContainer.style.pointerEvents = 'auto';
+                videoContainer.style.zIndex = '5';
+            }
+            // Ocultar portada
+            if (artwork) artwork.style.opacity = '0';
+            if (overlay) overlay.style.opacity = '0';
             if (icon) icon.className = 'fas fa-image';
             mostrarMensajeFlotante('🎬 Modo video');
         } else {
-            // Restaurar a modo oculto (anti-bots) al fondo del panel
-            videoContainer.style.cssText = 'width:300px;height:200px;position:absolute;z-index:-10;opacity:0.01;pointer-events:none;overflow:hidden;';
-            document.getElementById('player-panel').appendChild(videoContainer);
-
+            // Volver al formato cuadrado de portada
             if (artworkContainer) {
-                artworkContainer.style.display = 'block';
-                setTimeout(() => artworkContainer.style.opacity = '1', 50);
+                artworkContainer.style.width = '220px';
+                artworkContainer.style.height = '220px';
+                artworkContainer.style.aspectRatio = 'auto';
             }
+            // Ocultar video (sigue reproduciendo)
+            if (videoContainer) {
+                videoContainer.style.opacity = '0.01';
+                videoContainer.style.pointerEvents = 'none';
+                videoContainer.style.zIndex = '1';
+            }
+            // Mostrar portada
+            if (artwork) artwork.style.opacity = '1';
+            if (overlay) overlay.style.opacity = '1';
             if (icon) icon.className = 'fas fa-film';
             mostrarMensajeFlotante('🖼️ Modo portada');
         }
@@ -1729,9 +1740,12 @@ class RelatedManager {
 
     async loadRelatedForVideo(video) {
         const container = document.getElementById('relatedVideosList');
-        if (!container || !video.video_id) return;
-        if (this.lastId === video.video_id) return;
-        this.lastId = video.video_id;
+        // Soporte universal para objeto de YouTube o nuestro objeto de Playlist
+        const currentVideoId = video?.video_id || video?.videoId;
+        
+        if (!container || !currentVideoId) return;
+        if (this.lastId === currentVideoId) return;
+        this.lastId = currentVideoId;
 
         container.innerHTML = `
             <div class="related-loading">
@@ -1740,7 +1754,6 @@ class RelatedManager {
             </div>`;
 
         try {
-            // Limpieza agresiva de la query para garantizar resultados
             let artist = video.author || video.artist || video.uploaderName || '';
             let title = video.title || '';
             let cleanTitle = title.replace(/[\(\[].*?[\)\]]/g, '').replace(/official|video|audio|lyric|hd|hq/gi, '').trim();
@@ -1748,7 +1761,6 @@ class RelatedManager {
             let query = `${artist} ${cleanTitle}`.trim();
             if (!query) query = "musica recomendada 2024";
 
-            // Forzamos la palabra 'audio' para que devuelva canciones y no vlogs
             const data = await window.youtubeJSClient.search(query + " audio");
             if (!data || !data.items || !data.items.length) throw new Error('Sin resultados');
 
@@ -1756,9 +1768,9 @@ class RelatedManager {
             const list = document.createElement('div');
             list.className = 'related-grid';
 
-            // Filtrar el video actual para que no se recomiende a sí mismo
-            const items = data.items.filter(v => v.videoId !== video.video_id).slice(0, 12);
-            if(items.length === 0) throw new Error('Resultados vacíos post-filtrado');
+            // Evitamos recomendar la canción que ya está sonando
+            const items = data.items.filter(v => v.videoId !== currentVideoId).slice(0, 12);
+            if(items.length === 0) throw new Error('Resultados vacíos');
 
             items.forEach(v => {
                 const item = document.createElement('div');
