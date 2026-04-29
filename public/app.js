@@ -128,11 +128,14 @@ class NowPlayingManager {
     constructor() {
         this.currentVideo = null;
         this.isLiked = false;
+        this.videoMode = false; // Guardamos el estado del modo video aquí
         this.createNowPlayingUI();
     }
-   createNowPlayingUI() {
+
+    createNowPlayingUI() {
         const panel = document.createElement('div');
         panel.id = 'spotify-now-playing';
+        // HTML del Now Playing... (usa el mismo HTML que ya tienes en este método)
         panel.innerHTML = `
             <div id="now-playing-bg"></div>
             <div class="np-artwork-container" style="transition: all 0.5s ease;">
@@ -179,12 +182,24 @@ class NowPlayingManager {
         `;
         document.getElementById('player-panel').prepend(panel);
 
-        // ¡CLAVE! Mover videoContainer detrás de la portada una única vez.
+        // INYECCIÓN DE CSS VITAL PARA EVITAR PANTALLA NEGRA
+        const style = document.createElement('style');
+        style.textContent = `
+            #videoContainer { position: relative; }
+            .video-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.5s ease; }
+        `;
+        document.head.appendChild(style);
+
+        // Mover el contenedor de video detrás de la portada una sola vez
         const videoContainer = document.getElementById('videoContainer');
         const artworkContainer = document.querySelector('.np-artwork-container');
         if (videoContainer && artworkContainer) {
             artworkContainer.insertBefore(videoContainer, artworkContainer.firstChild);
             videoContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0.01; pointer-events: none; border-radius: var(--radius-md); overflow: hidden; transition: opacity 0.5s ease;';
+            
+            // Ocultar player2 al inicio con opacity, NO con class="hidden"
+            document.getElementById('player2').style.opacity = '0';
+            document.getElementById('player2').style.pointerEvents = 'none';
         }
 
         this.setupControls();
@@ -192,6 +207,7 @@ class NowPlayingManager {
         this.setupVolumeScrubbing();
         this.startProgressUpdater();
     }
+
     update(video) {
         this.currentVideo = video;
         if (!video) return;
@@ -202,7 +218,6 @@ class NowPlayingManager {
 
         if (title) {
             title.textContent = video.title || 'Sin título';
-            // Scroll automático para títulos largos
             if (video.title && video.title.length > 30) {
                 title.classList.add('scrolling-text');
             } else {
@@ -213,20 +228,21 @@ class NowPlayingManager {
 
         const thumbUrl = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
         if (artwork) {
-            // Animación de cambio de portada estilo Spotify
             artwork.style.opacity = '0';
             artwork.style.transform = 'scale(0.9) rotate(-2deg)';
             setTimeout(() => {
                 artwork.src = thumbUrl;
                 artwork.onload = () => {
                     artwork.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                    artwork.style.opacity = '1';
+                    // AQUI ESTÁ LA MAGIA: Solo restaurar opacidad si NO estamos en modo video
+                    if (!this.videoMode) {
+                        artwork.style.opacity = '1';
+                    }
                     artwork.style.transform = 'scale(1) rotate(0deg)';
                 };
             }, 200);
         }
 
-        // Extraer colores de la portada
         window.colorEngine.extractFromThumbnail(thumbUrl).then(palette => {
             window.colorEngine.applyPalette(palette);
         });
@@ -305,48 +321,41 @@ class NowPlayingManager {
         mostrarMensajeFlotante(modes[repeatMode].label);
     });
 
- // 2. Modo Video / Portada con Transición Suave
-    let videoMode = false;
+    //   "Modo Video / Portada"
     document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-        videoMode = !videoMode;
+        this.videoMode = !this.videoMode; // Usa el estado de la clase
         const videoContainer = document.getElementById('videoContainer');
         const artworkContainer = document.querySelector('.np-artwork-container');
         const artwork = document.getElementById('np-artwork');
         const overlay = document.querySelector('.np-artwork-overlay');
         const icon = document.querySelector('#np-view-toggle i');
 
-        if (videoMode) {
-            // Adaptar tamaño para que el video se vea bien (16:9)
+        if (this.videoMode) {
             if (artworkContainer) {
                 artworkContainer.style.width = '100%';
                 artworkContainer.style.height = 'auto';
                 artworkContainer.style.aspectRatio = '16/9';
             }
-            // Mostrar video habilitando clics
             if (videoContainer) {
                 videoContainer.style.opacity = '1';
                 videoContainer.style.pointerEvents = 'auto';
                 videoContainer.style.zIndex = '5';
             }
-            // Ocultar portada
             if (artwork) artwork.style.opacity = '0';
             if (overlay) overlay.style.opacity = '0';
             if (icon) icon.className = 'fas fa-image';
             mostrarMensajeFlotante('🎬 Modo video');
         } else {
-            // Volver al formato cuadrado de portada
             if (artworkContainer) {
                 artworkContainer.style.width = '220px';
                 artworkContainer.style.height = '220px';
                 artworkContainer.style.aspectRatio = 'auto';
             }
-            // Ocultar video (sigue reproduciendo)
             if (videoContainer) {
                 videoContainer.style.opacity = '0.01';
                 videoContainer.style.pointerEvents = 'none';
                 videoContainer.style.zIndex = '1';
             }
-            // Mostrar portada
             if (artwork) artwork.style.opacity = '1';
             if (overlay) overlay.style.opacity = '1';
             if (icon) icon.className = 'fas fa-film';
@@ -1740,7 +1749,6 @@ class RelatedManager {
 
     async loadRelatedForVideo(video) {
         const container = document.getElementById('relatedVideosList');
-        // Soporte universal para objeto de YouTube o nuestro objeto de Playlist
         const currentVideoId = video?.video_id || video?.videoId;
         
         if (!container || !currentVideoId) return;
@@ -1759,18 +1767,26 @@ class RelatedManager {
             let cleanTitle = title.replace(/[\(\[].*?[\)\]]/g, '').replace(/official|video|audio|lyric|hd|hq/gi, '').trim();
             
             let query = `${artist} ${cleanTitle}`.trim();
-            if (!query) query = "musica recomendada 2024";
+            if (query.length < 3) query = "musica";
 
-            const data = await window.youtubeJSClient.search(query + " audio");
-            if (!data || !data.items || !data.items.length) throw new Error('Sin resultados');
+            // Intento 1: Búsqueda exacta
+            let data = await window.youtubeJSClient.search(query);
+            
+            // Intento 2 (Fallback): Si falla, buscar solo por artista o género
+            if (!data || !data.items || data.items.length === 0) {
+                if (artist) {
+                    data = await window.youtubeJSClient.search(`${artist} mejores exitos`);
+                }
+            }
+
+            if (!data || !data.items || data.items.length === 0) throw new Error('Resultados vacíos en la API');
 
             container.innerHTML = '<div class="related-header">Recomendaciones sugeridas</div>';
             const list = document.createElement('div');
             list.className = 'related-grid';
 
-            // Evitamos recomendar la canción que ya está sonando
-            const items = data.items.filter(v => v.videoId !== currentVideoId).slice(0, 12);
-            if(items.length === 0) throw new Error('Resultados vacíos');
+            const items = data.items.filter(v => v.videoId && v.videoId !== currentVideoId).slice(0, 12);
+            if (items.length === 0) throw new Error('Todos los resultados fueron filtrados');
 
             items.forEach(v => {
                 const item = document.createElement('div');
@@ -1802,12 +1818,18 @@ class RelatedManager {
             container.appendChild(list);
         } catch (e) {
             console.error("Recomendados falló:", e);
+            // Botón robusto por si todo falla, carga hits genéricos para que no se quede estancado
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-magic-wand-sparkles" style="opacity:0.3"></i>
-                    <p>No pudimos cargar similares</p>
-                    <button onclick="window.relatedManager.loadRelatedForVideo(window.playlistVideos[window.currentIndex])" style="margin-top:10px; padding:6px 12px; border-radius:12px; background:rgba(255,255,255,0.1); color:white; border:none; cursor:pointer;">Reintentar</button>
+                    <p>No pudimos cargar similares específicos.</p>
+                    <button class="retry-btn" style="margin-top:10px; padding:6px 16px; border-radius:12px; background:var(--spotify-green); color:black; border:none; cursor:pointer; font-weight:bold;">Explorar Mix Pop</button>
                 </div>`;
+                
+            container.querySelector('.retry-btn').addEventListener('click', () => {
+                this.lastId = null; 
+                this.loadRelatedForVideo({ video_id: 'fallback', author: 'Top Hits', title: '2024' });
+            });
         }
     }
 }
