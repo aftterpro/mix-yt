@@ -183,24 +183,74 @@ class NowPlayingManager {
         document.getElementById('player-panel').prepend(panel);
 
         // INYECCIÓN DE CSS VITAL PARA EVITAR PANTALLA NEGRA
-        const style = document.createElement('style');
-        style.textContent = `
-            #videoContainer { position: relative; }
-            .video-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.5s ease; }
-        `;
-        document.head.appendChild(style);
+const style = document.createElement('style');
+style.textContent = `
+    #spotify-now-playing {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 16px 12px;
+        gap: 16px;
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+    #now-playing-bg {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .np-artwork-container {
+        position: relative;
+        width: 220px;
+        height: 220px;
+        flex-shrink: 0;
+        z-index: 1;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .np-info {
+        width: 100%;
+        position: relative;
+        z-index: 1;
+    }
+    .video-player {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        transition: opacity 0.5s ease;
+    }
+    #videoContainer {
+        position: absolute !important;
+        top: 0; left: 0;
+        width: 100% !important;
+        height: 100% !important;
+        z-index: 1;
+        border-radius: 8px;
+        overflow: hidden;
+        transition: opacity 0.5s ease;
+    }
+`;
+document.head.appendChild(style);
 
         // Mover el contenedor de video detrás de la portada una sola vez
         const videoContainer = document.getElementById('videoContainer');
         const artworkContainer = document.querySelector('.np-artwork-container');
-        if (videoContainer && artworkContainer) {
-            artworkContainer.insertBefore(videoContainer, artworkContainer.firstChild);
-            videoContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0.01; pointer-events: none; border-radius: var(--radius-md); overflow: hidden; transition: opacity 0.5s ease;';
-            
-            // Ocultar player2 al inicio con opacity, NO con class="hidden"
-            document.getElementById('player2').style.opacity = '0';
-            document.getElementById('player2').style.pointerEvents = 'none';
+    if (videoContainer && artworkContainer) {
+    artworkContainer.appendChild(videoContainer); // Usar appendChild en lugar de insertBefore
+    // Estado inicial: oculto detrás de la portada
+    videoContainer.style.opacity = '0.01';
+    videoContainer.style.pointerEvents = 'none';
+    videoContainer.style.zIndex = '1';
+    
+    const p2 = document.getElementById('player2');
+        if (p2) {
+            p2.style.opacity = '0';
+            p2.style.pointerEvents = 'none';
         }
+    }
 
         this.setupControls();
         this.setupProgressBarScrubbing();
@@ -322,46 +372,59 @@ class NowPlayingManager {
     });
 
     //   "Modo Video / Portada"
-    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-        this.videoMode = !this.videoMode; // Usa el estado de la clase
-        const videoContainer = document.getElementById('videoContainer');
-        const artworkContainer = document.querySelector('.np-artwork-container');
-        const artwork = document.getElementById('np-artwork');
-        const overlay = document.querySelector('.np-artwork-overlay');
-        const icon = document.querySelector('#np-view-toggle i');
+   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+    this.videoMode = !this.videoMode;
+    const videoContainer = document.getElementById('videoContainer');
+    const artworkContainer = document.querySelector('.np-artwork-container');
+    const artwork = document.getElementById('np-artwork');
+    const overlay = document.querySelector('.np-artwork-overlay');
+    const icon = document.querySelector('#np-view-toggle i');
+    const nowPlaying = document.getElementById('spotify-now-playing');
 
-        if (this.videoMode) {
-            if (artworkContainer) {
-                artworkContainer.style.width = '100%';
-                artworkContainer.style.height = 'auto';
-                artworkContainer.style.aspectRatio = '16/9';
-            }
-            if (videoContainer) {
-                videoContainer.style.opacity = '1';
-                videoContainer.style.pointerEvents = 'auto';
-                videoContainer.style.zIndex = '5';
-            }
-            if (artwork) artwork.style.opacity = '0';
-            if (overlay) overlay.style.opacity = '0';
-            if (icon) icon.className = 'fas fa-image';
-            mostrarMensajeFlotante('🎬 Modo video');
-        } else {
-            if (artworkContainer) {
-                artworkContainer.style.width = '220px';
-                artworkContainer.style.height = '220px';
-                artworkContainer.style.aspectRatio = 'auto';
-            }
-            if (videoContainer) {
-                videoContainer.style.opacity = '0.01';
-                videoContainer.style.pointerEvents = 'none';
-                videoContainer.style.zIndex = '1';
-            }
-            if (artwork) artwork.style.opacity = '1';
-            if (overlay) overlay.style.opacity = '1';
-            if (icon) icon.className = 'fas fa-film';
-            mostrarMensajeFlotante('🖼️ Modo portada');
+    if (this.videoMode) {
+          if (nowPlaying && videoContainer) {
+            nowPlaying.insertBefore(videoContainer, nowPlaying.firstChild);
+            videoContainer.style.cssText = `
+                position: relative !important;
+                width: 100% !important;
+                height: auto !important;
+                aspect-ratio: 16/9;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                z-index: 2;
+                border-radius: 8px;
+                overflow: hidden;
+                flex-shrink: 0;
+            `;
         }
-    });
+        if (artwork) artwork.style.opacity = '0';
+        if (overlay) overlay.style.opacity = '0';
+        if (artworkContainer) artworkContainer.style.display = 'none';
+        if (icon) icon.className = 'fas fa-image';
+        mostrarMensajeFlotante('🎬 Modo video');
+    } else {
+        // Modo portada: devolver videoContainer al artwork
+        if (artworkContainer && videoContainer) {
+            artworkContainer.style.display = '';
+            artworkContainer.appendChild(videoContainer);
+            videoContainer.style.cssText = `
+                position: absolute !important;
+                top: 0; left: 0;
+                width: 100% !important;
+                height: 100% !important;
+                opacity: 0.01 !important;
+                pointer-events: none !important;
+                z-index: 1;
+                border-radius: 8px;
+                overflow: hidden;
+            `;
+        }
+        if (artwork) artwork.style.opacity = '1';
+        if (overlay) overlay.style.opacity = '1';
+        if (icon) icon.className = 'fas fa-film';
+        mostrarMensajeFlotante('🖼️ Modo portada');
+    }
+});
 
     document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
         this.isLiked = !this.isLiked;
@@ -1284,7 +1347,6 @@ function displayPlaylist(playlist) {
     updatePlaylistDOM();
 }
 function playFirstVideo() {
-    // Verificar que ambos players estén inicializados correctamente
     if (!window.playersInitialized || !window.player1 || typeof window.player1.loadVideoById !== "function") {
         console.log("⏳ Players no listos, reintentando...");
         setTimeout(playFirstVideo, 300);
@@ -1297,13 +1359,11 @@ function playFirstVideo() {
     currentPlayer = 1;
     window.crossfadeTriggered = false;
 
-    // Mantener videoContainer en DOM pero oculto visualmente (sin sacarlo del viewport)
-    // para que el autoplay de YouTube funcione
-    const vc = document.getElementById('videoContainer');
-   if (vc && vc.style.display === 'none') {
-    // Mantener un tamaño válido para engañar al sistema anti-bots de YT
-    vc.style.cssText = 'width:300px;height:200px;position:absolute;z-index:-10;opacity:0.01;pointer-events:none;overflow:hidden;';
-}
+    const p2 = document.getElementById('player2');
+    if (p2) {
+        p2.style.opacity = '0';
+        p2.style.pointerEvents = 'none';
+    }
 
     window.player1.loadVideoById(video.videoId);
     window.player1.setVolume(80);
@@ -1747,91 +1807,114 @@ async fetchFromOracle(clean) {
 class RelatedManager {
     constructor() { this.lastId = null; }
 
-    async loadRelatedForVideo(video) {
-        const container = document.getElementById('relatedVideosList');
-        const currentVideoId = video?.video_id || video?.videoId;
+   async loadRelatedForVideo(video) {
+    const container = document.getElementById('relatedVideosList');
+    const currentVideoId = video?.video_id || video?.videoId;
+    
+    if (!container || !currentVideoId) return;
+    if (this.lastId === currentVideoId) return;
+    this.lastId = currentVideoId;
+
+    container.innerHTML = `
+        <div class="related-loading">
+            <div class="related-spinner"></div>
+            <p>Buscando recomendaciones...</p>
+        </div>`;
+
+    try {
+        // Obtener datos del video actual desde la playlist para tener mejor info
+        const playlistVideo = window.playlistVideos?.find(v => v.videoId === currentVideoId);
         
-        if (!container || !currentVideoId) return;
-        if (this.lastId === currentVideoId) return;
-        this.lastId = currentVideoId;
+        let artist = playlistVideo?.artist || video.author || video.artist || video.uploaderName || '';
+        let title = playlistVideo?.title || video.title || '';
+        
+        // Limpiar título
+        let cleanTitle = title
+            .replace(/[\(\[].*?[\)\]]/g, '')
+            .replace(/official|video|audio|lyric|hd|hq|mv|4k|en vivo|live/gi, '')
+            .trim();
+        
+        // Limpiar artista — quitar VEVO, Topic, etc.
+        let cleanArtist = artist
+            .replace(/VEVO$/i, '')
+            .replace(/\s*-\s*Topic$/i, '')
+            .replace(/Official/i, '')
+            .trim();
 
-        container.innerHTML = `
-            <div class="related-loading">
-                <div class="related-spinner"></div>
-                <p>Buscando recomendaciones...</p>
-            </div>`;
-
-        try {
-            let artist = video.author || video.artist || video.uploaderName || '';
-            let title = video.title || '';
-            let cleanTitle = title.replace(/[\(\[].*?[\)\]]/g, '').replace(/official|video|audio|lyric|hd|hq/gi, '').trim();
-            
-            let query = `${artist} ${cleanTitle}`.trim();
-            if (query.length < 3) query = "musica";
-
-            // Intento 1: Búsqueda exacta
-            let data = await window.youtubeJSClient.search(query);
-            
-            // Intento 2 (Fallback): Si falla, buscar solo por artista o género
-            if (!data || !data.items || data.items.length === 0) {
-                if (artist) {
-                    data = await window.youtubeJSClient.search(`${artist} mejores exitos`);
-                }
-            }
-
-            if (!data || !data.items || data.items.length === 0) throw new Error('Resultados vacíos en la API');
-
-            container.innerHTML = '<div class="related-header">Recomendaciones sugeridas</div>';
-            const list = document.createElement('div');
-            list.className = 'related-grid';
-
-            const items = data.items.filter(v => v.videoId && v.videoId !== currentVideoId).slice(0, 12);
-            if (items.length === 0) throw new Error('Todos los resultados fueron filtrados');
-
-            items.forEach(v => {
-                const item = document.createElement('div');
-                item.className = 'related-card';
-                item.innerHTML = `
-                    <div class="related-thumb">
-                        <img src="${v.thumbnail || `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`}" alt="">
-                        <div class="related-play-overlay"><i class="fas fa-play"></i></div>
-                    </div>
-                    <div class="related-info">
-                        <div class="related-title">${v.title}</div>
-                        <div class="related-artist">${v.artist || 'Sugerencia'}</div>
-                    </div>
-                    <button class="related-add-btn" title="Añadir a cola"><i class="fas fa-plus"></i></button>
-                `;
-
-                item.querySelector('.related-add-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    window.addToPlaylist(v);
-                });
-
-                item.addEventListener('click', (e) => {
-                    if (e.target.closest('.related-add-btn')) return;
-                    window.insertAndPlayNow(v);
-                });
-
-                list.appendChild(item);
-            });
-            container.appendChild(list);
-        } catch (e) {
-            console.error("Recomendados falló:", e);
-            // Botón robusto por si todo falla, carga hits genéricos para que no se quede estancado
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-magic-wand-sparkles" style="opacity:0.3"></i>
-                    <p>No pudimos cargar similares específicos.</p>
-                    <button class="retry-btn" style="margin-top:10px; padding:6px 16px; border-radius:12px; background:var(--spotify-green); color:black; border:none; cursor:pointer; font-weight:bold;">Explorar Mix Pop</button>
-                </div>`;
-                
-            container.querySelector('.retry-btn').addEventListener('click', () => {
-                this.lastId = null; 
-                this.loadRelatedForVideo({ video_id: 'fallback', author: 'Top Hits', title: '2024' });
-            });
+        // Estrategia de queries: de más específica a más general
+        const queries = [];
+        if (cleanArtist && cleanTitle) {
+            queries.push(`${cleanArtist} ${cleanTitle}`);
+            queries.push(`${cleanArtist} mix`);
+        } else if (cleanTitle) {
+            queries.push(cleanTitle);
         }
+        queries.push('top hits music 2024'); // fallback garantizado
+
+        let items = [];
+        for (const q of queries) {
+            try {
+                const data = await window.youtubeJSClient.search(q);
+                const candidates = (data?.items || []).filter(v => 
+                    v.videoId && v.videoId !== currentVideoId
+                );
+                if (candidates.length >= 3) {
+                    items = candidates.slice(0, 12);
+                    break;
+                }
+            } catch (e) {
+                console.warn('Query falló:', q, e);
+            }
+        }
+
+        if (items.length === 0) throw new Error('Sin resultados en todas las queries');
+
+        container.innerHTML = '<div class="related-header">Recomendaciones sugeridas</div>';
+        const list = document.createElement('div');
+        list.className = 'related-grid';
+
+        items.forEach(v => {
+            const item = document.createElement('div');
+            item.className = 'related-card';
+            item.innerHTML = `
+                <div class="related-thumb">
+                    <img src="${v.thumbnail || `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`}" alt="">
+                    <div class="related-play-overlay"><i class="fas fa-play"></i></div>
+                </div>
+                <div class="related-info">
+                    <div class="related-title">${v.title || 'Sin título'}</div>
+                    <div class="related-artist">${v.artist || v.uploaderName || 'Sugerencia'}</div>
+                </div>
+                <button class="related-add-btn" title="Añadir a cola"><i class="fas fa-plus"></i></button>
+            `;
+
+            item.querySelector('.related-add-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.addToPlaylist(v);
+            });
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.related-add-btn')) return;
+                window.insertAndPlayNow(v);
+            });
+            list.appendChild(item);
+        });
+
+        container.appendChild(list);
+
+    } catch (e) {
+        console.error("Recomendados falló:", e);
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-magic-wand-sparkles" style="opacity:0.3"></i>
+                <p>No pudimos cargar similares específicos.</p>
+                <button class="retry-btn" style="margin-top:10px; padding:6px 16px; border-radius:12px; background:var(--spotify-green); color:black; border:none; cursor:pointer; font-weight:bold;">Explorar Mix Pop</button>
+            </div>`;
+        container.querySelector('.retry-btn').addEventListener('click', () => {
+            this.lastId = null;
+            this.loadRelatedForVideo({ videoId: 'dQw4w9WgXcQ', video_id: 'dQw4w9WgXcQ', author: 'Top Hits', title: 'pop hits 2024' });
+        });
     }
+}
 }
 
 // =============================================
