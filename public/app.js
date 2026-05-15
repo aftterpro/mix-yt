@@ -1,5 +1,5 @@
 // =============================================
-// YT CrossMix - Spotify Effect Engine v2.0
+// YT CrossMix - Spotify Effect
 // =============================================
 
 const CONFIG = {
@@ -132,10 +132,48 @@ class NowPlayingManager {
         this.createNowPlayingUI();
     }
 
-    createNowPlayingUI() {
+     update(video) {
+        this.currentVideo = video;
+        if (!video) return;
+
+        const title = document.getElementById('np-title');
+        const artist = document.getElementById('np-artist');
+        const artwork = document.getElementById('np-artwork');
+
+        if (title) {
+            title.textContent = video.title || 'Sin título';
+            if (video.title && video.title.length > 30) {
+                title.classList.add('scrolling-text');
+            } else {
+                title.classList.remove('scrolling-text');
+            }
+        }
+        if (artist) artist.textContent = video.artist || video.uploaderName || 'Artista desconocido';
+
+        const thumbUrl = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
+        if (artwork) {
+            artwork.style.opacity = '0';
+            artwork.style.transform = 'scale(0.9) rotate(-2deg)';
+            setTimeout(() => {
+                artwork.src = thumbUrl;
+                artwork.onload = () => {
+                    artwork.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    // AQUI ESTÁ LA MAGIA: Solo restaurar opacidad si NO estamos en modo video
+                    if (!this.videoMode) {
+                        artwork.style.opacity = '1';
+                    }
+                    artwork.style.transform = 'scale(1) rotate(0deg)';
+                };
+            }, 200);
+        }
+
+        window.colorEngine.extractFromThumbnail(thumbUrl).then(palette => {
+            window.colorEngine.applyPalette(palette);
+        });
+    }
+createNowPlayingUI() {
         const panel = document.createElement('div');
         panel.id = 'spotify-now-playing';
-        // HTML del Now Playing... (usa el mismo HTML que ya tienes en este método)
         panel.innerHTML = `
             <div id="now-playing-bg"></div>
             <div class="np-artwork-container" style="transition: all 0.5s ease;">
@@ -182,75 +220,69 @@ class NowPlayingManager {
         `;
         document.getElementById('player-panel').prepend(panel);
 
-        // INYECCIÓN DE CSS VITAL PARA EVITAR PANTALLA NEGRA
-const style = document.createElement('style');
-style.textContent = `
-    #spotify-now-playing {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px 16px 12px;
-        gap: 16px;
-        flex: 1;
-        overflow-y: auto;
-        min-height: 0;
-    }
-    #now-playing-bg {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        z-index: 0;
-    }
-    .np-artwork-container {
-        position: relative;
-        width: 220px;
-        height: 220px;
-        flex-shrink: 0;
-        z-index: 1;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .np-info {
-        width: 100%;
-        position: relative;
-        z-index: 1;
-    }
-    .video-player {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        transition: opacity 0.5s ease;
-    }
-    #videoContainer {
-        position: absolute !important;
-        top: 0; left: 0;
-        width: 100% !important;
-        height: 100% !important;
-        z-index: 1;
-        border-radius: 8px;
-        overflow: hidden;
-        transition: opacity 0.5s ease;
-    }
-`;
-document.head.appendChild(style);
+        const style = document.createElement('style');
+        style.textContent = `
+            #spotify-now-playing {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 20px 16px 12px;
+                gap: 16px;
+                flex: 1;
+                overflow-y: auto;
+                min-height: 0;
+            }
+            #now-playing-bg {
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 0;
+            }
+            .np-artwork-container {
+                position: relative;
+                width: 220px;
+                height: 220px;
+                flex-shrink: 0;
+                z-index: 1;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .np-info {
+                width: 100%;
+                position: relative;
+                z-index: 1;
+            }
+            .video-player {
+                position: absolute;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
+                transition: opacity 0.5s ease;
+            }
+        `;
+        document.head.appendChild(style);
 
-        // Mover el contenedor de video detrás de la portada una sola vez
         const videoContainer = document.getElementById('videoContainer');
         const artworkContainer = document.querySelector('.np-artwork-container');
-    if (videoContainer && artworkContainer) {
-    artworkContainer.appendChild(videoContainer); // Usar appendChild en lugar de insertBefore
-    // Estado inicial: oculto detrás de la portada
-    videoContainer.style.opacity = '0.01';
-    videoContainer.style.pointerEvents = 'none';
-    videoContainer.style.zIndex = '1';
-    
-    const p2 = document.getElementById('player2');
-        if (p2) {
-            p2.style.opacity = '0';
-            p2.style.pointerEvents = 'none';
+        if (videoContainer && artworkContainer) {
+            artworkContainer.appendChild(videoContainer);
+            videoContainer.style.position = 'absolute';
+            videoContainer.style.top = '0';
+            videoContainer.style.left = '0';
+            videoContainer.style.width = '100%';
+            videoContainer.style.height = '100%';
+            videoContainer.style.opacity = '0.01';
+            videoContainer.style.pointerEvents = 'none';
+            videoContainer.style.zIndex = '1';
+            videoContainer.style.borderRadius = '8px';
+            videoContainer.style.overflow = 'hidden';
+            
+            const p2 = document.getElementById('player2');
+            if (p2) {
+                p2.style.opacity = '0';
+                p2.style.pointerEvents = 'none';
+            }
         }
-    }
 
         this.setupControls();
         this.setupProgressBarScrubbing();
@@ -258,184 +290,124 @@ document.head.appendChild(style);
         this.startProgressUpdater();
     }
 
-    update(video) {
-        this.currentVideo = video;
-        if (!video) return;
+    setupControls() {
+        document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
+            const player = currentPlayer === 1 ? player1 : player2;
 
-        const title = document.getElementById('np-title');
-        const artist = document.getElementById('np-artist');
-        const artwork = document.getElementById('np-artwork');
-
-        if (title) {
-            title.textContent = video.title || 'Sin título';
-            if (video.title && video.title.length > 30) {
-                title.classList.add('scrolling-text');
-            } else {
-                title.classList.remove('scrolling-text');
-            }
-        }
-        if (artist) artist.textContent = video.artist || video.uploaderName || 'Artista desconocido';
-
-        const thumbUrl = video.thumbnail || `https://i.ytimg.com/vi/${video.videoId}/maxresdefault.jpg`;
-        if (artwork) {
-            artwork.style.opacity = '0';
-            artwork.style.transform = 'scale(0.9) rotate(-2deg)';
-            setTimeout(() => {
-                artwork.src = thumbUrl;
-                artwork.onload = () => {
-                    artwork.style.transition = 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                    // AQUI ESTÁ LA MAGIA: Solo restaurar opacidad si NO estamos en modo video
-                    if (!this.videoMode) {
-                        artwork.style.opacity = '1';
+            if (!reproduccionIniciada) {
+                if (window.playlistVideos.length === 0) {
+                    mostrarMensajeFlotante('⚠️ Añade una playlist o canción primero');
+                    return;
+                }
+                reproduccionIniciada = true;
+                currentIndex = 0;
+                window.crossfadeTriggered = false;
+                
+                const tryPlay = () => {
+                    if (playersInitialized) {
+                        playFirstVideo();
+                    } else {
+                        setTimeout(tryPlay, 200);
                     }
-                    artwork.style.transform = 'scale(1) rotate(0deg)';
                 };
-            }, 200);
-        }
-
-        window.colorEngine.extractFromThumbnail(thumbUrl).then(palette => {
-            window.colorEngine.applyPalette(palette);
-        });
-    }
-
- setupControls() {
-    // 1. Unificación de Play/Pause e Inicio de Reproducción
-    document.getElementById('np-play-pause-btn')?.addEventListener('click', () => {
-        const player = currentPlayer === 1 ? player1 : player2;
-
-        // CASO 1: Aún no se ha iniciado la reproducción
-        if (!reproduccionIniciada) {
-            if (window.playlistVideos.length === 0) {
-                mostrarMensajeFlotante('⚠️ Añade una playlist o canción primero');
+                tryPlay();
                 return;
             }
-            reproduccionIniciada = true;
-            currentIndex = 0;
-            window.crossfadeTriggered = false;
-            
-            const tryPlay = () => {
-                if (playersInitialized) {
-                    playFirstVideo();
+
+            if (!player || typeof player.getPlayerState !== 'function') return;
+            try {
+                const state = player.getPlayerState();
+                const icon = document.getElementById('np-play-icon');
+                if (state === YT.PlayerState.PLAYING) {
+                    player.pauseVideo();
+                    if (icon) icon.className = 'fas fa-play';
                 } else {
-                    setTimeout(tryPlay, 200);
+                    player.playVideo();
+                    if (icon) icon.className = 'fas fa-pause';
                 }
-            };
-            tryPlay();
-            return;
-        }
-
-        // CASO 2: Ya hay reproducción — toggle play/pause
-        if (!player || typeof player.getPlayerState !== 'function') return;
-        try {
-            const state = player.getPlayerState();
-            const icon = document.getElementById('np-play-icon');
-            if (state === YT.PlayerState.PLAYING) {
-                player.pauseVideo();
-                if (icon) icon.className = 'fas fa-play';
-            } else {
-                player.playVideo();
-                if (icon) icon.className = 'fas fa-pause';
+            } catch (e) {
+                console.warn('Error en play-pause:', e);
             }
-        } catch (e) {
-            console.warn('Error en play-pause:', e);
-        }
-    });
+        });
 
-    document.getElementById('np-next-btn')?.addEventListener('click', () => playNextVideo());
-    document.getElementById('np-prev-btn')?.addEventListener('click', () => playPrevVideo());
+        document.getElementById('np-next-btn')?.addEventListener('click', () => playNextVideo());
+        document.getElementById('np-prev-btn')?.addEventListener('click', () => playPrevVideo());
 
-    document.getElementById('np-shuffle-btn')?.addEventListener('click', (e) => {
-        const btn = e.currentTarget;
-        btn.classList.toggle('active');
-        if (btn.classList.contains('active')) {
-            shufflePlaylist();
-            mostrarMensajeFlotante('🔀 Modo aleatorio activado');
-        } else {
-            mostrarMensajeFlotante('Modo aleatorio desactivado');
-        }
-    });
+        document.getElementById('np-shuffle-btn')?.addEventListener('click', (e) => {
+            const btn = e.currentTarget;
+            btn.classList.toggle('active');
+            if (btn.classList.contains('active')) {
+                shufflePlaylist();
+                mostrarMensajeFlotante('🔀 Modo aleatorio activado');
+            } else {
+                mostrarMensajeFlotante('Modo aleatorio desactivado');
+            }
+        });
 
-    let repeatMode = 0; // 0=off, 1=all, 2=one
-    document.getElementById('np-repeat-btn')?.addEventListener('click', (e) => {
-        repeatMode = (repeatMode + 1) % 3;
-        const btn = e.currentTarget;
-        const icon = btn.querySelector('i');
-        const modes = [
-            { class: '', icon: 'fa-redo', label: 'Repetición desactivada' },
-            { class: 'active', icon: 'fa-redo', label: '🔁 Repetir lista' },
-            { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
-        ];
-        btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
-        if (icon) icon.className = `fas ${modes[repeatMode].icon}`;
-        window.repeatMode = repeatMode;
-        mostrarMensajeFlotante(modes[repeatMode].label);
-    });
+        let repeatMode = 0; 
+        document.getElementById('np-repeat-btn')?.addEventListener('click', (e) => {
+            repeatMode = (repeatMode + 1) % 3;
+            const btn = e.currentTarget;
+            const icon = btn.querySelector('i');
+            const modes = [
+                { class: '', icon: 'fa-redo', label: 'Repetición desactivada' },
+                { class: 'active', icon: 'fa-redo', label: '🔁 Repetir lista' },
+                { class: 'active repeat-one', icon: 'fa-redo-alt', label: '🔂 Repetir canción' }
+            ];
+            btn.className = `np-ctrl-btn ${modes[repeatMode].class}`;
+            if (icon) icon.className = `fas ${modes[repeatMode].icon}`;
+            window.repeatMode = repeatMode;
+            mostrarMensajeFlotante(modes[repeatMode].label);
+        });
 
-    //   "Modo Video / Portada"
-   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-    this.videoMode = !this.videoMode;
-    const videoContainer = document.getElementById('videoContainer');
-    const artworkContainer = document.querySelector('.np-artwork-container');
-    const artwork = document.getElementById('np-artwork');
-    const overlay = document.querySelector('.np-artwork-overlay');
-    const icon = document.querySelector('#np-view-toggle i');
-    const nowPlaying = document.getElementById('spotify-now-playing');
+        document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+            this.videoMode = !this.videoMode;
+            const videoContainer = document.getElementById('videoContainer');
+            const artwork = document.getElementById('np-artwork');
+            const artworkContainer = document.querySelector('.np-artwork-container');
+            const overlay = document.querySelector('.np-artwork-overlay');
+            const icon = document.querySelector('#np-view-toggle i');
 
-    if (this.videoMode) {
-          if (nowPlaying && videoContainer) {
-            nowPlaying.insertBefore(videoContainer, nowPlaying.firstChild);
-            videoContainer.style.cssText = `
-                position: relative !important;
-                width: 100% !important;
-                height: auto !important;
-                aspect-ratio: 16/9;
-                opacity: 1 !important;
-                pointer-events: auto !important;
-                z-index: 2;
-                border-radius: 8px;
-                overflow: hidden;
-                flex-shrink: 0;
-            `;
-        }
-        if (artwork) artwork.style.opacity = '0';
-        if (overlay) overlay.style.opacity = '0';
-        if (artworkContainer) artworkContainer.style.display = 'none';
-        if (icon) icon.className = 'fas fa-image';
-        mostrarMensajeFlotante('🎬 Modo video');
-    } else {
-        // Modo portada: devolver videoContainer al artwork
-        if (artworkContainer && videoContainer) {
-            artworkContainer.style.display = '';
-            artworkContainer.appendChild(videoContainer);
-            videoContainer.style.cssText = `
-                position: absolute !important;
-                top: 0; left: 0;
-                width: 100% !important;
-                height: 100% !important;
-                opacity: 0.01 !important;
-                pointer-events: none !important;
-                z-index: 1;
-                border-radius: 8px;
-                overflow: hidden;
-            `;
-        }
-        if (artwork) artwork.style.opacity = '1';
-        if (overlay) overlay.style.opacity = '1';
-        if (icon) icon.className = 'fas fa-film';
-        mostrarMensajeFlotante('🖼️ Modo portada');
+            if (this.videoMode) {
+                if (videoContainer) {
+                    videoContainer.style.position = 'absolute';
+                    videoContainer.style.top = '0';
+                    videoContainer.style.left = '0';
+                    videoContainer.style.width = '100%';
+                    videoContainer.style.height = '100%';
+                    videoContainer.style.opacity = '1';
+                    videoContainer.style.pointerEvents = 'auto';
+                    videoContainer.style.zIndex = '10';
+                    videoContainer.style.borderRadius = '8px';
+                    videoContainer.style.overflow = 'hidden';
+                }
+                if (artwork) artwork.style.opacity = '0';
+                if (overlay) overlay.style.opacity = '0';
+                if (icon) icon.className = 'fas fa-image';
+                mostrarMensajeFlotante('🎬 Modo video');
+            } else {
+                if (videoContainer) {
+                    videoContainer.style.opacity = '0.01';
+                    videoContainer.style.pointerEvents = 'none';
+                    videoContainer.style.zIndex = '1';
+                }
+                if (artwork) artwork.style.opacity = '1';
+                if (overlay) overlay.style.opacity = '1';
+                if (icon) icon.className = 'fas fa-film';
+                mostrarMensajeFlotante('🖼️ Modo portada');
+            }
+        });
+
+        document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
+            this.isLiked = !this.isLiked;
+            const icon = e.currentTarget.querySelector('i');
+            if (icon) {
+                icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
+                icon.style.color = this.isLiked ? '#1DB954' : '';
+            }
+            mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
+        });
     }
-});
-
-    document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
-        this.isLiked = !this.isLiked;
-        const icon = e.currentTarget.querySelector('i');
-        if (icon) {
-            icon.className = this.isLiked ? 'fas fa-heart' : 'far fa-heart';
-            icon.style.color = this.isLiked ? '#1DB954' : '';
-        }
-        mostrarMensajeFlotante(this.isLiked ? '❤️ Añadido a favoritos' : 'Eliminado de favoritos');
-    });
-}
 
     setupProgressBarScrubbing() {
         const bar = document.getElementById('np-progress-bar');
@@ -696,9 +668,42 @@ function displaySearchResultsPiped(results = []) {
 // =============================================
 // QUEUE DISPLAY - Lista estilo Spotify
 // =============================================
+
+function onPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.PLAYING) {
+        const ytVideoData = event.target.getVideoData();
+        const icon = document.getElementById('np-play-icon');
+        if (icon) icon.className = 'fas fa-pause';
+
+        const fullVideo = window.playlistVideos?.find(v => v.videoId === ytVideoData.video_id) || {
+            videoId: ytVideoData.video_id,
+            video_id: ytVideoData.video_id,
+            title: ytVideoData.title,
+            artist: ytVideoData.author || '',
+            author: ytVideoData.author || ''
+        };
+
+        if (window.nowPlayingManager) {
+            window.nowPlayingManager.update(fullVideo);
+        }
+
+        setTimeout(() => {
+            if (window.lyricsManager) window.lyricsManager.loadLyricsForCurrentVideo(fullVideo);
+            if (window.relatedManager) window.relatedManager.loadRelatedForVideo(fullVideo);
+        }, 800);
+    } else if (event.data === YT.PlayerState.PAUSED) {
+        const icon = document.getElementById('np-play-icon');
+        if (icon) icon.className = 'fas fa-play';
+    }
+}
+
 function updatePlaylistDOM() {
     const playlistContainer = document.getElementById('playlist');
     if (!playlistContainer) return;
+    
+    const urlInput = document.getElementById('searchInput2');
+    const savedUrl = urlInput ? urlInput.value : '';
+    
     playlistContainer.innerHTML = '';
 
     if (window.playlistVideos.length === 0) {
@@ -708,10 +713,10 @@ function updatePlaylistDOM() {
                 <p>Tu cola está vacía</p>
                 <small>Busca canciones o añade una playlist</small>
             </div>`;
+        if (urlInput && savedUrl) urlInput.value = savedUrl;
         return;
     }
 
-    // Header de cola
     const header = document.createElement('div');
     header.className = 'queue-header';
     header.innerHTML = `
@@ -722,7 +727,6 @@ function updatePlaylistDOM() {
     `;
     playlistContainer.appendChild(header);
 
-    // "Reproduciendo ahora" - canción actual destacada
     if (currentIndex >= 0 && window.playlistVideos[currentIndex]) {
         const nowSection = document.createElement('div');
         nowSection.className = 'queue-section-label';
@@ -764,7 +768,6 @@ function updatePlaylistDOM() {
             </button>
         `;
 
-        // Sección "A continuación"
         if (index === currentIndex + 1) {
             const nextSection = document.createElement('div');
             nextSection.className = 'queue-section-label';
@@ -772,22 +775,18 @@ function updatePlaylistDOM() {
             fragment.appendChild(nextSection);
         }
 
-        // Click para reproducir
         item.addEventListener('click', (e) => {
             if (e.target.closest('.queue-delete-btn')) return;
             
             if (!reproduccionIniciada) {
-                // Primer clic: Iniciar normalmente
                 currentIndex = index;
                 reproduccionIniciada = true;
                 playFirstVideo();
             } else {
-                // Siguientes clics: usar crossfade
                 window.playSpecificVideoWithCrossfade(index);
             }
         });
 
-        // Eliminar
         item.querySelector('.queue-delete-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             deleteVideo(video.videoId);
@@ -799,24 +798,24 @@ function updatePlaylistDOM() {
     playlistContainer.appendChild(fragment);
     enableDragAndDrop();
 
-    // Scroll al elemento actual
     const currentItem = playlistContainer.querySelector('.queue-item--playing');
     if (currentItem) {
         setTimeout(() => currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
     }
 
-    // Actualizar botón iniciar
     const playBtn = document.getElementById('np-play-pause-btn');
     if (playBtn) {
         if (window.playlistVideos.length > 0) {
-        playBtn.style.opacity = '1';
-        playBtn.style.cursor = 'pointer';
-        playBtn.title = reproduccionIniciada ? 'Play/Pause' : '▶ Iniciar reproducción';
-    } else {
-        playBtn.style.opacity = '0.4';
-        playBtn.title = 'Añade canciones primero';
-     }
-   }
+            playBtn.style.opacity = '1';
+            playBtn.style.cursor = 'pointer';
+            playBtn.title = reproduccionIniciada ? 'Play/Pause' : '▶ Iniciar reproducción';
+        } else {
+            playBtn.style.opacity = '0.4';
+            playBtn.title = 'Añade canciones primero';
+        }
+    }
+
+    if (urlInput && savedUrl) urlInput.value = savedUrl;
 }
 // =============================================
 // ACCIONES DE PLAYLIST
@@ -1071,27 +1070,6 @@ function onPlayerError(event) {
     }
 }
 
-function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.PLAYING) {
-        const videoData = event.target.getVideoData();
-        const icon = document.getElementById('np-play-icon');
-        if (icon) icon.className = 'fas fa-pause';
-
-        setTimeout(() => {
-            if (window.lyricsManager) window.lyricsManager.loadLyricsForCurrentVideo(videoData);
-            if (window.relatedManager) window.relatedManager.loadRelatedForVideo(videoData);
-        }, 600);
-
-        // Actualizar Now Playing con datos del video actual
-        if (window.nowPlayingManager && currentIndex < window.playlistVideos.length) {
-            window.nowPlayingManager.update(window.playlistVideos[currentIndex]);
-        }
-    } else if (event.data === YT.PlayerState.PAUSED) {
-        const icon = document.getElementById('np-play-icon');
-        if (icon) icon.className = 'fas fa-play';
-    }
-}
-
 function playVideo(videoId, player) {
     player.loadVideoById(videoId);
 }
@@ -1153,9 +1131,11 @@ window.playSpecificVideoWithCrossfade = function(targetIndex) {
 }
 function playNextVideo() {
     Object.keys(_triggerCache).forEach(k => delete _triggerCache[k]);
+    if (window.relatedManager) window.relatedManager.lastId = null;
+    if (window.lyricsManager) window.lyricsManager.stopSync();
+
     const list = window.playlistVideos;
 
-    // Modo repetir uno
     if (window.repeatMode === 2) {
         const player = currentPlayer === 1 ? player1 : player2;
         player?.seekTo(0, true);
@@ -1166,7 +1146,6 @@ function playNextVideo() {
     if (currentIndex < list.length - 1) {
         currentIndex++;
     } else if (window.repeatMode === 1) {
-        // Repetir lista
         currentIndex = 0;
     } else {
         askToRepeatPlaylist();
@@ -1181,17 +1160,14 @@ function playNextVideo() {
 
     nextPlayerObj.loadVideoById(nextVideoId);
 
-    // Precargar SponsorBlock
     if (window.sponsorBlockManager) {
         window.sponsorBlockManager.cargarSegmentos(nextVideoId).catch(() => {});
     }
 
-    // Actualizar Now Playing inmediatamente con fade
     if (window.nowPlayingManager) window.nowPlayingManager.update(list[currentIndex]);
 
     updatePlaylistDOM();
 
-    // Transición visual cruzada
     currentEl.classList.add('fade-out');
     nextEl.classList.remove('hidden');
     nextEl.classList.add('fade-in');
@@ -1203,6 +1179,45 @@ function playNextVideo() {
         currentPlayer = nextPlayerNum;
         window.crossfadeTriggered = false;
         crossfadeAudio();
+    }, 1500);
+}
+
+window.playSpecificVideoWithCrossfade = function(targetIndex) {
+    if (targetIndex === currentIndex) return; 
+
+    if (window.relatedManager) window.relatedManager.lastId = null;
+    if (window.lyricsManager) window.lyricsManager.stopSync();
+
+    const currentEl = document.getElementById(`player${currentPlayer}`);
+    const nextPlayerNum = currentPlayer === 1 ? 2 : 1;
+    const nextPlayerObj = currentPlayer === 1 ? player2 : player1;
+    const nextEl = document.getElementById(`player${nextPlayerNum}`);
+    
+    currentIndex = targetIndex;
+    const video = window.playlistVideos[currentIndex];
+
+    nextPlayerObj.loadVideoById(video.videoId);
+
+    if (window.sponsorBlockManager) {
+        window.sponsorBlockManager.cargarSegmentos(video.videoId).catch(() => {});
+    }
+
+    if (window.nowPlayingManager) window.nowPlayingManager.update(video);
+    updatePlaylistDOM();
+
+    currentEl.classList.add('fade-out');
+    nextEl.classList.remove('hidden');
+    nextEl.classList.add('fade-in');
+
+    window.crossfadeTriggered = true;
+
+    setTimeout(() => {
+        currentEl.classList.add('hidden');
+        currentEl.classList.remove('fade-out');
+        nextEl.classList.remove('fade-in');
+        currentPlayer = nextPlayerNum;
+        window.crossfadeTriggered = false;
+        crossfadeAudio(); 
     }, 1500);
 }
 
