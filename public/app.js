@@ -266,17 +266,19 @@ createNowPlayingUI() {
         const artworkContainer = document.querySelector('.np-artwork-container');
         if (videoContainer && artworkContainer) {
             artworkContainer.appendChild(videoContainer);
-            videoContainer.style.position = 'absolute';
-            videoContainer.style.top = '0';
-            videoContainer.style.left = '0';
-            videoContainer.style.width = '100%';
-            videoContainer.style.height = '100%';
-            videoContainer.style.opacity = '';            
-            videoContainer.style.visibility = 'hidden';   
-            videoContainer.style.pointerEvents = 'none';
-            videoContainer.style.zIndex = '1';
-            videoContainer.style.borderRadius = '8px';
-            videoContainer.style.overflow = 'hidden';
+           
+        videoContainer.style.position = 'absolute';
+        videoContainer.style.top = '0';
+        videoContainer.style.left = '0';
+        videoContainer.style.width = '100%';
+        videoContainer.style.height = '100%';
+ 
+        videoContainer.style.opacity = '1';            
+        videoContainer.style.visibility = 'visible';   
+        videoContainer.style.pointerEvents = 'none';
+        videoContainer.style.zIndex = '0';  
+        videoContainer.style.borderRadius = '8px';
+        videoContainer.style.overflow = 'hidden';
             
             const p2 = document.getElementById('player2');
         if (p2) {
@@ -362,56 +364,61 @@ createNowPlayingUI() {
             mostrarMensajeFlotante(modes[repeatMode].label);
         });
 
-   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
-            this.videoMode = !this.videoMode;
-            const videoContainer = document.getElementById('videoContainer');
-            const artworkContainer = document.querySelector('.np-artwork-container');
-            const artwork = document.getElementById('np-artwork');
-            const overlay = document.querySelector('.np-artwork-overlay');
-            const icon = document.querySelector('#np-view-toggle i');
+  document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+    this.videoMode = !this.videoMode;
+    const videoContainer = document.getElementById('videoContainer');
+    const artworkContainer = document.querySelector('.np-artwork-container');
+    const artwork = document.getElementById('np-artwork');
+    const overlay = document.querySelector('.np-artwork-overlay');
+    const icon = document.querySelector('#np-view-toggle i');
 
-            if (this.videoMode) {
-                // MODO VIDEO
-                if (artworkContainer) {
-                    artworkContainer.style.width = '100%';
-                    artworkContainer.style.height = 'auto';
-                    artworkContainer.style.aspectRatio = '16/9';
-                }
-                if (videoContainer) {
-                    videoContainer.style.opacity = '1';
-                    videoContainer.style.visibility = 'visible'; // Faltaba esto
-                    videoContainer.style.pointerEvents = 'auto';
-                    videoContainer.style.zIndex = '10';
-                }
-                  
-                const activeEl = document.getElementById(`player${currentPlayer}`);
-                if (activeEl) {
-                    activeEl.style.opacity = '1';
-                    activeEl.style.visibility = 'visible';
-                }
-                if (artwork) artwork.style.opacity = '0';
-                if (overlay) overlay.style.opacity = '0';
-                if (icon) icon.className = 'fas fa-image';
-                mostrarMensajeFlotante('🎬 Modo video');
-            } else {
-                // MODO PORTADA
-                if (artworkContainer) {
-                    artworkContainer.style.width = '220px';
-                    artworkContainer.style.height = '220px';
-                    artworkContainer.style.aspectRatio = 'auto';
-                }
-                if (videoContainer) {
-                    videoContainer.style.opacity = '0.01';
-                    videoContainer.style.visibility = 'hidden'; // Faltaba esto
-                    videoContainer.style.pointerEvents = 'none';
-                    videoContainer.style.zIndex = '1';
-                }
-                if (artwork) artwork.style.opacity = '1';
-                if (overlay) overlay.style.opacity = '1';
-                if (icon) icon.className = 'fas fa-film';
-                mostrarMensajeFlotante('🖼️ Modo portada');
-            }
-        });
+    if (this.videoMode) {
+        // MODO VIDEO
+        if (artworkContainer) {
+            artworkContainer.style.width = '100%';
+            artworkContainer.style.height = 'auto';
+            artworkContainer.style.aspectRatio = '16/9';
+        }
+        if (videoContainer) {
+            // Mantener todo visible, solo traer al frente
+            videoContainer.style.opacity = '1';
+            videoContainer.style.visibility = 'visible'; 
+            videoContainer.style.pointerEvents = 'auto';
+            videoContainer.style.zIndex = '10'; // <-- Video por encima de la portada
+        }
+          
+        const activeEl = document.getElementById(`player${currentPlayer}`);
+        if (activeEl) {
+            activeEl.style.opacity = '1';
+            activeEl.style.visibility = 'visible';
+        }
+        if (artwork) artwork.style.opacity = '0';
+        if (overlay) overlay.style.opacity = '0';
+        if (icon) icon.className = 'fas fa-image';
+        mostrarMensajeFlotante('🎬 Modo video');
+    } else {
+        // MODO PORTADA
+        if (artworkContainer) {
+            artworkContainer.style.width = '220px';
+            artworkContainer.style.height = '220px';
+            artworkContainer.style.aspectRatio = 'auto';
+        }
+        if (videoContainer) {
+             videoContainer.style.opacity = '1'; 
+            videoContainer.style.visibility = 'visible'; 
+            videoContainer.style.pointerEvents = 'none';
+            videoContainer.style.zIndex = '0';  
+        }
+        if (artwork) {
+            artwork.style.opacity = '1';
+            artwork.style.position = 'relative'; 
+            artwork.style.zIndex = '2'; // <-- Portada por encima del video
+        }
+        if (overlay) overlay.style.opacity = '1';
+        if (icon) icon.className = 'fas fa-film';
+        mostrarMensajeFlotante('🖼️ Modo portada');
+    }
+});
 
         document.getElementById('np-like-btn')?.addEventListener('click', (e) => {
             this.isLiked = !this.isLiked;
