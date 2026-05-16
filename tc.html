@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad - YT CrossMix</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; padding: 0; color: #333; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1, h2 { color: #1DB954; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        h1 { text-align: center; font-size: 2em; }
+        h2 { font-size: 1.5em; margin-top: 30px; }
+        p { margin-bottom: 15px; text-align: justify; }
+        ul { list-style-type: disc; margin-left: 20px; margin-bottom: 15px; }
+        li { margin-bottom: 5px; }
+        strong { color: #000; }
+        .highlight-box { background-color: #f9f9f9; border-left: 4px solid #1DB954; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Política de Privacidad de YT CrossMix</h1>
+        <p><strong>Fecha de última actualización:</strong> 15 de mayo de 2026</p>
+
+        <p>Esta Política de Privacidad describe cómo "YT CrossMix" ("la Aplicación", "nosotros", "nuestro") recopila, utiliza y protege la información de los usuarios que acceden a nuestra plataforma web disponible en el dominio oficial <a href="https://mix.sys-lab.app" target="_blank" rel="noopener noreferrer">https://mix.sys-lab.app</a>.</p>
+
+        <hr>
+
+        <h2>1. Información que Recopilamos mediante la API de YouTube</h2>
+        <p>YT CrossMix es un controlador web enfocado en la mejora de transiciones de reproducción. Para ofrecer la carga y sincronización de tus listas de reproducción personales, solicitamos exclusivamente acceso al alcance (scope) sensible de Google OAuth: <code>https://www.googleapis.com/auth/youtube.readonly</code>.</p>
+        
+        <p>A través de este permiso, la aplicación accede únicamente a los siguientes datos de tu cuenta de YouTube:</p>
+        <ul>
+            <li>Títulos e identificadores (IDs) de tus Playlists guardadas.</li>
+            <li>Metadatos básicos de los videos dentro de dichas listas (títulos, nombres de canales/artistas, imágenes de miniaturas y duraciones de pista).</li>
+        </ul>
+
+        <div class="highlight-box">
+            <strong>🔒 Declaración de almacenamiento y transferencia cero:</strong> YT CrossMix es una aplicación basada puramente en el lado del cliente (Client-Side). Toda la información obtenida a través de la API de Google se procesa directamente en la memoria local de tu navegador. <strong>No guardamos, no almacenamos y no transmitimos ningún dato del usuario a servidores externos ni a terceros.</strong>
+        </div>
+
+        <hr>
+
+        <h2>2. Declaración de Cumplimiento de Datos de la API de Google (Uso Limitado)</h2>
+        <p>Nos adherimos estrictamente a las normativas de desarrollo seguro de Google. En cumplimiento con la política de seguridad requerida, declaramos lo siguiente:</p>
+        <p><em>El uso y la transferencia por parte de YT CrossMix de la información recibida de las APIs de Google a cualquier otra aplicación se adherirán a la <strong>Política de Datos del Usuario de los Servicios de Google API</strong> (Google API Services User Data Policy), incluidos sus requisitos de <strong>Uso Limitado (Limited Use requirements)</strong>.</em></p>
+
+        <hr>
+
+        <h2>3. Uso de la Información</h2>
+        <p>Los datos obtenidos de manera temporal se emplean de manera exclusiva para:</p>
+        <ul>
+            <li>Renderizar la cola de reproducción interactiva dentro de la interfaz del usuario.</li>
+            <li>Alimentar los controladores del motor de transiciones (crossfade) de audio y video.</li>
+        </ul>
+        <p>Bajo ninguna circunstancia estos metadatos serán utilizados para modelado de perfiles de usuario, venta de información comercial o redireccionamiento publicitario.</p>
+
+        <hr>
+
+        <h2>4. Retención y Destrucción de Datos</h2>
+        <p>Los tokens de acceso (Access Tokens) proporcionados de manera local por el inicio de sesión de Google se conservan únicamente en el almacenamiento local seguro del navegador del usuario (LocalStorage) para preservar el estado de la sesión activa. En el momento en que el usuario presione el botón "Salir" (Sign-Out) o borre la memoria caché de su navegador, toda la información se destruirá de forma inmediata y permanente.</p>
+
+        <hr>
+
+        <h2>5. Proveedores e Integraciones de Terceros</h2>
+        <p>La aplicación interactúa con servicios externos que operan bajo sus propios términos de cumplimiento:</p>
+        <ul>
+            <li><strong>Servicios de la API de YouTube:</strong> Al utilizar esta integración, aceptas quedar sujeto a los Términos de Servicio de YouTube (<a href="https://www.youtube.com/t/terms" target="_blank">https://www.youtube.com/t/terms</a>) y la Política de Privacidad de Google (<a href="https://policies.google.com/privacy" target="_blank">https://policies.google.com/privacy</a>).</li>
+            <li><strong>SponsorBlock API:</strong> Utilizado localmente para identificar marcas de tiempo de segmentos no musicales y optimizar la precisión de las mezclas en cadena.</li>
+        </ul>
+
+        <hr>
+
+        <h2>6. Contacto</h2>
+        <p>Para cualquier consulta técnica sobre el manejo transparente de tus datos dentro del entorno local de la aplicación, puedes escribir directamente a: <strong>aftterpro@gmail.com</strong>.</p>
+    </div>
+</body>
+</html>
