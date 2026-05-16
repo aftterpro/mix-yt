@@ -362,7 +362,7 @@ createNowPlayingUI() {
             mostrarMensajeFlotante(modes[repeatMode].label);
         });
 
-    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+   document.getElementById('np-view-toggle')?.addEventListener('click', () => {
             this.videoMode = !this.videoMode;
             const videoContainer = document.getElementById('videoContainer');
             const artworkContainer = document.querySelector('.np-artwork-container');
@@ -371,32 +371,38 @@ createNowPlayingUI() {
             const icon = document.querySelector('#np-view-toggle i');
 
             if (this.videoMode) {
-                // MODO VIDEO: NO mover el DOM. Solo expandimos el contenedor padre.
+                // MODO VIDEO
                 if (artworkContainer) {
                     artworkContainer.style.width = '100%';
                     artworkContainer.style.height = 'auto';
                     artworkContainer.style.aspectRatio = '16/9';
                 }
                 if (videoContainer) {
-                    // Revelar el video
                     videoContainer.style.opacity = '1';
+                    videoContainer.style.visibility = 'visible'; // Faltaba esto
                     videoContainer.style.pointerEvents = 'auto';
                     videoContainer.style.zIndex = '10';
+                }
+                  
+                const activeEl = document.getElementById(`player${currentPlayer}`);
+                if (activeEl) {
+                    activeEl.style.opacity = '1';
+                    activeEl.style.visibility = 'visible';
                 }
                 if (artwork) artwork.style.opacity = '0';
                 if (overlay) overlay.style.opacity = '0';
                 if (icon) icon.className = 'fas fa-image';
                 mostrarMensajeFlotante('🎬 Modo video');
             } else {
-                // MODO PORTADA: Restaurar tamaño original (cuadrado)
+                // MODO PORTADA
                 if (artworkContainer) {
                     artworkContainer.style.width = '220px';
                     artworkContainer.style.height = '220px';
                     artworkContainer.style.aspectRatio = 'auto';
                 }
                 if (videoContainer) {
-                    // Ocultar el video
                     videoContainer.style.opacity = '0.01';
+                    videoContainer.style.visibility = 'hidden'; // Faltaba esto
                     videoContainer.style.pointerEvents = 'none';
                     videoContainer.style.zIndex = '1';
                 }
@@ -1245,17 +1251,24 @@ function crossfadeAudio() {
         prevPlayer?.setVolume?.(Math.max(0, outVol));
         nextPlayer?.setVolume?.(Math.min(100, inVol));
 
-    if (progress >= 1) {
-    clearInterval(interval);
-    prevPlayer?.pauseVideo?.();
-    nextPlayer?.setVolume?.(100);
-    if (window.nowPlayingManager?.videoMode) {
-        const activeEl = document.getElementById(`player${currentPlayer}`);
-        const inactiveEl = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        if (activeEl) { activeEl.style.opacity = '1'; activeEl.style.visibility = 'visible'; }
-        if (inactiveEl) { activeEl.style.opacity = '0'; inactiveEl.style.visibility = 'hidden'; }
+   if (progress >= 1) {
+        clearInterval(interval);
+        prevPlayer?.pauseVideo?.();
+        nextPlayer?.setVolume?.(100);
+        if (window.nowPlayingManager?.videoMode) {
+            const activeEl = document.getElementById(`player${currentPlayer}`);
+            const inactiveEl = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
+            if (activeEl) { 
+                activeEl.style.opacity = '1'; 
+                activeEl.style.visibility = 'visible'; 
+            }
+            if (inactiveEl) { 
+                // AQUI ESTABA EL ERROR: Decía activeEl en lugar de inactiveEl
+                inactiveEl.style.opacity = '0'; 
+                inactiveEl.style.visibility = 'hidden'; 
             }
         }
+    }
     }, 100);
 }
 
@@ -1389,11 +1402,19 @@ function playFirstVideo() {
     currentPlayer = 1;
     window.crossfadeTriggered = false;
 
+    const p1 = document.getElementById('player1'); // Nuevo
     const p2 = document.getElementById('player2');
+    
     if (p2) {
         p2.style.opacity = '0';
         p2.style.visibility = 'hidden';
         p2.style.pointerEvents = 'none';
+    }
+    
+    // Validar si el Modo Video está activo para revelar p1
+    if (p1 && window.nowPlayingManager?.videoMode) {
+        p1.style.opacity = '1';
+        p1.style.visibility = 'visible';
     }
 
     window.player1.loadVideoById(video.videoId);
