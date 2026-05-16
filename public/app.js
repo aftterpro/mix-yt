@@ -271,16 +271,18 @@ createNowPlayingUI() {
             videoContainer.style.left = '0';
             videoContainer.style.width = '100%';
             videoContainer.style.height = '100%';
-            videoContainer.style.opacity = '0.01';
+            videoContainer.style.opacity = '';            
+            videoContainer.style.visibility = 'hidden';   
             videoContainer.style.pointerEvents = 'none';
             videoContainer.style.zIndex = '1';
             videoContainer.style.borderRadius = '8px';
             videoContainer.style.overflow = 'hidden';
             
             const p2 = document.getElementById('player2');
-            if (p2) {
-                p2.style.opacity = '0';
-                p2.style.pointerEvents = 'none';
+        if (p2) {
+            p2.style.opacity = '0';
+            p2.style.visibility = 'hidden';
+            p2.style.pointerEvents = 'none';
             }
         }
 
@@ -360,11 +362,10 @@ createNowPlayingUI() {
             mostrarMensajeFlotante(modes[repeatMode].label);
         });
 
-      document.getElementById('np-view-toggle')?.addEventListener('click', () => {
+    document.getElementById('np-view-toggle')?.addEventListener('click', () => {
     this.videoMode = !this.videoMode;
     const videoContainer = document.getElementById('videoContainer');
     const artwork = document.getElementById('np-artwork');
-    const artworkContainer = document.querySelector('.np-artwork-container');
     const overlay = document.querySelector('.np-artwork-overlay');
     const icon = document.querySelector('#np-view-toggle i');
 
@@ -375,34 +376,41 @@ createNowPlayingUI() {
             videoContainer.style.left = '0';
             videoContainer.style.width = '100%';
             videoContainer.style.height = '100%';
-            videoContainer.style.opacity = '1';
-            videoContainer.style.pointerEvents = 'auto';
             videoContainer.style.zIndex = '10';
             videoContainer.style.borderRadius = '8px';
             videoContainer.style.overflow = 'hidden';
+            videoContainer.style.pointerEvents = 'auto';
+            // ← CLAVE: quitar opacity del contenedor completamente
+            videoContainer.style.opacity = '';
+            videoContainer.style.visibility = 'visible';
         }
-        // ← NUEVO: mostrar iframe del player activo
+        // Mostrar solo el iframe activo
         const activeEl = document.getElementById(`player${currentPlayer}`);
         const inactiveEl = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        if (activeEl) { activeEl.style.opacity = '1'; activeEl.style.pointerEvents = 'auto'; }
-        if (inactiveEl) { inactiveEl.style.opacity = '0'; inactiveEl.style.pointerEvents = 'none'; }
-
+        if (activeEl) {
+            activeEl.style.opacity = '1';
+            activeEl.style.visibility = 'visible';
+        }
+        if (inactiveEl) {
+            inactiveEl.style.opacity = '0';
+            inactiveEl.style.visibility = 'hidden';
+        }
         if (artwork) artwork.style.opacity = '0';
         if (overlay) overlay.style.opacity = '0';
         if (icon) icon.className = 'fas fa-image';
         mostrarMensajeFlotante('🎬 Modo video');
     } else {
         if (videoContainer) {
-            videoContainer.style.opacity = '0.01';
+            // ← volver a ocultar SIN opacity (que crea stacking context)
+            videoContainer.style.visibility = 'hidden';
             videoContainer.style.pointerEvents = 'none';
             videoContainer.style.zIndex = '1';
+            videoContainer.style.opacity = '';
         }
-        // ← NUEVO: resetear opacidades de iframes
         const p1 = document.getElementById('player1');
         const p2 = document.getElementById('player2');
-        if (p1) p1.style.opacity = '';
-        if (p2) p2.style.opacity = '0';
-
+        if (p1) { p1.style.opacity = ''; p1.style.visibility = 'visible'; }
+        if (p2) { p2.style.opacity = '0'; p2.style.visibility = 'hidden'; }
         if (artwork) artwork.style.opacity = '1';
         if (overlay) overlay.style.opacity = '1';
         if (icon) icon.className = 'fas fa-film';
@@ -1248,16 +1256,15 @@ function crossfadeAudio() {
         prevPlayer?.setVolume?.(Math.max(0, outVol));
         nextPlayer?.setVolume?.(Math.min(100, inVol));
 
-        if (progress >= 1) {
+    if (progress >= 1) {
     clearInterval(interval);
     prevPlayer?.pauseVideo?.();
     nextPlayer?.setVolume?.(100);
-    
     if (window.nowPlayingManager?.videoMode) {
         const activeEl = document.getElementById(`player${currentPlayer}`);
         const inactiveEl = document.getElementById(`player${currentPlayer === 1 ? 2 : 1}`);
-        if (activeEl) { activeEl.style.opacity = '1'; activeEl.style.pointerEvents = 'auto'; }
-        if (inactiveEl) { inactiveEl.style.opacity = '0'; inactiveEl.style.pointerEvents = 'none'; }
+        if (activeEl) { activeEl.style.opacity = '1'; activeEl.style.visibility = 'visible'; }
+        if (inactiveEl) { activeEl.style.opacity = '0'; inactiveEl.style.visibility = 'hidden'; }
             }
         }
     }, 100);
@@ -1396,6 +1403,7 @@ function playFirstVideo() {
     const p2 = document.getElementById('player2');
     if (p2) {
         p2.style.opacity = '0';
+        p2.style.visibility = 'hidden';
         p2.style.pointerEvents = 'none';
     }
 
