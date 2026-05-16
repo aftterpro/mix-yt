@@ -764,7 +764,6 @@ button.play {
     background: #000;
     border-radius: 12px;
     overflow: hidden;
-    display: none; /* Inicialmente oculto */
 }
 
 #controls {
