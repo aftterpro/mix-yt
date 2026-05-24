@@ -464,8 +464,14 @@ button.play {
 
 /* Now Playing - Componente principal */
 #spotify-now-playing {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 14px 10px;
+    gap: 10px;
     flex: 1;
-    overflow: hidden;  
+    overflow-y: auto;
     min-height: 0;
 }
 
@@ -481,31 +487,19 @@ button.play {
 /* Artwork */
 .np-artwork-container {
     position: relative;
-    width: 220px;
-    height: 220px;
-    flex-shrink: 0;
-}
-
-.np-artwork-shadow {
-    position: absolute;
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 160px;
-    height: 40px;
-    background: rgba(0,0,0,0.6);
-    filter: blur(20px);
-    border-radius: 50%;
-}
-
-.np-artwork {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    aspect-ratio: 16/9;
+    flex-shrink: 0;
+    z-index: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #000;
+    /* Sombra sutil debajo */
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
+
+.np-artwork-shadow { display: none; }
+.np-artwork { display: none; }
 
 .np-artwork-overlay {
     position: absolute;
@@ -555,6 +549,46 @@ button.play {
     85%, 100% { transform: translateX(-50%); }
 }
 
+/* === BOTÓN TRADUCTOR LETRAS === */
+.lyrics-translate-btn {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-radius: 20px !important;
+    padding: 5px 12px !important;
+    font-size: 0.8rem !important;
+    color: var(--spotify-text-secondary) !important;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+ 
+.lyrics-translate-btn::after {
+    content: 'Traducir';
+    font-size: 0.72rem;
+}
+ 
+.lyrics-translate-btn.active {
+    background: rgba(29,185,84,0.15) !important;
+    border-color: var(--spotify-green) !important;
+    color: var(--spotify-green) !important;
+}
+ 
+.lyrics-translate-btn.active::after {
+    content: 'Original';
+}
+ 
+.lyrics-translate-btn:hover {
+    color: var(--spotify-text) !important;
+    background: rgba(255,255,255,0.14) !important;
+}
+ 
+.lyrics-translate-btn i {
+    font-size: 0.9em;
+}
 .np-artist {
     font-size: 0.85rem;
     color: var(--spotify-text-secondary);
@@ -759,13 +793,22 @@ button.play {
 .add-to-playlist:hover { background: var(--spotify-green-hover); transform: scale(1.01); }
 
 #videoContainer {
-    width: 100%;
-    aspect-ratio: 16/9;
+    position: absolute !important;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
     background: #000;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
+    z-index: 1;
 }
-
+.video-player {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    /* Sin z-index conflictivo */
+}
 #controls {
     display: flex;
     gap: 8px;
