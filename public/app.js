@@ -1433,7 +1433,6 @@ class LyricsManager {
         if (!btn) return;
 
         if (this.isTranslated) {
-            // Revertir a original
             this.isTranslated = false;
             btn.classList.remove('active');
             btn.title = 'Traducir al español';
@@ -1446,42 +1445,45 @@ class LyricsManager {
             return;
         }
 
-        // Traducir
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         btn.disabled = true;
 
         try {
-            const textToTranslate = isSynced
-                ? this.currentLrc.map(l => l.text).join('\n')
-                : (data.plainLyrics || '');
+            const lines = isSynced
+                ? this.currentLrc.map(l => l.text).filter(t => t && t.trim())
+                : (data.plainLyrics || '').split('\n').filter(l => l.trim());
 
-            const cacheKey = 'trans_' + textToTranslate.substring(0, 50);
-            let translated = this.translationCache.get(cacheKey);
+            if (lines.length === 0) throw new Error('Sin texto para traducir');
 
-            if (!translated) {
-                // Usar MyMemory API (gratuita, sin key)
-                const encoded = encodeURIComponent(textToTranslate.substring(0, 4500));
-                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encoded}&langpair=auto|es`);
-                const json = await res.json();
-                if (json.responseStatus !== 200 && json.responseStatus !== '200') throw new Error('API error');
-                translated = json.responseData.translatedText;
-                this.translationCache.set(cacheKey, translated);
+            const cacheKey = 'trans_' + lines.slice(0, 3).join('').substring(0, 60);
+            let translatedLines = this.translationCache.get(cacheKey);
+
+            if (!translatedLines) {
+                translatedLines = await this._translateLines(lines);
+                if (translatedLines && translatedLines.length > 0) {
+                    this.translationCache.set(cacheKey, translatedLines);
+                }
             }
+
+            if (!translatedLines || translatedLines.length === 0) throw new Error('Traducción vacía');
 
             const body = document.querySelector('.lyrics-body');
             if (body) {
                 if (isSynced) {
-                    const translatedLines = translated.split('\n');
-                    // Reasignar textos traducidos manteniendo tiempos LRC
-                    this.currentLrc.forEach((line, i) => {
-                        line.translatedText = translatedLines[i] || line.text;
+                    let transIdx = 0;
+                    this.currentLrc.forEach(line => {
+                        if (line.text && line.text.trim()) {
+                            line.translatedText = translatedLines[transIdx++] || line.text;
+                        } else {
+                            line.translatedText = line.text;
+                        }
                     });
                     body.innerHTML = this.currentLrc.map(line =>
-                        `<p class="lyric-line" data-time="${line.time}">${this.escape(line.translatedText || line.text)}</p>`
+                        `<p class="lyric-line" data-time="${line.time}">${this.escape(line.translatedText || line.text) || '♪'}</p>`
                     ).join('');
                     this.startSync();
                 } else {
-                    body.innerHTML = this.renderPlain(translated);
+                    body.innerHTML = this.renderPlain(translatedLines.join('\n'));
                 }
             }
 
@@ -1490,11 +1492,110 @@ class LyricsManager {
             btn.title = 'Ver original';
             mostrarMensajeFlotante('🌐 Traducido al español');
         } catch (e) {
-            mostrarMensajeFlotante('❌ Error al traducir');
+            console.error('Error traducción:', e);
+            mostrarMensajeFlotante('❌ ' + (e.message || 'Error al traducir'));
         } finally {
             btn.innerHTML = '<i class="fas fa-language"></i>';
             btn.disabled = false;
         }
+    }
+
+    async _translateLines(lines) {
+        // Chunks de 15 líneas para no exceder límites
+        const chunkSize = 15;
+        const chunks = [];
+        for (let i = 0; i < lines.length; i += chunkSize) {
+            chunks.push(lines.slice(i, i + chunkSize));
+        }
+        const results = [];
+        for (const chunk of chunks) {
+            const translated = await this._translateChunk(chunk);
+            results.push(...translated);
+        }
+        return results;
+    }
+
+    async _translateChunk(lines) {
+        const SEP = '\n||||\n';
+        const text = lines.join(SEP);
+
+        // Intentar APIs en orden
+        const apis = [
+            () => this._translateGoogle(lines),
+            () => this._translateLingva(text, SEP, lines),
+            () => this._translateMyMemory(text, SEP, lines),
+        ];
+
+        for (const apiFn of apis) {
+            try {
+                const result = await apiFn();
+                if (result && result.length >= Math.floor(lines.length * 0.5)) {
+                    // Rellenar líneas faltantes con originales
+                    while (result.length < lines.length) result.push(lines[result.length]);
+                    return result.slice(0, lines.length);
+                }
+            } catch (e) {
+                console.warn('API de traducción falló, probando siguiente:', e.message);
+            }
+        }
+        return lines; // fallback: originales
+    }
+
+    // Google Translate no oficial (cliente gtx)
+    async _translateGoogle(lines) {
+        const results = [];
+        const batchSize = 5;
+        for (let i = 0; i < lines.length; i += batchSize) {
+            const batch = lines.slice(i, i + batchSize);
+            const text = batch.join('\n');
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(text)}`;
+            const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+            if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
+            const json = await res.json();
+            // json[0] es array de segmentos traducidos
+            const translated = (json[0] || []).map(seg => seg[0] || '').join('');
+            const translatedBatch = translated.split('\n');
+            // Asegurar mismo número de líneas que el batch
+            while (translatedBatch.length < batch.length) translatedBatch.push(batch[translatedBatch.length] || '');
+            results.push(...translatedBatch.slice(0, batch.length));
+            if (i + batchSize < lines.length) await new Promise(r => setTimeout(r, 150));
+        }
+        return results;
+    }
+
+    // Lingva Translate (instancias públicas open source)
+    async _translateLingva(text, sep, lines) {
+        const instances = ['https://lingva.ml', 'https://lingva.thedaviddelta.com'];
+        for (const base of instances) {
+            try {
+                const url = `${base}/api/v1/auto/es/${encodeURIComponent(text)}`;
+                const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+                if (!res.ok) continue;
+                const json = await res.json();
+                if (!json.translation) continue;
+                const parts = json.translation.split(sep).map(p => p.trim()).filter(Boolean);
+                if (parts.length >= Math.floor(lines.length * 0.5)) return parts;
+            } catch (e) { /* probar siguiente */ }
+        }
+        throw new Error('Lingva: todas las instancias fallaron');
+    }
+
+    // MyMemory API
+    async _translateMyMemory(text, sep, lines) {
+        // MyMemory funciona mejor con textos cortos
+        const short = text.substring(0, 450);
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(short)}&langpair=en|es`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
+        const json = await res.json();
+        const status = parseInt(json.responseStatus);
+        if (status !== 200) throw new Error('MyMemory: ' + json.responseDetails);
+        const translated = json.responseData?.translatedText || '';
+        if (!translated || translated.includes('MYMEMORY WARNING')) throw new Error('MyMemory: cuota');
+        const parts = translated.split(sep).map(p => p.trim()).filter(Boolean);
+        if (parts.length >= Math.floor(lines.length * 0.5)) return parts;
+        // Si no separó bien, devolver como una sola línea
+        return [translated];
     }
 
     renderSynced(lrc) {
