@@ -71,3 +71,49 @@
     text-align: left;
     padding: 5px 0;
 }
+/* Efecto de transición optimizado para botones usando GPU (transform y opacity) */
+.btn-youtube-style {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 20px;
+    background-color: #ff0000;
+    color: #ffffff;
+    cursor: pointer;
+    
+    /* Indicamos al navegador que prepare la aceleración por hardware */
+    will-change: transform, opacity;
+    
+    /* SÓLO animamos transform y opacity para evitar Layout Reflow */
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-youtube-style:hover {
+    transform: scale(1.05); /* En lugar de cambiar width/height */
+    opacity: 0.9;
+}
+
+.btn-youtube-style:active {
+    transform: scale(0.95);
+}
+
+/* Animación constante (ej. un Ecualizador de reproducción o Spinner de carga) */
+.playing-equalizer-bar {
+    width: 4px;
+    height: 20px;
+    background-color: #ffffff;
+    will-change: transform; /* Crucial para animaciones en bucle continuo */
+    animation: pulseEqualizer 0.8s infinite ease-in-out alternate;
+}
+
+@keyframes pulseEqualizer {
+    0% {
+        transform: scaleY(0.3);
+    }
+    100% {
+        transform: scaleY(1);
+    }
+}
