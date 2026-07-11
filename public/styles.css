@@ -455,6 +455,25 @@ button.play {
 /* =============================================
    PANEL REPRODUCTOR - Centro
    ============================================= */
+/* Contenedor general de tarjetas de videos */
+.video-grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+    padding: 20px;
+}
+
+/* Tarjeta individual de video optimizada con Content Visibility */
+.video-card {
+    background-color: #1f1f1f;
+    border-radius: 8px;
+    overflow: hidden;
+    
+    /* Evita que el navegador renderice la tarjeta si está fuera del viewport */
+    content-visibility: auto;
+    /* Asigna una altura estimada para que la barra de scroll no salte bruscamente */
+    contain-intrinsic-size: 0 320px; 
+}
 #player-panel {
     display: flex;
     flex-direction: column;
