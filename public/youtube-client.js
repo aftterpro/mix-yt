@@ -1,3 +1,42 @@
+// === 1. DECLARACIONES GLOBALES (Al inicio absoluto del archivo) ===
+const CACHE_EXPIRATION_TIME = 1000 * 60 * 10; // 10 minutos en ms
+
+// === 2. FUNCIONES DE LA API DE YOUTUBE ===
+async function buscarVideosConCache(termino) {
+    if (!termino) return [];
+    
+    const cacheKey = `search_cache_${termino.trim().toLowerCase()}`;
+    const cacheGuardada = localStorage.getItem(cacheKey);
+    
+    if (cacheGuardada) {
+        try {
+            const dataParsed = JSON.parse(cacheGuardada);
+            if (Date.now() - dataParsed.timestamp < CACHE_EXPIRATION_TIME) {
+                console.log("🚀 [YT CrossMix] Cargando desde caché local...");
+                return dataParsed.resultados;
+            }
+        } catch (e) {
+            console.error("Error leyendo caché, se ignorará:", e);
+        }
+    }
+    
+    // Si no hay caché o expiró, llamamos a la Serverless Function / API
+    try {
+        const respuesta = await fetch(`/api/search?q=${encodeURIComponent(termino)}`);
+        const resultados = await respuesta.json();
+        
+        const objetoCache = {
+            timestamp: Date.now(),
+            resultados: resultados
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(objetoCache));
+        
+        return resultados;
+    } catch (error) {
+        console.error("Error en buscarVideosConCache:", error);
+        return []; // Retornar array vacío para evitar romper el flujo del DOM
+    }
+}
 class YouTubeSimplifiedClient {
 constructor() {
         this.baseUrl = "/search";  
@@ -10,39 +49,6 @@ constructor() {
         this.initialized = true;
         return true;
     }
-    const CACHE_EXPIRATION_TIME = 1000 * 60 * 10; // 10 Minutos en milisegundos
-
-async function buscarVideosConCache(termino) {
-    const cacheKey = `search_cache_${termino.trim().toLowerCase()}`;
-    const cacheGuardada = localStorage.getItem(cacheKey);
-    
-    if (cacheGuardada) {
-        const dataParsed = JSON.parse(cacheGuardada);
-        // Verificamos si la caché aún no ha expirado
-        if (Date.now() - dataParsed.timestamp < CACHE_EXPIRATION_TIME) {
-            console.log("Retornando resultados desde la caché local...");
-            return dataParsed.resultados;
-        }
-    }
-    
-    // Si no hay caché o expiró, hacemos el fetch a nuestra Serverless Function
-    try {
-        const respuesta = await fetch(`/api/search?q=${encodeURIComponent(termino)}`);
-        const resultados = await respuesta.json();
-        
-        // Guardamos los datos nuevos junto con la marca de tiempo actual
-        const objetoCache = {
-            timestamp: Date.now(),
-            resultados: resultados
-        };
-        localStorage.setItem(cacheKey, JSON.stringify(objetoCache));
-        
-        return resultados;
-    } catch (error) {
-        console.error("Error consultando la función de búsqueda:", error);
-        throw error;
-    }
-}
         
 async search(query) {
     const cleanQuery = query.trim();
