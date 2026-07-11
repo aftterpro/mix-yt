@@ -1,8 +1,7 @@
 // ============================================================================
 // 1. CONFIGURACIÓN GLOBAL Y CACHÉ
 // ============================================================================
-const CACHE_EXPIRATION_TIME = 1000 * 60 * 10; // 10 minutos en ms
-
+const YT_CLIENT_CACHE_EXPIRATION = 1000 * 60 * 10;
 // Función independiente para buscar videos usando el almacenamiento local
 async function buscarVideosConCache(termino) {
     if (!termino) return [];
@@ -13,7 +12,7 @@ async function buscarVideosConCache(termino) {
     if (cacheGuardada) {
         try {
             const dataParsed = JSON.parse(cacheGuardada);
-            if (Date.now() - dataParsed.timestamp < CACHE_EXPIRATION_TIME) {
+            if (Date.now() - dataParsed.timestamp < YT_CLIENT_CACHE_EXPIRATION) {
                 console.log("🚀 [YT CrossMix] Cargando desde caché local...");
                 return dataParsed.resultados;
             }
@@ -461,12 +460,36 @@ window.lyricsService = {
     },
 
     async fetchFromLrclib(clean) {
-        const q = encodeURIComponent(`${clean.artist} ${clean.title}`);
-        const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
-        const data = await res.json();
-        if (!data?.length) throw new Error('LRCLIB: no encontrado');
-        return { syncedLyrics: data[0].syncedLyrics, plainLyrics: data[0].plainLyrics, provider: 'LRCLib' };
-    }
+    // Función interna para limpiar términos basura de YouTube
+    const limpiarTextoYT = (texto) => {
+        if (!texto) return '';
+        return texto
+            .replace(/\(.*?\)/g, '')  // Borra todo lo que esté entre paréntesis (Ej: Letra Oficial)
+            .replace(/\[.*?\]/g, '')  // Borra todo lo que esté entre corchetes (Ej: Video Oficial)
+            .replace(/\s-/g, '')      // Remueve guiones sueltos
+            .replace(/(oficial|official|lyric|letra|video|hd|4k|en vivo|live)/gi, '') // Palabras clave comunes
+            .trim();
+    };
+
+    const artistaLimpio = limpiarTextoYT(clean.artist);
+    const tituloLimpio = limpiarTextoYT(clean.title);
+
+    // Concatenamos de forma limpia para asegurar que LRCLIB encuentre el tema exacto
+    const q = encodeURIComponent(`${artistaLimpio} ${tituloLimpio}`);
+    
+    console.log(`🔍 Buscando letras optimizadas en LRCLIB con el query: ${artistaLimpio} ${tituloLimpio}`);
+
+    const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
+    const data = await res.json();
+    
+    if (!data?.length) throw new Error('LRCLIB: no encontrado');
+    
+    return { 
+        syncedLyrics: data[0].syncedLyrics, 
+        plainLyrics: data[0].plainLyrics, 
+        provider: 'LRCLib' 
+    };
+}
 };
 
 // ============================================================================
