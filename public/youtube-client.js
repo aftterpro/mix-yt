@@ -417,37 +417,52 @@ window.youtubeClientUtils = {
 window.initializePlayers = function() {};
 
 // Servicios de Letras de Canciones
+// Servicios de Letras de Canciones Corregido y Optimizado
 window.lyricsService = {
     cache: new Map(),
 
     async getOrFetchLyrics(clean, cacheKey) {
         if (this.cache.has(cacheKey)) return this.cache.get(cacheKey);
         try {
+            // Intenta primero con Oracle (subtítulos de YT) y si falla va a LRCLIB
             const data = await Promise.any([this.fetchFromOracle(clean), this.fetchFromLrclib(clean)]);
             if (data) this.cache.set(cacheKey, data);
             return data;
-        } catch { throw new Error('Todos los proveedores fallaron'); }
+        } catch (err) { 
+            console.error('❌ Ambos proveedores de letras fallaron:', err);
+            throw new Error('Todos los proveedores fallaron'); 
+        }
     },
 
     async fetchFromOracle(clean) {
-        // Obtenemos dinámicamente el reproductor activo desde el contexto de la app
+        // Accedemos de forma segura a los objetos del reproductor global expuestos en window
         const activePlayer = window.currentPlayer === 1 ? window.player1 : window.player2;
         let videoId = null;
-        try { videoId = activePlayer?.getVideoData()?.video_id; } catch {}
-        if (!videoId) throw new Error('Sin videoId');
+        
+        try { 
+            videoId = activePlayer?.getVideoData()?.video_id; 
+        } catch (e) {
+            console.warn("No se pudo obtener el video_id del reproductor activo");
+        }
+        
+        if (!videoId) throw new Error('Sin videoId válido');
 
         const ctrl = new AbortController();
-        const timeoutId = setTimeout(() => ctrl.abort(), 65000);
+        const timeoutId = setTimeout(() => ctrl.abort(), 8000); // 8 segundos de timeout razonable
 
-        // ✅ Corregido el uso de 'id' por 'videoId' para evitar el ReferenceError
+        // ✅ CORREGIDO: Usamos videoId en lugar del id inexistente
         const urlLetras = encodeURIComponent(`https://lyric.sys-lab.app/get-lyrics?id=${videoId}`);
         
         try {
+            // Apuntamos a tu endpoint local que procesará la petición en tu VPS de Oracle
             const res = await fetch(`/cors-proxy?url=${urlLetras}`, { signal: ctrl.signal });
             clearTimeout(timeoutId);
-            const data = await res.json();
             
-            if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
+            if (!res.ok) throw new Error(`Proxy HTTP error: ${res.status}`);
+            
+            const data = await res.json();
+            if (data.status !== 'success' || !data.data) throw new Error('Oracle: Letras no encontradas en este video');
+            
             return { 
                 syncedLyrics: data.data, 
                 plainLyrics: data.data.replace(/\[.*?\]/g, ''), 
@@ -455,41 +470,42 @@ window.lyricsService = {
             };
         } catch (e) {
             clearTimeout(timeoutId);
+            console.warn(`⚠️ Proveedor Oracle falló para el video ${videoId}:`, e.message);
             throw e;
         }
     },
 
     async fetchFromLrclib(clean) {
-    // Función interna para limpiar términos basura de YouTube
-    const limpiarTextoYT = (texto) => {
-        if (!texto) return '';
-        return texto
-            .replace(/\(.*?\)/g, '')  // Borra todo lo que esté entre paréntesis (Ej: Letra Oficial)
-            .replace(/\[.*?\]/g, '')  // Borra todo lo que esté entre corchetes (Ej: Video Oficial)
-            .replace(/\s-/g, '')      // Remueve guiones sueltos
-            .replace(/(oficial|official|lyric|letra|video|hd|4k|en vivo|live)/gi, '') // Palabras clave comunes
-            .trim();
-    };
+        // Función de limpieza profunda para quitar estorbos de los títulos de YouTube
+        const limpiarTerminosBasura = (texto) => {
+            if (!texto) return '';
+            return texto
+                .replace(/\(.*?\)/g, '')  // Elimina paréntesis (Ej: Video Oficial)
+                .replace(/\[.*?\]/g, '')  // Elimina corchetes
+                .replace(/\s-/g, '')      // Elimina guiones intermedios sueltos
+                .replace(/“|”|"/g, '')    // Elimina comillas decorativas del artista
+                .replace(/(oficial|official|lyric|letra|video|hd|4k|en vivo|live|la reina)/gi, '') 
+                .trim();
+        };
 
-    const artistaLimpio = limpiarTextoYT(clean.artist);
-    const tituloLimpio = limpiarTextoYT(clean.title);
+        const artistaLimpio = limpiarTerminosBasura(clean.artist);
+        const tituloLimpio = limpiarTerminosBasura(clean.title);
+        
+        const q = encodeURIComponent(`${artistaLimpio} ${tituloLimpio}`);
+        console.log(`🔍 Query alternativo para LRCLIB: "https://lrclib.net/api/search?q=${q}"`);
 
-    // Concatenamos de forma limpia para asegurar que LRCLIB encuentre el tema exacto
-    const q = encodeURIComponent(`${artistaLimpio} ${tituloLimpio}`);
-    
-    console.log(`🔍 Buscando letras optimizadas en LRCLIB con el query: ${artistaLimpio} ${tituloLimpio}`);
-
-    const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
-    const data = await res.json();
-    
-    if (!data?.length) throw new Error('LRCLIB: no encontrado');
-    
-    return { 
-        syncedLyrics: data[0].syncedLyrics, 
-        plainLyrics: data[0].plainLyrics, 
-        provider: 'LRCLib' 
-    };
-}
+        const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
+        if (!res.ok) throw new Error(`LRCLIB HTTP Error: ${res.status}`);
+        
+        const data = await res.json();
+        if (!data?.length) throw new Error('LRCLIB: Letra no encontrada con términos limpios');
+        
+        return { 
+            syncedLyrics: data[0].syncedLyrics, 
+            plainLyrics: data[0].plainLyrics, 
+            provider: 'LRCLib' 
+        };
+    }
 };
 
 // ============================================================================
