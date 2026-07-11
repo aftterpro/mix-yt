@@ -10,7 +10,40 @@ constructor() {
         this.initialized = true;
         return true;
     }
+    const CACHE_EXPIRATION_TIME = 1000 * 60 * 10; // 10 Minutos en milisegundos
+
+async function buscarVideosConCache(termino) {
+    const cacheKey = `search_cache_${termino.trim().toLowerCase()}`;
+    const cacheGuardada = localStorage.getItem(cacheKey);
     
+    if (cacheGuardada) {
+        const dataParsed = JSON.parse(cacheGuardada);
+        // Verificamos si la caché aún no ha expirado
+        if (Date.now() - dataParsed.timestamp < CACHE_EXPIRATION_TIME) {
+            console.log("Retornando resultados desde la caché local...");
+            return dataParsed.resultados;
+        }
+    }
+    
+    // Si no hay caché o expiró, hacemos el fetch a nuestra Serverless Function
+    try {
+        const respuesta = await fetch(`/api/search?q=${encodeURIComponent(termino)}`);
+        const resultados = await respuesta.json();
+        
+        // Guardamos los datos nuevos junto con la marca de tiempo actual
+        const objetoCache = {
+            timestamp: Date.now(),
+            resultados: resultados
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(objetoCache));
+        
+        return resultados;
+    } catch (error) {
+        console.error("Error consultando la función de búsqueda:", error);
+        throw error;
+    }
+}
+        
 async search(query) {
     const cleanQuery = query.trim();
     if (!cleanQuery) return { items: [] };
@@ -65,6 +98,83 @@ async fetchWithRetry(url, attempt = 1) {
             return this.fetchWithRetry(url, attempt + 1);
         }
     }
+        // --- DEBOUNCE (Para optimizar la barra de búsqueda en tiempo real) ---
+function debounce(fn, delay) {
+    let timeoutId;
+    return function (...args) {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+            fn.apply(this, args);
+        }, delay);
+    };
+}
+
+// Ejemplo de uso asociado a un input de búsqueda
+const inputBusqueda = document.getElementById('search-input');
+if (inputBusqueda) {
+    inputBusqueda.addEventListener('input', debounce((e) => {
+        ejecutarBusquedaAPI(e.target.value);
+    }, 400)); // Espera 400ms tras dejar de escribir
+}
+
+
+// --- EVITAR REFLOW CON DOCUMENT FRAGMENT ---
+function renderizarResultadosVideo(videos, contenedorId) {
+    const contenedor = document.getElementById(contenedorId);
+    if (!contenedor) return;
+    
+    // Limpiamos el contenedor original una sola vez
+    contenedor.innerHTML = ''; 
+    
+    // Creamos el fragmento en memoria virtual
+    const fragmento = document.createDocumentFragment();
+    
+    videos.forEach(video => {
+        // Creamos la estructura del nodo limpiamente en memoria
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        
+        // Atributo loading="lazy" inyectado directamente en las miniaturas
+        card.innerHTML = `
+            <div class="thumbnail-wrapper">
+                <img src="${video.thumbnail}" alt="${video.title}" loading="lazy" />
+            </div>
+            <div class="video-info">
+                <h3>${video.title}</h3>
+                <p>${video.channelTitle}</p>
+            </div>
+        `;
+        
+        // Adjuntamos al fragmento virtual, NO al DOM real todavía
+        fragmento.appendChild(card);
+    });
+    
+    // Insertamos todo el bloque procesado al DOM real en una única operación
+    contenedor.appendChild(fragmento);
+}
+function inicializarLazyCards() {
+    const opciones = {
+        root: null, // usa el viewport actual
+        rootMargin: '200px 0px', // Carga elementos 200px antes de que aparezcan
+        threshold: 0.01
+    };
+
+    const observador = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            const cardInner = entry.target.querySelector('.card-content-delayed');
+            if (entry.isIntersecting) {
+                // El elemento es visible o está cerca: renderizamos o mostramos contenido
+                if (cardInner) cardInner.style.display = 'block';
+            } else {
+                // El elemento salió del área: ocultamos para liberar memoria gráfica
+                if (cardInner) cardInner.style.display = 'none';
+            }
+        });
+    }, opciones);
+
+    // Registramos todas las tarjetas actuales
+    document.querySelectorAll('.video-card').forEach(card => observador.observe(card));
+}
 }
 // =============================================
 // SPONSORBLOCK - Sistema de Detección y Salto
