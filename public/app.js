@@ -1370,8 +1370,9 @@ class LyricsManager {
         if (!videoId) throw new Error('Sin videoId');
         const ctrl = new AbortController();
         setTimeout(() => ctrl.abort(), 65000);
-        const res = await fetch(`https://lyric.sys-lab.app/get-lyrics?id=${videoId}`, { signal: ctrl.signal });
-        const data = await res.json();
+        const urlLetras = encodeURIComponent(`https://lyric.sys-lab.app/get-lyrics?id=${id}`);
+       const res = await fetch(`/cors-proxy?url=${urlLetras}`);
+       const data = await res.json();
         if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
         return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
     }
