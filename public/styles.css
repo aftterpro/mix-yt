@@ -15,8 +15,6 @@
     --spotify-text-secondary: #b3b3b3;
     --spotify-accent: #1DB954;
     --spotify-accent-dark: #158f3e;
-   --spotify-border: rgba(255, 255, 255, 0.15);  
-    --spotify-dark: #121212;  
     --font-main: 'Circular', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     --transition-fast: 0.15s ease;
     --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
