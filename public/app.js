@@ -135,7 +135,8 @@ class NowPlayingManager {
             window.colorEngine.applyPalette(palette);
         });
     }
-function activateTab(tabName) {
+    
+   activateTab(tabName) {
     const target = document.getElementById(`tab-${tabName}`);
     if (!target) return;
 
