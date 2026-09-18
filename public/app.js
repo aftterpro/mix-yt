@@ -136,24 +136,6 @@ class NowPlayingManager {
         });
     }
     
-   activateTab(tabName) {
-    const target = document.getElementById(`tab-${tabName}`);
-    if (!target) return;
-
-    document.querySelectorAll('.tab-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.tab === tabName));
-
-    document.querySelectorAll('.tab-content').forEach(c => {
-        const isActive = c === target;
-        c.classList.toggle('active', isActive);
-        // Evita que un tab oculto conserve scroll y "empuje" al panel
-        if (!isActive) c.scrollTop = 0;
-    });
-
-    // Reinicia el scroll del contenedor interno al cambiar de pestaña
-    const scroller = target.querySelector('#playlistContainer, .lyrics-container, #relatedVideosList, #user-playlists-overview');
-    if (scroller) scroller.scrollTop = 0;
-}
       createNowPlayingUI() {
         const panel = document.getElementById('player-panel');
         if (!panel || document.getElementById('spotify-now-playing')) return;
@@ -1210,6 +1192,24 @@ const performSearch = async (query) => {
 // =============================================
 // UTILIDADES
 // =============================================
+activateTab(tabName) {
+    const target = document.getElementById(`tab-${tabName}`);
+    if (!target) return;
+
+    document.querySelectorAll('.tab-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.tab === tabName));
+
+    document.querySelectorAll('.tab-content').forEach(c => {
+        const isActive = c === target;
+        c.classList.toggle('active', isActive);
+        
+        if (!isActive) c.scrollTop = 0;
+    });
+
+    const scroller = target.querySelector('#playlistContainer, .lyrics-container, #relatedVideosList, #user-playlists-overview');
+    if (scroller) scroller.scrollTop = 0;
+}
+
 function applyLayoutFix() {
     if (document.getElementById('layout-fix-styles')) return;
 
