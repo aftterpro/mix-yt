@@ -1210,6 +1210,111 @@ const performSearch = async (query) => {
 // =============================================
 // UTILIDADES
 // =============================================
+function applyLayoutFix() {
+    if (document.getElementById('layout-fix-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'layout-fix-styles';
+    style.textContent = `
+        /* ---- 1 sola caja de scroll: el documento NO scrollea ---- */
+        html { height: 100%; }
+        body {
+            height: 100dvh;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header { flex: 0 0 auto; position: static; }
+        footer, body > hr { flex: 0 0 auto; }
+
+        /* El main ocupa lo que sobre, sin calc() hardcodeado */
+        main {
+            flex: 1 1 auto;
+            height: auto !important;
+            max-height: none !important;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        main > section {
+            height: auto;
+            max-height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* ---- Panel central: una sola barra, video acotado ---- */
+        #player-panel { position: relative; min-height: 0; }
+
+        #spotify-now-playing {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        .np-artwork-container {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            max-height: 40vh;
+            max-width: calc(40vh * 16 / 9);
+            margin-inline: auto;
+            flex-shrink: 0;
+        }
+
+        /* El contenedor huérfano de index.html no debe ocupar layout */
+        #player-panel > #videoContainer:not(.np-artwork-container > #videoContainer) {
+            display: none;
+        }
+
+        /* ---- Biblioteca: el panel no scrollea, solo la lista interna ---- */
+        #playlist-panel { min-height: 0; }
+        .panel-header-tabs, .tabs-container { flex: 0 0 auto; }
+
+        .tab-content {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: hidden !important;
+        }
+        .tab-content.active { display: flex; flex-direction: column; }
+
+        #tab-lyrics, #tab-related, #tab-cola, #tab-yt-playlists {
+            height: auto !important;
+            min-height: 0;
+        }
+
+        #playlistContainer,
+        .lyrics-container,
+        #relatedVideosList,
+        #user-playlists-overview,
+        #details-video-list-container,
+        #resultsContainer {
+            flex: 1 1 auto;
+            height: auto !important;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+
+        #user-playlist-details {
+            flex: 1 1 auto;
+            min-height: 0;
+            flex-direction: column;
+        }
+        #user-playlist-details[style*="flex"] { display: flex !important; }
+
+        /* ---- Responsive: aquí SÍ scrollea el documento ---- */
+        @media (max-width: 1100px) {
+            body { height: auto; min-height: 100dvh; overflow-y: auto; }
+            main { overflow: visible; }
+            main > section { max-height: none; }
+            .np-artwork-container { max-height: 32vh; max-width: calc(32vh * 16 / 9); }
+        }
+    `;
+    document.head.appendChild(style);
+}
 function formatDuration(duration) {
     if (isNaN(duration) || duration < 0) return '0:00';
     const h = Math.floor(duration / 3600);
