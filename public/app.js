@@ -1192,7 +1192,8 @@ const performSearch = async (query) => {
 // =============================================
 // UTILIDADES
 // =============================================
-activateTab(tabName) {
+
+function activateTab(tabName) {
     const target = document.getElementById(`tab-${tabName}`);
     if (!target) return;
 
