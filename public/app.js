@@ -1419,9 +1419,11 @@ function setupEventListeners() {
         if (e.code === 'ArrowLeft') playPrevVideo();
     });
 }
+
 // =============================================
-// LETRAS CON TRADUCTOR
+// LETRAS CON TRADUCTOR 
 // =============================================
+
 class LyricsManager {
     constructor() {
         this.currentLrc = [];
@@ -1436,14 +1438,30 @@ class LyricsManager {
     cleanData(video) {
         let artist = (video.artist || video.uploaderName || video.author || '')
             .replace(/VEVO$/i, '').replace(/\s*-\s*Topic$/i, '').replace(/Official/i, '').trim();
+        
         let title = (video.title || '')
-            .replace(/[\(\[](official|video|audio|lyric|hd|hq|remix|4k|mv|en vivo|live).*?[\)\]]/gi, '').trim();
-        if (title.includes(' - ')) {
-            const [p0, p1] = title.split(' - ');
-            if (p0.toLowerCase().includes(artist.toLowerCase().split(' ')[0])) { artist = p0.trim(); title = p1.trim(); }
+            .replace(/[\(\[](official\vert{}video\vert{}audio\vert{}lyric\vert{}hd\vert{}hq\vert{}remix\vert{}4k\vert{}mv\vert{}en vivo\vert{}live).*?[\)\]]/gi, '').trim();
+        
+        // Evitar duplicaciones de artista en el título (ej: "Luis Fonsi Luis Fonsi - Nada Es Para Siempre")
+        if (artist && title.toLowerCase().includes(artist.toLowerCase())) {
+            title = title.replace(new RegExp(artist, 'gi'), '').replace(/^[\s\-–—]+|[\s\-–—]+$/g, '').trim();
         }
+
+        if (title.includes(' - ')) {
+            const parts = title.split(' - ');
+            if (parts.length > 1 && parts[0].toLowerCase().includes(artist.toLowerCase().split(' ')[0])) {
+                artist = parts[0].trim();
+                title = parts.slice(1).join(' - ').trim();
+            }
+        }
+
         title = title.split(/\s(\(|\[)?(ft\.|feat\.|starring)/i)[0].trim();
         artist = artist.split(/\s(\(|\[)?(ft\.|feat\.|,|&|y\s)/i)[0].trim();
+        
+        // Limpiar espacios múltiples que causan URLs mal formadas
+        artist = artist.replace(/\s+/g, ' ');
+        title = title.replace(/\s+/g, ' ');
+
         let duration = typeof video.duration === 'number' ? video.duration : parseDuration(video.duration || '');
         return { artist, title, duration: Math.round(duration) };
     }
@@ -1486,21 +1504,45 @@ class LyricsManager {
         let videoId = null;
         try { videoId = activePlayer?.getVideoData()?.video_id; } catch {}
         if (!videoId) throw new Error('Sin videoId');
-        const ctrl = new AbortController();
-        setTimeout(() => ctrl.abort(), 65000);
-        const urlLetras = encodeURIComponent(`https://lyric.sys-lab.app/get-lyrics?id=${id}`);
-       const res = await fetch(`/cors-proxy?url=${urlLetras}`);
-       const data = await res.json();
+        
+        const urlLetras = encodeURIComponent(`https://lyric.sys-lab.app/get-lyrics?id=${videoId}`);
+        const res = await fetch(`/cors-proxy?url=${urlLetras}`);
+        const data = await res.json();
         if (data.status !== 'success' || !data.data) throw new Error('Oracle: no encontrado');
         return { syncedLyrics: data.data, plainLyrics: data.data.replace(/\[.*?\]/g, ''), provider: 'YT-Subtitles' };
     }
 
-    async fetchFromLrclib(clean) {
-        const q = encodeURIComponent(`${clean.artist} ${clean.title}`);
-        const res = await fetch(`https://lrclib.net/api/search?q=${q}`);
-        const data = await res.json();
-        if (!data?.length) throw new Error('LRCLIB: no encontrado');
-        return { syncedLyrics: data[0].syncedLyrics, plainLyrics: data[0].plainLyrics, provider: 'LRCLib' };
+    async fetchFromLrclib(clean, retries = 3, delay = 1000) {
+        const queryStr = `${clean.artist} ${clean.title}`.trim();
+        const q = encodeURIComponent(queryStr);
+        const url = `https://lrclib.net/api/search?q=${q}`;
+
+        for (let i = 0; i < retries; i++) {
+            try {
+                const res = await fetch(url);
+                
+                // Si hay error 503 u otro error de servidor, reintentar tras una espera
+                if (res.status >= 500 && i < retries - 1) {
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                    continue;
+                }
+
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+                const data = await res.json();
+                if (!data?.length) throw new Error('LRCLIB: no encontrado');
+                
+                return { 
+                    syncedLyrics: data[0].syncedLyrics, 
+                    plainLyrics: data[0].plainLyrics, 
+                    provider: 'LRCLib' 
+                };
+            } catch (error) {
+                if (i === retries - 1) throw error;
+                await new Promise(res => setTimeout(res, delay));
+            }
+        }
     }
 
     prefetchNext() {
@@ -1517,7 +1559,6 @@ class LyricsManager {
         const isSynced = data.syncedLyrics?.includes('[');
         container.innerHTML = '';
 
-        // Header con botón traductor
         container.innerHTML = `
             <div class="lyrics-header">
                 <div style="flex:1">
@@ -1534,12 +1575,10 @@ class LyricsManager {
             </div>
         `;
 
-        // Guardar líneas originales para poder revertir
         if (isSynced) {
             this.originalLines = this.currentLrc.map(l => l.text);
         }
 
-        // Botón traductor
         document.getElementById('btn-translate-lyrics')?.addEventListener('click', () => {
             this.toggleTranslation(data, isSynced);
         });
@@ -1560,7 +1599,6 @@ class LyricsManager {
                 body.innerHTML = isSynced ? this.renderSynced(data.syncedLyrics) : this.renderPlain(data.plainLyrics);
                 if (isSynced) this.startSync();
             }
-            mostrarMensajeFlotante('🔤 Letra original');
             return;
         }
 
@@ -1609,10 +1647,8 @@ class LyricsManager {
             this.isTranslated = true;
             btn.classList.add('active');
             btn.title = 'Ver original';
-            mostrarMensajeFlotante('🌐 Traducido al español');
         } catch (e) {
             console.error('Error traducción:', e);
-            mostrarMensajeFlotante('❌ ' + (e.message || 'Error al traducir'));
         } finally {
             btn.innerHTML = '<i class="fas fa-language"></i>';
             btn.disabled = false;
@@ -1620,7 +1656,6 @@ class LyricsManager {
     }
 
     async _translateLines(lines) {
-        // Chunks de 15 líneas para no exceder límites
         const chunkSize = 15;
         const chunks = [];
         for (let i = 0; i < lines.length; i += chunkSize) {
@@ -1637,84 +1672,14 @@ class LyricsManager {
     async _translateChunk(lines) {
         const SEP = '\n||||\n';
         const text = lines.join(SEP);
-
-        // Intentar APIs en orden
-        const apis = [
-            () => this._translateGoogle(lines),
-            () => this._translateLingva(text, SEP, lines),
-            () => this._translateMyMemory(text, SEP, lines),
-        ];
-
-        for (const apiFn of apis) {
-            try {
-                const result = await apiFn();
-                if (result && result.length >= Math.floor(lines.length * 0.5)) {
-                    // Rellenar líneas faltantes con originales
-                    while (result.length < lines.length) result.push(lines[result.length]);
-                    return result.slice(0, lines.length);
-                }
-            } catch (e) {
-                console.warn('API de traducción falló, probando siguiente:', e.message);
-            }
-        }
-        return lines; // fallback: originales
-    }
-
-    // Google Translate no oficial (cliente gtx)
-    async _translateGoogle(lines) {
-        const results = [];
-        const batchSize = 5;
-        for (let i = 0; i < lines.length; i += batchSize) {
-            const batch = lines.slice(i, i + batchSize);
-            const text = batch.join('\n');
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(text)}`;
-            const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
-            if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
-            const json = await res.json();
-            // json[0] es array de segmentos traducidos
-            const translated = (json[0] || []).map(seg => seg[0] || '').join('');
-            const translatedBatch = translated.split('\n');
-            // Asegurar mismo número de líneas que el batch
-            while (translatedBatch.length < batch.length) translatedBatch.push(batch[translatedBatch.length] || '');
-            results.push(...translatedBatch.slice(0, batch.length));
-            if (i + batchSize < lines.length) await new Promise(r => setTimeout(r, 150));
-        }
-        return results;
-    }
-
-    // Lingva Translate (instancias públicas open source)
-    async _translateLingva(text, sep, lines) {
-        const instances = ['https://lingva.ml', 'https://lingva.thedaviddelta.com'];
-        for (const base of instances) {
-            try {
-                const url = `${base}/api/v1/auto/es/${encodeURIComponent(text)}`;
-                const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-                if (!res.ok) continue;
-                const json = await res.json();
-                if (!json.translation) continue;
-                const parts = json.translation.split(sep).map(p => p.trim()).filter(Boolean);
-                if (parts.length >= Math.floor(lines.length * 0.5)) return parts;
-            } catch (e) { /* probar siguiente */ }
-        }
-        throw new Error('Lingva: todas las instancias fallaron');
-    }
-
-    // MyMemory API
-    async _translateMyMemory(text, sep, lines) {
-        // MyMemory funciona mejor con textos cortos
-        const short = text.substring(0, 450);
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(short)}&langpair=en|es`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!res.ok) throw new Error(`MyMemory HTTP ${res.status}`);
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(text)}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+        if (!res.ok) throw new Error(`Google HTTP ${res.status}`);
         const json = await res.json();
-        const status = parseInt(json.responseStatus);
-        if (status !== 200) throw new Error('MyMemory: ' + json.responseDetails);
-        const translated = json.responseData?.translatedText || '';
-        if (!translated || translated.includes('MYMEMORY WARNING')) throw new Error('MyMemory: cuota');
-        const parts = translated.split(sep).map(p => p.trim()).filter(Boolean);
-        if (parts.length >= Math.floor(lines.length * 0.5)) return parts;
-        // Si no separó bien, devolver como una sola línea
-        return [translated];
+        const translated = (json[0] || []).map(seg => seg[0] || '').join('');
+        const translatedBatch = translated.split('\n');
+        while (translatedBatch.length < lines.length) translatedBatch.push(lines[translatedBatch.length] || '');
+        return translatedBatch.slice(0, lines.length);
     }
 
     renderSynced(lrc) {
@@ -1769,7 +1734,6 @@ class LyricsManager {
         return s.replace(/[&<>'"]/g, t => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[t] || t));
     }
 }
-
 // =============================================
 // RELACIONADOS — usa la misma API de búsqueda
 // =============================================
