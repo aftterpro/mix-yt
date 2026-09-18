@@ -135,15 +135,44 @@ class NowPlayingManager {
             window.colorEngine.applyPalette(palette);
         });
     }
+function activateTab(tabName) {
+    const target = document.getElementById(`tab-${tabName}`);
+    if (!target) return;
 
-    createNowPlayingUI() {
+    document.querySelectorAll('.tab-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.tab === tabName));
+
+    document.querySelectorAll('.tab-content').forEach(c => {
+        const isActive = c === target;
+        c.classList.toggle('active', isActive);
+        // Evita que un tab oculto conserve scroll y "empuje" al panel
+        if (!isActive) c.scrollTop = 0;
+    });
+
+    // Reinicia el scroll del contenedor interno al cambiar de pestaña
+    const scroller = target.querySelector('#playlistContainer, .lyrics-container, #relatedVideosList, #user-playlists-overview');
+    if (scroller) scroller.scrollTop = 0;
+}
+      createNowPlayingUI() {
         const panel = document.getElementById('player-panel');
+        if (!panel || document.getElementById('spotify-now-playing')) return;
 
-        // Mover videoContainer al DOM principal primero (si aún está en body)
-        const existingVC = document.getElementById('videoContainer');
-        if (existingVC && existingVC.parentElement !== document.body) {
-            // ya está, no mover
+        // Rescatamos el contenedor de video original (no lo recreamos: IDs duplicados)
+        let videoContainer = document.getElementById('videoContainer');
+        if (!videoContainer) {
+            videoContainer = document.createElement('div');
+            videoContainer.id = 'videoContainer';
+            videoContainer.innerHTML = `
+                <div id="player1" class="video-player"></div>
+                <div id="player2" class="video-player"></div>`;
         }
+        // Limpiamos los estilos inline que lo escondían fuera del flujo
+        videoContainer.removeAttribute('style');
+        videoContainer.remove();
+
+        const p2 = videoContainer.querySelector('#player2');
+        if (p2) p2.style.cssText =
+            'opacity:0;visibility:hidden;pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%;';
 
         const spotifyPanel = document.createElement('div');
         spotifyPanel.id = 'spotify-now-playing';
@@ -151,10 +180,6 @@ class NowPlayingManager {
             <div id="now-playing-bg"></div>
             <div class="np-artwork-container">
                 <div class="np-artwork-shadow"></div>
-                <div id="videoContainer">
-                    <div id="player1" class="video-player"></div>
-                    <div id="player2" class="video-player" style="opacity:0;visibility:hidden;pointer-events:none;position:absolute;top:0;left:0;width:100%;height:100%;"></div>
-                </div>
                 <div class="np-artwork-overlay"></div>
             </div>
             <div class="np-info">
@@ -193,66 +218,56 @@ class NowPlayingManager {
                 </div>
             </div>
         `;
+
+        // Insertamos el contenedor de video ORIGINAL dentro del artwork
+        const artwork = spotifyPanel.querySelector('.np-artwork-container');
+        artwork.insertBefore(videoContainer, artwork.querySelector('.np-artwork-overlay'));
+
         panel.prepend(spotifyPanel);
 
-        const style = document.createElement('style');
-        style.textContent = `
-            #spotify-now-playing {
-                position: relative;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                padding: 16px 16px 12px;
-                gap: 12px;
-                flex: 1;
-                overflow-y: auto;
-                min-height: 0;
-            }
-            #now-playing-bg {
-                position: absolute;
-                inset: 0;
-                pointer-events: none;
-                z-index: 0;
-            }
-            .np-artwork-container {
-                position: relative;
-                width: 100%;
-                aspect-ratio: 16/9;
-                flex-shrink: 0;
-                z-index: 1;
-                border-radius: 10px;
-                overflow: hidden;
-                background: #000;
-            }
-            #videoContainer {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-                z-index: 1;
-                border-radius: 10px;
-                overflow: hidden;
-                background: #000;
-            }
-            .video-player {
-                position: absolute;
-                top: 0; left: 0;
-                width: 100%; height: 100%;
-            }
-            .np-artwork-overlay {
-                position: absolute;
-                inset: 0;
-                border-radius: 10px;
-                background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%);
-                pointer-events: none;
-                z-index: 2;
-            }
-            .np-info {
-                width: 100%;
-                position: relative;
-                z-index: 1;
-            }
-        `;
-        document.head.appendChild(style);
+        // Estilos propios del componente (sin reglas de scroll: eso lo maneja applyLayoutFix)
+        if (!document.getElementById('now-playing-styles')) {
+            const style = document.createElement('style');
+            style.id = 'now-playing-styles';
+            style.textContent = `
+                #spotify-now-playing {
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 12px 14px 10px;
+                    gap: 10px;
+                }
+                #now-playing-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+                .np-artwork-container {
+                    position: relative;
+                    z-index: 1;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: #000;
+                }
+                #videoContainer {
+                    position: absolute;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                    z-index: 1;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: #000;
+                    opacity: 1;
+                    pointer-events: auto;
+                }
+                .video-player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+                .np-artwork-overlay {
+                    position: absolute; inset: 0; border-radius: 10px;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%);
+                    pointer-events: none; z-index: 2;
+                }
+                .np-info { width: 100%; position: relative; z-index: 1; }
+            `;
+            document.head.appendChild(style);
+        }
 
         this.setupControls();
         this.setupProgressBarScrubbing();
@@ -1273,6 +1288,7 @@ function setupEventListeners() {
         if (info?.items?.length) {
             displayPlaylist(info);
             if (input) input.value = '';
+            activateTab('cola');
         } else {
             mostrarMensajeFlotante('❌ No se pudo cargar la playlist');
         }
@@ -1283,24 +1299,19 @@ function setupEventListeners() {
         if (reproduccionIniciada) playNextVideo();
     });
 
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            btn.classList.add('active');
-            const target = document.getElementById(`tab-${btn.dataset.tab}`);
-            if (target) target.classList.add('active');
-        });
+    // Delegación: funciona también con tabs añadidos después
+    document.querySelector('.tabs-container')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tab-btn');
+        if (btn?.dataset.tab) activateTab(btn.dataset.tab);
     });
 
     document.addEventListener('keydown', (e) => {
-        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
         if (e.code === 'Space') { e.preventDefault(); document.getElementById('np-play-pause-btn')?.click(); }
         if (e.code === 'ArrowRight') playNextVideo();
         if (e.code === 'ArrowLeft') playPrevVideo();
     });
 }
-
 // =============================================
 // LETRAS CON TRADUCTOR
 // =============================================
@@ -1751,6 +1762,7 @@ class RelatedManager {
 // =============================================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 YT CrossMix iniciando...');
+    applyLayoutFix();                                   
     if (window.youtubeJSClient) await window.youtubeJSClient.init();
     window.nowPlayingManager = new NowPlayingManager();
     window.lyricsManager = new LyricsManager();
@@ -1759,4 +1771,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadYouTubeAPI();
     setupEventListeners();
     updatePlaylistDOM();
+    activateTab('cola');
 });
